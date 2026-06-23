@@ -1,0 +1,61 @@
+@import "tailwindcss";
+
+/* ===== Kalendar design tokens — tema "Clínico" (default) ===== */
+:root {
+  --color-bg: #f3f6f8;
+  --color-surface: #ffffff;
+  --color-surface-2: #eef3f6;
+  --color-ink: #0f1f2e;
+  --color-ink-soft: #5a6b78;
+  --color-line: #e4ebf0;
+
+  --color-brand: #0d9488;
+  --color-brand-weak: #e3f3f1;
+  --color-brand-line: #bfe3de;
+  --color-brand-ink: #0a5c54;
+
+  --color-error: #e0506a;
+  --color-error-weak: #fbe6ea;
+
+  --shadow-card: 0 12px 40px rgba(15, 31, 46, 0.09);
+  --shadow-sm: 0 1px 3px rgba(15, 31, 46, 0.06);
+}
+
+@theme inline {
+  --color-bg: var(--color-bg);
+  --color-surface: var(--color-surface);
+  --color-surface-2: var(--color-surface-2);
+  --color-ink: var(--color-ink);
+  --color-ink-soft: var(--color-ink-soft);
+  --color-line: var(--color-line);
+
+  --color-brand: var(--color-brand);
+  --color-brand-weak: var(--color-brand-weak);
+  --color-brand-line: var(--color-brand-line);
+  --color-brand-ink: var(--color-brand-ink);
+
+  --color-error: var(--color-error);
+  --color-error-weak: var(--color-error-weak);
+
+  --font-display: var(--font-bricolage);
+  --font-ui: var(--font-jakarta);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+h1, h2, h3 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+::selection {
+  background: color-mix(in oklab, var(--color-brand) 25%, white);
+}
+
+/* Native select arrow can look inconsistent across browsers — keep it simple */
+select {
+  font-family: inherit;
+}
