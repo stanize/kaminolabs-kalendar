@@ -1,6 +1,9 @@
-import Link from "next/link";
+"use client";
+
+import { useRouter } from "next/navigation";
 import { Btn } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
+import { skipOnboarding } from "@/lib/actions/skip-onboarding";
 
 export function NavBtns({
   paso,
@@ -17,8 +20,15 @@ export function NavBtns({
   loading?: boolean;
   errorMsg?: string | null;
 }) {
+  const router = useRouter();
+
   // Step 0 is Google-only — no nav buttons needed
   if (paso === 0) return null;
+
+  async function handleMasTarde() {
+    await skipOnboarding();
+    router.push("/panel");
+  }
 
   return (
     <div className="mt-[26px] border-t border-line pt-[22px]">
@@ -28,16 +38,17 @@ export function NavBtns({
         </p>
       )}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
           <Btn variant="ghost" onClick={back} disabled={loading}>
             <Icon name="chevronLeft" size={17} /> Atrás
           </Btn>
-          <Link
-            href="/panel"
+          <button
+            type="button"
+            onClick={handleMasTarde}
             className="text-[13.5px] font-medium text-ink-soft transition-colors duration-150 hover:text-ink"
           >
             Más tarde
-          </Link>
+          </button>
         </div>
         <Btn onClick={next} disabled={!canNext || loading}>
           {loading ? "Creando…" : paso === 4 ? "Crear mi página" : "Continuar"}
