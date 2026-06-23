@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 
 export function StepCuenta() {
   const [cargando, setCargando] = useState(false);
@@ -11,22 +12,25 @@ export function StepCuenta() {
     setCargando(true);
 
     try {
-      // Build the OAuth URL manually through our proxied /auth/v1 endpoint.
-      // This makes Google show kalendar.kaminolabs.dev on the consent screen
-      // instead of the raw Supabase project URL.
+      const supabase = createClient();
       const redirectTo = `${window.location.origin}/auth/callback?next=/onboarding`;
-      const params = new URLSearchParams({
+
+      // Get the OAuth URL from the Supabase client (includes PKCE code_challenge etc.)
+      const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: "google",
-        redirect_to: redirectTo,
+        options: {
+          redirectTo,
+          skipBrowserRedirect: true, // give us the URL instead of redirecting
+        },
       });
 
-      // Hit our Next.js rewrite proxy instead of Supabase directly
-      const res = await fetch(`/auth/v1/authorize?${params.toString()}`);
+      if (oauthError || !data?.url) throw oauthError ?? new Error("No URL returned");
 
-      if (!res.ok) throw new Error("authorize failed");
+      // Swap the Supabase host for our proxy so Google sees kaminolabs.dev
+      const original = new URL(data.url);
+      const proxied = new URL(original.pathname + original.search, window.location.origin);
 
-      // The response is a redirect — follow it
-      window.location.href = res.url;
+      window.location.href = proxied.toString();
     } catch {
       setError("No se pudo conectar con Google. Inténtalo de nuevo.");
       setCargando(false);
