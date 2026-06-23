@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Btn } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 
@@ -16,7 +17,7 @@ export function NavBtns({
   loading?: boolean;
   errorMsg?: string | null;
 }) {
-  // Step 0 is Google-only — no Continuar button needed
+  // Step 0 is Google-only — no nav buttons needed
   if (paso === 0) return null;
 
   return (
@@ -27,13 +28,17 @@ export function NavBtns({
         </p>
       )}
       <div className="flex items-center justify-between">
-        {paso > 0 ? (
+        <div className="flex items-center gap-3">
           <Btn variant="ghost" onClick={back} disabled={loading}>
             <Icon name="chevronLeft" size={17} /> Atrás
           </Btn>
-        ) : (
-          <span />
-        )}
+          <Link
+            href="/panel"
+            className="text-[13.5px] font-medium text-ink-soft transition-colors duration-150 hover:text-ink"
+          >
+            Más tarde
+          </Link>
+        </div>
         <Btn onClick={next} disabled={!canNext || loading}>
           {loading ? "Creando…" : paso === 4 ? "Crear mi página" : "Continuar"}
           {!loading && <Icon name="arrowRight" size={17} />}
