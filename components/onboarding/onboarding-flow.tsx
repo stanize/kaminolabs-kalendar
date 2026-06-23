@@ -40,7 +40,9 @@ export function OnboardingFlow() {
     authClient.getSession().then(({ data: session }) => {
       if (session?.user) {
         const name = session.user.name ?? "";
-        setUserName(name);
+        // Use only the first name for the greeting
+        const firstName = name.split(" ")[0] ?? name;
+        setUserName(firstName);
         if (!d.account.googleAuthed) {
           setGoogleAuthed(name, session.user.email ?? "");
           if (paso === 0) goTo(1);
@@ -52,10 +54,9 @@ export function OnboardingFlow() {
 
   const canNext = canAdvance(paso, d);
 
-  // Dynamic title for step 1: personalised greeting with full name from Google
   const meta = PASOS[paso];
   const titulo = paso === 1 && userName
-    ? `¡Bienvenido/a, ${userName}!`
+    ? `¡Hola, ${userName}!`
     : meta.titulo;
   const sub = paso === 1 && userName
     ? "Cuéntanos un poco sobre tu negocio."
