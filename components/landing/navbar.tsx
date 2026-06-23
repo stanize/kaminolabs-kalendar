@@ -21,9 +21,9 @@ export function Navbar() {
         </nav>
 
         <div className="flex items-center gap-3">
-          {/* TODO: enlazar a una página de inicio de sesión dedicada cuando exista el panel */}
+          {/* /panel redirects to /onboarding if no session, or shows the panel if logged in */}
           <Link
-            href="/onboarding"
+            href="/panel"
             className="hidden text-[14.5px] font-semibold text-ink-soft transition-colors hover:text-ink sm:inline"
           >
             Iniciar sesión
