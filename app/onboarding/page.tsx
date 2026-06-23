@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
-import { createClient } from "@/lib/supabase/server";
 import type { Metadata } from "next";
 import { OnboardingFlow } from "@/components/onboarding/onboarding-flow";
 
@@ -10,22 +9,15 @@ export const metadata: Metadata = {
 };
 
 export default async function OnboardingPage() {
-  const session = await auth.api.getSession({ headers: await headers() });
+  try {
+    const session = await auth.api.getSession({ headers: await headers() });
 
-  if (session?.user?.id) {
-    // Verify user still exists in DB via Supabase (uses pooler, works on Vercel free plan).
-    // Guards against stale cookies after test user deletion.
-    const supabase = await createClient();
-    const { data } = await supabase
-      .from("user")
-      .select("id")
-      .eq("id", session.user.id)
-      .maybeSingle();
-
-    if (data) {
+    // Only redirect if Better Auth confirms a valid active session
+    if (session?.user?.id && session?.session?.id) {
       redirect("/panel");
     }
-    // No row found = deleted user, stale cookie — fall through to onboarding
+  } catch {
+    // Session invalid or expired — show onboarding
   }
 
   return <OnboardingFlow />;
