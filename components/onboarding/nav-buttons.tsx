@@ -16,6 +16,9 @@ export function NavBtns({
   loading?: boolean;
   errorMsg?: string | null;
 }) {
+  // Step 0 is Google-only — no Continuar button needed
+  if (paso === 0) return null;
+
   return (
     <div className="mt-[26px] border-t border-line pt-[22px]">
       {errorMsg && (
