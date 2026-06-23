@@ -1,15 +1,16 @@
-import { type NextRequest } from "next/server";
-import { updateSession } from "@/lib/supabase/middleware";
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
-// Next.js 16 renamed the "middleware" file convention to "proxy" — same
-// mechanism (runs before routes render, refreshes the Supabase session
-// cookie on every request), new name and Node.js runtime by default.
-export async function proxy(request: NextRequest) {
-  return updateSession(request);
+export async function middleware(request: NextRequest) {
+  // Allow Better Auth API routes through unconditionally
+  if (request.nextUrl.pathname.startsWith("/api/auth")) {
+    return NextResponse.next();
+  }
+  return NextResponse.next();
 }
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|.*\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
