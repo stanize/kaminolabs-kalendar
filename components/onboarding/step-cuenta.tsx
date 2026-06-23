@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { authClient } from "@/lib/auth-client";
 
 export function StepCuenta() {
   const [cargando, setCargando] = useState(false);
@@ -10,27 +10,11 @@ export function StepCuenta() {
   async function continuarConGoogle() {
     setError(null);
     setCargando(true);
-
     try {
-      const supabase = createClient();
-      const redirectTo = `${window.location.origin}/auth/callback?next=/onboarding`;
-
-      // Get the OAuth URL from the Supabase client (includes PKCE code_challenge etc.)
-      const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
+      await authClient.signIn.social({
         provider: "google",
-        options: {
-          redirectTo,
-          skipBrowserRedirect: true, // give us the URL instead of redirecting
-        },
+        callbackURL: "/onboarding",
       });
-
-      if (oauthError || !data?.url) throw oauthError ?? new Error("No URL returned");
-
-      // Swap the Supabase host for our proxy so Google sees kaminolabs.dev
-      const original = new URL(data.url);
-      const proxied = new URL(original.pathname + original.search, window.location.origin);
-
-      window.location.href = proxied.toString();
     } catch {
       setError("No se pudo conectar con Google. Inténtalo de nuevo.");
       setCargando(false);
