@@ -9,7 +9,7 @@ import { StepServicios } from "@/components/onboarding/step-servicios";
 import { StepHorario } from "@/components/onboarding/step-horario";
 import { StepEquipo } from "@/components/onboarding/step-equipo";
 import { StepListo } from "@/components/onboarding/step-listo";
-import { createClient } from "@/lib/supabase/client";
+import { authClient } from "@/lib/auth-client";
 import { finishOnboarding } from "@/lib/actions/onboarding";
 import { useOnboardingStore } from "@/lib/onboarding/store";
 import { canAdvance } from "@/lib/onboarding/validation";
@@ -31,25 +31,21 @@ export function OnboardingFlow() {
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Resultado final: capturado al terminar, antes de limpiar el store.
   const [terminado, setTerminado] = useState(false);
   const [dFinal, setDFinal] = useState<OnboardingData | null>(null);
   const [slugFinal, setSlugFinal] = useState<string>("");
 
-  // Si volvemos de la redirección de Google, recuperamos la sesión y avanzamos.
+  // Check Better Auth session on mount — handles post-OAuth redirect
   useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user && !d.account.googleAuthed) {
-        const nombre =
-          (user.user_metadata?.full_name as string) ||
-          (user.user_metadata?.name as string) ||
-          "";
-        setGoogleAuthed(nombre, user.email ?? "");
+    authClient.getSession().then(({ data: session }) => {
+      if (session?.user && !d.account.googleAuthed) {
+        setGoogleAuthed(
+          session.user.name ?? "",
+          session.user.email ?? ""
+        );
         if (paso === 0) goTo(1);
       }
     });
-    // Solo al montar — el store ya gestiona los cambios posteriores.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -68,8 +64,6 @@ export function OnboardingFlow() {
         setError(resultado.error ?? "Ha ocurrido un error. Inténtalo de nuevo.");
         return;
       }
-      // Guardamos una foto fija de los datos para la pantalla de éxito
-      // y solo entonces limpiamos el store (sessionStorage incluido).
       setDFinal(d);
       setSlugFinal(resultado.slug ?? slugify(d.negocio.nombre));
       setTerminado(true);
