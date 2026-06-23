@@ -6,13 +6,9 @@ export const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 /** Mirrors the `canNext` array from the design handoff, one rule per config step (0-4). */
 export function canAdvance(paso: number, d: OnboardingData): boolean {
   switch (paso) {
-    case 0: {
-      const emailOk = EMAIL_RE.test(d.account.email.trim());
-      return (
-        d.account.googleAuthed ||
-        (d.account.nombre.trim().length > 1 && emailOk && d.account.password.length >= 6)
-      );
-    }
+    case 0:
+      // Step 0 is Google-only: the user must have completed OAuth
+      return d.account.googleAuthed;
     case 1:
       return d.negocio.nombre.trim().length > 0 && !!d.negocio.tipo;
     case 2:
