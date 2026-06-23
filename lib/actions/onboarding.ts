@@ -49,7 +49,7 @@ export async function finishOnboarding(d: OnboardingData): Promise<FinishOnboard
   for (let intento = 0; intento < MAX_SLUG_INTENTOS; intento++) {
     const candidato = intento === 0 ? base : `${base}-${intento + 1}`;
     const { data: negocio, error } = await supabase
-      .from("businesses")
+      .from("kalendar_businesses")
       .insert({
         owner_id: userId,
         nombre: d.negocio.nombre.trim(),
@@ -79,7 +79,7 @@ export async function finishOnboarding(d: OnboardingData): Promise<FinishOnboard
 
   // 3) Servicios
   if (d.servicios.length > 0) {
-    const { error } = await supabase.from("services").insert(
+    const { error } = await supabase.from("kalendar_services").insert(
       d.servicios.map((s, i) => ({
         business_id: negocioId,
         nombre: s.nombre.trim(),
@@ -92,7 +92,7 @@ export async function finishOnboarding(d: OnboardingData): Promise<FinishOnboard
   }
 
   // 4) Horario
-  const { error: horarioError } = await supabase.from("business_hours").insert(
+  const { error: horarioError } = await supabase.from("kalendar_business_hours").insert(
     DIAS.map((dia) => ({
       business_id: negocioId,
       dia: dia.id,
@@ -104,7 +104,7 @@ export async function finishOnboarding(d: OnboardingData): Promise<FinishOnboard
   if (horarioError) return { ok: false, error: "No se pudo guardar tu disponibilidad." };
 
   // 5) Equipo
-  const { error: equipoError } = await supabase.from("team_members").insert(
+  const { error: equipoError } = await supabase.from("kalendar_team_members").insert(
     d.equipo.map((m, i) => ({
       business_id: negocioId,
       nombre: m.nombre.trim(),

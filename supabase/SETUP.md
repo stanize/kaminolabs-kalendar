@@ -1,36 +1,44 @@
-# Configurar Supabase para Kalendar
+# Supabase Setup — Kalendar
 
-Notas para crear el proyecto de Supabase **dedicado a Kalendar** (cuenta separada,
-como querías) y dejarlo listo para el flujo de onboarding.
+Step-by-step guide to configure the dedicated Supabase project for Kalendar.
 
-## 1. Crear el proyecto
+---
 
-1. En tu cuenta nueva de Supabase → **New project**.
-2. Elige una región cercana a España (p. ej. `eu-west-1` / `eu-central-1`) para
-   menor latencia.
-3. Guarda la contraseña de la base de datos en un sitio seguro (no se usa en el
-   código, pero la pedirás si algún día conectas herramientas externas).
+## 1. Create the project
 
-## 2. Ejecutar el esquema
+1. Log in to your **dedicated Supabase account** for Kalendar (keep it separate from other projects).
+2. **New project** → choose a region close to Spain (`eu-west-1` or `eu-central-1`) for lower latency.
+3. Save the database password somewhere safe. You won't need it in code, but it's required if you ever connect external DB tools (e.g. pgAdmin, Supabase CLI).
 
-1. En el proyecto → **SQL Editor** → **New query**.
-2. Pega el contenido completo de [`schema.sql`](./schema.sql) y ejecútalo.
-3. Verifica en **Table Editor** que aparecen: `profiles`, `businesses`,
-   `services`, `business_hours`, `team_members`.
+---
 
-Esto crea las tablas, los índices, las políticas de RLS (cada negocio solo lo
-puede editar su propietario; la lectura es pública para que la futura página
-de reservas funcione) y el trigger que crea automáticamente una fila en
-`profiles` cuando alguien se registra.
+## 2. Run the schema
 
-## 3. Variables de entorno
+1. In your project → **SQL Editor** → **New query**.
+2. Paste the full contents of [`schema.sql`](./schema.sql) and click **Run**.
+3. Verify in **Table Editor** that these five tables exist:
+   - `kalendar_profiles`
+   - `kalendar_businesses`
+   - `kalendar_services`
+   - `kalendar_business_hours`
+   - `kalendar_team_members`
 
-En **Project Settings → API**, copia:
+The schema also installs:
+- Row-level security (RLS) on every table — each business is only writable by its owner; public pages can read without an auth session.
+- A trigger (`on_auth_user_created`) that automatically creates a `kalendar_profiles` row whenever someone signs up, whether via email/password or Google OAuth.
 
-- `Project URL` → `NEXT_PUBLIC_SUPABASE_URL`
-- `anon public` key → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+---
 
-Pégalas en `.env.local` (copia `.env.local.example`):
+## 3. Environment variables
+
+In **Project Settings → API**, copy:
+
+| Setting | Maps to |
+|---|---|
+| Project URL | `NEXT_PUBLIC_SUPABASE_URL` |
+| anon / public key | `NEXT_PUBLIC_SUPABASE_ANON_KEY` |
+
+Create `.env.local` at the project root (there is a `.env.local.example` to copy from):
 
 ```bash
 cp .env.local.example .env.local
@@ -41,68 +49,89 @@ NEXT_PUBLIC_SUPABASE_URL=https://xxxxxxxx.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOi...
 ```
 
-En Vercel, añade las mismas dos variables en **Project Settings → Environment
-Variables** para Production, Preview y Development.
+In **Vercel**, add the same two variables under **Project Settings → Environment Variables** for Production, Preview, and Development.
 
-## 4. Confirmación de email — desactívala (por ahora)
+---
 
-El flujo de Kalendar **crea la cuenta al final del wizard** (paso 6), no en el
-paso 1, para no obligar a nadie a confirmar su correo a mitad de la
-configuración. Para que `supabase.auth.signUp()` devuelva una sesión activa
-inmediatamente:
+## 4. Disable email confirmation (important for the onboarding flow)
 
-1. **Authentication → Providers → Email**.
-2. Desactiva **"Confirm email"**.
+Kalendar defers account creation to the **very end of the wizard** — the user fills in all their business details first, then the account is created in one go when they click "Crear mi página". If email confirmation is enabled, `signUp()` returns an unconfirmed session and the onboarding save will fail with an auth error.
 
-> Cuando tengáis tiempo de construir el flujo de verificación, podéis
-> reactivarlo y añadir una pantalla intermedia de "revisa tu correo" antes del
-> paso 6 — el resto del código no cambia.
+To disable it:
 
-## 5. Activar Google OAuth
+1. **Authentication → Providers → Email**
+2. Toggle off **"Confirm email"**
 
-1. En [Google Cloud Console](https://console.cloud.google.com/) crea (o
-   reutiliza) un proyecto OAuth → **APIs & Services → Credentials → Create
-   credentials → OAuth client ID** → tipo **Web application**.
-2. En **Authorized redirect URIs** añade la URL de callback de Supabase
-   (la encuentras en Supabase → **Authentication → Providers → Google**):
+> When you're ready to add an email verification step later (recommended before launch), re-enable this and add an intermediate "Check your inbox" screen between the wizard's last step and the success screen — nothing else in the codebase needs to change.
+
+---
+
+## 5. Enable Google OAuth
+
+**In Google Cloud Console:**
+
+1. Go to [console.cloud.google.com](https://console.cloud.google.com) → **APIs & Services → Credentials → Create credentials → OAuth client ID**.
+2. Application type: **Web application**.
+3. Under **Authorized redirect URIs**, add the Supabase callback URL (find it in the next step):
    ```
    https://xxxxxxxx.supabase.co/auth/v1/callback
    ```
-3. Copia el **Client ID** y **Client Secret** generados por Google.
-4. En Supabase → **Authentication → Providers → Google**: actívalo y pega
-   ambos valores.
+4. Copy the generated **Client ID** and **Client Secret**.
 
-## 6. URLs de redirección de la app
+**In Supabase:**
 
-En Supabase → **Authentication → URL Configuration**:
+1. **Authentication → Providers → Google** → toggle it on.
+2. Paste the Client ID and Client Secret from Google.
+3. Copy the **Callback URL** shown here — this is what you add to Google Cloud Console in step 3 above.
 
-- **Site URL**: tu dominio de producción, p. ej. `https://kalendar.app`
-- **Redirect URLs**: añade todas las que vayas a usar, una por línea:
-  ```
-  http://localhost:3000/auth/callback
-  https://kalendar.app/auth/callback
-  https://*.vercel.app/auth/callback
-  ```
-  (el comodín `*.vercel.app` cubre tus preview deployments de Vercel; si tu
-  proyecto Supabase no admite comodines en tu plan, añade cada preview URL que
-  necesites probar de forma explícita).
+---
 
-## 7. Comprobación rápida
+## 6. Configure redirect URLs
 
-Con `npm run dev` y `.env.local` configurado:
+In Supabase → **Authentication → URL Configuration**:
 
-1. Abre `/onboarding`, completa el paso 1 con correo/contraseña y avanza hasta
-   el final.
-2. Al pulsar **"Crear mi página"** deberías ver en Supabase → **Table Editor**
-   una fila nueva en `businesses` (y sus `services` / `business_hours` /
-   `team_members` asociados) y un usuario nuevo en **Authentication → Users**.
-3. Prueba también el botón **"Continuar con Google"** — te llevará a Google,
-   volverá a `/onboarding` ya autenticado, y debería saltarse directamente al
-   paso 2 con tu nombre y correo prerellenados.
+- **Site URL**: your production domain, e.g. `https://kalendar.app`
+- **Redirect URLs** — add all environments you'll use, one per line:
 
-## Qué falta fuera de este alcance
+```
+http://localhost:3000/auth/callback
+https://kalendar.app/auth/callback
+https://*.vercel.app/auth/callback
+```
 
-Este esquema cubre **solo onboarding**. Quedan fuera (a propósito, para
-construir después): tabla de `bookings` (reservas reales de clientes),
-excepciones de disponibilidad (vacaciones, festivos), notificaciones por email
-/ WhatsApp, y pagos.
+The `*.vercel.app` wildcard covers Vercel preview deployments automatically. If your Supabase plan doesn't support wildcards, add each preview URL explicitly.
+
+---
+
+## 7. Quick verification checklist
+
+With `npm run dev` running and `.env.local` configured:
+
+- [ ] Go to `/onboarding`, fill in the email/password flow through all 5 steps, click "Crear mi página" → you should land on the success screen.
+- [ ] Check **Table Editor** in Supabase — you should see a new row in `kalendar_businesses` and its related rows in `kalendar_services`, `kalendar_business_hours`, and `kalendar_team_members`.
+- [ ] Check **Authentication → Users** — a new user should appear.
+- [ ] Test **"Continuar con Google"** — it should redirect to Google, return to `/onboarding`, skip to step 2 with name and email pre-filled.
+- [ ] Visit `/[your-slug]` — the public booking page stub should render with the business name.
+
+---
+
+## Tables at a glance
+
+| Table | Purpose |
+|---|---|
+| `kalendar_profiles` | User profile, linked 1:1 to `auth.users` |
+| `kalendar_businesses` | The business/practice — holds the public slug |
+| `kalendar_services` | Bookable services (name, duration, price) |
+| `kalendar_business_hours` | Weekly availability, one row per day |
+| `kalendar_team_members` | Staff who deliver services |
+
+---
+
+## What is not in this schema (intentionally)
+
+These are out of the current onboarding scope and will be added in later sprints:
+
+- `kalendar_bookings` — client reservations
+- `kalendar_availability_overrides` — holidays, one-off closures
+- `kalendar_notifications` — email / WhatsApp reminders
+- `kalendar_payments` — Stripe payment records

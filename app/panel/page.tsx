@@ -16,7 +16,7 @@ export default async function PanelPage() {
   }
 
   const { data: negocio } = await supabase
-    .from("businesses")
+    .from("kalendar_businesses")
     .select("nombre, slug")
     .eq("owner_id", user.id)
     .order("created_at", { ascending: false })

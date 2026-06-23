@@ -1,104 +1,105 @@
 # Kalendar
 
-Software de reservas online para profesionales (psicólogos, nutricionistas,
-fisioterapeutas, centros de estética, entrenadores, coaches, academias…) en
-el mercado español. Todo el producto está en español.
+Online booking software for Spanish-market professionals — psychologists, nutritionists, physiotherapists, beauty centres, fitness trainers, coaches, tutors, and similar service businesses. The product UI is in Spanish; this documentation is in English.
 
-> Este repo contiene **solo el alcance de onboarding**: la landing page y el
-> asistente de 6 pasos para crear una cuenta y dar de alta un negocio. El
-> panel de control y la página pública de reservas son features futuras
-> (quedan stubs mínimos para que los enlaces del flujo no rompan).
+> **Current scope: onboarding only.** This repo contains the landing page and the 6-step onboarding wizard. The practitioner dashboard and the live public booking page are future features — minimal stubs are included so wizard-end links don't break.
 
-## Stack
+---
 
-- **Next.js 16** (App Router) + **TypeScript**
-- **Tailwind CSS v4** (tokens de diseño vía `@theme` en `app/globals.css`)
-- **Supabase** (`@supabase/ssr`) — Auth (email/contraseña + Google OAuth) y Postgres
-- **Zustand** (con persistencia en `sessionStorage`) para el estado del wizard
-- **lucide-react** para iconos
-- Fuentes: **Bricolage Grotesque** (títulos) + **Plus Jakarta Sans** (UI), vía `next/font/google`
+## Tech stack
 
-## Empezar
+| | |
+|---|---|
+| Framework | Next.js 16 (App Router) + TypeScript |
+| Styles | Tailwind CSS v4 — design tokens via `@theme` in `app/globals.css` |
+| Auth + DB | Supabase (`@supabase/ssr`) — email/password + Google OAuth, Postgres |
+| Wizard state | Zustand with `sessionStorage` persistence |
+| Icons | lucide-react |
+| Fonts | Bricolage Grotesque (headings) + Plus Jakarta Sans (UI) via `next/font/google` |
+
+---
+
+## Getting started
 
 ```bash
 npm install
-cp .env.local.example .env.local   # rellena con tus claves de Supabase — ver supabase/SETUP.md
+cp .env.local.example .env.local   # fill in your Supabase credentials
 npm run dev
 ```
 
-Abre [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:3000](http://localhost:3000).
 
-**Antes de poder completar el onboarding de verdad necesitas un proyecto de
-Supabase configurado** — sigue [`supabase/SETUP.md`](./supabase/SETUP.md)
-paso a paso (crear el proyecto, ejecutar `supabase/schema.sql`, activar Google
-OAuth, configurar las URLs de redirección).
+You need a configured Supabase project before the wizard can save anything. Follow [`supabase/SETUP.md`](./supabase/SETUP.md) — it covers creating the project, running the schema, enabling Google OAuth, and configuring redirect URLs.
 
-## Estructura
+---
+
+## Project structure
 
 ```
 app/
-  page.tsx                  Landing page ("Empezar gratis" → /onboarding)
-  onboarding/page.tsx       Punto de entrada del wizard
-  auth/callback/route.ts    Callback de OAuth (intercambia el code por sesión)
-  panel/page.tsx            Stub del panel (fuera de alcance)
-  [slug]/page.tsx           Stub de la página pública de reservas (fuera de alcance)
+  page.tsx                    Landing page — "Empezar gratis" links to /onboarding
+  onboarding/page.tsx         Onboarding wizard entry point
+  auth/callback/route.ts      OAuth callback — exchanges code for Supabase session
+  panel/page.tsx              Dashboard stub (future feature)
+  [slug]/page.tsx             Public booking page stub (future feature)
 
 components/
-  ui/                       Primitivas: Icon, Logo, Avatar, Btn, Field
-  landing/                  Navbar de la landing
-  onboarding/               Los 6 pasos, el shell "dividido", la vista previa en vivo
+  ui/                         Primitives: Icon, Logo, Avatar, Btn, Field
+  landing/                    Navbar
+  onboarding/                 6 step components, split shell, live booking preview
 
 lib/
-  onboarding/               Tipos, datos de referencia, slug, store (Zustand), validación
-  supabase/                 Clientes de Supabase (browser / server / middleware)
-  actions/onboarding.ts     Server Action que persiste todo al terminar el wizard
+  onboarding/                 Types, reference data, slug helper, Zustand store, validation
+  supabase/                   Browser client, server client, session middleware
+  actions/onboarding.ts       Server Action — persists everything on wizard completion
+  landing/                    Example business data for the landing preview cards
 
 supabase/
-  schema.sql                Esquema completo (tablas + RLS + trigger)
-  SETUP.md                  Guía de configuración del proyecto Supabase
+  schema.sql                  Full database schema (tables + RLS + trigger)
+  SETUP.md                    Step-by-step Supabase project configuration guide
 ```
 
-## Cómo funciona el flujo de onboarding
+---
 
-Sigue el handoff de diseño (`Onboarding.html` + `.jsx` del bundle original):
-un wizard lineal de 6 pasos con el shell **"dividido"** (split-screen) como
-único layout implementado — panel de marca + vista previa en vivo a la
-izquierda, formulario a la derecha. Los otros dos shells del handoff
-(asistente centrado, conversacional a pantalla completa) **no se han
-construido**: el contenido de cada paso vive en componentes separados
-(`components/onboarding/step-*.tsx`) precisamente para poder añadir esos
-shells más adelante sin reescribir nada.
+## How the onboarding flow works
 
-**Cuenta diferida al final.** Para no obligar a nadie a verificar su email a
-mitad del wizard, la cuenta (email/contraseña) **no se crea en el paso 1**:
-solo se valida localmente. La cuenta real se crea — junto con el negocio, los
-servicios, el horario y el equipo — en la Server Action `finishOnboarding`,
-de un tirón, al pulsar "Crear mi página" en el último paso.
+A 6-step linear wizard using the **split-screen shell** as the sole layout: brand panel + live booking preview on the left, scrollable form on the right. Step content lives in isolated `step-*.tsx` components so the other two shells from the design handoff (centred wizard, full-screen conversational) can be added later without rewriting anything.
 
-**Excepción: Google.** Si la persona pulsa "Continuar con Google", sí hay una
-redirección real a Google en ese momento (es inevitable con OAuth). Para que
-no se pierdan los datos ya introducidos en pasos posteriores durante ese
-salto de página, el estado del wizard se persiste en `sessionStorage` con el
-middleware `persist` de Zustand. Al volver de Google, el controlador
-(`onboarding-flow.tsx`) detecta la sesión activa, rellena nombre/correo y
-salta directamente al paso 2.
+**Deferred account creation.** To avoid forcing email verification mid-wizard, the actual Supabase account is **not created at step 1** — credentials are validated locally. Everything (account + business + services + hours + team) is written to the database in a single Server Action call when the user clicks "Crear mi página" at the end.
 
-**Slug único.** El nombre del negocio se convierte en slug (`lib/onboarding/slug.ts`)
-y se reclama en `finishOnboarding`: si ya existe, se reintenta añadiendo
-`-2`, `-3`… hasta encontrar uno libre.
+**Exception: Google OAuth.** Clicking "Continuar con Google" triggers a real OAuth redirect immediately (unavoidable). Wizard state is persisted to `sessionStorage` via Zustand's `persist` middleware so nothing is lost during the round-trip. On return, the controller detects the active session, pre-fills name/email, and jumps to step 2.
 
-## Lo que NO está construido (a propósito)
+**Unique slug.** The business name is slugified (`lib/onboarding/slug.ts`) and claimed in `finishOnboarding`. If the slug already exists, the action retries with `-2`, `-3`, etc. up to 25 attempts.
 
-- Panel de control real (solo un stub que confirma que la cuenta existe)
-- Página pública de reservas con calendario real (solo un stub de "próximamente")
-- Recuperación de contraseña / reenvío de verificación de email
-- Pagos, recordatorios, gestión de reservas de clientes
+**Key lesson from earlier prototypes:** never call `reset()` on the store before snapshotting the data you need for the success screen. The controller captures `dFinal` and `slugFinal` into local React state *before* calling `reset()` — the success screen reads from that snapshot, not the store.
 
-## Notas de diseño
+---
 
-Un solo tema ("Clínico", claro) y un solo color de marca (`#0d9488`, teal) —
-los tokens están en `app/globals.css`. El bundle de diseño original incluía
-un selector de tema/marca/estilo (`tweaks-panel.jsx`); según su propio
-README era **solo una herramienta del prototipo**, no parte del producto, así
-que no se ha incluido aquí. Si más adelante queréis white-labeling por
-negocio, los tokens ya están aislados en un único sitio para facilitarlo.
+## Database tables
+
+All tables are prefixed with `kalendar_` for clean identification in the Supabase dashboard.
+
+| Table | Purpose |
+|---|---|
+| `kalendar_profiles` | User profile, auto-created on sign-up via trigger |
+| `kalendar_businesses` | Business/practice — holds the public slug and branding |
+| `kalendar_services` | Bookable services (name, duration, price) |
+| `kalendar_business_hours` | Weekly availability, one row per day |
+| `kalendar_team_members` | Staff who deliver the services |
+
+---
+
+## What is not built (intentionally out of scope)
+
+- Real practitioner dashboard (stub only)
+- Live public booking page with calendar (stub only)
+- Password recovery / email verification resend
+- Client-facing bookings, notifications, payments
+
+---
+
+## Design notes
+
+Single theme ("Clínico", light) and single brand colour (`#0d9488` teal). All tokens live in `app/globals.css`. The original design bundle included a theme/brand/style picker (`tweaks-panel.jsx`) — per the handoff README, that was a prototype-only tool, not a product feature, so it isn't included here. If per-business white-labelling is added later, all tokens are in one place to make it easy.
+
+The proxy file (`proxy.ts`) uses the Next.js 16 naming convention — `middleware.ts` is deprecated in Next 16 in favour of `proxy.ts` with a named `proxy` export.

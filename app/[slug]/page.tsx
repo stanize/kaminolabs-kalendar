@@ -14,7 +14,7 @@ export default async function PaginaNegocioPublica({
   const supabase = await createClient();
 
   const { data: negocio } = await supabase
-    .from("businesses")
+    .from("kalendar_businesses")
     .select("nombre, tipo, ciudad")
     .eq("slug", slug)
     .maybeSingle();
