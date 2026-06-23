@@ -1,5 +1,7 @@
 "use server";
 
+import { auth } from "@/lib/auth";
+import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { DIAS } from "@/lib/onboarding/data";
 import { slugify } from "@/lib/onboarding/slug";
@@ -8,40 +10,19 @@ import type { FinishOnboardingResult, OnboardingData } from "@/lib/onboarding/ty
 const MAX_SLUG_INTENTOS = 25;
 
 export async function finishOnboarding(d: OnboardingData): Promise<FinishOnboardingResult> {
-  const supabase = await createClient();
+  // Get session from Better Auth
+  const session = await auth.api.getSession({
+    headers: await headers(),
+  });
 
-  // 1) Cuenta — si vino por Google ya hay sesión; si no, la creamos ahora (al final del flujo)
-  const {
-    data: { user: existingUser },
-  } = await supabase.auth.getUser();
-
-  let userId = existingUser?.id;
-
-  if (!userId) {
-    if (!d.account.email || d.account.password.length < 6) {
-      return { ok: false, error: "Faltan datos de la cuenta. Vuelve al primer paso." };
-    }
-    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-      email: d.account.email.trim(),
-      password: d.account.password,
-      options: { data: { nombre: d.account.nombre.trim() } },
-    });
-    if (signUpError || !signUpData.user) {
-      const msg =
-        signUpError?.message?.toLowerCase().includes("already") ||
-        signUpError?.code === "user_already_exists"
-          ? "Ya existe una cuenta con ese correo. Inicia sesión en su lugar."
-          : "No se pudo crear la cuenta. Inténtalo de nuevo.";
-      return { ok: false, error: msg };
-    }
-    userId = signUpData.user.id;
-  }
-
-  if (!userId) {
+  if (!session?.user?.id) {
     return { ok: false, error: "No se pudo verificar tu cuenta. Inténtalo de nuevo." };
   }
 
-  // 2) Negocio — intentamos reclamar el slug, añadiendo un sufijo si ya existe
+  const userId = session.user.id;
+  const supabase = await createClient();
+
+  // Negocio — slug with uniqueness retry
   const base = slugify(d.negocio.nombre);
   let slug = base;
   let negocioId: string | null = null;
@@ -67,7 +48,6 @@ export async function finishOnboarding(d: OnboardingData): Promise<FinishOnboard
       break;
     }
 
-    // 23505 = unique_violation (slug ya existe) → probamos el siguiente sufijo
     if (error && error.code !== "23505") {
       return { ok: false, error: "No se pudo guardar tu negocio. Inténtalo de nuevo." };
     }
@@ -77,7 +57,7 @@ export async function finishOnboarding(d: OnboardingData): Promise<FinishOnboard
     return { ok: false, error: "No se pudo asignar un enlace único. Prueba con otro nombre." };
   }
 
-  // 3) Servicios
+  // Servicios
   if (d.servicios.length > 0) {
     const { error } = await supabase.from("kalendar_services").insert(
       d.servicios.map((s, i) => ({
@@ -91,7 +71,7 @@ export async function finishOnboarding(d: OnboardingData): Promise<FinishOnboard
     if (error) return { ok: false, error: "No se pudieron guardar tus servicios." };
   }
 
-  // 4) Horario
+  // Horario
   const { error: horarioError } = await supabase.from("kalendar_business_hours").insert(
     DIAS.map((dia) => ({
       business_id: negocioId,
@@ -103,7 +83,7 @@ export async function finishOnboarding(d: OnboardingData): Promise<FinishOnboard
   );
   if (horarioError) return { ok: false, error: "No se pudo guardar tu disponibilidad." };
 
-  // 5) Equipo
+  // Equipo
   const { error: equipoError } = await supabase.from("kalendar_team_members").insert(
     d.equipo.map((m, i) => ({
       business_id: negocioId,
