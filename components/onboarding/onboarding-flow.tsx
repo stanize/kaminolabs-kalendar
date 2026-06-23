@@ -30,27 +30,36 @@ export function OnboardingFlow() {
 
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [userName, setUserName] = useState<string>("");
 
   const [terminado, setTerminado] = useState(false);
   const [dFinal, setDFinal] = useState<OnboardingData | null>(null);
   const [slugFinal, setSlugFinal] = useState<string>("");
 
-  // Check Better Auth session on mount — handles post-OAuth redirect
   useEffect(() => {
     authClient.getSession().then(({ data: session }) => {
-      if (session?.user && !d.account.googleAuthed) {
-        setGoogleAuthed(
-          session.user.name ?? "",
-          session.user.email ?? ""
-        );
-        if (paso === 0) goTo(1);
+      if (session?.user) {
+        const name = session.user.name ?? "";
+        setUserName(name);
+        if (!d.account.googleAuthed) {
+          setGoogleAuthed(name, session.user.email ?? "");
+          if (paso === 0) goTo(1);
+        }
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const canNext = canAdvance(paso, d);
+
+  // Dynamic title for step 1: personalised greeting with full name from Google
   const meta = PASOS[paso];
+  const titulo = paso === 1 && userName
+    ? `¡Bienvenido/a, ${userName}!`
+    : meta.titulo;
+  const sub = paso === 1 && userName
+    ? "Cuéntanos un poco sobre tu negocio."
+    : meta.sub;
 
   async function manejarContinuar() {
     setError(null);
@@ -83,8 +92,8 @@ export function OnboardingFlow() {
   return (
     <SplitShell
       paso={paso}
-      titulo={meta.titulo}
-      sub={meta.sub}
+      titulo={titulo}
+      sub={sub}
       d={d}
       footer={
         <NavBtns
