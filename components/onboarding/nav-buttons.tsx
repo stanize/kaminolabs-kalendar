@@ -22,7 +22,6 @@ export function NavBtns({
 }) {
   const router = useRouter();
 
-  // Step 0 is Google-only — no nav buttons needed
   if (paso === 0) return null;
 
   async function handleMasTarde() {
@@ -45,7 +44,7 @@ export function NavBtns({
           <button
             type="button"
             onClick={handleMasTarde}
-            className="text-[13.5px] font-medium text-ink-soft transition-colors duration-150 hover:text-ink"
+            className="cursor-pointer text-[13.5px] font-medium text-ink-soft underline-offset-2 transition-colors duration-150 hover:text-ink hover:underline"
           >
             Más tarde
           </button>
