@@ -3,6 +3,7 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   ArrowRight,
   X,
   Mail,
@@ -15,6 +16,15 @@ import {
   User,
   Users,
   Clock,
+  Home,
+  Settings,
+  CreditCard,
+  FileText,
+  Bell,
+  BarChart2,
+  LogOut,
+  ExternalLink,
+  Building2,
   type LucideIcon,
 } from "lucide-react";
 
@@ -23,6 +33,7 @@ export const ICONOS: Record<string, LucideIcon> = {
   check: Check,
   chevronLeft: ChevronLeft,
   chevronRight: ChevronRight,
+  chevronDown: ChevronDown,
   arrowRight: ArrowRight,
   x: X,
   mail: Mail,
@@ -35,6 +46,15 @@ export const ICONOS: Record<string, LucideIcon> = {
   user: User,
   users: Users,
   clock: Clock,
+  home: Home,
+  settings: Settings,
+  creditCard: CreditCard,
+  fileText: FileText,
+  bell: Bell,
+  barChart: BarChart2,
+  logOut: LogOut,
+  externalLink: ExternalLink,
+  building: Building2,
 };
 
 export function Icon({
