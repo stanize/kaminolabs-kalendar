@@ -1,24 +1,26 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
+import { auth } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { Logo } from "@/components/ui/logo";
 import { Btn } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
+import Link from "next/link";
 
 export default async function PanelPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const session = await auth.api.getSession({
+    headers: await headers(),
+  });
 
-  if (!user) {
+  if (!session?.user) {
     redirect("/onboarding");
   }
 
+  const supabase = await createClient();
   const { data: negocio } = await supabase
     .from("kalendar_businesses")
     .select("nombre, slug")
-    .eq("owner_id", user.id)
+    .eq("owner_id", session.user.id)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
