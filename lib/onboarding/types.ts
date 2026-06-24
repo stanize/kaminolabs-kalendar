@@ -35,8 +35,10 @@ export interface OnboardingAccount {
   nombre: string;
   email: string;
   password: string;
-  /** true once the person has authenticated via Google (real Supabase OAuth session) */
+  /** true once the person has authenticated via Google OAuth */
   googleAuthed: boolean;
+  /** true once the person has signed up or signed in via email+password */
+  emailAuthed: boolean;
 }
 
 export interface OnboardingNegocio {
