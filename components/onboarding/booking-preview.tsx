@@ -1,15 +1,15 @@
 import clsx from "clsx";
 import { Icon } from "@/components/ui/icon";
-import { tipoIcon, tipoLabel } from "@/lib/onboarding/data";
+import { businessTypeIcon, businessTypeLabel } from "@/lib/onboarding/data";
 import { slugify } from "@/lib/onboarding/slug";
 import type { OnboardingData } from "@/lib/onboarding/types";
 
-const DIAS_PREVIEW = ["lun", "mar", "mié", "jue", "vie"];
+const PREVIEW_DAYS = ["lun", "mar", "mié", "jue", "vie"];
 
 export function BookingPreview({ d, compact }: { d: OnboardingData; compact?: boolean }) {
-  const servicios = d.servicios.length
-    ? d.servicios.slice(0, 3)
-    : [{ id: "ph", nombre: "Tu primer servicio", min: 60, precio: 40, ph: true }];
+  const services = d.services.length
+    ? d.services.slice(0, 3)
+    : [{ id: "ph", name: "Tu primer servicio", min: 60, price: 40, ph: true }];
 
   return (
     <div
@@ -23,21 +23,21 @@ export function BookingPreview({ d, compact }: { d: OnboardingData; compact?: bo
         <span className="h-2 w-2 rounded-full bg-line" />
         <span className="h-2 w-2 rounded-full bg-line" />
         <span className="ml-2 truncate text-[11.5px] font-medium text-ink-soft">
-          kalendar.app/{slugify(d.negocio.nombre)}
+          kalendar.app/{slugify(d.business.name)}
         </span>
       </div>
 
       <div className="p-4">
         <div className="mb-3.5 flex items-center gap-2.5 border-b border-line pb-3.5">
           <div className="grid h-[38px] w-[38px] shrink-0 place-items-center rounded-[11px] bg-brand-weak text-brand">
-            <Icon name={tipoIcon(d.negocio.tipo)} size={18} />
+            <Icon name={businessTypeIcon(d.business.type)} size={18} />
           </div>
           <div className="min-w-0">
             <div className="truncate font-display text-[16px] font-semibold">
-              {d.negocio.nombre || "Tu negocio"}
+              {d.business.name || "Tu negocio"}
             </div>
             <div className="truncate text-[12.5px] text-ink-soft">
-              {tipoLabel(d.negocio.tipo) || "Reserva tu cita online"}
+              {businessTypeLabel(d.business.type) || "Reserva tu cita online"}
             </div>
           </div>
         </div>
@@ -46,7 +46,7 @@ export function BookingPreview({ d, compact }: { d: OnboardingData; compact?: bo
           Elige un servicio
         </div>
         <div className="mb-4 flex flex-col gap-2">
-          {servicios.map((s) => (
+          {services.map((s) => (
             <div
               key={s.id}
               className={clsx(
@@ -55,10 +55,10 @@ export function BookingPreview({ d, compact }: { d: OnboardingData; compact?: bo
               )}
             >
               <div>
-                <div className="text-[13.5px] font-semibold">{s.nombre || "Servicio"}</div>
+                <div className="text-[13.5px] font-semibold">{s.name || "Servicio"}</div>
                 <div className="text-[12px] text-ink-soft">{s.min} min</div>
               </div>
-              <span className="font-display text-[14px] font-semibold text-brand">{s.precio} €</span>
+              <span className="font-display text-[14px] font-semibold text-brand">{s.price} €</span>
             </div>
           ))}
         </div>
@@ -67,16 +67,16 @@ export function BookingPreview({ d, compact }: { d: OnboardingData; compact?: bo
           Elige día
         </div>
         <div className="grid grid-cols-5 gap-1.5">
-          {DIAS_PREVIEW.map((dia, i) => (
+          {PREVIEW_DAYS.map((day, i) => (
             <div
-              key={dia}
+              key={day}
               className={clsx(
                 "flex flex-col items-center gap-0.5 rounded-[9px] border border-line py-2",
                 i === 2 && "border-brand bg-brand text-white"
               )}
             >
               <span className={clsx("text-[11px] capitalize text-ink-soft", i === 2 && "text-white/85")}>
-                {dia}
+                {day}
               </span>
               <b className="font-display text-[15px]">{18 + i}</b>
             </div>
