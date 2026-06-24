@@ -13,15 +13,15 @@ export async function finishOnboarding(d: OnboardingData): Promise<OnboardingRes
   const session = await auth.api.getSession({ headers: await headers() });
 
   if (!session?.user?.id) {
-    return { ok: false, error: "No se pudo verificar tu cuenta. Inténtalo de nuevo." };
+    return { ok: false, error: "Sesión no encontrada. Por favor inicia sesión de nuevo." };
   }
 
-  const userId = session.user.id;
+  const userId   = session.user.id;
   const supabase = await createClient();
 
-  // Business — slug with uniqueness retry
+  // ── Business ─────────────────────────────────────────────────────────────
   const base = slugify(d.business.name);
-  let slug = base;
+  let slug       = base;
   let businessId: string | null = null;
 
   for (let attempt = 0; attempt < MAX_SLUG_ATTEMPTS; attempt++) {
@@ -41,12 +41,12 @@ export async function finishOnboarding(d: OnboardingData): Promise<OnboardingRes
 
     if (!error && business) {
       businessId = business.id;
-      slug = business.slug;
+      slug       = business.slug;
       break;
     }
 
     if (error && error.code !== "23505") {
-      return { ok: false, error: "No se pudo guardar tu negocio. Inténtalo de nuevo." };
+      return { ok: false, error: `Error al guardar el negocio: ${error.message}` };
     }
   }
 
@@ -54,7 +54,7 @@ export async function finishOnboarding(d: OnboardingData): Promise<OnboardingRes
     return { ok: false, error: "No se pudo asignar un enlace único. Prueba con otro nombre." };
   }
 
-  // Services
+  // ── Services ──────────────────────────────────────────────────────────────
   if (d.services.length > 0) {
     const { error } = await supabase.from("kalendar_services").insert(
       d.services.map((s, i) => ({
@@ -65,10 +65,10 @@ export async function finishOnboarding(d: OnboardingData): Promise<OnboardingRes
         orden:        i,
       }))
     );
-    if (error) return { ok: false, error: "No se pudieron guardar tus servicios." };
+    if (error) return { ok: false, error: `Error al guardar servicios: ${error.message}` };
   }
 
-  // Schedule
+  // ── Schedule ──────────────────────────────────────────────────────────────
   const { error: scheduleError } = await supabase.from("kalendar_business_hours").insert(
     DAYS.map((day) => ({
       business_id: businessId,
@@ -78,9 +78,9 @@ export async function finishOnboarding(d: OnboardingData): Promise<OnboardingRes
       hora_fin:    d.schedule[day.id].on ? d.schedule[day.id].to   : null,
     }))
   );
-  if (scheduleError) return { ok: false, error: "No se pudo guardar tu disponibilidad." };
+  if (scheduleError) return { ok: false, error: `Error al guardar disponibilidad: ${scheduleError.message}` };
 
-  // Team
+  // ── Team ──────────────────────────────────────────────────────────────────
   const { error: teamError } = await supabase.from("kalendar_team_members").insert(
     d.team.map((m, i) => ({
       business_id:    businessId,
@@ -90,7 +90,7 @@ export async function finishOnboarding(d: OnboardingData): Promise<OnboardingRes
       orden:          i,
     }))
   );
-  if (teamError) return { ok: false, error: "No se pudo guardar tu equipo." };
+  if (teamError) return { ok: false, error: `Error al guardar equipo: ${teamError.message}` };
 
   return { ok: true, slug };
 }
