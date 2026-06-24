@@ -33,10 +33,10 @@ export function StepCuenta() {
     setError(null);
 
     if (mode === "register") {
-      if (!name.trim()) { setError("Introduce tu nombre."); return; }
-      if (!email.trim()) { setError("Introduce tu email."); return; }
-      if (password.length < 8) { setError("La contraseña debe tener al menos 8 caracteres."); return; }
-      if (password !== confirmPassword) { setError("Las contraseñas no coinciden."); return; }
+      if (!name.trim())                       { setError("Introduce tu nombre."); return; }
+      if (!email.trim())                      { setError("Introduce tu email."); return; }
+      if (password.length < 8)               { setError("La contraseña debe tener al menos 8 caracteres."); return; }
+      if (password !== confirmPassword)      { setError("Las contraseñas no coinciden."); return; }
     } else {
       if (!email.trim() || !password.trim()) { setError("Por favor rellena todos los campos."); return; }
     }
@@ -44,35 +44,49 @@ export function StepCuenta() {
     setLoadingEmail(true);
     try {
       if (mode === "register") {
-        const { error: err } = await authClient.signUp.email({
+        const result = await authClient.signUp.email({
           name: name.trim(),
           email: email.trim(),
           password,
         });
-        if (err) {
+
+        // Better Auth returns { data, error } — surface any error clearly
+        if (result.error) {
+          const msg = result.error.message ?? "";
           setError(
-            err.message?.includes("already")
+            msg.toLowerCase().includes("already") || msg.toLowerCase().includes("exist")
               ? "Ya existe una cuenta con ese email. ¿Quieres iniciar sesión?"
-              : "No se pudo crear la cuenta. Inténtalo de nuevo."
+              : `No se pudo crear la cuenta: ${msg || "inténtalo de nuevo."}`
           );
           setLoadingEmail(false);
           return;
         }
+
+        // Success — data.user should be present
+        if (!result.data?.user) {
+          setError("Cuenta creada pero no se pudo iniciar sesión automáticamente. Prueba a iniciar sesión.");
+          setLoadingEmail(false);
+          return;
+        }
+
         setEmailAuthed(name.trim(), email.trim());
       } else {
-        const { data, error: err } = await authClient.signIn.email({
+        const result = await authClient.signIn.email({
           email: email.trim(),
           password,
         });
-        if (err || !data?.user) {
+
+        if (result.error || !result.data?.user) {
           setError("Email o contraseña incorrectos.");
           setLoadingEmail(false);
           return;
         }
-        setEmailAuthed(data.user.name ?? email.trim(), email.trim());
+
+        setEmailAuthed(result.data.user.name ?? email.trim(), email.trim());
       }
-    } catch {
-      setError("Ha ocurrido un error. Inténtalo de nuevo.");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(`Ha ocurrido un error: ${msg}`);
       setLoadingEmail(false);
     }
   }
