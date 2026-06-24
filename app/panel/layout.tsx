@@ -6,7 +6,7 @@ import { PanelSidebar } from "@/components/panel/sidebar";
 
 export default async function PanelLayout({ children }: { children: ReactNode }) {
   const session = await auth.api.getSession({ headers: await headers() });
-  if (!session?.user) redirect("/onboarding");
+  if (!session?.user) redirect("/login");
 
   return (
     <div className="flex min-h-screen bg-bg">
