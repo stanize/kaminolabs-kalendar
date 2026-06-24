@@ -7,8 +7,8 @@ export const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 export function canAdvance(paso: number, d: OnboardingData): boolean {
   switch (paso) {
     case 0:
-      // Step 0 is Google-only: the user must have completed OAuth
-      return d.account.googleAuthed;
+      // Step 0: user must have authenticated via Google OR email+password
+      return d.account.googleAuthed || d.account.emailAuthed;
     case 1:
       return d.negocio.nombre.trim().length > 0 && !!d.negocio.tipo;
     case 2:
