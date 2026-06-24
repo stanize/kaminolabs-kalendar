@@ -29,11 +29,11 @@ export async function finishOnboarding(d: OnboardingData): Promise<OnboardingRes
     const { data: business, error } = await supabase
       .from("kalendar_businesses")
       .insert({
-        owner_id: userId,
-        nombre:   d.business.name.trim(),
-        tipo:     d.business.type || "otro",
-        ciudad:   d.business.city?.trim() || null,
-        slug:     candidate,
+        owner_id:                userId,
+        name:                    d.business.name.trim(),
+        type:                    d.business.type || "otro",
+        city:                    d.business.city?.trim() || null,
+        slug:                    candidate,
         onboarding_completed_at: new Date().toISOString(),
       })
       .select("id, slug")
@@ -59,10 +59,10 @@ export async function finishOnboarding(d: OnboardingData): Promise<OnboardingRes
     const { error } = await supabase.from("kalendar_services").insert(
       d.services.map((s, i) => ({
         business_id:  businessId,
-        nombre:       s.name.trim(),
-        duracion_min: s.min,
-        precio:       s.price,
-        orden:        i,
+        name:         s.name.trim(),
+        duration_min: s.min,
+        price:        s.price,
+        sort_order:   i,
       }))
     );
     if (error) return { ok: false, error: `Error al guardar servicios: ${error.message}` };
@@ -72,10 +72,10 @@ export async function finishOnboarding(d: OnboardingData): Promise<OnboardingRes
   const { error: scheduleError } = await supabase.from("kalendar_business_hours").insert(
     DAYS.map((day) => ({
       business_id: businessId,
-      dia:         day.id,
-      activo:      d.schedule[day.id].on,
-      hora_inicio: d.schedule[day.id].on ? d.schedule[day.id].from : null,
-      hora_fin:    d.schedule[day.id].on ? d.schedule[day.id].to   : null,
+      day:         day.id,
+      active:      d.schedule[day.id].on,
+      start_time:  d.schedule[day.id].on ? d.schedule[day.id].from : null,
+      end_time:    d.schedule[day.id].on ? d.schedule[day.id].to   : null,
     }))
   );
   if (scheduleError) return { ok: false, error: `Error al guardar disponibilidad: ${scheduleError.message}` };
@@ -83,11 +83,11 @@ export async function finishOnboarding(d: OnboardingData): Promise<OnboardingRes
   // ── Team ──────────────────────────────────────────────────────────────────
   const { error: teamError } = await supabase.from("kalendar_team_members").insert(
     d.team.map((m, i) => ({
-      business_id:    businessId,
-      nombre:         m.name.trim(),
-      rol:            m.role?.trim() || null,
-      es_propietario: m.owner,
-      orden:          i,
+      business_id: businessId,
+      name:        m.name.trim(),
+      role:        m.role?.trim() || null,
+      is_owner:    m.owner,
+      sort_order:  i,
     }))
   );
   if (teamError) return { ok: false, error: `Error al guardar equipo: ${teamError.message}` };
