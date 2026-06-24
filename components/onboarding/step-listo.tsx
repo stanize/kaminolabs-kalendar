@@ -5,18 +5,18 @@ import Link from "next/link";
 import { Btn } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { BookingPreview } from "@/components/onboarding/booking-preview";
-import { DIAS } from "@/lib/onboarding/data";
+import { DAYS } from "@/lib/onboarding/data";
 import type { OnboardingData } from "@/lib/onboarding/types";
 
 export function StepListo({ d, slug }: { d: OnboardingData; slug: string }) {
-  const [copiado, setCopiado] = useState(false);
-  const link = `kalendar.app/${slug}`;
-  const primerNombre = d.account.nombre.trim().split(" ")[0] || "bienvenida";
+  const [copied, setCopied] = useState(false);
+  const link      = `kalendar.app/${slug}`;
+  const firstName = d.account.name.trim().split(" ")[0] || "bienvenida";
 
-  function copiar() {
+  function copyLink() {
     navigator.clipboard?.writeText(`https://${link}`).catch(() => {});
-    setCopiado(true);
-    setTimeout(() => setCopiado(false), 1800);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1800);
   }
 
   return (
@@ -26,7 +26,7 @@ export function StepListo({ d, slug }: { d: OnboardingData; slug: string }) {
           <Icon name="check" size={38} strokeWidth={2.4} />
         </div>
         <h1 className="mb-3 text-[clamp(27px,3vw,36px)] leading-[1.1]">
-          ¡Tu página ya está lista, {primerNombre}!
+          ¡Tu página ya está lista, {firstName}!
         </h1>
         <p className="m-0 mb-6 text-[16px] text-ink-soft">
           Comparte este enlace y empieza a recibir reservas hoy mismo.
@@ -38,13 +38,11 @@ export function StepListo({ d, slug }: { d: OnboardingData; slug: string }) {
             {link}
           </span>
           <button
-            onClick={copiar}
+            onClick={copyLink}
             className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[9px] bg-brand px-4 py-2.5 text-[14px] font-semibold text-white transition-[filter] duration-150 hover:brightness-[1.07]"
           >
-            {copiado ? (
-              <>
-                <Icon name="check" size={15} /> Copiado
-              </>
+            {copied ? (
+              <><Icon name="check" size={15} /> Copiado</>
             ) : (
               "Copiar"
             )}
@@ -65,29 +63,25 @@ export function StepListo({ d, slug }: { d: OnboardingData; slug: string }) {
 
         <div className="mb-7 flex flex-wrap gap-3">
           <Link href="/panel">
-            <Btn size="lg">
-              Ir a mi panel <Icon name="arrowRight" size={17} />
-            </Btn>
+            <Btn size="lg">Ir a mi panel <Icon name="arrowRight" size={17} /></Btn>
           </Link>
           <Link href={`/${slug}`}>
-            <Btn variant="outline" size="lg">
-              Ver mi página
-            </Btn>
+            <Btn variant="outline" size="lg">Ver mi página</Btn>
           </Link>
         </div>
 
         <div className="flex flex-wrap gap-6 border-t border-line pt-[22px] text-[14px] text-ink-soft">
           <span>
-            <b className="mr-1 font-display text-[18px] text-ink">{d.servicios.length}</b> servicios
+            <b className="mr-1 font-display text-[18px] text-ink">{d.services.length}</b> servicios
           </span>
           <span>
             <b className="mr-1 font-display text-[18px] text-ink">
-              {DIAS.filter((dia) => d.horario[dia.id].on).length}
+              {DAYS.filter((day) => d.schedule[day.id].on).length}
             </b>{" "}
             días disponibles
           </span>
           <span>
-            <b className="mr-1 font-display text-[18px] text-ink">{d.equipo.length}</b> en el equipo
+            <b className="mr-1 font-display text-[18px] text-ink">{d.team.length}</b> en el equipo
           </span>
         </div>
       </div>
