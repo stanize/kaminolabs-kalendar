@@ -1,22 +1,22 @@
-import { DIAS } from "./data";
+import { DAYS } from "./data";
 import type { OnboardingData } from "./types";
 
 export const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
-/** Mirrors the `canNext` array from the design handoff, one rule per config step (0-4). */
-export function canAdvance(paso: number, d: OnboardingData): boolean {
-  switch (paso) {
+/** Returns true when the user can proceed from the given step. */
+export function canProceed(step: number, d: OnboardingData): boolean {
+  switch (step) {
     case 0:
       // Step 0: user must have authenticated via Google OR email+password
       return d.account.googleAuthed || d.account.emailAuthed;
     case 1:
-      return d.negocio.nombre.trim().length > 0 && !!d.negocio.tipo;
+      return d.business.name.trim().length > 0 && !!d.business.type;
     case 2:
-      return d.servicios.length >= 1 && d.servicios.every((s) => s.nombre.trim().length > 0);
+      return d.services.length >= 1 && d.services.every((s) => s.name.trim().length > 0);
     case 3:
-      return DIAS.some((dia) => d.horario[dia.id].on);
+      return DAYS.some((day) => d.schedule[day.id].on);
     case 4:
-      return d.equipo.length >= 1 && d.equipo[0].nombre.trim().length > 0;
+      return d.team.length >= 1 && d.team[0].name.trim().length > 0;
     default:
       return true;
   }
