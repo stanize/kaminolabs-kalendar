@@ -2,75 +2,77 @@
 -- Kalendar — database schema  (onboarding scope)
 -- ============================================================================
 -- Usage:
---   1. Create a new, dedicated Supabase project for Kalendar.
---   2. Open SQL Editor → New query, paste this entire file, and run it.
+--   1. Open Supabase SQL Editor → New query.
+--   2. Paste this entire file and run it.
 --   3. Follow SETUP.md for Auth, Google OAuth, and env var configuration.
 --
 -- All tables are prefixed with "kalendar_" so they are clearly identifiable
--- inside the Supabase dashboard and easy to filter / export independently
--- of any other product that might share this Supabase organisation in future.
+-- inside the Supabase dashboard.
+-- All column names are in English.
 -- ============================================================================
 
 create extension if not exists "pgcrypto";
 
 -- ----------------------------------------------------------------------------
--- kalendar_profiles
--- Extends auth.users with Kalendar-specific user data.
--- A row is created automatically via trigger whenever a user signs up
--- (covers both email/password and Google OAuth).
+-- Drop existing tables (cascade removes dependent objects: policies, indexes)
+-- Order matters — children before parents.
 -- ----------------------------------------------------------------------------
-create table if not exists public.kalendar_profiles (
+drop table if exists public.kalendar_team_members   cascade;
+drop table if exists public.kalendar_business_hours cascade;
+drop table if exists public.kalendar_services       cascade;
+drop table if exists public.kalendar_businesses     cascade;
+drop table if exists public.kalendar_profiles       cascade;
+
+-- ----------------------------------------------------------------------------
+-- kalendar_profiles
+-- Extends Better Auth's "user" table with Kalendar-specific user data.
+-- ----------------------------------------------------------------------------
+create table public.kalendar_profiles (
   id                    uuid        primary key,
-  nombre                text        not null default '',
-  email                 text        not null,
-  -- NULL = onboarding completed fully
-  -- timestamp = user skipped onboarding at this time (show "complete your setup" banner)
+  name                  text        not null default '',
+  email                 text        not null default '',
+  -- NULL  = onboarding completed fully
+  -- value = user skipped onboarding at this time → show "complete setup" banner
   onboarding_skipped_at timestamptz,
   created_at            timestamptz not null default now()
 );
 
 alter table public.kalendar_profiles enable row level security;
 
-create policy "User can read own profile"
-  on public.kalendar_profiles for select
-  using (true);
+create policy "Profiles: public read"
+  on public.kalendar_profiles for select using (true);
 
-create policy "User can update own profile"
-  on public.kalendar_profiles for update
-  using (true)
-  with check (true);
+create policy "Profiles: owner insert"
+  on public.kalendar_profiles for insert with check (true);
 
-create policy "User can insert own profile"
-  on public.kalendar_profiles for insert
-  with check (true);
+create policy "Profiles: owner update"
+  on public.kalendar_profiles for update using (true) with check (true);
 
 -- ----------------------------------------------------------------------------
 -- kalendar_businesses
 -- ----------------------------------------------------------------------------
-create table if not exists public.kalendar_businesses (
-  id                       uuid    primary key default gen_random_uuid(),
-  owner_id                 text    not null,
-  nombre                   text    not null,
-  tipo                     text    not null check (
-    tipo in ('psico', 'nutri', 'fisio', 'belleza', 'fitness', 'coaching', 'tutorias', 'otro')
+create table public.kalendar_businesses (
+  id                      uuid        primary key default gen_random_uuid(),
+  owner_id                text        not null,
+  name                    text        not null,
+  type                    text        not null check (
+    type in ('psico', 'nutri', 'fisio', 'belleza', 'fitness', 'coaching', 'tutorias', 'otro')
   ),
-  ciudad                   text,
-  slug                     text    not null unique,
-  brand_color              text    not null default '#0d9488',
-  onboarding_completed_at  timestamptz,
-  created_at               timestamptz not null default now()
+  city                    text,
+  slug                    text        not null unique,
+  brand_color             text        not null default '#0d9488',
+  onboarding_completed_at timestamptz,
+  created_at              timestamptz not null default now()
 );
 
-create index if not exists kalendar_businesses_owner_id_idx
-  on public.kalendar_businesses (owner_id);
+create index kalendar_businesses_owner_id_idx on public.kalendar_businesses (owner_id);
 
 alter table public.kalendar_businesses enable row level security;
 
-create policy "Public read access to businesses"
-  on public.kalendar_businesses for select
-  using (true);
+create policy "Businesses: public read"
+  on public.kalendar_businesses for select using (true);
 
-create policy "Owner manages their business"
+create policy "Businesses: owner write"
   on public.kalendar_businesses for all
   using  (owner_id = current_setting('request.jwt.claims', true)::json->>'sub')
   with check (owner_id = current_setting('request.jwt.claims', true)::json->>'sub');
@@ -78,26 +80,24 @@ create policy "Owner manages their business"
 -- ----------------------------------------------------------------------------
 -- kalendar_services
 -- ----------------------------------------------------------------------------
-create table if not exists public.kalendar_services (
-  id           uuid        primary key default gen_random_uuid(),
-  business_id  uuid        not null references public.kalendar_businesses (id) on delete cascade,
-  nombre       text        not null,
-  duracion_min integer     not null check (duracion_min > 0),
-  precio       numeric(10, 2) not null default 0 check (precio >= 0),
-  orden        integer     not null default 0,
-  created_at   timestamptz not null default now()
+create table public.kalendar_services (
+  id           uuid           primary key default gen_random_uuid(),
+  business_id  uuid           not null references public.kalendar_businesses (id) on delete cascade,
+  name         text           not null,
+  duration_min integer        not null check (duration_min > 0),
+  price        numeric(10, 2) not null default 0 check (price >= 0),
+  sort_order   integer        not null default 0,
+  created_at   timestamptz    not null default now()
 );
 
-create index if not exists kalendar_services_business_id_idx
-  on public.kalendar_services (business_id);
+create index kalendar_services_business_id_idx on public.kalendar_services (business_id);
 
 alter table public.kalendar_services enable row level security;
 
-create policy "Public read access to services"
-  on public.kalendar_services for select
-  using (true);
+create policy "Services: public read"
+  on public.kalendar_services for select using (true);
 
-create policy "Owner manages their services"
+create policy "Services: owner write"
   on public.kalendar_services for all
   using (exists (
     select 1 from public.kalendar_businesses b
@@ -113,26 +113,24 @@ create policy "Owner manages their services"
 -- ----------------------------------------------------------------------------
 -- kalendar_business_hours
 -- ----------------------------------------------------------------------------
-create table if not exists public.kalendar_business_hours (
+create table public.kalendar_business_hours (
   id           uuid    primary key default gen_random_uuid(),
   business_id  uuid    not null references public.kalendar_businesses (id) on delete cascade,
-  dia          text    not null check (dia in ('lun', 'mar', 'mie', 'jue', 'vie', 'sab', 'dom')),
-  activo       boolean not null default false,
-  hora_inicio  time,
-  hora_fin     time,
-  unique (business_id, dia)
+  day          text    not null check (day in ('lun', 'mar', 'mie', 'jue', 'vie', 'sab', 'dom')),
+  active       boolean not null default false,
+  start_time   time,
+  end_time     time,
+  unique (business_id, day)
 );
 
-create index if not exists kalendar_business_hours_business_id_idx
-  on public.kalendar_business_hours (business_id);
+create index kalendar_business_hours_business_id_idx on public.kalendar_business_hours (business_id);
 
 alter table public.kalendar_business_hours enable row level security;
 
-create policy "Public read access to business hours"
-  on public.kalendar_business_hours for select
-  using (true);
+create policy "Hours: public read"
+  on public.kalendar_business_hours for select using (true);
 
-create policy "Owner manages their hours"
+create policy "Hours: owner write"
   on public.kalendar_business_hours for all
   using (exists (
     select 1 from public.kalendar_businesses b
@@ -148,26 +146,24 @@ create policy "Owner manages their hours"
 -- ----------------------------------------------------------------------------
 -- kalendar_team_members
 -- ----------------------------------------------------------------------------
-create table if not exists public.kalendar_team_members (
-  id              uuid        primary key default gen_random_uuid(),
-  business_id     uuid        not null references public.kalendar_businesses (id) on delete cascade,
-  nombre          text        not null,
-  rol             text,
-  es_propietario  boolean     not null default false,
-  orden           integer     not null default 0,
-  created_at      timestamptz not null default now()
+create table public.kalendar_team_members (
+  id           uuid        primary key default gen_random_uuid(),
+  business_id  uuid        not null references public.kalendar_businesses (id) on delete cascade,
+  name         text        not null,
+  role         text,
+  is_owner     boolean     not null default false,
+  sort_order   integer     not null default 0,
+  created_at   timestamptz not null default now()
 );
 
-create index if not exists kalendar_team_members_business_id_idx
-  on public.kalendar_team_members (business_id);
+create index kalendar_team_members_business_id_idx on public.kalendar_team_members (business_id);
 
 alter table public.kalendar_team_members enable row level security;
 
-create policy "Public read access to team members"
-  on public.kalendar_team_members for select
-  using (true);
+create policy "Team: public read"
+  on public.kalendar_team_members for select using (true);
 
-create policy "Owner manages their team"
+create policy "Team: owner write"
   on public.kalendar_team_members for all
   using (exists (
     select 1 from public.kalendar_businesses b
@@ -181,5 +177,5 @@ create policy "Owner manages their team"
   ));
 
 -- ============================================================================
--- End of onboarding schema.
+-- End of schema.
 -- ============================================================================
