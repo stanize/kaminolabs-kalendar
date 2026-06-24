@@ -4,40 +4,37 @@ import { useState } from "react";
 import { authClient } from "@/lib/auth-client";
 import { useOnboardingStore } from "@/lib/onboarding/store";
 
-type Modo = "registro" | "login";
+type Mode = "register" | "login";
 
 export function StepCuenta() {
   const setEmailAuthed = useOnboardingStore((s) => s.setEmailAuthed);
 
-  const [modo, setModo] = useState<Modo>("registro");
-  const [nombre, setNombre] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [cargandoGoogle, setCargandoGoogle] = useState(false);
-  const [cargandoEmail, setCargandoEmail] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [mode, setMode]                     = useState<Mode>("register");
+  const [name, setName]                     = useState("");
+  const [email, setEmail]                   = useState("");
+  const [password, setPassword]             = useState("");
+  const [loadingGoogle, setLoadingGoogle]   = useState(false);
+  const [loadingEmail, setLoadingEmail]     = useState(false);
+  const [error, setError]                   = useState<string | null>(null);
 
-  async function continuarConGoogle() {
+  async function handleGoogle() {
     setError(null);
-    setCargandoGoogle(true);
+    setLoadingGoogle(true);
     try {
-      await authClient.signIn.social({
-        provider: "google",
-        callbackURL: "/onboarding",
-      });
+      await authClient.signIn.social({ provider: "google", callbackURL: "/onboarding" });
     } catch {
       setError("No se pudo conectar con Google. Inténtalo de nuevo.");
-      setCargandoGoogle(false);
+      setLoadingGoogle(false);
     }
   }
 
-  async function manejarEmail() {
+  async function handleEmail() {
     setError(null);
     if (!email.trim() || !password.trim()) {
       setError("Por favor rellena todos los campos.");
       return;
     }
-    if (modo === "registro" && !nombre.trim()) {
+    if (mode === "register" && !name.trim()) {
       setError("Introduce tu nombre.");
       return;
     }
@@ -46,11 +43,11 @@ export function StepCuenta() {
       return;
     }
 
-    setCargandoEmail(true);
+    setLoadingEmail(true);
     try {
-      if (modo === "registro") {
+      if (mode === "register") {
         const { error: err } = await authClient.signUp.email({
-          name: nombre.trim(),
+          name: name.trim(),
           email: email.trim(),
           password,
         });
@@ -60,10 +57,10 @@ export function StepCuenta() {
               ? "Ya existe una cuenta con ese email. ¿Quieres iniciar sesión?"
               : "No se pudo crear la cuenta. Inténtalo de nuevo."
           );
-          setCargandoEmail(false);
+          setLoadingEmail(false);
           return;
         }
-        setEmailAuthed(nombre.trim(), email.trim());
+        setEmailAuthed(name.trim(), email.trim());
       } else {
         const { data, error: err } = await authClient.signIn.email({
           email: email.trim(),
@@ -71,26 +68,26 @@ export function StepCuenta() {
         });
         if (err || !data?.user) {
           setError("Email o contraseña incorrectos.");
-          setCargandoEmail(false);
+          setLoadingEmail(false);
           return;
         }
         setEmailAuthed(data.user.name ?? email.trim(), email.trim());
       }
     } catch {
       setError("Ha ocurrido un error. Inténtalo de nuevo.");
-      setCargandoEmail(false);
+      setLoadingEmail(false);
     }
   }
 
-  const cargando = cargandoGoogle || cargandoEmail;
+  const loading = loadingGoogle || loadingEmail;
 
   return (
     <div className="flex flex-col gap-4">
       {/* Google */}
       <button
         type="button"
-        onClick={continuarConGoogle}
-        disabled={cargando}
+        onClick={handleGoogle}
+        disabled={loading}
         className="flex w-full items-center justify-center gap-3 rounded-xl border border-line bg-surface px-5 py-3.5 text-[15px] font-semibold text-ink shadow-sm transition-all duration-150 hover:border-brand-line hover:shadow-md disabled:cursor-wait disabled:opacity-60"
       >
         <svg width="20" height="20" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
@@ -100,7 +97,7 @@ export function StepCuenta() {
           <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
           <path fill="none" d="M0 0h48v48H0z"/>
         </svg>
-        {cargandoGoogle ? "Conectando…" : "Continuar con Google"}
+        {loadingGoogle ? "Conectando…" : "Continuar con Google"}
       </button>
 
       {/* Divider */}
@@ -112,13 +109,13 @@ export function StepCuenta() {
 
       {/* Email form */}
       <div className="flex flex-col gap-3">
-        {modo === "registro" && (
+        {mode === "register" && (
           <input
             type="text"
             placeholder="Tu nombre"
-            value={nombre}
-            onChange={(e) => setNombre(e.target.value)}
-            disabled={cargando}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            disabled={loading}
             className="w-full rounded-xl border border-line bg-surface px-4 py-3 text-[14px] text-ink placeholder:text-ink-soft focus:border-brand focus:outline-none disabled:opacity-50"
           />
         )}
@@ -127,7 +124,7 @@ export function StepCuenta() {
           placeholder="Email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          disabled={cargando}
+          disabled={loading}
           className="w-full rounded-xl border border-line bg-surface px-4 py-3 text-[14px] text-ink placeholder:text-ink-soft focus:border-brand focus:outline-none disabled:opacity-50"
         />
         <input
@@ -135,33 +132,32 @@ export function StepCuenta() {
           placeholder="Contraseña (mín. 8 caracteres)"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          disabled={cargando}
-          onKeyDown={(e) => e.key === "Enter" && manejarEmail()}
+          disabled={loading}
+          onKeyDown={(e) => e.key === "Enter" && handleEmail()}
           className="w-full rounded-xl border border-line bg-surface px-4 py-3 text-[14px] text-ink placeholder:text-ink-soft focus:border-brand focus:outline-none disabled:opacity-50"
         />
-
         <button
           type="button"
-          onClick={manejarEmail}
-          disabled={cargando}
+          onClick={handleEmail}
+          disabled={loading}
           className="w-full rounded-xl bg-brand px-5 py-3.5 text-[15px] font-semibold text-white transition-all duration-150 hover:bg-brand/90 disabled:cursor-wait disabled:opacity-60"
         >
-          {cargandoEmail
+          {loadingEmail
             ? "Un momento…"
-            : modo === "registro"
+            : mode === "register"
             ? "Crear cuenta"
             : "Iniciar sesión"}
         </button>
       </div>
 
-      {/* Toggle modo */}
+      {/* Mode toggle */}
       <p className="text-center text-[13px] text-ink-soft">
-        {modo === "registro" ? (
+        {mode === "register" ? (
           <>
             ¿Ya tienes cuenta?{" "}
             <button
               type="button"
-              onClick={() => { setModo("login"); setError(null); }}
+              onClick={() => { setMode("login"); setError(null); }}
               className="font-medium text-brand hover:underline"
             >
               Iniciar sesión
@@ -172,7 +168,7 @@ export function StepCuenta() {
             ¿No tienes cuenta?{" "}
             <button
               type="button"
-              onClick={() => { setModo("registro"); setError(null); }}
+              onClick={() => { setMode("register"); setError(null); }}
               className="font-medium text-brand hover:underline"
             >
               Crear una
