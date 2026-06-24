@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { SplitShell } from "@/components/onboarding/split-shell";
 import { NavBtns } from "@/components/onboarding/nav-buttons";
 import { StepCuenta } from "@/components/onboarding/step-cuenta";
@@ -36,38 +36,54 @@ export function OnboardingFlow() {
   const [finalData, setFinalData] = useState<OnboardingData | null>(null);
   const [finalSlug, setFinalSlug] = useState<string>("");
 
-  // On mount: detect an existing session (Google OAuth redirect or page refresh).
-  // Skip entirely if the user just signed up with email — their name is already
-  // in the store and we must not overwrite it with a stale Google session.
+  // Guard: ensure we only advance from step 0 once, regardless of how many
+  // effects fire (email signUp creates a session immediately, so both the
+  // emailAuthed watcher and the getSession callback can race).
+  const advancedRef = useRef(false);
+
+  function advanceFromStep0(firstName: string) {
+    if (advancedRef.current) return;
+    advancedRef.current = true;
+    setUserName(firstName);
+    goTo(1);
+  }
+
+  // On mount: handle Google OAuth redirect or page refresh with existing session.
+  // If emailAuthed is already set (email signup just completed), skip getSession
+  // entirely — the emailAuthed watcher below will handle the advance.
   useEffect(() => {
-    if (d.account.emailAuthed) {
-      // Email auth already completed — just set the greeting from the store
-      const firstName = d.account.name.split(" ")[0] ?? d.account.name;
-      setUserName(firstName);
-      if (step === 0) goTo(1);
+    // Read fresh state directly from the store (not the stale closure)
+    const state = useOnboardingStore.getState();
+    if (state.d.account.emailAuthed) {
+      const firstName = state.d.account.name.split(" ")[0] ?? state.d.account.name;
+      advanceFromStep0(firstName);
       return;
     }
 
     authClient.getSession().then(({ data: session }) => {
-      if (session?.user) {
-        const fullName  = session.user.name ?? "";
-        const firstName = fullName.split(" ")[0] ?? fullName;
-        setUserName(firstName);
-        if (!d.account.googleAuthed) {
-          setGoogleAuthed(fullName, session.user.email ?? "");
-          if (step === 0) goTo(1);
-        }
+      if (!session?.user) return;
+      // Re-read store state here — it may have changed since mount
+      const current = useOnboardingStore.getState();
+      if (current.d.account.emailAuthed) {
+        // Email signup completed while getSession was in-flight — do nothing,
+        // the emailAuthed watcher already handled (or will handle) the advance.
+        return;
       }
+      const fullName  = session.user.name ?? "";
+      const firstName = fullName.split(" ")[0] ?? fullName;
+      if (!current.d.account.googleAuthed) {
+        current.setGoogleAuthed(fullName, session.user.email ?? "");
+      }
+      if (current.step === 0) advanceFromStep0(firstName);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Advance when emailAuthed flips to true (set synchronously in step-cuenta after signUp)
+  // Watch for emailAuthed flipping true (set synchronously in step-cuenta after signUp).
   useEffect(() => {
     if (d.account.emailAuthed && step === 0) {
       const firstName = d.account.name.split(" ")[0] ?? d.account.name;
-      setUserName(firstName);
-      goTo(1);
+      advanceFromStep0(firstName);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [d.account.emailAuthed]);
