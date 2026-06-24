@@ -9,13 +9,14 @@ type Mode = "register" | "login";
 export function StepCuenta() {
   const setEmailAuthed = useOnboardingStore((s) => s.setEmailAuthed);
 
-  const [mode, setMode]                     = useState<Mode>("register");
-  const [name, setName]                     = useState("");
-  const [email, setEmail]                   = useState("");
-  const [password, setPassword]             = useState("");
-  const [loadingGoogle, setLoadingGoogle]   = useState(false);
-  const [loadingEmail, setLoadingEmail]     = useState(false);
-  const [error, setError]                   = useState<string | null>(null);
+  const [mode, setMode]                       = useState<Mode>("register");
+  const [name, setName]                       = useState("");
+  const [email, setEmail]                     = useState("");
+  const [password, setPassword]               = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [loadingGoogle, setLoadingGoogle]     = useState(false);
+  const [loadingEmail, setLoadingEmail]       = useState(false);
+  const [error, setError]                     = useState<string | null>(null);
 
   async function handleGoogle() {
     setError(null);
@@ -30,17 +31,14 @@ export function StepCuenta() {
 
   async function handleEmail() {
     setError(null);
-    if (!email.trim() || !password.trim()) {
-      setError("Por favor rellena todos los campos.");
-      return;
-    }
-    if (mode === "register" && !name.trim()) {
-      setError("Introduce tu nombre.");
-      return;
-    }
-    if (password.length < 8) {
-      setError("La contraseña debe tener al menos 8 caracteres.");
-      return;
+
+    if (mode === "register") {
+      if (!name.trim()) { setError("Introduce tu nombre."); return; }
+      if (!email.trim()) { setError("Introduce tu email."); return; }
+      if (password.length < 8) { setError("La contraseña debe tener al menos 8 caracteres."); return; }
+      if (password !== confirmPassword) { setError("Las contraseñas no coinciden."); return; }
+    } else {
+      if (!email.trim() || !password.trim()) { setError("Por favor rellena todos los campos."); return; }
     }
 
     setLoadingEmail(true);
@@ -77,6 +75,13 @@ export function StepCuenta() {
       setError("Ha ocurrido un error. Inténtalo de nuevo.");
       setLoadingEmail(false);
     }
+  }
+
+  function switchMode(next: Mode) {
+    setMode(next);
+    setError(null);
+    setPassword("");
+    setConfirmPassword("");
   }
 
   const loading = loadingGoogle || loadingEmail;
@@ -133,9 +138,20 @@ export function StepCuenta() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           disabled={loading}
-          onKeyDown={(e) => e.key === "Enter" && handleEmail()}
+          onKeyDown={(e) => mode === "login" && e.key === "Enter" && handleEmail()}
           className="w-full rounded-xl border border-line bg-surface px-4 py-3 text-[14px] text-ink placeholder:text-ink-soft focus:border-brand focus:outline-none disabled:opacity-50"
         />
+        {mode === "register" && (
+          <input
+            type="password"
+            placeholder="Repite la contraseña"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            disabled={loading}
+            onKeyDown={(e) => e.key === "Enter" && handleEmail()}
+            className="w-full rounded-xl border border-line bg-surface px-4 py-3 text-[14px] text-ink placeholder:text-ink-soft focus:border-brand focus:outline-none disabled:opacity-50"
+          />
+        )}
         <button
           type="button"
           onClick={handleEmail}
@@ -155,22 +171,14 @@ export function StepCuenta() {
         {mode === "register" ? (
           <>
             ¿Ya tienes cuenta?{" "}
-            <button
-              type="button"
-              onClick={() => { setMode("login"); setError(null); }}
-              className="font-medium text-brand hover:underline"
-            >
+            <button type="button" onClick={() => switchMode("login")} className="font-medium text-brand hover:underline">
               Iniciar sesión
             </button>
           </>
         ) : (
           <>
             ¿No tienes cuenta?{" "}
-            <button
-              type="button"
-              onClick={() => { setMode("register"); setError(null); }}
-              className="font-medium text-brand hover:underline"
-            >
+            <button type="button" onClick={() => switchMode("register")} className="font-medium text-brand hover:underline">
               Crear una
             </button>
           </>
