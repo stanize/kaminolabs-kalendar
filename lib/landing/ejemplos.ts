@@ -6,7 +6,7 @@ function ejemplo(partial: {
   servicios: OnboardingData["servicios"];
 }): OnboardingData {
   return {
-    account: { nombre: "", email: "", password: "", googleAuthed: false },
+    account: { nombre: "", email: "", password: "", googleAuthed: false, emailAuthed: false },
     negocio: { nombre: partial.nombre, tipo: partial.tipo, ciudad: "" },
     servicios: partial.servicios,
     horario: {
