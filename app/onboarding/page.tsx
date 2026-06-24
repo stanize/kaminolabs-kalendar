@@ -11,13 +11,11 @@ export const metadata: Metadata = {
 export default async function OnboardingPage() {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
-
-    // Only redirect if Better Auth confirms a valid active session
     if (session?.user?.id && session?.session?.id) {
       redirect("/panel");
     }
   } catch {
-    // Session invalid or expired — show onboarding
+    // No session — show onboarding
   }
 
   return <OnboardingFlow />;
