@@ -43,7 +43,9 @@ export function OnboardingFlow() {
         // Use only the first name for the greeting
         const firstName = name.split(" ")[0] ?? name;
         setUserName(firstName);
-        if (!d.account.googleAuthed) {
+        // Advance past step 0 if user already has a session (Google OAuth redirect
+        // or returning email-auth user who refreshed the page)
+        if (!d.account.googleAuthed && !d.account.emailAuthed) {
           setGoogleAuthed(name, session.user.email ?? "");
           if (paso === 0) goTo(1);
         }
@@ -51,6 +53,16 @@ export function OnboardingFlow() {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Also advance when emailAuthed flips to true (set synchronously in step-cuenta)
+  useEffect(() => {
+    if (d.account.emailAuthed && paso === 0) {
+      const firstName = d.account.nombre.split(" ")[0] ?? d.account.nombre;
+      setUserName(firstName);
+      goTo(1);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [d.account.emailAuthed]);
 
   const canNext = canAdvance(paso, d);
 
