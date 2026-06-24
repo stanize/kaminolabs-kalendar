@@ -20,30 +20,40 @@ import type { OnboardingData } from "@/lib/onboarding/types";
 const STEP_COMPONENTS = [StepCuenta, StepNegocio, StepServicios, StepHorario, StepEquipo];
 
 export function OnboardingFlow() {
-  const step          = useOnboardingStore((s) => s.step);
-  const d             = useOnboardingStore((s) => s.d);
-  const goNext        = useOnboardingStore((s) => s.goNext);
-  const goBack        = useOnboardingStore((s) => s.goBack);
-  const goTo          = useOnboardingStore((s) => s.goTo);
+  const step            = useOnboardingStore((s) => s.step);
+  const d               = useOnboardingStore((s) => s.d);
+  const goNext          = useOnboardingStore((s) => s.goNext);
+  const goBack          = useOnboardingStore((s) => s.goBack);
+  const goTo            = useOnboardingStore((s) => s.goTo);
   const setGoogleAuthed = useOnboardingStore((s) => s.setGoogleAuthed);
-  const reset         = useOnboardingStore((s) => s.reset);
+  const reset           = useOnboardingStore((s) => s.reset);
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError]           = useState<string | null>(null);
   const [userName, setUserName]     = useState<string>("");
 
-  const [completed, setCompleted]   = useState(false);
-  const [finalData, setFinalData]   = useState<OnboardingData | null>(null);
-  const [finalSlug, setFinalSlug]   = useState<string>("");
+  const [completed, setCompleted] = useState(false);
+  const [finalData, setFinalData] = useState<OnboardingData | null>(null);
+  const [finalSlug, setFinalSlug] = useState<string>("");
 
-  // Detect existing session on mount (Google OAuth redirect or page refresh)
+  // On mount: detect an existing session (Google OAuth redirect or page refresh).
+  // Skip entirely if the user just signed up with email — their name is already
+  // in the store and we must not overwrite it with a stale Google session.
   useEffect(() => {
+    if (d.account.emailAuthed) {
+      // Email auth already completed — just set the greeting from the store
+      const firstName = d.account.name.split(" ")[0] ?? d.account.name;
+      setUserName(firstName);
+      if (step === 0) goTo(1);
+      return;
+    }
+
     authClient.getSession().then(({ data: session }) => {
       if (session?.user) {
         const fullName  = session.user.name ?? "";
         const firstName = fullName.split(" ")[0] ?? fullName;
         setUserName(firstName);
-        if (!d.account.googleAuthed && !d.account.emailAuthed) {
+        if (!d.account.googleAuthed) {
           setGoogleAuthed(fullName, session.user.email ?? "");
           if (step === 0) goTo(1);
         }
@@ -52,7 +62,7 @@ export function OnboardingFlow() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Advance when emailAuthed flips to true (set synchronously in step-cuenta)
+  // Advance when emailAuthed flips to true (set synchronously in step-cuenta after signUp)
   useEffect(() => {
     if (d.account.emailAuthed && step === 0) {
       const firstName = d.account.name.split(" ")[0] ?? d.account.name;
