@@ -36,9 +36,6 @@ export function OnboardingFlow() {
   const [finalData, setFinalData] = useState<OnboardingData | null>(null);
   const [finalSlug, setFinalSlug] = useState<string>("");
 
-  // Guard: ensure we only advance from step 0 once, regardless of how many
-  // effects fire (email signUp creates a session immediately, so both the
-  // emailAuthed watcher and the getSession callback can race).
   const advancedRef = useRef(false);
 
   function advanceFromStep0(firstName: string) {
@@ -48,11 +45,7 @@ export function OnboardingFlow() {
     goTo(1);
   }
 
-  // On mount: handle Google OAuth redirect or page refresh with existing session.
-  // If emailAuthed is already set (email signup just completed), skip getSession
-  // entirely — the emailAuthed watcher below will handle the advance.
   useEffect(() => {
-    // Read fresh state directly from the store (not the stale closure)
     const state = useOnboardingStore.getState();
     if (state.d.account.emailAuthed) {
       const firstName = state.d.account.name.split(" ")[0] ?? state.d.account.name;
@@ -62,13 +55,8 @@ export function OnboardingFlow() {
 
     authClient.getSession().then(({ data: session }) => {
       if (!session?.user) return;
-      // Re-read store state here — it may have changed since mount
       const current = useOnboardingStore.getState();
-      if (current.d.account.emailAuthed) {
-        // Email signup completed while getSession was in-flight — do nothing,
-        // the emailAuthed watcher already handled (or will handle) the advance.
-        return;
-      }
+      if (current.d.account.emailAuthed) return;
       const fullName  = session.user.name ?? "";
       const firstName = fullName.split(" ")[0] ?? fullName;
       if (!current.d.account.googleAuthed) {
@@ -79,7 +67,6 @@ export function OnboardingFlow() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Watch for emailAuthed flipping true (set synchronously in step-cuenta after signUp).
   useEffect(() => {
     if (d.account.emailAuthed && step === 0) {
       const firstName = d.account.name.split(" ")[0] ?? d.account.name;
@@ -100,16 +87,22 @@ export function OnboardingFlow() {
 
     if (step === 4) {
       setSubmitting(true);
-      const result = await finishOnboarding(d);
-      setSubmitting(false);
-      if (!result.ok) {
-        setError(result.error ?? "Ha ocurrido un error. Inténtalo de nuevo.");
-        return;
+      try {
+        const result = await finishOnboarding(d);
+        if (!result.ok) {
+          setError(result.error ?? "Ha ocurrido un error. Inténtalo de nuevo.");
+          return;
+        }
+        setFinalData(d);
+        setFinalSlug(result.slug ?? slugify(d.business.name));
+        setCompleted(true);
+        reset();
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        setError(`Error inesperado: ${msg}`);
+      } finally {
+        setSubmitting(false);
       }
-      setFinalData(d);
-      setFinalSlug(result.slug ?? slugify(d.business.name));
-      setCompleted(true);
-      reset();
       return;
     }
 
@@ -122,6 +115,9 @@ export function OnboardingFlow() {
 
   const StepComponent = STEP_COMPONENTS[step];
 
+  // Debug info shown only in development
+  const isDev = process.env.NODE_ENV === "development";
+
   return (
     <SplitShell
       step={step}
@@ -129,14 +125,22 @@ export function OnboardingFlow() {
       sub={sub}
       d={d}
       footer={
-        <NavBtns
-          step={step}
-          canNext={canNext}
-          next={handleContinue}
-          back={goBack}
-          loading={submitting}
-          errorMsg={error}
-        />
+        <>
+          {isDev && (
+            <details className="mt-3 rounded-lg border border-line bg-surface-2 p-3 text-[11px] text-ink-soft">
+              <summary className="cursor-pointer font-mono">debug: step {step} · canNext={String(canNext)}</summary>
+              <pre className="mt-2 overflow-auto">{JSON.stringify({ step, canNext, account: d.account, business: d.business }, null, 2)}</pre>
+            </details>
+          )}
+          <NavBtns
+            step={step}
+            canNext={canNext}
+            next={handleContinue}
+            back={goBack}
+            loading={submitting}
+            errorMsg={error}
+          />
+        </>
       }
     >
       <StepComponent />
