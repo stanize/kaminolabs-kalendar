@@ -3,11 +3,11 @@ import { Navbar } from "@/components/landing/navbar";
 import { Btn } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { BookingPreview } from "@/components/onboarding/booking-preview";
-import { TIPOS } from "@/lib/onboarding/data";
-import { EJEMPLOS_LANDING } from "@/lib/landing/ejemplos";
+import { BUSINESS_TYPES } from "@/lib/onboarding/data";
+import { LANDING_EXAMPLES } from "@/lib/landing/ejemplos";
 
-const ROTACIONES = ["-rotate-3", "rotate-2", "-rotate-1", "rotate-3"];
-const DESPLAZAMIENTOS = ["md:translate-y-3", "md:-translate-y-2", "md:translate-y-4", "md:-translate-y-1"];
+const ROTATIONS   = ["-rotate-3", "rotate-2", "-rotate-1", "rotate-3"];
+const OFFSETS     = ["md:translate-y-3", "md:-translate-y-2", "md:translate-y-4", "md:-translate-y-1"];
 
 export default function LandingPage() {
   return (
@@ -34,21 +34,21 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* ===== Tira de páginas de reserva en vivo ===== */}
+        {/* ===== Live booking page previews ===== */}
         <section className="overflow-x-clip px-5 pb-24 sm:px-8">
           <div className="mx-auto flex max-w-[1180px] flex-wrap justify-center gap-6 md:flex-nowrap">
-            {EJEMPLOS_LANDING.map((ej, i) => (
+            {LANDING_EXAMPLES.map((example, i) => (
               <div
-                key={ej.negocio.nombre}
-                className={`w-[260px] shrink-0 transition-transform duration-300 hover:translate-y-0! hover:rotate-0! ${ROTACIONES[i]} ${DESPLAZAMIENTOS[i]}`}
+                key={example.business.name}
+                className={`w-[260px] shrink-0 transition-transform duration-300 hover:translate-y-0! hover:rotate-0! ${ROTATIONS[i]} ${OFFSETS[i]}`}
               >
-                <BookingPreview d={ej} compact />
+                <BookingPreview d={example} compact />
               </div>
             ))}
           </div>
         </section>
 
-        {/* ===== Para quién es ===== */}
+        {/* ===== Who it's for ===== */}
         <section id="para-quien" className="border-t border-line bg-surface px-5 py-20 sm:px-8">
           <div className="mx-auto max-w-[1000px] text-center">
             <h2 className="text-[clamp(26px,3.5vw,34px)]">Pensado para quien atiende citas, no agendas</h2>
@@ -57,56 +57,44 @@ export default function LandingPage() {
               servicios pensadas para cada sector.
             </p>
             <div className="mx-auto mt-10 grid max-w-[760px] grid-cols-2 gap-3 sm:grid-cols-4">
-              {TIPOS.map((tipo) => (
+              {BUSINESS_TYPES.map((bt) => (
                 <div
-                  key={tipo.id}
+                  key={bt.id}
                   className="flex flex-col items-center gap-2.5 rounded-2xl border border-line bg-surface px-3 py-6 text-center"
                 >
                   <div className="grid h-10 w-10 place-items-center rounded-full bg-brand-weak text-brand">
-                    <Icon name={tipo.icon} size={19} />
+                    <Icon name={bt.icon} size={19} />
                   </div>
-                  <span className="text-[13.5px] font-semibold text-ink">{tipo.label}</span>
+                  <span className="text-[13.5px] font-semibold text-ink">{bt.label}</span>
                 </div>
               ))}
             </div>
           </div>
         </section>
 
-        {/* ===== Cómo funciona ===== */}
+        {/* ===== How it works ===== */}
         <section id="como-funciona" className="px-5 py-20 sm:px-8">
           <div className="mx-auto max-w-[1000px]">
             <h2 className="text-center text-[clamp(26px,3.5vw,34px)]">Listo para recibir reservas en 3 pasos</h2>
             <div className="mt-12 grid gap-8 sm:grid-cols-3">
               {[
-                {
-                  numero: "1",
-                  titulo: "Crea tu cuenta",
-                  texto: "Con tu correo o con Google. Sin tarjeta, sin compromiso.",
-                },
-                {
-                  numero: "2",
-                  titulo: "Configura tu negocio",
-                  texto: "Añade tus servicios, tu horario y tu equipo en un par de minutos.",
-                },
-                {
-                  numero: "3",
-                  titulo: "Comparte tu enlace",
-                  texto: "Tu página kalendar.app/tu-negocio ya está lista para recibir reservas.",
-                },
-              ].map((paso) => (
-                <div key={paso.numero} className="rounded-2xl border border-line bg-surface p-7">
+                { number: "1", title: "Crea tu cuenta",        text: "Con tu correo o con Google. Sin tarjeta, sin compromiso." },
+                { number: "2", title: "Configura tu negocio",  text: "Añade tus servicios, tu horario y tu equipo en un par de minutos." },
+                { number: "3", title: "Comparte tu enlace",    text: "Tu página kalendar.app/tu-negocio ya está lista para recibir reservas." },
+              ].map((step) => (
+                <div key={step.number} className="rounded-2xl border border-line bg-surface p-7">
                   <div className="mb-4 grid h-9 w-9 place-items-center rounded-full bg-brand text-[14px] font-bold text-white">
-                    {paso.numero}
+                    {step.number}
                   </div>
-                  <h3 className="mb-1.5 text-[18px]">{paso.titulo}</h3>
-                  <p className="m-0 text-[14.5px] leading-relaxed text-ink-soft">{paso.texto}</p>
+                  <h3 className="mb-1.5 text-[18px]">{step.title}</h3>
+                  <p className="m-0 text-[14.5px] leading-relaxed text-ink-soft">{step.text}</p>
                 </div>
               ))}
             </div>
           </div>
         </section>
 
-        {/* ===== CTA final ===== */}
+        {/* ===== Final CTA ===== */}
         <section
           className="mx-5 mb-20 rounded-[28px] px-6 py-16 text-center text-white sm:mx-8"
           style={{
