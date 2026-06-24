@@ -11,7 +11,7 @@ export default async function PanelHomePage() {
 
   const { data: business } = await supabase
     .from("kalendar_businesses")
-    .select("id, nombre, slug, tipo, ciudad, onboarding_completed_at")
+    .select("id, name, slug, type, city, onboarding_completed_at")
     .eq("owner_id", session!.user.id)
     .order("created_at", { ascending: false })
     .limit(1)
@@ -22,7 +22,7 @@ export default async function PanelHomePage() {
     : { data: [] };
 
   const { data: scheduleRows } = business
-    ? await supabase.from("kalendar_business_hours").select("activo").eq("business_id", business.id).eq("activo", true)
+    ? await supabase.from("kalendar_business_hours").select("active").eq("business_id", business.id).eq("active", true)
     : { data: [] };
 
   const { data: teamMembers } = business
@@ -152,10 +152,10 @@ export default async function PanelHomePage() {
             </p>
             <div className="mt-3 flex flex-col gap-1">
               {[
-                { label: "Servicios",       href: "/panel/servicios",      icon: "sparkles" },
-                { label: "Disponibilidad",  href: "/panel/disponibilidad", icon: "clock" },
-                { label: "Equipo",          href: "/panel/equipo",         icon: "users" },
-                { label: "Ajustes",         href: "/panel/ajustes",        icon: "settings" },
+                { label: "Servicios",      href: "/panel/servicios",      icon: "sparkles" },
+                { label: "Disponibilidad", href: "/panel/disponibilidad", icon: "clock" },
+                { label: "Equipo",         href: "/panel/equipo",         icon: "users" },
+                { label: "Ajustes",        href: "/panel/ajustes",        icon: "settings" },
               ].map((item) => (
                 <Link
                   key={item.href}
