@@ -12,83 +12,77 @@ import { StepListo } from "@/components/onboarding/step-listo";
 import { authClient } from "@/lib/auth-client";
 import { finishOnboarding } from "@/lib/actions/onboarding";
 import { useOnboardingStore } from "@/lib/onboarding/store";
-import { canAdvance } from "@/lib/onboarding/validation";
-import { PASOS } from "@/lib/onboarding/data";
+import { canProceed } from "@/lib/onboarding/validation";
+import { STEPS } from "@/lib/onboarding/data";
 import { slugify } from "@/lib/onboarding/slug";
 import type { OnboardingData } from "@/lib/onboarding/types";
 
-const STEP_CONTENT = [StepCuenta, StepNegocio, StepServicios, StepHorario, StepEquipo];
+const STEP_COMPONENTS = [StepCuenta, StepNegocio, StepServicios, StepHorario, StepEquipo];
 
 export function OnboardingFlow() {
-  const paso = useOnboardingStore((s) => s.paso);
-  const d = useOnboardingStore((s) => s.d);
-  const goNext = useOnboardingStore((s) => s.goNext);
-  const goBack = useOnboardingStore((s) => s.goBack);
-  const goTo = useOnboardingStore((s) => s.goTo);
+  const step          = useOnboardingStore((s) => s.step);
+  const d             = useOnboardingStore((s) => s.d);
+  const goNext        = useOnboardingStore((s) => s.goNext);
+  const goBack        = useOnboardingStore((s) => s.goBack);
+  const goTo          = useOnboardingStore((s) => s.goTo);
   const setGoogleAuthed = useOnboardingStore((s) => s.setGoogleAuthed);
-  const reset = useOnboardingStore((s) => s.reset);
+  const reset         = useOnboardingStore((s) => s.reset);
 
-  const [enviando, setEnviando] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [userName, setUserName] = useState<string>("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError]           = useState<string | null>(null);
+  const [userName, setUserName]     = useState<string>("");
 
-  const [terminado, setTerminado] = useState(false);
-  const [dFinal, setDFinal] = useState<OnboardingData | null>(null);
-  const [slugFinal, setSlugFinal] = useState<string>("");
+  const [completed, setCompleted]   = useState(false);
+  const [finalData, setFinalData]   = useState<OnboardingData | null>(null);
+  const [finalSlug, setFinalSlug]   = useState<string>("");
 
+  // Detect existing session on mount (Google OAuth redirect or page refresh)
   useEffect(() => {
     authClient.getSession().then(({ data: session }) => {
       if (session?.user) {
-        const name = session.user.name ?? "";
-        // Use only the first name for the greeting
-        const firstName = name.split(" ")[0] ?? name;
+        const fullName  = session.user.name ?? "";
+        const firstName = fullName.split(" ")[0] ?? fullName;
         setUserName(firstName);
-        // Advance past step 0 if user already has a session (Google OAuth redirect
-        // or returning email-auth user who refreshed the page)
         if (!d.account.googleAuthed && !d.account.emailAuthed) {
-          setGoogleAuthed(name, session.user.email ?? "");
-          if (paso === 0) goTo(1);
+          setGoogleAuthed(fullName, session.user.email ?? "");
+          if (step === 0) goTo(1);
         }
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Also advance when emailAuthed flips to true (set synchronously in step-cuenta)
+  // Advance when emailAuthed flips to true (set synchronously in step-cuenta)
   useEffect(() => {
-    if (d.account.emailAuthed && paso === 0) {
-      const firstName = d.account.nombre.split(" ")[0] ?? d.account.nombre;
+    if (d.account.emailAuthed && step === 0) {
+      const firstName = d.account.name.split(" ")[0] ?? d.account.name;
       setUserName(firstName);
       goTo(1);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [d.account.emailAuthed]);
 
-  const canNext = canAdvance(paso, d);
+  const canNext = canProceed(step, d);
 
-  const meta = PASOS[paso];
-  const titulo = paso === 1 && userName
-    ? `¡Hola, ${userName}!`
-    : meta.titulo;
-  const sub = paso === 1 && userName
-    ? "Cuéntanos un poco sobre tu negocio."
-    : meta.sub;
+  const meta  = STEPS[step];
+  const title = step === 1 && userName ? `¡Hola, ${userName}!` : meta.title;
+  const sub   = step === 1 && userName ? "Cuéntanos un poco sobre tu negocio." : meta.sub;
 
-  async function manejarContinuar() {
+  async function handleContinue() {
     setError(null);
     if (!canNext) return;
 
-    if (paso === 4) {
-      setEnviando(true);
-      const resultado = await finishOnboarding(d);
-      setEnviando(false);
-      if (!resultado.ok) {
-        setError(resultado.error ?? "Ha ocurrido un error. Inténtalo de nuevo.");
+    if (step === 4) {
+      setSubmitting(true);
+      const result = await finishOnboarding(d);
+      setSubmitting(false);
+      if (!result.ok) {
+        setError(result.error ?? "Ha ocurrido un error. Inténtalo de nuevo.");
         return;
       }
-      setDFinal(d);
-      setSlugFinal(resultado.slug ?? slugify(d.negocio.nombre));
-      setTerminado(true);
+      setFinalData(d);
+      setFinalSlug(result.slug ?? slugify(d.business.name));
+      setCompleted(true);
       reset();
       return;
     }
@@ -96,30 +90,30 @@ export function OnboardingFlow() {
     goNext();
   }
 
-  if (terminado && dFinal) {
-    return <StepListo d={dFinal} slug={slugFinal} />;
+  if (completed && finalData) {
+    return <StepListo d={finalData} slug={finalSlug} />;
   }
 
-  const StepContent = STEP_CONTENT[paso];
+  const StepComponent = STEP_COMPONENTS[step];
 
   return (
     <SplitShell
-      paso={paso}
-      titulo={titulo}
+      step={step}
+      title={title}
       sub={sub}
       d={d}
       footer={
         <NavBtns
-          paso={paso}
+          step={step}
           canNext={canNext}
-          next={manejarContinuar}
+          next={handleContinue}
           back={goBack}
-          loading={enviando}
+          loading={submitting}
           errorMsg={error}
         />
       }
     >
-      <StepContent />
+      <StepComponent />
     </SplitShell>
   );
 }
