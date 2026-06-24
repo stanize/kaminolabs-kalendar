@@ -3,19 +3,19 @@ import clsx from "clsx";
 import { Logo } from "@/components/ui/logo";
 import { Icon } from "@/components/ui/icon";
 import { BookingPreview } from "@/components/onboarding/booking-preview";
-import { PASOS, TOTAL_PASOS_CONFIG } from "@/lib/onboarding/data";
+import { STEPS, TOTAL_CONFIG_STEPS } from "@/lib/onboarding/data";
 import type { OnboardingData } from "@/lib/onboarding/types";
 
 export function SplitShell({
-  paso,
-  titulo,
+  step,
+  title,
   sub,
   d,
   children,
   footer,
 }: {
-  paso: number;
-  titulo: string;
+  step: number;
+  title: string;
   sub: string;
   d: OnboardingData;
   children: ReactNode;
@@ -23,7 +23,7 @@ export function SplitShell({
 }) {
   return (
     <div className="grid min-h-screen md:grid-cols-[minmax(380px,44%)_1fr]">
-      {/* Panel de marca + vista previa en vivo */}
+      {/* Brand panel + live booking preview */}
       <div
         className="hidden flex-col gap-6 overflow-hidden p-7 text-white md:flex md:p-10 lg:p-12"
         style={{
@@ -52,41 +52,41 @@ export function SplitShell({
         </div>
 
         <div className="mt-auto flex flex-col gap-0.5">
-          {PASOS.slice(0, TOTAL_PASOS_CONFIG).map((p, i) => (
+          {STEPS.slice(0, TOTAL_CONFIG_STEPS).map((s, i) => (
             <div
-              key={p.id}
+              key={s.id}
               className={clsx(
                 "flex items-center gap-2.5 py-1.5 text-[14px] font-medium text-white/60",
-                i === paso && "font-semibold text-white",
-                i < paso && "text-white/85"
+                i === step && "font-semibold text-white",
+                i < step && "text-white/85"
               )}
             >
               <span
                 className={clsx(
                   "grid h-[22px] w-[22px] shrink-0 place-items-center rounded-full border border-white/30 text-[12px]",
-                  i === paso && "border-white bg-white text-brand",
-                  i < paso && "border-transparent bg-white/22 text-white"
+                  i === step && "border-white bg-white text-brand",
+                  i < step && "border-transparent bg-white/22 text-white"
                 )}
               >
-                {i < paso ? <Icon name="check" size={12} strokeWidth={3} /> : i + 1}
+                {i < step ? <Icon name="check" size={12} strokeWidth={3} /> : i + 1}
               </span>
-              {p.titulo}
+              {s.title}
             </div>
           ))}
         </div>
       </div>
 
-      {/* Formulario */}
+      {/* Form panel */}
       <div className="grid place-items-center overflow-y-auto px-5 py-10 sm:px-8 md:px-12">
         <div className="w-full max-w-[520px]">
           <div className="mb-6 h-1.5 overflow-hidden rounded-full bg-surface-2">
             <div
               className="h-full rounded-full bg-brand transition-[width] duration-[350ms] ease-[cubic-bezier(.4,0,.2,1)]"
-              style={{ width: `${((paso + 1) / TOTAL_PASOS_CONFIG) * 100}%` }}
+              style={{ width: `${((step + 1) / TOTAL_CONFIG_STEPS) * 100}%` }}
             />
           </div>
           <div className="mb-5">
-            <h1 className="mb-1.5 text-[25px]">{titulo}</h1>
+            <h1 className="mb-1.5 text-[25px]">{title}</h1>
             <p className="m-0 text-[15px] text-ink-soft">{sub}</p>
           </div>
           {children}
