@@ -6,6 +6,16 @@ import { useOnboardingStore } from "@/lib/onboarding/store";
 
 type Mode = "register" | "login";
 
+/** Wraps a promise with a timeout — rejects with a timeout error if it takes too long */
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`Timeout after ${ms}ms`)), ms)
+    ),
+  ]);
+}
+
 export function StepCuenta() {
   const setEmailAuthed = useOnboardingStore((s) => s.setEmailAuthed);
 
@@ -33,10 +43,10 @@ export function StepCuenta() {
     setError(null);
 
     if (mode === "register") {
-      if (!name.trim())                       { setError("Introduce tu nombre."); return; }
-      if (!email.trim())                      { setError("Introduce tu email."); return; }
-      if (password.length < 8)               { setError("La contraseña debe tener al menos 8 caracteres."); return; }
-      if (password !== confirmPassword)      { setError("Las contraseñas no coinciden."); return; }
+      if (!name.trim())                  { setError("Introduce tu nombre."); return; }
+      if (!email.trim())                 { setError("Introduce tu email."); return; }
+      if (password.length < 8)          { setError("La contraseña debe tener al menos 8 caracteres."); return; }
+      if (password !== confirmPassword) { setError("Las contraseñas no coinciden."); return; }
     } else {
       if (!email.trim() || !password.trim()) { setError("Por favor rellena todos los campos."); return; }
     }
@@ -44,40 +54,37 @@ export function StepCuenta() {
     setLoadingEmail(true);
     try {
       if (mode === "register") {
-        const result = await authClient.signUp.email({
-          name: name.trim(),
-          email: email.trim(),
-          password,
-        });
+        const result = await withTimeout(
+          authClient.signUp.email({ name: name.trim(), email: email.trim(), password }),
+          12000
+        );
 
-        // Better Auth returns { data, error } — surface any error clearly
         if (result.error) {
           const msg = result.error.message ?? "";
           setError(
             msg.toLowerCase().includes("already") || msg.toLowerCase().includes("exist")
               ? "Ya existe una cuenta con ese email. ¿Quieres iniciar sesión?"
-              : `No se pudo crear la cuenta: ${msg || "inténtalo de nuevo."}`
+              : `Error al crear la cuenta: ${msg || "inténtalo de nuevo."}`
           );
           setLoadingEmail(false);
           return;
         }
 
-        // Success — data.user should be present
         if (!result.data?.user) {
-          setError("Cuenta creada pero no se pudo iniciar sesión automáticamente. Prueba a iniciar sesión.");
+          setError("Cuenta creada pero sin sesión. Por favor inicia sesión.");
           setLoadingEmail(false);
           return;
         }
 
         setEmailAuthed(name.trim(), email.trim());
       } else {
-        const result = await authClient.signIn.email({
-          email: email.trim(),
-          password,
-        });
+        const result = await withTimeout(
+          authClient.signIn.email({ email: email.trim(), password }),
+          12000
+        );
 
         if (result.error || !result.data?.user) {
-          setError("Email o contraseña incorrectos.");
+          setError(`Email o contraseña incorrectos.${result.error?.message ? ` (${result.error.message})` : ""}`);
           setLoadingEmail(false);
           return;
         }
@@ -86,7 +93,7 @@ export function StepCuenta() {
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      setError(`Ha ocurrido un error: ${msg}`);
+      setError(`Error: ${msg}`);
       setLoadingEmail(false);
     }
   }
