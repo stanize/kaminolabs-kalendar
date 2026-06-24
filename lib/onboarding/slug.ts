@@ -1,7 +1,7 @@
 /**
  * Turns a business name into a URL-safe slug.
  * "Centro Bienestar Serena" -> "centro-bienestar-serena"
- * Falls back to "tu-negocio" when the input produces nothing usable.
+ * Falls back to "my-business" when the input produces nothing usable.
  */
 export function slugify(input: string): string {
   const s = (input || "")
@@ -12,5 +12,5 @@ export function slugify(input: string): string {
     .trim()
     .replace(/\s+/g, "-")
     .replace(/-+/g, "-");
-  return s || "tu-negocio";
+  return s || "my-business";
 }
