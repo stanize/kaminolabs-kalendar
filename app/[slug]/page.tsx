@@ -15,7 +15,7 @@ export default async function BusinessPublicPage({
 
   const { data: business } = await supabase
     .from("kalendar_businesses")
-    .select("nombre, tipo, ciudad")
+    .select("name, type, city")
     .eq("slug", slug)
     .maybeSingle();
 
@@ -30,10 +30,10 @@ export default async function BusinessPublicPage({
         <div className="mx-auto mb-5 grid h-14 w-14 place-items-center rounded-full bg-brand-weak text-brand">
           <Icon name="calendar" size={24} />
         </div>
-        <h1 className="mb-1.5 text-[22px]">{business.nombre}</h1>
+        <h1 className="mb-1.5 text-[22px]">{business.name}</h1>
         <p className="m-0 mb-6 text-[14.5px] text-ink-soft">
-          {businessTypeLabel(business.tipo as BusinessType)}
-          {business.ciudad ? ` · ${business.ciudad}` : ""}
+          {businessTypeLabel(business.type as BusinessType)}
+          {business.city ? ` · ${business.city}` : ""}
         </p>
         <p className="m-0 rounded-xl bg-surface-2 px-4 py-3 text-[14px] text-ink-soft">
           La página de reservas online de este negocio estará disponible muy pronto.
