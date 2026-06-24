@@ -2,67 +2,67 @@
 
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
-import { DIAS, newServicioId, tipoLabel, TOTAL_PASOS_CONFIG } from "./data";
+import { DAYS, newServiceId, businessTypeLabel, TOTAL_CONFIG_STEPS } from "./data";
 import type {
-  DiaId,
-  Horario,
-  MiembroEquipo,
+  DayId,
+  Schedule,
+  TeamMember,
   OnboardingData,
-  Servicio,
-  TipoNegocio,
+  Service,
+  BusinessType,
 } from "./types";
 
-function horarioInicial(): Horario {
-  const h = {} as Horario;
-  DIAS.forEach((dia, i) => {
-    h[dia.id] = { on: i < 5, desde: "09:00", hasta: "18:00" };
+function initialSchedule(): Schedule {
+  const s = {} as Schedule;
+  DAYS.forEach((day, i) => {
+    s[day.id] = { on: i < 5, from: "09:00", to: "18:00" };
   });
-  return h;
+  return s;
 }
 
-function estadoInicial(): OnboardingData {
+function initialState(): OnboardingData {
   return {
-    account: { nombre: "", email: "", password: "", googleAuthed: false, emailAuthed: false },
-    negocio: { nombre: "", tipo: "", ciudad: "" },
-    servicios: [],
-    horario: horarioInicial(),
-    equipo: [{ nombre: "", rol: "", owner: true }],
+    account:  { name: "", email: "", password: "", googleAuthed: false, emailAuthed: false },
+    business: { name: "", type: "", city: "" },
+    services: [],
+    schedule: initialSchedule(),
+    team:     [{ name: "", role: "", owner: true }],
   };
 }
 
 interface OnboardingStore {
-  paso: number;
+  step: number;
   d: OnboardingData;
 
-  // navegación
+  // navigation
   goNext: () => void;
   goBack: () => void;
-  goTo: (paso: number) => void;
+  goTo: (step: number) => void;
 
-  // paso 0 — cuenta
-  setNombre: (v: string) => void;
-  setEmail: (v: string) => void;
-  setPassword: (v: string) => void;
-  setGoogleAuthed: (nombre: string, email: string) => void;
-  setEmailAuthed: (nombre: string, email: string) => void;
+  // step 0 — account
+  setName:          (v: string) => void;
+  setEmail:         (v: string) => void;
+  setPassword:      (v: string) => void;
+  setGoogleAuthed:  (name: string, email: string) => void;
+  setEmailAuthed:   (name: string, email: string) => void;
 
-  // paso 1 — negocio
-  setNegocioNombre: (v: string) => void;
-  setNegocioTipo: (v: TipoNegocio) => void;
-  setNegocioCiudad: (v: string) => void;
+  // step 1 — business
+  setBusinessName:  (v: string) => void;
+  setBusinessType:  (v: BusinessType) => void;
+  setBusinessCity:  (v: string) => void;
 
-  // paso 2 — servicios
-  addServicio: (nombre?: string, min?: number, precio?: number) => void;
-  updateServicio: (id: string, patch: Partial<Omit<Servicio, "id">>) => void;
-  removeServicio: (id: string) => void;
+  // step 2 — services
+  addService:    (name?: string, min?: number, price?: number) => void;
+  updateService: (id: string, patch: Partial<Omit<Service, "id">>) => void;
+  removeService: (id: string) => void;
 
-  // paso 3 — horario
-  setHorarioDia: (dia: DiaId, patch: Partial<Horario[DiaId]>) => void;
+  // step 3 — schedule
+  setScheduleDay: (day: DayId, patch: Partial<Schedule[DayId]>) => void;
 
-  // paso 4 — equipo
-  addMiembro: () => void;
-  updateMiembro: (index: number, patch: Partial<MiembroEquipo>) => void;
-  removeMiembro: (index: number) => void;
+  // step 4 — team
+  addMember:    () => void;
+  updateMember: (index: number, patch: Partial<TeamMember>) => void;
+  removeMember: (index: number) => void;
 
   reset: () => void;
 }
@@ -70,107 +70,98 @@ interface OnboardingStore {
 export const useOnboardingStore = create<OnboardingStore>()(
   persist(
     (set) => ({
-      paso: 0,
-      d: estadoInicial(),
+      step: 0,
+      d: initialState(),
 
       goNext: () =>
         set((s) => {
-          const siguiente = Math.min(s.paso + 1, 5);
+          const next = Math.min(s.step + 1, 5);
           let d = s.d;
-          // Al entrar en "equipo", precargamos al propietario con los datos de la cuenta
-          if (siguiente === 4 && !s.d.equipo[0]?.nombre.trim()) {
-            const equipo = [...s.d.equipo];
-            equipo[0] = {
-              ...equipo[0],
-              nombre: s.d.account.nombre || "Tú",
-              rol: tipoLabel(s.d.negocio.tipo) || "Profesional",
+          // When entering "team" step, pre-fill the owner with account data
+          if (next === 4 && !s.d.team[0]?.name.trim()) {
+            const team = [...s.d.team];
+            team[0] = {
+              ...team[0],
+              name: s.d.account.name || "Tú",
+              role: businessTypeLabel(s.d.business.type) || "Profesional",
             };
-            d = { ...s.d, equipo };
+            d = { ...s.d, team };
           }
-          return { paso: siguiente, d };
+          return { step: next, d };
         }),
 
-      goBack: () => set((s) => ({ paso: Math.max(0, s.paso - 1) })),
-      goTo: (paso) => set({ paso: Math.max(0, Math.min(paso, 5)) }),
+      goBack: () => set((s) => ({ step: Math.max(0, s.step - 1) })),
+      goTo:   (step) => set({ step: Math.max(0, Math.min(step, 5)) }),
 
-      setNombre: (v) => set((s) => ({ d: { ...s.d, account: { ...s.d.account, nombre: v } } })),
-      setEmail: (v) => set((s) => ({ d: { ...s.d, account: { ...s.d.account, email: v } } })),
-      setPassword: (v) =>
-        set((s) => ({ d: { ...s.d, account: { ...s.d.account, password: v } } })),
-      setGoogleAuthed: (nombre, email) =>
+      setName:     (v) => set((s) => ({ d: { ...s.d, account: { ...s.d.account, name: v } } })),
+      setEmail:    (v) => set((s) => ({ d: { ...s.d, account: { ...s.d.account, email: v } } })),
+      setPassword: (v) => set((s) => ({ d: { ...s.d, account: { ...s.d.account, password: v } } })),
+      setGoogleAuthed: (name, email) =>
         set((s) => ({
           d: {
             ...s.d,
             account: {
               ...s.d.account,
               googleAuthed: true,
-              nombre: s.d.account.nombre || nombre,
+              name:  s.d.account.name  || name,
               email: s.d.account.email || email,
             },
           },
         })),
-      setEmailAuthed: (nombre, email) =>
+      setEmailAuthed: (name, email) =>
         set((s) => ({
           d: {
             ...s.d,
             account: {
               ...s.d.account,
               emailAuthed: true,
-              nombre: s.d.account.nombre || nombre,
+              name:  s.d.account.name  || name,
               email: s.d.account.email || email,
             },
           },
         })),
 
-      setNegocioNombre: (v) =>
-        set((s) => ({ d: { ...s.d, negocio: { ...s.d.negocio, nombre: v } } })),
-      setNegocioTipo: (v) => set((s) => ({ d: { ...s.d, negocio: { ...s.d.negocio, tipo: v } } })),
-      setNegocioCiudad: (v) =>
-        set((s) => ({ d: { ...s.d, negocio: { ...s.d.negocio, ciudad: v } } })),
+      setBusinessName: (v) => set((s) => ({ d: { ...s.d, business: { ...s.d.business, name: v } } })),
+      setBusinessType: (v) => set((s) => ({ d: { ...s.d, business: { ...s.d.business, type: v } } })),
+      setBusinessCity: (v) => set((s) => ({ d: { ...s.d, business: { ...s.d.business, city: v } } })),
 
-      addServicio: (nombre = "", min = 60, precio = 40) =>
+      addService: (name = "", min = 60, price = 40) =>
+        set((s) => ({
+          d: { ...s.d, services: [...s.d.services, { id: newServiceId(), name, min, price }] },
+        })),
+      updateService: (id, patch) =>
         set((s) => ({
           d: {
             ...s.d,
-            servicios: [...s.d.servicios, { id: newServicioId(), nombre, min, precio }],
+            services: s.d.services.map((srv) => (srv.id === id ? { ...srv, ...patch } : srv)),
           },
         })),
-      updateServicio: (id, patch) =>
-        set((s) => ({
-          d: {
-            ...s.d,
-            servicios: s.d.servicios.map((srv) => (srv.id === id ? { ...srv, ...patch } : srv)),
-          },
-        })),
-      removeServicio: (id) =>
-        set((s) => ({ d: { ...s.d, servicios: s.d.servicios.filter((srv) => srv.id !== id) } })),
+      removeService: (id) =>
+        set((s) => ({ d: { ...s.d, services: s.d.services.filter((srv) => srv.id !== id) } })),
 
-      setHorarioDia: (dia, patch) =>
+      setScheduleDay: (day, patch) =>
         set((s) => ({
-          d: { ...s.d, horario: { ...s.d.horario, [dia]: { ...s.d.horario[dia], ...patch } } },
+          d: { ...s.d, schedule: { ...s.d.schedule, [day]: { ...s.d.schedule[day], ...patch } } },
         })),
 
-      addMiembro: () =>
-        set((s) => ({ d: { ...s.d, equipo: [...s.d.equipo, { nombre: "", rol: "", owner: false }] } })),
-      updateMiembro: (index, patch) =>
+      addMember: () =>
+        set((s) => ({ d: { ...s.d, team: [...s.d.team, { name: "", role: "", owner: false }] } })),
+      updateMember: (index, patch) =>
         set((s) => ({
-          d: {
-            ...s.d,
-            equipo: s.d.equipo.map((m, i) => (i === index ? { ...m, ...patch } : m)),
-          },
+          d: { ...s.d, team: s.d.team.map((m, i) => (i === index ? { ...m, ...patch } : m)) },
         })),
-      removeMiembro: (index) =>
-        set((s) => ({ d: { ...s.d, equipo: s.d.equipo.filter((_, i) => i !== index) } })),
+      removeMember: (index) =>
+        set((s) => ({ d: { ...s.d, team: s.d.team.filter((_, i) => i !== index) } })),
 
-      reset: () => set({ paso: 0, d: estadoInicial() }),
+      reset: () => set({ step: 0, d: initialState() }),
     }),
     {
       name: "kalendar-onboarding",
       storage: createJSONStorage(() => sessionStorage),
-      // sessionStorage (no localStorage) on purpose: state must survive the
-      // Google OAuth redirect round-trip, but shouldn't linger beyond the tab/session.
+      // sessionStorage (not localStorage): survives Google OAuth redirect but
+      // clears when the tab closes.
     }
   )
 );
 
-export { TOTAL_PASOS_CONFIG };
+export { TOTAL_CONFIG_STEPS };
