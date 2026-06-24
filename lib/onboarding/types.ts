@@ -1,4 +1,4 @@
-export type TipoNegocio =
+export type BusinessType =
   | "psico"
   | "nutri"
   | "fisio"
@@ -8,31 +8,31 @@ export type TipoNegocio =
   | "tutorias"
   | "otro";
 
-export type DiaId = "lun" | "mar" | "mie" | "jue" | "vie" | "sab" | "dom";
+export type DayId = "lun" | "mar" | "mie" | "jue" | "vie" | "sab" | "dom";
 
-export interface Servicio {
+export interface Service {
   id: string;
-  nombre: string;
+  name: string;
   min: number;
-  precio: number;
+  price: number;
 }
 
-export interface DiaHorario {
+export interface DaySchedule {
   on: boolean;
-  desde: string;
-  hasta: string;
+  from: string;
+  to: string;
 }
 
-export type Horario = Record<DiaId, DiaHorario>;
+export type Schedule = Record<DayId, DaySchedule>;
 
-export interface MiembroEquipo {
-  nombre: string;
-  rol: string;
+export interface TeamMember {
+  name: string;
+  role: string;
   owner: boolean;
 }
 
 export interface OnboardingAccount {
-  nombre: string;
+  name: string;
   email: string;
   password: string;
   /** true once the person has authenticated via Google OAuth */
@@ -41,22 +41,22 @@ export interface OnboardingAccount {
   emailAuthed: boolean;
 }
 
-export interface OnboardingNegocio {
-  nombre: string;
-  tipo: TipoNegocio | "";
-  ciudad: string;
+export interface OnboardingBusiness {
+  name: string;
+  type: BusinessType | "";
+  city: string;
 }
 
 export interface OnboardingData {
   account: OnboardingAccount;
-  negocio: OnboardingNegocio;
-  servicios: Servicio[];
-  horario: Horario;
-  equipo: MiembroEquipo[];
+  business: OnboardingBusiness;
+  services: Service[];
+  schedule: Schedule;
+  team: TeamMember[];
 }
 
 /** Result returned by the server action that finalizes onboarding */
-export interface FinishOnboardingResult {
+export interface OnboardingResult {
   ok: boolean;
   slug?: string;
   error?: string;
