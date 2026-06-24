@@ -3,17 +3,14 @@
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
-import { DIAS } from "@/lib/onboarding/data";
+import { DAYS } from "@/lib/onboarding/data";
 import { slugify } from "@/lib/onboarding/slug";
-import type { FinishOnboardingResult, OnboardingData } from "@/lib/onboarding/types";
+import type { OnboardingResult, OnboardingData } from "@/lib/onboarding/types";
 
-const MAX_SLUG_INTENTOS = 25;
+const MAX_SLUG_ATTEMPTS = 25;
 
-export async function finishOnboarding(d: OnboardingData): Promise<FinishOnboardingResult> {
-  // Get session from Better Auth
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
+export async function finishOnboarding(d: OnboardingData): Promise<OnboardingResult> {
+  const session = await auth.api.getSession({ headers: await headers() });
 
   if (!session?.user?.id) {
     return { ok: false, error: "No se pudo verificar tu cuenta. Inténtalo de nuevo." };
@@ -22,29 +19,29 @@ export async function finishOnboarding(d: OnboardingData): Promise<FinishOnboard
   const userId = session.user.id;
   const supabase = await createClient();
 
-  // Negocio — slug with uniqueness retry
-  const base = slugify(d.negocio.nombre);
+  // Business — slug with uniqueness retry
+  const base = slugify(d.business.name);
   let slug = base;
-  let negocioId: string | null = null;
+  let businessId: string | null = null;
 
-  for (let intento = 0; intento < MAX_SLUG_INTENTOS; intento++) {
-    const candidato = intento === 0 ? base : `${base}-${intento + 1}`;
-    const { data: negocio, error } = await supabase
+  for (let attempt = 0; attempt < MAX_SLUG_ATTEMPTS; attempt++) {
+    const candidate = attempt === 0 ? base : `${base}-${attempt + 1}`;
+    const { data: business, error } = await supabase
       .from("kalendar_businesses")
       .insert({
         owner_id: userId,
-        nombre: d.negocio.nombre.trim(),
-        tipo: d.negocio.tipo || "otro",
-        ciudad: d.negocio.ciudad?.trim() || null,
-        slug: candidato,
+        nombre:   d.business.name.trim(),
+        tipo:     d.business.type || "otro",
+        ciudad:   d.business.city?.trim() || null,
+        slug:     candidate,
         onboarding_completed_at: new Date().toISOString(),
       })
       .select("id, slug")
       .single();
 
-    if (!error && negocio) {
-      negocioId = negocio.id;
-      slug = negocio.slug;
+    if (!error && business) {
+      businessId = business.id;
+      slug = business.slug;
       break;
     }
 
@@ -53,47 +50,47 @@ export async function finishOnboarding(d: OnboardingData): Promise<FinishOnboard
     }
   }
 
-  if (!negocioId) {
+  if (!businessId) {
     return { ok: false, error: "No se pudo asignar un enlace único. Prueba con otro nombre." };
   }
 
-  // Servicios
-  if (d.servicios.length > 0) {
+  // Services
+  if (d.services.length > 0) {
     const { error } = await supabase.from("kalendar_services").insert(
-      d.servicios.map((s, i) => ({
-        business_id: negocioId,
-        nombre: s.nombre.trim(),
+      d.services.map((s, i) => ({
+        business_id:  businessId,
+        nombre:       s.name.trim(),
         duracion_min: s.min,
-        precio: s.precio,
-        orden: i,
+        precio:       s.price,
+        orden:        i,
       }))
     );
     if (error) return { ok: false, error: "No se pudieron guardar tus servicios." };
   }
 
-  // Horario
-  const { error: horarioError } = await supabase.from("kalendar_business_hours").insert(
-    DIAS.map((dia) => ({
-      business_id: negocioId,
-      dia: dia.id,
-      activo: d.horario[dia.id].on,
-      hora_inicio: d.horario[dia.id].on ? d.horario[dia.id].desde : null,
-      hora_fin: d.horario[dia.id].on ? d.horario[dia.id].hasta : null,
+  // Schedule
+  const { error: scheduleError } = await supabase.from("kalendar_business_hours").insert(
+    DAYS.map((day) => ({
+      business_id: businessId,
+      dia:         day.id,
+      activo:      d.schedule[day.id].on,
+      hora_inicio: d.schedule[day.id].on ? d.schedule[day.id].from : null,
+      hora_fin:    d.schedule[day.id].on ? d.schedule[day.id].to   : null,
     }))
   );
-  if (horarioError) return { ok: false, error: "No se pudo guardar tu disponibilidad." };
+  if (scheduleError) return { ok: false, error: "No se pudo guardar tu disponibilidad." };
 
-  // Equipo
-  const { error: equipoError } = await supabase.from("kalendar_team_members").insert(
-    d.equipo.map((m, i) => ({
-      business_id: negocioId,
-      nombre: m.nombre.trim(),
-      rol: m.rol?.trim() || null,
+  // Team
+  const { error: teamError } = await supabase.from("kalendar_team_members").insert(
+    d.team.map((m, i) => ({
+      business_id:    businessId,
+      nombre:         m.name.trim(),
+      rol:            m.role?.trim() || null,
       es_propietario: m.owner,
-      orden: i,
+      orden:          i,
     }))
   );
-  if (equipoError) return { ok: false, error: "No se pudo guardar tu equipo." };
+  if (teamError) return { ok: false, error: "No se pudo guardar tu equipo." };
 
   return { ok: true, slug };
 }
