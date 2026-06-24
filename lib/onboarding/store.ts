@@ -14,8 +14,10 @@ import type {
 
 function initialSchedule(): Schedule {
   const s = {} as Schedule;
-  DAYS.forEach((day, i) => {
-    s[day.id] = { on: i < 5, from: "09:00", to: "18:00" };
+  // All days start OFF — user must actively enable at least one day.
+  // This prevents the schedule section appearing pre-completed.
+  DAYS.forEach((day) => {
+    s[day.id] = { on: false, from: "09:00", to: "18:00" };
   });
   return s;
 }
@@ -34,32 +36,26 @@ interface OnboardingStore {
   step: number;
   d: OnboardingData;
 
-  // navigation
   goNext: () => void;
   goBack: () => void;
   goTo: (step: number) => void;
 
-  // step 0 — account
-  setName:          (v: string) => void;
-  setEmail:         (v: string) => void;
-  setPassword:      (v: string) => void;
-  setGoogleAuthed:  (name: string, email: string) => void;
-  setEmailAuthed:   (name: string, email: string) => void;
+  setName:         (v: string) => void;
+  setEmail:        (v: string) => void;
+  setPassword:     (v: string) => void;
+  setGoogleAuthed: (name: string, email: string) => void;
+  setEmailAuthed:  (name: string, email: string) => void;
 
-  // step 1 — business
-  setBusinessName:  (v: string) => void;
-  setBusinessType:  (v: BusinessType) => void;
-  setBusinessCity:  (v: string) => void;
+  setBusinessName: (v: string) => void;
+  setBusinessType: (v: BusinessType) => void;
+  setBusinessCity: (v: string) => void;
 
-  // step 2 — services
   addService:    (name?: string, min?: number, price?: number) => void;
   updateService: (id: string, patch: Partial<Omit<Service, "id">>) => void;
   removeService: (id: string) => void;
 
-  // step 3 — schedule
   setScheduleDay: (day: DayId, patch: Partial<Schedule[DayId]>) => void;
 
-  // step 4 — team
   addMember:    () => void;
   updateMember: (index: number, patch: Partial<TeamMember>) => void;
   removeMember: (index: number) => void;
@@ -77,7 +73,6 @@ export const useOnboardingStore = create<OnboardingStore>()(
         set((s) => {
           const next = Math.min(s.step + 1, 5);
           let d = s.d;
-          // When entering "team" step, pre-fill the owner with account data
           if (next === 4 && !s.d.team[0]?.name.trim()) {
             const team = [...s.d.team];
             team[0] = {
@@ -98,27 +93,11 @@ export const useOnboardingStore = create<OnboardingStore>()(
       setPassword: (v) => set((s) => ({ d: { ...s.d, account: { ...s.d.account, password: v } } })),
       setGoogleAuthed: (name, email) =>
         set((s) => ({
-          d: {
-            ...s.d,
-            account: {
-              ...s.d.account,
-              googleAuthed: true,
-              name:  s.d.account.name  || name,
-              email: s.d.account.email || email,
-            },
-          },
+          d: { ...s.d, account: { ...s.d.account, googleAuthed: true, name: s.d.account.name || name, email: s.d.account.email || email } },
         })),
       setEmailAuthed: (name, email) =>
         set((s) => ({
-          d: {
-            ...s.d,
-            account: {
-              ...s.d.account,
-              emailAuthed: true,
-              name:  s.d.account.name  || name,
-              email: s.d.account.email || email,
-            },
-          },
+          d: { ...s.d, account: { ...s.d.account, emailAuthed: true, name: s.d.account.name || name, email: s.d.account.email || email } },
         })),
 
       setBusinessName: (v) => set((s) => ({ d: { ...s.d, business: { ...s.d.business, name: v } } })),
@@ -131,10 +110,7 @@ export const useOnboardingStore = create<OnboardingStore>()(
         })),
       updateService: (id, patch) =>
         set((s) => ({
-          d: {
-            ...s.d,
-            services: s.d.services.map((srv) => (srv.id === id ? { ...srv, ...patch } : srv)),
-          },
+          d: { ...s.d, services: s.d.services.map((srv) => (srv.id === id ? { ...srv, ...patch } : srv)) },
         })),
       removeService: (id) =>
         set((s) => ({ d: { ...s.d, services: s.d.services.filter((srv) => srv.id !== id) } })),
@@ -158,8 +134,6 @@ export const useOnboardingStore = create<OnboardingStore>()(
     {
       name: "kalendar-onboarding",
       storage: createJSONStorage(() => sessionStorage),
-      // sessionStorage (not localStorage): survives Google OAuth redirect but
-      // clears when the tab closes.
     }
   )
 );
