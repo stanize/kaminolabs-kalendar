@@ -10,15 +10,17 @@ export async function skipOnboarding(): Promise<{ ok: boolean }> {
 
   const supabase = await createClient();
 
-  // Upsert profile with skipped timestamp — panel will show "complete your setup" banner
   await supabase
     .from("kalendar_profiles")
-    .upsert({
-      id: session.user.id,
-      nombre: session.user.name ?? "",
-      email: session.user.email ?? "",
-      onboarding_skipped_at: new Date().toISOString(),
-    }, { onConflict: "id" });
+    .upsert(
+      {
+        id:                    session.user.id,
+        name:                  session.user.name ?? "",
+        email:                 session.user.email ?? "",
+        onboarding_skipped_at: new Date().toISOString(),
+      },
+      { onConflict: "id" }
+    );
 
   return { ok: true };
 }
