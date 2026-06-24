@@ -7,14 +7,14 @@ import { Icon } from "@/components/ui/icon";
 import { skipOnboarding } from "@/lib/actions/skip-onboarding";
 
 export function NavBtns({
-  paso,
+  step,
   canNext,
   next,
   back,
   loading,
   errorMsg,
 }: {
-  paso: number;
+  step: number;
   canNext: boolean;
   next: () => void;
   back: () => void;
@@ -24,9 +24,9 @@ export function NavBtns({
   const router = useRouter();
   const [skipping, setSkipping] = useState(false);
 
-  if (paso === 0) return null;
+  if (step === 0) return null;
 
-  async function handleMasTarde() {
+  async function handleSkip() {
     setSkipping(true);
     await skipOnboarding();
     router.push("/panel");
@@ -46,7 +46,7 @@ export function NavBtns({
           </Btn>
           <button
             type="button"
-            onClick={handleMasTarde}
+            onClick={handleSkip}
             disabled={skipping}
             className="cursor-pointer text-[13.5px] font-medium text-ink-soft underline-offset-2 transition-colors duration-150 hover:text-ink hover:underline disabled:cursor-wait disabled:opacity-50"
           >
@@ -54,7 +54,7 @@ export function NavBtns({
           </button>
         </div>
         <Btn onClick={next} disabled={!canNext || loading || skipping}>
-          {loading ? "Creando…" : paso === 4 ? "Crear mi página" : "Continuar"}
+          {loading ? "Creando…" : step === 4 ? "Crear mi página" : "Continuar"}
           {!loading && <Icon name="arrowRight" size={17} />}
         </Btn>
       </div>
