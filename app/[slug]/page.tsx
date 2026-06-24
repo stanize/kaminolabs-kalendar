@@ -2,10 +2,10 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Logo } from "@/components/ui/logo";
 import { Icon } from "@/components/ui/icon";
-import { tipoLabel } from "@/lib/onboarding/data";
-import type { TipoNegocio } from "@/lib/onboarding/types";
+import { businessTypeLabel } from "@/lib/onboarding/data";
+import type { BusinessType } from "@/lib/onboarding/types";
 
-export default async function PaginaNegocioPublica({
+export default async function BusinessPublicPage({
   params,
 }: {
   params: Promise<{ slug: string }>;
@@ -13,13 +13,13 @@ export default async function PaginaNegocioPublica({
   const { slug } = await params;
   const supabase = await createClient();
 
-  const { data: negocio } = await supabase
+  const { data: business } = await supabase
     .from("kalendar_businesses")
     .select("nombre, tipo, ciudad")
     .eq("slug", slug)
     .maybeSingle();
 
-  if (!negocio) notFound();
+  if (!business) notFound();
 
   return (
     <div className="grid min-h-screen place-items-center px-5 py-16">
@@ -30,10 +30,10 @@ export default async function PaginaNegocioPublica({
         <div className="mx-auto mb-5 grid h-14 w-14 place-items-center rounded-full bg-brand-weak text-brand">
           <Icon name="calendar" size={24} />
         </div>
-        <h1 className="mb-1.5 text-[22px]">{negocio.nombre}</h1>
+        <h1 className="mb-1.5 text-[22px]">{business.nombre}</h1>
         <p className="m-0 mb-6 text-[14.5px] text-ink-soft">
-          {tipoLabel(negocio.tipo as TipoNegocio)}
-          {negocio.ciudad ? ` · ${negocio.ciudad}` : ""}
+          {businessTypeLabel(business.tipo as BusinessType)}
+          {business.ciudad ? ` · ${business.ciudad}` : ""}
         </p>
         <p className="m-0 rounded-xl bg-surface-2 px-4 py-3 text-[14px] text-ink-soft">
           La página de reservas online de este negocio estará disponible muy pronto.
