@@ -22,7 +22,7 @@ function horarioInicial(): Horario {
 
 function estadoInicial(): OnboardingData {
   return {
-    account: { nombre: "", email: "", password: "", googleAuthed: false },
+    account: { nombre: "", email: "", password: "", googleAuthed: false, emailAuthed: false },
     negocio: { nombre: "", tipo: "", ciudad: "" },
     servicios: [],
     horario: horarioInicial(),
@@ -39,26 +39,27 @@ interface OnboardingStore {
   goBack: () => void;
   goTo: (paso: number) => void;
 
-  // paso 1 — cuenta
+  // paso 0 — cuenta
   setNombre: (v: string) => void;
   setEmail: (v: string) => void;
   setPassword: (v: string) => void;
   setGoogleAuthed: (nombre: string, email: string) => void;
+  setEmailAuthed: (nombre: string, email: string) => void;
 
-  // paso 2 — negocio
+  // paso 1 — negocio
   setNegocioNombre: (v: string) => void;
   setNegocioTipo: (v: TipoNegocio) => void;
   setNegocioCiudad: (v: string) => void;
 
-  // paso 3 — servicios
+  // paso 2 — servicios
   addServicio: (nombre?: string, min?: number, precio?: number) => void;
   updateServicio: (id: string, patch: Partial<Omit<Servicio, "id">>) => void;
   removeServicio: (id: string) => void;
 
-  // paso 4 — horario
+  // paso 3 — horario
   setHorarioDia: (dia: DiaId, patch: Partial<Horario[DiaId]>) => void;
 
-  // paso 5 — equipo
+  // paso 4 — equipo
   addMiembro: () => void;
   updateMiembro: (index: number, patch: Partial<MiembroEquipo>) => void;
   removeMiembro: (index: number) => void;
@@ -103,6 +104,18 @@ export const useOnboardingStore = create<OnboardingStore>()(
             account: {
               ...s.d.account,
               googleAuthed: true,
+              nombre: s.d.account.nombre || nombre,
+              email: s.d.account.email || email,
+            },
+          },
+        })),
+      setEmailAuthed: (nombre, email) =>
+        set((s) => ({
+          d: {
+            ...s.d,
+            account: {
+              ...s.d.account,
+              emailAuthed: true,
               nombre: s.d.account.nombre || nombre,
               email: s.d.account.email || email,
             },
