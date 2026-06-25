@@ -176,6 +176,75 @@ create policy "Team: owner write"
       and b.owner_id = current_setting('request.jwt.claims', true)::json->>'sub'
   ));
 
+
+-- ----------------------------------------------------------------------------
+-- kalendar_support_tickets
+-- Stores support requests submitted by authenticated users via the panel.
+-- The help portal reads and updates this table (status, admin_notes).
+-- ----------------------------------------------------------------------------
+create type public.support_ticket_status as enum ('open', 'in_progress', 'resolved', 'closed');
+create type public.support_ticket_category as enum ('billing', 'technical', 'feature_request', 'account', 'other');
+
+create table public.kalendar_support_tickets (
+  id           uuid                          primary key default gen_random_uuid(),
+  user_id      text                          not null,
+  user_email   text                          not null default '',
+  subject      text                          not null,
+  description  text                          not null,
+  category     public.support_ticket_category not null default 'other',
+  status       public.support_ticket_status   not null default 'open',
+  attachments  text[]                        not null default '{}',
+  -- Populated by the help-portal admin when responding to a ticket
+  admin_notes  text,
+  created_at   timestamptz                   not null default now(),
+  updated_at   timestamptz                   not null default now()
+);
+
+create index kalendar_support_tickets_user_id_idx on public.kalendar_support_tickets (user_id);
+create index kalendar_support_tickets_status_idx  on public.kalendar_support_tickets (status);
+
+-- Auto-update updated_at on row change
+create or replace function public.set_updated_at()
+returns trigger language plpgsql as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
+create trigger kalendar_support_tickets_updated_at
+  before update on public.kalendar_support_tickets
+  for each row execute function public.set_updated_at();
+
+alter table public.kalendar_support_tickets enable row level security;
+
+-- Users can only read and insert their own tickets (no delete/update from client)
+create policy "Support: owner read"
+  on public.kalendar_support_tickets for select
+  using (true);
+
+create policy "Support: owner insert"
+  on public.kalendar_support_tickets for insert
+  with check (true);
+
+-- ============================================================================
+-- support-attachments storage bucket
+-- ============================================================================
+-- Run the following in the Supabase dashboard → Storage:
+--   1. Create a new bucket named "support-attachments" (public: true)
+--   2. Set allowed MIME types: image/png, image/jpeg, image/webp, image/gif
+--   3. Max file size: 5 MB
+-- Or run via SQL:
+--
+-- insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+-- values (
+--   'support-attachments',
+--   'support-attachments',
+--   true,
+--   5242880,
+--   array['image/png','image/jpeg','image/webp','image/gif']
+-- ) on conflict (id) do nothing;
+
 -- ============================================================================
 -- End of schema.
 -- ============================================================================
