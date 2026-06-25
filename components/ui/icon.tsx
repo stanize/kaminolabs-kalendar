@@ -25,6 +25,10 @@ import {
   LogOut,
   ExternalLink,
   Building2,
+  LifeBuoy,
+  MessageSquare,
+  Paperclip,
+  Send,
   type LucideIcon,
 } from "lucide-react";
 
@@ -55,6 +59,10 @@ export const ICONOS: Record<string, LucideIcon> = {
   logOut: LogOut,
   externalLink: ExternalLink,
   building: Building2,
+  lifeBuoy: LifeBuoy,
+  messageSquare: MessageSquare,
+  paperclip: Paperclip,
+  send: Send,
 };
 
 export function Icon({
