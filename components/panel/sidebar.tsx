@@ -23,7 +23,7 @@ const NAV_ITEMS = [
 ];
 
 const BOTTOM_NAV_ITEMS = [
-  { href: "/panel/soporte", label: "Soporte", icon: "lifeBuoy" },
+  { href: "/panel/support", label: "Soporte", icon: "lifeBuoy" },
 ];
 
 export function PanelSidebar({ user }: { user: { name?: string | null; email?: string | null; image?: string | null } }) {
