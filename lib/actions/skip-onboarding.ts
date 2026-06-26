@@ -1,11 +1,10 @@
 "use server";
 
-import { auth } from "@/lib/auth";
-import { headers } from "next/headers";
+import { getSession } from "@/lib/auth-session";
 import { createClient } from "@/lib/supabase/server";
 
 export async function skipOnboarding(): Promise<{ ok: boolean }> {
-  const session = await auth.api.getSession({ headers: await headers() });
+  const session = await getSession();
   if (!session?.user?.id) return { ok: false };
 
   const supabase = await createClient();
