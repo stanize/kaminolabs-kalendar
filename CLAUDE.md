@@ -19,6 +19,8 @@ Kalendar is a SaaS online booking platform targeting Spanish-market professional
 - **Route handler**: `app/api/auth/[...all]/route.ts`
 - **Server client**: `lib/auth.ts` (uses pg Pool + DATABASE_URL)
 - **Browser client**: `lib/auth-client.ts` (createAuthClient)
+- **Session helpers**: `lib/auth-session.ts` — `getSession()` (React `cache()`-deduped per request), `requireSession()` (throws `UnauthorizedError` when absent), and the `UnauthorizedError` class
+- **Action wrapper**: `lib/auth-action.ts` — `authedAction(handler)` injects a verified session as the guaranteed first arg (this file must stay free of `"use server"`)
 - Supabase is used for DB only — never for auth
 
 ### Database — Supabase
@@ -78,7 +80,10 @@ Kalendar is a SaaS online booking platform targeting Spanish-market professional
 ## Key Conventions
 
 - **Middleware**: Must be named `proxy.ts` (not `middleware.ts`) with exported function `proxy` — Next.js 16 convention
-- **Server actions**: Always get user via `auth.api.getSession({ headers: await headers() })` — never trust client-passed user IDs
+- **Auth layering (two gates)**: The `/panel` layout (`app/panel/layout.tsx`) is a server-component UX gate — it redirects unauthenticated users and every nested route inherits it. It is **not** a security boundary: server actions are directly invocable, so each must verify auth itself. Because all DB access uses the Supabase service-role key (no RLS backstop), the app-level check is the *only* authorization boundary.
+- **New mutations**: Wrap in `authedAction` from `lib/auth-action.ts` — `export const createX = authedAction(async (session, input) => { ... })`. The verified session is the guaranteed first arg, so there is no path into the body that skips the check. (`authedAction` throws `UnauthorizedError`. The existing `support` / `onboarding` / `skip-onboarding` actions instead **return** a graceful Spanish `{ ok: false, error }`, so they keep their own inline `getSession()` check and are intentionally not wrapped — wrapping would change their error contract.)
+- **Reads in server components**: Plain query functions taking `userId` as a required first arg — `getServices(userId)` — scoping every query by it (e.g. `.eq("owner_id", userId)`). Obtain the id via `requireSession()` (already guaranteed by the layout). The required parameter is what makes "scope to current user" impossible to forget; there is no unscoped overload to call by accident.
+- **Never trust client-passed user IDs** — always derive from the session.
 - **DB queries**: Always use `createClient()` from `lib/supabase/server.ts` in server components/actions
 - **Icons**: Add new icons to `components/ui/icon.tsx` ICONOS registry before using
 - **Copy**: All UI copy in Spanish
