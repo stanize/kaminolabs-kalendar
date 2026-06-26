@@ -1,7 +1,6 @@
 "use server";
 
-import { auth } from "@/lib/auth";
-import { headers } from "next/headers";
+import { getSession } from "@/lib/auth-session";
 import { createClient } from "@/lib/supabase/server";
 import { DAYS } from "@/lib/onboarding/data";
 import { slugify } from "@/lib/onboarding/slug";
@@ -10,7 +9,7 @@ import type { OnboardingResult, OnboardingData } from "@/lib/onboarding/types";
 const MAX_SLUG_ATTEMPTS = 25;
 
 export async function finishOnboarding(d: OnboardingData): Promise<OnboardingResult> {
-  const session = await auth.api.getSession({ headers: await headers() });
+  const session = await getSession();
 
   if (!session?.user?.id) {
     return { ok: false, error: "Sesión no encontrada. Por favor inicia sesión de nuevo." };
