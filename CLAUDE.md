@@ -12,7 +12,9 @@ Kalendar is a SaaS online booking platform targeting Spanish-market professional
 ## Architecture
 
 ### Auth — Better Auth
-- **Provider**: Better Auth with Google OAuth only (no email/password)
+- **Provider**: Better Auth — Google OAuth + email/password
+- **Email verification**: required for email/password sign-ups. `requireEmailVerification` is **false** (a session is created on sign-up so the user reaches the panel), but the panel renders a full-screen blocking gate (`components/panel/email-verification-gate.tsx`) until `user.emailVerified` is true. Google sign-ups arrive pre-verified and never see the gate.
+- **Verification email**: sent on sign-up via `emailVerification.sendVerificationEmail` in `lib/auth.ts` → `lib/email.ts` (Resend REST API, env-gated). `autoSignInAfterVerification: true`; link `callbackURL` is `/panel`.
 - **Tables**: `user`, `session`, `account`, `verification` (no RLS — Better Auth managed)
 - **Google OAuth app name**: "Kalendar by Kaminolabs"
 - **Callback URI**: `https://kalendar.kaminolabs.dev/api/auth/callback/google`
@@ -37,21 +39,25 @@ Kalendar is a SaaS online booking platform targeting Spanish-market professional
 
 ---
 
-## Onboarding Wizard (`/onboarding`)
+## Onboarding (`/onboarding`) — sign-up only
 
-6 steps: `cuenta → negocio → servicios → horario → equipo → listo`
+The multi-step wizard was removed. `/onboarding` is now a simple sign-up screen:
 
-- **Step 0 (cuenta)**: Google-only sign-in. No email form. No Continuar button.
-- **Step 1 (negocio)**: Shows personalised `¡Hola, [first name]!` greeting using name from Better Auth session.
-- **Steps 1–4**: Have a "Más tarde" skip button (with `Redirigiendo…` loading state) that calls `skipOnboarding()` server action, sets `onboarding_skipped_at` on `kalendar_profiles`, then redirects to `/panel`.
-- **State**: Zustand store persisted to `sessionStorage` (`lib/onboarding/store.ts`)
-- **Key pattern**: Snapshot `dFinal` and `slugFinal` into local state before calling `reset()` — never reset before reading store data needed for the success screen.
+- **Component**: `components/auth/signup-form.tsx` (mirrors `components/auth/login-form.tsx`), rendered by `app/onboarding/page.tsx` in a centered layout.
+- **Google sign-up** → `callbackURL: "/panel"`. Email is pre-verified, so the panel loads with no gate.
+- **Email sign-up** → `authClient.signUp.email({ ..., callbackURL: "/panel" })`, then `router.push("/panel")`. A session is created immediately; the verification email is sent automatically; the panel shows the blocking confirmation gate until the user verifies.
+- Business/services/schedule/team data collection is **no longer part of sign-up** — it will move to a separate in-panel setup flow (the panel home already shows a setup checklist that gracefully reflects an empty account).
 
 ### Routing guards
-- `/onboarding` → redirects to `/panel` if valid Better Auth session exists (verifies user in DB)
-- `/panel` → redirects to `/onboarding` if no session
+- `/onboarding` → redirects to `/panel` if a valid session exists
+- `/panel` → redirects to `/login` if no session; if signed in but email unverified, renders the verification gate over the panel
 
----
+### Removed files
+`components/onboarding/{onboarding-flow,step-cuenta,step-negocio,step-servicios,step-horario,step-equipo,step-listo,nav-buttons,split-shell}.tsx`, `lib/onboarding/{store,validation}.ts`, `lib/actions/{onboarding,skip-onboarding}.ts`.
+
+### Kept (still used by landing + public booking pages)
+`components/onboarding/booking-preview.tsx`, `lib/onboarding/{data,types,slug}.ts` — imported by `app/page.tsx`, `app/[slug]/page.tsx`, and `lib/landing/ejemplos.ts`.
+
 
 ## Panel (`/panel`)
 
@@ -74,6 +80,8 @@ Kalendar is a SaaS online booking platform targeting Spanish-market professional
 | `NEXT_PUBLIC_APP_URL` | `https://kalendar.kaminolabs.dev` |
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key |
+| `RESEND_API_KEY` | Resend API key for verification emails (without it, emails are skipped/logged, not sent) |
+| `EMAIL_FROM` | Sender, e.g. `Kalendar <no-reply@kaminolabs.dev>` (domain must be verified in Resend) |
 
 ---
 
@@ -104,6 +112,6 @@ Both steps required for a clean reset.
 
 - **Better Auth over Supabase Auth**: Supabase Auth custom domain requires paid plan ($25/mo). Better Auth runs inside Next.js, uses our domain natively — Google consent screen shows `kaminolabs.dev`.
 - **Supabase for DB only**: Keeps data ownership and avoids vendor lock-in on auth.
-- **Google OAuth only**: Simplifies auth flow for Spanish market professionals. Email/password may be added later.
+- **Auth: Google OAuth + email/password**: Email/password requires email confirmation, enforced as a panel-level UI gate (not via `requireEmailVerification`, which would block the user from ever reaching the gate).
 - **sessionStorage for Zustand**: Survives Google OAuth redirect round-trip but clears when tab closes.
 - **`onboarding_skipped_at` flag**: Nullable timestamp — NULL means completed, timestamp means skipped. Drives the "complete your setup" banner in the panel.
