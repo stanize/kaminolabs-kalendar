@@ -12,6 +12,7 @@ export const DURATION_PRESETS = [15, 30, 45, 60, 90, 120] as const;
 export const PRICE_MIN = 0;
 export const PRICE_MAX = 9999; // hard ceiling; the slider only spans the common range below
 export const PRICE_SLIDER_MAX = 100; // slider range; the number box may exceed it (clamped slider)
+export const PRICE_STEP = 5; // increment for the stepper arrows beside the slider
 
 export const NAME_MAX_LENGTH = 80;
 
