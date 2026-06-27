@@ -1,19 +1,22 @@
 import { requireSession } from "@/lib/auth-session";
-import { getSetupProgress } from "@/lib/business/data";
+import { getBusinessForUser } from "@/lib/business/data";
 import { BusinessForm } from "@/components/panel/business-form";
 
-export default async function BusinessPage() {
+export default async function BusinessPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ from?: string }>;
+}) {
   const session = await requireSession();
-  const { business, hasServices, hasActiveHours, hasTeam } = await getSetupProgress(
-    session.user.id
-  );
+  const business = await getBusinessForUser(session.user.id);
+
+  const { from } = await searchParams;
+  // Return-intent: links from the home page carry ?from=home. After a successful
+  // primary save, the form sends the user back to Inicio. Direct nav from the
+  // sidebar has no param, so the user stays put to keep editing.
+  const returnToHome = from === "home";
 
   const isNew = !business;
-
-  // Setup is complete once a business exists and the other three blocks have
-  // rows. The form uses this to decide whether to return to Inicio after save
-  // (incomplete setup) or stay put (everything already done).
-  const setupComplete = !!business && hasServices && hasActiveHours && hasTeam;
 
   return (
     <div className="mx-auto max-w-[680px] px-8 py-8">
@@ -27,7 +30,7 @@ export default async function BusinessPage() {
       </div>
 
       <BusinessForm
-        setupComplete={setupComplete}
+        returnToHome={returnToHome}
         initial={
           business
             ? {
