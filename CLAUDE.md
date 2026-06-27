@@ -139,12 +139,17 @@ duration preset row (15/30/45/60/90/120 + "Otra" custom, bounded 5-120 min); a
 **price slider 0-100 € synced with an editable number box** — the box is the
 source of truth and the slider clamps to its max when the price exceeds 100
 (whole euros, no decimals, 0 = "Gratis"). Templates come from
-`SERVICE_TEMPLATES[businessType]` (`[name, duration_min, price]`); user
-multi-selects then hits "Añadir". Reads: `getServicesForUser(userId)` in
+`SERVICE_TEMPLATES[businessType]` (`[name, duration_min, price]`). **Template flow
+(customize-before-confirm)**: the user multi-selects templates, hits
+"Personalizar N" to stage them as pre-filled, individually-removable editable
+draft cards (reusing the shared `ServiceFields`), tweaks each, then "Confirmar N"
+bulk-saves the EDITED values via `createServices`. "Cancelar" discards; removing
+all drafts returns to the picker; the manual "Añadir servicio" button is hidden
+while staging. Reads: `getServicesForUser(userId)` in
 `lib/services/data.ts` (resolves business via owner_id, scopes by business_id).
 Constraints/validation in `lib/services/constants.ts`. Server actions in
 `lib/actions/services.ts` (all `authedAction`, all scope by the caller's
-business_id): `createService`, `addServicesFromTemplates`, `updateService`,
+business_id): `createService`, `createServices` (bulk), `updateService`,
 `deleteService`, `reorderServices`; each revalidates `/panel` + `/panel/services`.
 
 ## Key Conventions
