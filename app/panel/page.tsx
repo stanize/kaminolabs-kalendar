@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Icon } from "@/components/ui/icon";
 import { Btn } from "@/components/ui/button";
 import Link from "next/link";
+import { bookingPath, bookingUrlDisplay } from "@/lib/business/booking-url";
 
 export default async function PanelHomePage() {
   const session  = await auth.api.getSession({ headers: await headers() });
@@ -136,9 +137,9 @@ export default async function PanelHomePage() {
                 Tu página de reservas
               </p>
               <p className="mb-3 truncate text-[14px] font-semibold text-ink">
-                kalendar.app/{business.slug}
+                {bookingUrlDisplay(business.slug)}
               </p>
-              <Link href={`/${business.slug}`} target="_blank">
+              <Link href={bookingPath(business.slug)} target="_blank">
                 <Btn variant="outline" size="sm" full>
                   <Icon name="externalLink" size={14} /> Ver página
                 </Btn>
