@@ -2,6 +2,7 @@ import clsx from "clsx";
 import { Icon } from "@/components/ui/icon";
 import { businessTypeIcon, businessTypeLabel } from "@/lib/onboarding/data";
 import { slugify } from "@/lib/onboarding/slug";
+import { bookingUrlDisplay } from "@/lib/business/booking-url";
 import type { OnboardingData } from "@/lib/onboarding/types";
 
 const PREVIEW_DAYS = ["lun", "mar", "mié", "jue", "vie"];
@@ -23,7 +24,7 @@ export function BookingPreview({ d, compact }: { d: OnboardingData; compact?: bo
         <span className="h-2 w-2 rounded-full bg-line" />
         <span className="h-2 w-2 rounded-full bg-line" />
         <span className="ml-2 truncate text-[11.5px] font-medium text-ink-soft">
-          kalendar.app/{slugify(d.business.name)}
+          {bookingUrlDisplay(slugify(d.business.name))}
         </span>
       </div>
 
