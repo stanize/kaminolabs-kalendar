@@ -64,7 +64,7 @@ The multi-step wizard was removed. `/onboarding` is now a simple sign-up screen:
 
 - **Layout**: `app/panel/layout.tsx` — sidebar + main content
 - **Sidebar**: `components/panel/sidebar.tsx` — full Spanish nav, user info, Cerrar sesión
-- **Nav items** (Spanish labels / English routes): Inicio `/panel`, Calendario `/panel/calendar`, Clientes `/panel/clients`, Servicios `/panel/services`, Disponibilidad `/panel/availability`, Equipo `/panel/team`, Pagos `/panel/payments`, Facturas `/panel/invoices`, Emails y avisos `/panel/notifications`, Informes `/panel/reports`, Integraciones `/panel/integrations`, Ajustes `/panel/settings`
+- **Nav items** (Spanish labels / English routes): Inicio `/panel`, Calendario `/panel/calendar`, Clientes `/panel/clients`, Negocio `/panel/business`, Servicios `/panel/services`, Disponibilidad `/panel/availability`, Equipo `/panel/team`, Pagos `/panel/payments`, Facturas `/panel/invoices`, Emails y avisos `/panel/notifications`, Informes `/panel/reports`, Integraciones `/panel/integrations`, Ajustes `/panel/settings`
 - **Home page**: Setup checklist with progress bar (Negocio, Servicios, Disponibilidad, Equipo), booking page link, quick access shortcuts
 
 ---
@@ -88,10 +88,13 @@ The multi-step wizard was removed. `/onboarding` is now a simple sign-up screen:
 
 ## Business settings & public booking
 
-- **First in-panel setup page is built**: `/panel/settings` ("Configura tu negocio")
+- **First in-panel setup page is built**: `/panel/business` ("Configura tu negocio"; sidebar label "Negocio")
   manages the single business record (name, type, city, slug). Page:
-  `app/panel/settings/page.tsx` (server, `requireSession` + `getBusinessForUser`);
-  form: `components/panel/business-settings-form.tsx` (client). Server actions in
+  `app/panel/business/page.tsx` (server, `requireSession` + `getSetupProgress`);
+  form: `components/panel/business-settings-form.tsx` (client). Each setup-checklist
+  block maps to its own sidebar nav item + page, built one block at a time; Negocio
+  is the first. After a successful save, if overall setup is incomplete the form
+  redirects to Inicio (`/panel`); if complete it stays put. Server actions in
   `lib/actions/business.ts`: `saveBusinessSettings` (create/update) and
   `checkSlugAvailability` (live UX check) — both wrapped in `authedAction`.
 - **Public booking pages live under `/bookings/[slug]`** (moved from root
@@ -130,7 +133,9 @@ The multi-step wizard was removed. `/onboarding` is now a simple sign-up screen:
   must port to another country by swapping the label layer alone, with zero code
   changes. Business type codes: `psychology|nutrition|physiotherapy|beauty|fitness|coaching|tutoring|other`.
   Weekday codes: `mon|tue|wed|thu|fri|sat|sun`. Panel routes are English
-  (`/panel/settings`, `/panel/services`, `/panel/availability`, `/panel/team`, etc.).
+  (`/panel/business`, `/panel/services`, `/panel/availability`, `/panel/team`, etc.).
+  `/panel/settings` (label "Ajustes") is reserved for FUTURE app/account settings —
+  the business record lives at `/panel/business`, not settings.
 
 - **Middleware**: Must be named `proxy.ts` (not `middleware.ts`) with exported function `proxy` — Next.js 16 convention
 - **Auth layering (two gates)**: The `/panel` layout (`app/panel/layout.tsx`) is a server-component UX gate — it redirects unauthenticated users and every nested route inherits it. It is **not** a security boundary: server actions are directly invocable, so each must verify auth itself. Because all DB access uses the Supabase service-role key (no RLS backstop), the app-level check is the *only* authorization boundary.
