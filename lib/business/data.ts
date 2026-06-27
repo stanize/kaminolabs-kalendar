@@ -18,6 +18,7 @@ export interface Business {
   created_at: string;
 }
 
+const BUSINESS_TABLE = "kalendar_businesses";
 const BUSINESS_COLUMNS =
   "id, owner_id, name, type, city, slug, slug_status, slug_flag_reason, slug_reviewed_at, brand_color, created_at";
 
@@ -29,7 +30,7 @@ const BUSINESS_COLUMNS =
 export async function getBusinessForUser(userId: string): Promise<Business | null> {
   const supabase = await createClient();
   const { data } = await supabase
-    .from("kalendar_businesses")
+    .from(BUSINESS_TABLE)
     .select(BUSINESS_COLUMNS)
     .eq("owner_id", userId)
     .order("created_at", { ascending: false })
@@ -46,10 +47,56 @@ export async function getBusinessForUser(userId: string): Promise<Business | nul
 export async function getActiveBusinessBySlug(slug: string): Promise<Business | null> {
   const supabase = await createClient();
   const { data } = await supabase
-    .from("kalendar_businesses")
+    .from(BUSINESS_TABLE)
     .select(BUSINESS_COLUMNS)
     .eq("slug", slug)
     .eq("slug_status", "active")
     .maybeSingle();
   return (data as Business | null) ?? null;
+}
+
+export interface SetupProgress {
+  business: Business | null;
+  hasServices: boolean;
+  hasActiveHours: boolean;
+  hasTeam: boolean;
+}
+
+/**
+ * Setup-checklist state for the panel home: the user's business plus whether
+ * each downstream setup step has any rows yet. Scoped by userId; the per-section
+ * checks are skipped entirely when the user has no business. Each check fetches
+ * only a count (head:true), never the rows.
+ */
+export async function getSetupProgress(userId: string): Promise<SetupProgress> {
+  const business = await getBusinessForUser(userId);
+  if (!business) {
+    return { business: null, hasServices: false, hasActiveHours: false, hasTeam: false };
+  }
+
+  const supabase = await createClient();
+  const businessId = business.id;
+
+  const [servicesRes, hoursRes, teamRes] = await Promise.all([
+    supabase
+      .from("kalendar_services")
+      .select("id", { count: "exact", head: true })
+      .eq("business_id", businessId),
+    supabase
+      .from("kalendar_business_hours")
+      .select("id", { count: "exact", head: true })
+      .eq("business_id", businessId)
+      .eq("active", true),
+    supabase
+      .from("kalendar_team_members")
+      .select("id", { count: "exact", head: true })
+      .eq("business_id", businessId),
+  ]);
+
+  return {
+    business,
+    hasServices: (servicesRes.count ?? 0) > 0,
+    hasActiveHours: (hoursRes.count ?? 0) > 0,
+    hasTeam: (teamRes.count ?? 0) > 0,
+  };
 }
