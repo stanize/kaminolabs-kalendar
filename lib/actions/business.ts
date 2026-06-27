@@ -108,7 +108,7 @@ export const saveBusinessSettings = authedAction(
         return { ok: false, error: `No se pudo guardar: ${error.message}` };
       }
       revalidatePath("/panel");
-      revalidatePath("/panel/settings");
+      revalidatePath("/panel/business");
       return { ok: true, slug: existing.slug as string, pendingReview: false };
     }
 
@@ -159,7 +159,7 @@ export const saveBusinessSettings = authedAction(
     }
 
     revalidatePath("/panel");
-    revalidatePath("/panel/settings");
+    revalidatePath("/panel/business");
     return { ok: true, slug, pendingReview: !screen.clean };
   }
 );
