@@ -32,7 +32,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-export const ICONOS: Record<string, LucideIcon> = {
+export const ICONS: Record<string, LucideIcon> = {
   calendar: Calendar,
   check: Check,
   chevronLeft: ChevronLeft,
@@ -76,6 +76,6 @@ export function Icon({
   strokeWidth?: number;
   className?: string;
 }) {
-  const Cmp = ICONOS[name] ?? Calendar;
+  const Cmp = ICONS[name] ?? Calendar;
   return <Cmp size={size} strokeWidth={strokeWidth} className={className} />;
 }
