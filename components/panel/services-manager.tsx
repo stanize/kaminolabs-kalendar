@@ -18,6 +18,7 @@ import {
   PRICE_MIN,
   PRICE_MAX,
   PRICE_SLIDER_MAX,
+  PRICE_STEP,
   NAME_MAX_LENGTH,
 } from "@/lib/services/constants";
 
@@ -38,9 +39,32 @@ interface DraftService {
   name: string;
   duration_min: number;
   price: number;
+  // UI-only: whether the user chose "Otra" (free custom duration). Not persisted;
+  // stripped before sending to the server. Derived initial value from whether the
+  // duration matches a preset, but explicit so "Otra" can hold a preset value too.
+  durationCustom: boolean;
 }
 
-const EMPTY_DRAFT: DraftService = { name: "", duration_min: 60, price: 40 };
+const EMPTY_DRAFT: DraftService = {
+  name: "",
+  duration_min: 60,
+  price: 40,
+  durationCustom: false,
+};
+
+/** Strips UI-only fields before sending a draft to a server action. */
+function toServiceInput(d: DraftService): { name: string; duration_min: number; price: number } {
+  return { name: d.name, duration_min: d.duration_min, price: d.price };
+}
+
+function isPreset(min: number): boolean {
+  return (DURATION_PRESETS as readonly number[]).includes(min);
+}
+
+/** Builds a draft from a template tuple, marking custom when not a preset. */
+function draftFromTemplate(t: { name: string; duration_min: number; price: number }): DraftService {
+  return { ...t, durationCustom: !isPreset(t.duration_min) };
+}
 
 function formatPrice(euros: number): string {
   return euros === 0 ? "Gratis" : `${euros} €`;
@@ -82,7 +106,7 @@ export function ServicesManager({
     setError(null);
     setBusy(true);
     try {
-      const result = await createService(draft);
+      const result = await createService(toServiceInput(draft));
       if (!result.ok) {
         setError(result.error);
         setBusy(false);
@@ -103,7 +127,7 @@ export function ServicesManager({
     setError(null);
     setBusy(true);
     try {
-      const result = await createServices(staged);
+      const result = await createServices(staged.map(toServiceInput));
       if (!result.ok) {
         setError(result.error);
         setBusy(false);
@@ -123,7 +147,7 @@ export function ServicesManager({
     setError(null);
     setBusy(true);
     try {
-      const result = await updateService({ id, ...draft });
+      const result = await updateService({ id, ...toServiceInput(draft) });
       if (!result.ok) {
         setError(result.error);
         setBusy(false);
@@ -196,7 +220,12 @@ export function ServicesManager({
             editingId === svc.id ? (
               <ServiceEditor
                 key={svc.id}
-                initial={{ name: svc.name, duration_min: svc.duration_min, price: svc.price }}
+                initial={{
+                  name: svc.name,
+                  duration_min: svc.duration_min,
+                  price: svc.price,
+                  durationCustom: !isPreset(svc.duration_min),
+                }}
                 busy={busy}
                 onCancel={() => setEditingId(null)}
                 onSave={(draft) => handleUpdate(svc.id, draft)}
@@ -372,12 +401,21 @@ function ServiceFields({
   draft: DraftService;
   onChange: (next: DraftService) => void;
 }) {
-  const customDuration = !DURATION_PRESETS.includes(
-    draft.duration_min as (typeof DURATION_PRESETS)[number]
-  );
+  const customDuration = draft.durationCustom;
 
   const inputBase =
     "rounded-[10px] border border-line bg-surface px-[13px] py-3 text-[15px] text-ink outline-none transition-all focus:border-brand focus:shadow-[0_0_0_3px_var(--color-brand-weak)]";
+
+  function setPrice(value: number) {
+    const v = Math.round(value);
+    onChange({
+      ...draft,
+      price: Number.isFinite(v) ? Math.max(PRICE_MIN, Math.min(PRICE_MAX, v)) : 0,
+    });
+  }
+
+  const stepBtn =
+    "grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-line bg-surface text-ink-soft transition-colors hover:border-brand-line hover:text-ink disabled:opacity-40 disabled:hover:border-line disabled:hover:text-ink-soft";
 
   return (
     <>
@@ -401,7 +439,7 @@ function ServiceFields({
             <button
               key={d}
               type="button"
-              onClick={() => onChange({ ...draft, duration_min: d })}
+              onClick={() => onChange({ ...draft, duration_min: d, durationCustom: false })}
               className={`rounded-lg border px-3 py-2 text-[13px] font-semibold transition-all ${
                 !customDuration && draft.duration_min === d
                   ? "border-brand bg-brand text-white"
@@ -413,7 +451,9 @@ function ServiceFields({
           ))}
           <button
             type="button"
-            onClick={() => onChange({ ...draft, duration_min: DURATION_MAX_MINUTES })}
+            // "Otra": switch to free custom entry, keeping the current value as a
+            // starting point. The explicit flag lets custom hold a preset value too.
+            onClick={() => onChange({ ...draft, durationCustom: true })}
             className={`rounded-lg border px-3 py-2 text-[13px] font-semibold transition-all ${
               customDuration
                 ? "border-brand bg-brand text-white"
@@ -438,19 +478,39 @@ function ServiceFields({
         </div>
       </div>
 
-      {/* Price: slider + synced box */}
+      {/* Price: stepper − slider + synced box */}
       <div className="flex flex-col gap-[7px]">
         <span className="text-[13px] font-semibold text-ink">Precio</span>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setPrice(draft.price - PRICE_STEP)}
+            disabled={draft.price <= PRICE_MIN}
+            className={stepBtn}
+            aria-label={`Bajar ${PRICE_STEP} €`}
+          >
+            <Icon name="minus" size={15} />
+          </button>
           <input
             type="range"
             min={PRICE_MIN}
             max={PRICE_SLIDER_MAX}
             step={1}
+            // Slider clamps to its max when the real price exceeds the common
+            // range; the number box remains the source of truth.
             value={Math.min(draft.price, PRICE_SLIDER_MAX)}
-            onChange={(e) => onChange({ ...draft, price: Number(e.target.value) })}
+            onChange={(e) => setPrice(Number(e.target.value))}
             className="h-1.5 flex-1 cursor-pointer appearance-none rounded-full bg-surface-2 accent-brand"
           />
+          <button
+            type="button"
+            onClick={() => setPrice(draft.price + PRICE_STEP)}
+            disabled={draft.price >= PRICE_MAX}
+            className={stepBtn}
+            aria-label={`Subir ${PRICE_STEP} €`}
+          >
+            <Icon name="plus" size={15} />
+          </button>
           <div className="flex items-center gap-1.5">
             <input
               type="number"
@@ -458,13 +518,7 @@ function ServiceFields({
               max={PRICE_MAX}
               step={1}
               value={draft.price}
-              onChange={(e) => {
-                const v = Math.round(Number(e.target.value));
-                onChange({
-                  ...draft,
-                  price: Number.isFinite(v) ? Math.max(PRICE_MIN, Math.min(PRICE_MAX, v)) : 0,
-                });
-              }}
+              onChange={(e) => setPrice(Number(e.target.value))}
               className={`${inputBase} w-24 !py-2`}
             />
             <span className="text-[14px] font-medium text-ink-soft">€</span>
@@ -500,7 +554,7 @@ function TemplatePicker({
   function stageSelected() {
     const drafts = [...selected]
       .sort((a, b) => a - b)
-      .map((i) => ({ ...templates[i] }));
+      .map((i) => draftFromTemplate(templates[i]));
     if (drafts.length > 0) onStage(drafts);
   }
 
