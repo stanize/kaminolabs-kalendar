@@ -4,8 +4,6 @@ import { revalidatePath } from "next/cache";
 import { authedAction } from "@/lib/auth-action";
 import { createClient } from "@/lib/supabase/server";
 import { getBusinessForUser } from "@/lib/business/data";
-import { SERVICE_TEMPLATES } from "@/lib/onboarding/data";
-import type { BusinessType } from "@/lib/onboarding/types";
 import { validateService } from "@/lib/services/constants";
 
 export type ServiceActionResult =
@@ -70,19 +68,30 @@ export const createService = authedAction(
   }
 );
 
-// ── Add selected templates in bulk ─────────────────────────────────────────
-export const addServicesFromTemplates = authedAction(
-  async (session, indices: number[]): Promise<ServiceActionResult> => {
-    const business = await getBusinessForUser(session.user.id);
-    if (!business) return { ok: false, error: "Primero configura tu negocio." };
+// ── Create multiple services in one go ─────────────────────────────────────
+// Used when the user stages template-derived drafts, customizes them, and
+// confirms. The drafts carry their (possibly edited) values, so this validates
+// and inserts them directly rather than re-reading any template source.
+export const createServices = authedAction(
+  async (
+    session,
+    items: { name: string; duration_min: number; price: number }[]
+  ): Promise<ServiceActionResult> => {
+    const businessId = await resolveBusinessId(session.user.id);
+    if (!businessId) {
+      return { ok: false, error: "Primero configura tu negocio." };
+    }
 
-    const templates = SERVICE_TEMPLATES[business.type as BusinessType] ?? [];
-    const chosen = indices
-      .filter((i) => Number.isInteger(i) && i >= 0 && i < templates.length)
-      .map((i) => templates[i]);
+    if (!Array.isArray(items) || items.length === 0) {
+      return { ok: false, error: "No hay servicios que añadir." };
+    }
 
-    if (chosen.length === 0) {
-      return { ok: false, error: "Selecciona al menos un servicio." };
+    // Validate every draft before inserting any; report the first problem.
+    const validated = [];
+    for (const item of items) {
+      const v = validateService(item);
+      if (!v.valid) return { ok: false, error: v.error };
+      validated.push(v.value);
     }
 
     const supabase = await createClient();
@@ -90,17 +99,17 @@ export const addServicesFromTemplates = authedAction(
     const { data: last } = await supabase
       .from("kalendar_services")
       .select("sort_order")
-      .eq("business_id", business.id)
+      .eq("business_id", businessId)
       .order("sort_order", { ascending: false })
       .limit(1)
       .maybeSingle();
     let nextOrder = (last?.sort_order ?? -1) + 1;
 
-    const rows = chosen.map(([name, duration_min, price]) => ({
-      business_id: business.id,
-      name,
-      duration_min,
-      price,
+    const rows = validated.map((v) => ({
+      business_id: businessId,
+      name: v.name,
+      duration_min: v.duration_min,
+      price: v.price,
       sort_order: nextOrder++,
     }));
 
