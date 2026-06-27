@@ -31,20 +31,20 @@ export default async function PanelHomePage() {
       icon:  "sparkles",
     },
     {
-      id:    "schedule",
-      label: "Define tu disponibilidad",
-      sub:   "Los días y horas en que aceptas citas",
-      done:  hasActiveHours,
-      href:  "/panel/availability?from=home",
-      icon:  "clock",
-    },
-    {
       id:    "team",
       label: "Añade tu equipo",
       sub:   "Tú y las personas que trabajan contigo",
       done:  hasTeam,
       href:  "/panel/team?from=home",
       icon:  "users",
+    },
+    {
+      id:    "schedule",
+      label: "Define tu disponibilidad",
+      sub:   "Los días y horas en que aceptas citas",
+      done:  hasActiveHours,
+      href:  "/panel/availability?from=home",
+      icon:  "clock",
     },
   ];
 
