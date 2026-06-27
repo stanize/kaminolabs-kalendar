@@ -100,11 +100,45 @@ The multi-step wizard was removed. `/onboarding` is now a simple sign-up screen:
 
 ## Testing — Deleting Test Users
 
-1. Run in Supabase SQL editor: `DELETE FROM "user" WHERE email = 'user@example.com';`  
-   (cascades automatically to `account`, `session`, `verification`)
-2. Clear browser cookies for `kaminolabs.dev`
+After applying `supabase/schema_003.sql`, every `kalendar_*` table has an
+`ON DELETE CASCADE` FK to `"user"(id)`, so deleting a user removes all of their data.
+
+1. Run in Supabase SQL editor: `DELETE FROM "user" WHERE email = 'user@example.com';`
+   Cascades to: `account`, `session`, `verification` (Better Auth) **and**
+   `kalendar_profiles`, `kalendar_support_tickets`, `kalendar_businesses`
+   → `kalendar_services` / `kalendar_business_hours` / `kalendar_team_members`.
+2. Clear browser cookies for `kaminolabs.dev`.
 
 Both steps required for a clean reset.
+
+### Full database reset (wipe all users)
+One-off, destructive — run in the Supabase SQL editor:
+
+```sql
+truncate
+  public.kalendar_support_tickets,
+  public.kalendar_team_members,
+  public.kalendar_business_hours,
+  public.kalendar_services,
+  public.kalendar_businesses,
+  public.kalendar_profiles,
+  public."account",
+  public."session",
+  public."verification",
+  public."user"
+restart identity cascade;
+```
+
+Storage files in `support-attachments` are not removed by the truncate above;
+clear them separately if needed:
+`delete from storage.objects where bucket_id = 'support-attachments';`
+
+## Migrations
+
+- `schema_001.sql` — base schema (profiles, businesses, services, hours, team)
+- `schema_002.sql` — support tickets
+- `schema_003.sql` — cascade user deletion to all Kalendar data; corrects
+  `kalendar_profiles.id` from `uuid` to `text` to match Better Auth's `user.id`
 
 ---
 
