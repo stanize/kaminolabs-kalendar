@@ -91,10 +91,15 @@ The multi-step wizard was removed. `/onboarding` is now a simple sign-up screen:
 - **First in-panel setup page is built**: `/panel/business` ("Configura tu negocio"; sidebar label "Negocio")
   manages the single business record (name, type, city, slug). Page:
   `app/panel/business/page.tsx` (server, `requireSession` + `getSetupProgress`);
-  form: `components/panel/business-settings-form.tsx` (client). Each setup-checklist
+  form: `components/panel/business-form.tsx` (`BusinessForm`) (client). Each setup-checklist
   block maps to its own sidebar nav item + page, built one block at a time; Negocio
-  is the first. After a successful save, if overall setup is incomplete the form
-  redirects to Inicio (`/panel`); if complete it stays put. Server actions in
+  is the first. **Return-intent pattern**: links from the home page (`/panel`)
+  carry `?from=home` (checklist items today, dashboard widgets later). The target
+  page reads it and, after a successful PRIMARY mutation, redirects back to
+  `/panel`; direct nav from the sidebar (no param) stays put. Secondary mutations
+  (edit/delete/reorder) never redirect. Negocio redirects on any successful save
+  when `from=home`; Servicios redirects only on the FIRST service added (0->1
+  transition) when `from=home`. Server actions in
   `lib/actions/business.ts`: `saveBusinessSettings` (create/update) and
   `checkSlugAvailability` (live UX check) — both wrapped in `authedAction`.
 - **Public booking pages live under `/bookings/[slug]`** (moved from root
@@ -121,6 +126,26 @@ The multi-step wizard was removed. `/onboarding` is now a simple sign-up screen:
   Review queue = `slug_reviewed_at IS NULL`. The future admin portal owns review.
 - **Reserved slugs** (`lib/business/reserved-slugs.ts`): vanity/abuse blocklist
   (admin, support, kalendar, official, api, app, login, billing, ...), extend over time.
+
+### Servicios (second in-panel setup page, BUILT)
+Route `/panel/services` (label "Servicios"), heading "Tus servicios". Manages the
+business's services (name, duration_min, price — no other fields yet; more in
+later releases). Server page `app/panel/services/page.tsx` (redirects to
+`/panel/business?from=home` if no business yet). Client component
+`components/panel/services-manager.tsx`: list with native HTML5 drag-reorder
+(persists immediately via `reorderServices`), inline add/edit editor, and a
+templates picker shown only when the user has zero services. Editor: name; a
+duration preset row (15/30/45/60/90/120 + "Otra" custom, bounded 5-120 min); a
+**price slider 0-100 € synced with an editable number box** — the box is the
+source of truth and the slider clamps to its max when the price exceeds 100
+(whole euros, no decimals, 0 = "Gratis"). Templates come from
+`SERVICE_TEMPLATES[businessType]` (`[name, duration_min, price]`); user
+multi-selects then hits "Añadir". Reads: `getServicesForUser(userId)` in
+`lib/services/data.ts` (resolves business via owner_id, scopes by business_id).
+Constraints/validation in `lib/services/constants.ts`. Server actions in
+`lib/actions/services.ts` (all `authedAction`, all scope by the caller's
+business_id): `createService`, `addServicesFromTemplates`, `updateService`,
+`deleteService`, `reorderServices`; each revalidates `/panel` + `/panel/services`.
 
 ## Key Conventions
 
