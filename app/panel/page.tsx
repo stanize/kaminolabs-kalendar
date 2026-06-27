@@ -37,7 +37,7 @@ export default async function PanelHomePage() {
       label: "Configura tu negocio",
       sub:   "Nombre, tipo y ciudad",
       done:  !!business,
-      href:  "/panel/ajustes",
+      href:  "/panel/settings",
       icon:  "building",
     },
     {
@@ -45,7 +45,7 @@ export default async function PanelHomePage() {
       label: "Crea tus servicios",
       sub:   "Lo que tus clientes podrán reservar",
       done:  (services?.length ?? 0) > 0,
-      href:  "/panel/servicios",
+      href:  "/panel/services",
       icon:  "sparkles",
     },
     {
@@ -53,7 +53,7 @@ export default async function PanelHomePage() {
       label: "Define tu disponibilidad",
       sub:   "Los días y horas en que aceptas citas",
       done:  (scheduleRows?.length ?? 0) > 0,
-      href:  "/panel/disponibilidad",
+      href:  "/panel/availability",
       icon:  "clock",
     },
     {
@@ -61,7 +61,7 @@ export default async function PanelHomePage() {
       label: "Añade tu equipo",
       sub:   "Tú y las personas que trabajan contigo",
       done:  (teamMembers?.length ?? 0) > 0,
-      href:  "/panel/equipo",
+      href:  "/panel/team",
       icon:  "users",
     },
   ];
@@ -152,10 +152,10 @@ export default async function PanelHomePage() {
             </p>
             <div className="mt-3 flex flex-col gap-1">
               {[
-                { label: "Servicios",      href: "/panel/servicios",      icon: "sparkles" },
-                { label: "Disponibilidad", href: "/panel/disponibilidad", icon: "clock" },
-                { label: "Equipo",         href: "/panel/equipo",         icon: "users" },
-                { label: "Ajustes",        href: "/panel/ajustes",        icon: "settings" },
+                { label: "Servicios",      href: "/panel/services",      icon: "sparkles" },
+                { label: "Disponibilidad", href: "/panel/availability", icon: "clock" },
+                { label: "Equipo",         href: "/panel/team",         icon: "users" },
+                { label: "Ajustes",        href: "/panel/settings",        icon: "settings" },
               ].map((item) => (
                 <Link
                   key={item.href}
