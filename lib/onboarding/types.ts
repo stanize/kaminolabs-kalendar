@@ -1,14 +1,14 @@
 export type BusinessType =
-  | "psico"
-  | "nutri"
-  | "fisio"
-  | "belleza"
+  | "psychology"
+  | "nutrition"
+  | "physiotherapy"
+  | "beauty"
   | "fitness"
   | "coaching"
-  | "tutorias"
-  | "otro";
+  | "tutoring"
+  | "other";
 
-export type DayId = "lun" | "mar" | "mie" | "jue" | "vie" | "sab" | "dom";
+export type DayId = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
 
 export interface Service {
   id: string;
