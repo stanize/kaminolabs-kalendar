@@ -31,32 +31,9 @@ drop table if exists public.kalendar_team_members    cascade;
 drop table if exists public.kalendar_business_hours  cascade;
 drop table if exists public.kalendar_services        cascade;
 drop table if exists public.kalendar_businesses      cascade;
-drop table if exists public.kalendar_profiles        cascade;
 
 drop type if exists public.support_ticket_status   cascade;
 drop type if exists public.support_ticket_category cascade;
-
--- ----------------------------------------------------------------------------
--- kalendar_profiles
--- Extends Better Auth's "user" table with Kalendar-specific user data.
--- id is text to match Better Auth's user.id.
--- ----------------------------------------------------------------------------
-create table public.kalendar_profiles (
-  id         text        primary key
-                         references public."user" (id) on delete cascade,
-  name       text        not null default '',
-  email      text        not null default '',
-  created_at timestamptz not null default now()
-);
-
-alter table public.kalendar_profiles enable row level security;
-
-create policy "Profiles: public read"
-  on public.kalendar_profiles for select using (true);
-create policy "Profiles: insert"
-  on public.kalendar_profiles for insert with check (true);
-create policy "Profiles: update"
-  on public.kalendar_profiles for update using (true) with check (true);
 
 -- ----------------------------------------------------------------------------
 -- kalendar_businesses
