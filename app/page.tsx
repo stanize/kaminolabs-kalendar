@@ -80,7 +80,7 @@ export default function LandingPage() {
               {[
                 { number: "1", title: "Crea tu cuenta",        text: "Con tu correo o con Google. Sin tarjeta, sin compromiso." },
                 { number: "2", title: "Configura tu negocio",  text: "Añade tus servicios, tu horario y tu equipo en un par de minutos." },
-                { number: "3", title: "Comparte tu enlace",    text: "Tu página kalendar.app/tu-negocio ya está lista para recibir reservas." },
+                { number: "3", title: "Comparte tu enlace",    text: "Tu página kalendar.kaminolabs.dev/bookings/tu-negocio ya está lista para recibir reservas." },
               ].map((step) => (
                 <div key={step.number} className="rounded-2xl border border-line bg-surface p-7">
                   <div className="mb-4 grid h-9 w-9 place-items-center rounded-full bg-brand text-[14px] font-bold text-white">
