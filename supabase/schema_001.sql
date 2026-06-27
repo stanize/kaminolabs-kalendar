@@ -53,12 +53,28 @@ create table public.kalendar_businesses (
   ),
   city                    text,
   slug                    text        not null unique,
+  -- Slug moderation. Every slug is human-reviewed regardless of the automated
+  -- screen at creation. 'active' = publicly bookable; 'pending_review' = held
+  -- offline until an admin approves; 'rejected' = suspended, user must repick.
+  -- The automated screen at creation sets the initial status: clean slugs go
+  -- live ('active') but still await review (slug_reviewed_at is null); slugs
+  -- that trip the reserved/profanity screen start 'pending_review'.
+  slug_status             text        not null default 'active' check (
+    slug_status in ('active', 'pending_review', 'rejected')
+  ),
+  slug_flag_reason        text,        -- why the auto-screen flagged it; null when clean
+  slug_reviewed_at        timestamptz, -- null = awaiting human review (the review queue)
+  slug_reviewed_by        text,        -- admin user id who actioned the review; null until reviewed
   brand_color             text        not null default '#0d9488',
   onboarding_completed_at timestamptz,
   created_at              timestamptz not null default now()
 );
 
 create index kalendar_businesses_owner_id_idx on public.kalendar_businesses (owner_id);
+-- Review queue: rows not yet human-reviewed.
+create index kalendar_businesses_review_queue_idx
+  on public.kalendar_businesses (slug_reviewed_at)
+  where slug_reviewed_at is null;
 
 alter table public.kalendar_businesses enable row level security;
 
