@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { href: "/panel", label: "Inicio", icon: "home", exact: true },
   { href: "/panel/calendar", label: "Calendario", icon: "calendar" },
   { href: "/panel/clients", label: "Clientes", icon: "users" },
+  { href: "/panel/business", label: "Negocio", icon: "building" },
   { href: "/panel/services", label: "Servicios", icon: "sparkles" },
   { href: "/panel/availability", label: "Disponibilidad", icon: "clock" },
   { href: "/panel/team", label: "Equipo", icon: "user" },
