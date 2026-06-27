@@ -19,7 +19,7 @@ export default async function PanelHomePage() {
       label: "Configura tu negocio",
       sub:   "Nombre, tipo y ciudad",
       done:  !!business,
-      href:  "/panel/business",
+      href:  "/panel/business?from=home",
       icon:  "building",
     },
     {
@@ -27,7 +27,7 @@ export default async function PanelHomePage() {
       label: "Crea tus servicios",
       sub:   "Lo que tus clientes podrán reservar",
       done:  hasServices,
-      href:  "/panel/services",
+      href:  "/panel/services?from=home",
       icon:  "sparkles",
     },
     {
@@ -35,7 +35,7 @@ export default async function PanelHomePage() {
       label: "Define tu disponibilidad",
       sub:   "Los días y horas en que aceptas citas",
       done:  hasActiveHours,
-      href:  "/panel/availability",
+      href:  "/panel/availability?from=home",
       icon:  "clock",
     },
     {
@@ -43,7 +43,7 @@ export default async function PanelHomePage() {
       label: "Añade tu equipo",
       sub:   "Tú y las personas que trabajan contigo",
       done:  hasTeam,
-      href:  "/panel/team",
+      href:  "/panel/team?from=home",
       icon:  "users",
     },
   ];
