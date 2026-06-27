@@ -19,7 +19,7 @@ export default async function PanelHomePage() {
       label: "Configura tu negocio",
       sub:   "Nombre, tipo y ciudad",
       done:  !!business,
-      href:  "/panel/settings",
+      href:  "/panel/business",
       icon:  "building",
     },
     {
@@ -86,7 +86,7 @@ export default async function PanelHomePage() {
                       {item.done && <Icon name="check" size={13} strokeWidth={2.5} />}
                     </div>
                     <div className="flex-1">
-                      <p className={`text-[14px] font-semibold ${item.done ? "text-ink-soft line-through" : "text-ink"}`}>
+                      <p className={`text-[14px] font-semibold ${item.done ? "text-ink-soft" : "text-ink"}`}>
                         {item.label}
                       </p>
                       <p className="text-[12.5px] text-ink-soft">{item.sub}</p>
