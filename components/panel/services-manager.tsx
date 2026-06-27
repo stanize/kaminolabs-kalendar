@@ -6,10 +6,10 @@ import { Icon } from "@/components/ui/icon";
 import { Btn } from "@/components/ui/button";
 import {
   createService,
+  createServices,
   updateService,
   deleteService,
   reorderServices,
-  addServicesFromTemplates,
 } from "@/lib/actions/services";
 import {
   DURATION_PRESETS,
@@ -62,9 +62,22 @@ export function ServicesManager({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  // Staged template drafts the user is customizing before confirming. null when
+  // not in the staging flow.
+  const [staged, setStaged] = useState<DraftService[] | null>(null);
+
   const hadNoServices = initialServices.length === 0;
 
-  // ── Create ────────────────────────────────────────────────────────────────
+  function redirectAfterFirstAdd() {
+    if (returnToHome && hadNoServices) {
+      router.push("/panel");
+      return true;
+    }
+    router.refresh();
+    return false;
+  }
+
+  // ── Create one (manual) ─────────────────────────────────────────────────────
   async function handleCreate(draft: DraftService) {
     setError(null);
     setBusy(true);
@@ -77,35 +90,28 @@ export function ServicesManager({
       }
       setAdding(false);
       setBusy(false);
-      // First-service transition from the home flow -> return to Inicio.
-      if (returnToHome && hadNoServices) {
-        router.push("/panel");
-        return;
-      }
-      router.refresh();
+      redirectAfterFirstAdd();
     } catch {
       setError("Ocurrió un error inesperado. Inténtalo de nuevo.");
       setBusy(false);
     }
   }
 
-  // ── Add selected templates ──────────────────────────────────────────────────
-  async function handleAddTemplates(indices: number[]) {
+  // ── Confirm staged template drafts (bulk, with edits) ───────────────────────
+  async function handleConfirmStaged() {
+    if (!staged || staged.length === 0) return;
     setError(null);
     setBusy(true);
     try {
-      const result = await addServicesFromTemplates(indices);
+      const result = await createServices(staged);
       if (!result.ok) {
         setError(result.error);
         setBusy(false);
         return;
       }
+      setStaged(null);
       setBusy(false);
-      if (returnToHome && hadNoServices) {
-        router.push("/panel");
-        return;
-      }
-      router.refresh();
+      redirectAfterFirstAdd();
     } catch {
       setError("Ocurrió un error inesperado. Inténtalo de nuevo.");
       setBusy(false);
@@ -136,7 +142,6 @@ export function ServicesManager({
   async function handleDelete(id: string) {
     setError(null);
     setBusy(true);
-    // Optimistic removal.
     const prev = services;
     setServices((s) => s.filter((x) => x.id !== id));
     try {
@@ -167,11 +172,13 @@ export function ServicesManager({
     next.splice(targetIndex, 0, moved);
     setServices(next);
     setDragIndex(null);
-    // Persist immediately.
     void reorderServices(next.map((s) => s.id)).then(() => router.refresh());
   }
 
-  const showTemplates = templates.length > 0 && services.length === 0 && !adding;
+  // While staging template drafts, that flow owns the screen.
+  const inStaging = staged !== null;
+  const showTemplates =
+    templates.length > 0 && services.length === 0 && !adding && !inStaging;
 
   return (
     <div className="flex flex-col gap-5">
@@ -234,8 +241,8 @@ export function ServicesManager({
         </div>
       )}
 
-      {/* Add new service editor */}
-      {adding && (
+      {/* Add new service editor (manual) */}
+      {adding && !inStaging && (
         <ServiceEditor
           initial={EMPTY_DRAFT}
           busy={busy}
@@ -244,8 +251,8 @@ export function ServicesManager({
         />
       )}
 
-      {/* Add button */}
-      {!adding && (
+      {/* Add button — hidden while staging templates */}
+      {!adding && !inStaging && (
         <div>
           <Btn variant="outline" onClick={() => { setError(null); setAdding(true); }}>
             <Icon name="plus" size={15} /> Añadir servicio
@@ -253,15 +260,58 @@ export function ServicesManager({
         </div>
       )}
 
-      {/* Templates picker (only when no services yet) */}
+      {/* Template picker (only when no services yet) */}
       {showTemplates && (
-        <TemplatePicker templates={templates} busy={busy} onAdd={handleAddTemplates} />
+        <TemplatePicker
+          templates={templates}
+          busy={busy}
+          onStage={(drafts) => { setError(null); setStaged(drafts); }}
+        />
+      )}
+
+      {/* Staged template drafts: customize, then confirm together */}
+      {inStaging && staged && (
+        <div className="flex flex-col gap-4">
+          <div>
+            <p className="text-[14px] font-semibold text-ink">Personaliza tus servicios</p>
+            <p className="text-[13px] text-ink-soft">
+              Ajusta cada servicio antes de añadirlo. Puedes quitar los que no necesites.
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-3">
+            {staged.map((draft, i) => (
+              <StagedDraftCard
+                key={i}
+                draft={draft}
+                onChange={(next) =>
+                  setStaged((cur) => cur!.map((d, idx) => (idx === i ? next : d)))
+                }
+                onRemove={() =>
+                  setStaged((cur) => {
+                    const next = cur!.filter((_, idx) => idx !== i);
+                    return next.length === 0 ? null : next;
+                  })
+                }
+              />
+            ))}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Btn onClick={handleConfirmStaged} disabled={busy || staged.length === 0}>
+              {busy ? "Añadiendo…" : `Confirmar ${staged.length}`}
+            </Btn>
+            <Btn variant="ghost" onClick={() => setStaged(null)} disabled={busy}>
+              Cancelar
+            </Btn>
+          </div>
+        </div>
       )}
     </div>
   );
 }
 
-// ── Inline editor (create + edit) ─────────────────────────────────────────────
+// ── Inline editor (manual create + edit existing) ─────────────────────────────
 function ServiceEditor({
   initial,
   busy,
@@ -273,24 +323,70 @@ function ServiceEditor({
   onSave: (draft: DraftService) => void;
   onCancel: () => void;
 }) {
-  const [name, setName] = useState(initial.name);
-  const [duration, setDuration] = useState<number>(initial.duration_min);
-  const [customDuration, setCustomDuration] = useState<boolean>(
-    !DURATION_PRESETS.includes(initial.duration_min as (typeof DURATION_PRESETS)[number])
+  const [draft, setDraft] = useState<DraftService>(initial);
+
+  return (
+    <div className="flex flex-col gap-4 rounded-xl border border-brand-line bg-brand-weak/40 p-4">
+      <ServiceFields draft={draft} onChange={setDraft} />
+      <div className="flex items-center gap-2">
+        <Btn onClick={() => onSave(draft)} disabled={busy}>
+          {busy ? "Guardando…" : "Guardar"}
+        </Btn>
+        <Btn variant="ghost" onClick={onCancel} disabled={busy}>
+          Cancelar
+        </Btn>
+      </div>
+    </div>
   );
-  const [price, setPrice] = useState<number>(initial.price);
+}
+
+// ── Staged draft card (template being customized) ─────────────────────────────
+function StagedDraftCard({
+  draft,
+  onChange,
+  onRemove,
+}: {
+  draft: DraftService;
+  onChange: (next: DraftService) => void;
+  onRemove: () => void;
+}) {
+  return (
+    <div className="relative rounded-xl border border-line bg-surface p-4">
+      <button
+        onClick={onRemove}
+        className="absolute right-3 top-3 grid h-7 w-7 place-items-center rounded-lg text-ink-soft hover:bg-error-weak hover:text-error"
+        aria-label="Quitar"
+      >
+        <Icon name="x" size={15} />
+      </button>
+      <ServiceFields draft={draft} onChange={onChange} />
+    </div>
+  );
+}
+
+// ── Shared field set: name + duration + price ─────────────────────────────────
+function ServiceFields({
+  draft,
+  onChange,
+}: {
+  draft: DraftService;
+  onChange: (next: DraftService) => void;
+}) {
+  const customDuration = !DURATION_PRESETS.includes(
+    draft.duration_min as (typeof DURATION_PRESETS)[number]
+  );
 
   const inputBase =
     "rounded-[10px] border border-line bg-surface px-[13px] py-3 text-[15px] text-ink outline-none transition-all focus:border-brand focus:shadow-[0_0_0_3px_var(--color-brand-weak)]";
 
   return (
-    <div className="flex flex-col gap-4 rounded-xl border border-brand-line bg-brand-weak/40 p-4">
+    <>
       {/* Name */}
       <label className="flex flex-col gap-[7px]">
         <span className="text-[13px] font-semibold text-ink">Nombre del servicio</span>
         <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
+          value={draft.name}
+          onChange={(e) => onChange({ ...draft, name: e.target.value })}
           placeholder="Primera consulta"
           maxLength={NAME_MAX_LENGTH}
           className={inputBase}
@@ -305,12 +401,9 @@ function ServiceEditor({
             <button
               key={d}
               type="button"
-              onClick={() => {
-                setCustomDuration(false);
-                setDuration(d);
-              }}
+              onClick={() => onChange({ ...draft, duration_min: d })}
               className={`rounded-lg border px-3 py-2 text-[13px] font-semibold transition-all ${
-                !customDuration && duration === d
+                !customDuration && draft.duration_min === d
                   ? "border-brand bg-brand text-white"
                   : "border-line bg-surface text-ink-soft hover:border-brand-line hover:text-ink"
               }`}
@@ -320,7 +413,7 @@ function ServiceEditor({
           ))}
           <button
             type="button"
-            onClick={() => setCustomDuration(true)}
+            onClick={() => onChange({ ...draft, duration_min: DURATION_MAX_MINUTES })}
             className={`rounded-lg border px-3 py-2 text-[13px] font-semibold transition-all ${
               customDuration
                 ? "border-brand bg-brand text-white"
@@ -335,8 +428,8 @@ function ServiceEditor({
                 type="number"
                 min={DURATION_MIN_MINUTES}
                 max={DURATION_MAX_MINUTES}
-                value={duration}
-                onChange={(e) => setDuration(Number(e.target.value))}
+                value={draft.duration_min}
+                onChange={(e) => onChange({ ...draft, duration_min: Number(e.target.value) })}
                 className={`${inputBase} w-24 !py-2`}
               />
               <span className="text-[13px] text-ink-soft">min</span>
@@ -354,10 +447,8 @@ function ServiceEditor({
             min={PRICE_MIN}
             max={PRICE_SLIDER_MAX}
             step={1}
-            // Slider clamps to its max when the real price exceeds the common range;
-            // the number box remains the source of truth.
-            value={Math.min(price, PRICE_SLIDER_MAX)}
-            onChange={(e) => setPrice(Number(e.target.value))}
+            value={Math.min(draft.price, PRICE_SLIDER_MAX)}
+            onChange={(e) => onChange({ ...draft, price: Number(e.target.value) })}
             className="h-1.5 flex-1 cursor-pointer appearance-none rounded-full bg-surface-2 accent-brand"
           />
           <div className="flex items-center gap-1.5">
@@ -366,28 +457,22 @@ function ServiceEditor({
               min={PRICE_MIN}
               max={PRICE_MAX}
               step={1}
-              value={price}
+              value={draft.price}
               onChange={(e) => {
                 const v = Math.round(Number(e.target.value));
-                setPrice(Number.isFinite(v) ? Math.max(PRICE_MIN, Math.min(PRICE_MAX, v)) : 0);
+                onChange({
+                  ...draft,
+                  price: Number.isFinite(v) ? Math.max(PRICE_MIN, Math.min(PRICE_MAX, v)) : 0,
+                });
               }}
               className={`${inputBase} w-24 !py-2`}
             />
             <span className="text-[14px] font-medium text-ink-soft">€</span>
           </div>
         </div>
-        <p className="text-[12px] text-ink-soft">{formatPrice(price)}</p>
+        <p className="text-[12px] text-ink-soft">{formatPrice(draft.price)}</p>
       </div>
-
-      <div className="flex items-center gap-2">
-        <Btn onClick={() => onSave({ name, duration_min: duration, price })} disabled={busy}>
-          {busy ? "Guardando…" : "Guardar"}
-        </Btn>
-        <Btn variant="ghost" onClick={onCancel} disabled={busy}>
-          Cancelar
-        </Btn>
-      </div>
-    </div>
+    </>
   );
 }
 
@@ -395,11 +480,11 @@ function ServiceEditor({
 function TemplatePicker({
   templates,
   busy,
-  onAdd,
+  onStage,
 }: {
   templates: TemplateItem[];
   busy: boolean;
-  onAdd: (indices: number[]) => void;
+  onStage: (drafts: DraftService[]) => void;
 }) {
   const [selected, setSelected] = useState<Set<number>>(new Set());
 
@@ -412,11 +497,18 @@ function TemplatePicker({
     });
   }
 
+  function stageSelected() {
+    const drafts = [...selected]
+      .sort((a, b) => a - b)
+      .map((i) => ({ ...templates[i] }));
+    if (drafts.length > 0) onStage(drafts);
+  }
+
   return (
     <div className="rounded-xl border border-line bg-surface p-5">
       <p className="mb-1 text-[14px] font-semibold text-ink">¿No sabes por dónde empezar?</p>
       <p className="mb-4 text-[13px] text-ink-soft">
-        Elige algunos servicios habituales para tu tipo de negocio y añádelos de una vez.
+        Elige los servicios habituales de tu tipo de negocio y ajústalos a tus necesidades.
       </p>
       <div className="flex flex-col gap-2">
         {templates.map((t, i) => {
@@ -450,12 +542,9 @@ function TemplatePicker({
         })}
       </div>
       <div className="mt-4">
-        <Btn
-          onClick={() => onAdd([...selected])}
-          disabled={busy || selected.size === 0}
-        >
+        <Btn onClick={stageSelected} disabled={busy || selected.size === 0}>
           <Icon name="plus" size={15} />
-          {selected.size > 0 ? `Añadir ${selected.size}` : "Añadir seleccionados"}
+          {selected.size > 0 ? `Personalizar ${selected.size}` : "Añadir seleccionados"}
         </Btn>
       </div>
     </div>
