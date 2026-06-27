@@ -13,14 +13,14 @@ export const STEPS = [
 export const TOTAL_CONFIG_STEPS = STEPS.length - 1;
 
 export const BUSINESS_TYPES: { id: BusinessType; label: string; icon: string }[] = [
-  { id: "psico",    label: "Psicología",        icon: "user" },
-  { id: "nutri",    label: "Nutrición",          icon: "leaf" },
-  { id: "fisio",    label: "Fisioterapia",       icon: "sparkles" },
-  { id: "belleza",  label: "Estética y belleza", icon: "sparkles" },
-  { id: "fitness",  label: "Fitness y entreno",  icon: "sparkles" },
-  { id: "coaching", label: "Coaching",           icon: "users" },
-  { id: "tutorias", label: "Clases y tutorías",  icon: "list" },
-  { id: "otro",     label: "Otro",               icon: "grid" },
+  { id: "psychology",    label: "Psicología",        icon: "user" },
+  { id: "nutrition",     label: "Nutrición",          icon: "leaf" },
+  { id: "physiotherapy", label: "Fisioterapia",       icon: "sparkles" },
+  { id: "beauty",        label: "Estética y belleza", icon: "sparkles" },
+  { id: "fitness",       label: "Fitness y entreno",  icon: "sparkles" },
+  { id: "coaching",      label: "Coaching",           icon: "users" },
+  { id: "tutoring",      label: "Clases y tutorías",  icon: "list" },
+  { id: "other",         label: "Otro",               icon: "grid" },
 ];
 
 export function businessTypeLabel(type: BusinessType | ""): string {
@@ -33,21 +33,21 @@ export function businessTypeIcon(type: BusinessType | ""): string {
 
 /** [name, minutes, priceEUR][] */
 export const SERVICE_TEMPLATES: Record<BusinessType, [string, number, number][]> = {
-  psico: [
+  psychology: [
     ["Primera consulta", 50, 60],
     ["Sesión de seguimiento", 45, 45],
     ["Consulta online", 45, 40],
   ],
-  nutri: [
+  nutrition: [
     ["Primera visita", 60, 55],
     ["Seguimiento", 30, 35],
     ["Plan online", 45, 40],
   ],
-  fisio: [
+  physiotherapy: [
     ["Primera valoración", 50, 50],
     ["Sesión de fisioterapia", 60, 45],
   ],
-  belleza: [
+  beauty: [
     ["Limpieza facial", 60, 45],
     ["Manicura", 45, 25],
     ["Maquillaje", 60, 40],
@@ -60,21 +60,21 @@ export const SERVICE_TEMPLATES: Record<BusinessType, [string, number, number][]>
     ["Sesión de coaching", 60, 70],
     ["Sesión inicial", 50, 55],
   ],
-  tutorias: [
+  tutoring: [
     ["Clase particular", 60, 25],
     ["Clase en grupo", 60, 15],
   ],
-  otro: [["Cita estándar", 60, 40]],
+  other: [["Cita estándar", 60, 40]],
 };
 
 export const DAYS: { id: DayId; label: string; short: string }[] = [
-  { id: "lun", label: "Lunes",      short: "lun" },
-  { id: "mar", label: "Martes",     short: "mar" },
-  { id: "mie", label: "Miércoles",  short: "mié" },
-  { id: "jue", label: "Jueves",     short: "jue" },
-  { id: "vie", label: "Viernes",    short: "vie" },
-  { id: "sab", label: "Sábado",     short: "sáb" },
-  { id: "dom", label: "Domingo",    short: "dom" },
+  { id: "mon", label: "Lunes",      short: "lun" },
+  { id: "tue", label: "Martes",     short: "mar" },
+  { id: "wed", label: "Miércoles",  short: "mié" },
+  { id: "thu", label: "Jueves",     short: "jue" },
+  { id: "fri", label: "Viernes",    short: "vie" },
+  { id: "sat", label: "Sábado",     short: "sáb" },
+  { id: "sun", label: "Domingo",    short: "dom" },
 ];
 
 /** Every 30 minutes from 07:00 to 22:00 */
