@@ -1,36 +1,17 @@
-import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
-import { createClient } from "@/lib/supabase/server";
 import { Icon } from "@/components/ui/icon";
 import { Btn } from "@/components/ui/button";
 import Link from "next/link";
+import { requireSession } from "@/lib/auth-session";
+import { getSetupProgress } from "@/lib/business/data";
 import { bookingPath, bookingUrlDisplay } from "@/lib/business/booking-url";
 
 export default async function PanelHomePage() {
-  const session  = await auth.api.getSession({ headers: await headers() });
-  const supabase = await createClient();
+  const session = await requireSession();
+  const { business, hasServices, hasActiveHours, hasTeam } = await getSetupProgress(
+    session.user.id
+  );
 
-  const { data: business } = await supabase
-    .from("kalendar_businesses")
-    .select("id, name, slug, type, city, onboarding_completed_at")
-    .eq("owner_id", session!.user.id)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  const { data: services } = business
-    ? await supabase.from("kalendar_services").select("id").eq("business_id", business.id)
-    : { data: [] };
-
-  const { data: scheduleRows } = business
-    ? await supabase.from("kalendar_business_hours").select("active").eq("business_id", business.id).eq("active", true)
-    : { data: [] };
-
-  const { data: teamMembers } = business
-    ? await supabase.from("kalendar_team_members").select("id").eq("business_id", business.id)
-    : { data: [] };
-
-  const firstName = session!.user.name?.split(" ")[0] ?? "";
+  const firstName = session.user.name?.split(" ")[0] ?? "";
 
   const setupItems = [
     {
@@ -45,7 +26,7 @@ export default async function PanelHomePage() {
       id:    "services",
       label: "Crea tus servicios",
       sub:   "Lo que tus clientes podrán reservar",
-      done:  (services?.length ?? 0) > 0,
+      done:  hasServices,
       href:  "/panel/services",
       icon:  "sparkles",
     },
@@ -53,7 +34,7 @@ export default async function PanelHomePage() {
       id:    "schedule",
       label: "Define tu disponibilidad",
       sub:   "Los días y horas en que aceptas citas",
-      done:  (scheduleRows?.length ?? 0) > 0,
+      done:  hasActiveHours,
       href:  "/panel/availability",
       icon:  "clock",
     },
@@ -61,7 +42,7 @@ export default async function PanelHomePage() {
       id:    "team",
       label: "Añade tu equipo",
       sub:   "Tú y las personas que trabajan contigo",
-      done:  (teamMembers?.length ?? 0) > 0,
+      done:  hasTeam,
       href:  "/panel/team",
       icon:  "users",
     },
