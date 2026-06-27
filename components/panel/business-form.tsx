@@ -29,10 +29,10 @@ interface InitialBusiness {
 
 export function BusinessForm({
   initial,
-  setupComplete,
+  returnToHome,
 }: {
   initial: InitialBusiness | null;
-  setupComplete: boolean;
+  returnToHome: boolean;
 }) {
   const router = useRouter();
   const isNew = !initial;
@@ -140,14 +140,14 @@ export function BusinessForm({
       setSaved(true);
       setSaving(false);
 
-      // If the overall setup checklist isn't finished yet, send the user back to
-      // Inicio so they can pick the next step. If everything is already done,
-      // stay here with the "Guardado" confirmation — they can keep editing.
-      if (!setupComplete) {
+      // Return-intent: when the user arrived from the home page (?from=home),
+      // send them back to Inicio after a successful save so the guided setup
+      // flows step-to-step. When they came directly (sidebar), stay put.
+      if (returnToHome) {
         router.push("/panel");
         return;
       }
-      // Refresh server components (panel checklist, this page's create/edit mode).
+      // Refresh server components (this page's create/edit mode, home checklist).
       router.refresh();
     } catch {
       setError("Ocurrió un error inesperado. Inténtalo de nuevo.");
