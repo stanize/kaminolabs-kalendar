@@ -27,7 +27,13 @@ interface InitialBusiness {
   slugStatus: SlugStatus;
 }
 
-export function BusinessSettingsForm({ initial }: { initial: InitialBusiness | null }) {
+export function BusinessSettingsForm({
+  initial,
+  setupComplete,
+}: {
+  initial: InitialBusiness | null;
+  setupComplete: boolean;
+}) {
   const router = useRouter();
   const isNew = !initial;
 
@@ -133,6 +139,14 @@ export function BusinessSettingsForm({ initial }: { initial: InitialBusiness | n
       }
       setSaved(true);
       setSaving(false);
+
+      // If the overall setup checklist isn't finished yet, send the user back to
+      // Inicio so they can pick the next step. If everything is already done,
+      // stay here with the "Guardado" confirmation — they can keep editing.
+      if (!setupComplete) {
+        router.push("/panel");
+        return;
+      }
       // Refresh server components (panel checklist, this page's create/edit mode).
       router.refresh();
     } catch {
