@@ -9,7 +9,9 @@
  * Required env vars for real delivery:
  *   - RESEND_API_KEY  → from https://resend.com (free tier available)
  *   - EMAIL_FROM      → e.g. "Kalendar <no-reply@kaminolabs.dev>"
- *                       (the domain must be verified in Resend)
+ *                       (the domain must be verified in Resend). If unset, the
+ *                       Resend shared test sender is used, which only delivers
+ *                       to the email address of the Resend account owner.
  */
 type SendEmailInput = {
   to: string;
@@ -17,17 +19,22 @@ type SendEmailInput = {
   html: string;
 };
 
-const FROM = process.env.EMAIL_FROM ?? "Kalendar <onboarding@resend.dev>";
+export type SendEmailResult =
+  | { ok: true; id?: string }
+  | { ok: false; error: string };
 
-export async function sendEmail({ to, subject, html }: SendEmailInput): Promise<void> {
+const DEFAULT_FROM = "Kalendar <onboarding@resend.dev>";
+
+export async function sendEmail({ to, subject, html }: SendEmailInput): Promise<SendEmailResult> {
   const apiKey = process.env.RESEND_API_KEY;
+  const from   = process.env.EMAIL_FROM ?? DEFAULT_FROM;
 
   if (!apiKey) {
     // No provider configured yet — log and move on rather than break sign-up.
     console.warn(
       `[email] RESEND_API_KEY not set — skipping send. to=${to} subject="${subject}"`
     );
-    return;
+    return { ok: false, error: "RESEND_API_KEY not configured" };
   }
 
   try {
@@ -37,15 +44,30 @@ export async function sendEmail({ to, subject, html }: SendEmailInput): Promise<
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ from: FROM, to, subject, html }),
+      body: JSON.stringify({ from, to: [to], subject, html }),
     });
 
+    const payload = await res.json().catch(() => null);
+
     if (!res.ok) {
-      const detail = await res.text();
-      console.error(`[email] Resend responded ${res.status}: ${detail}`);
+      const detail =
+        (payload && typeof payload === "object" && "message" in payload
+          ? String((payload as { message: unknown }).message)
+          : "") || `HTTP ${res.status}`;
+      console.error(`[email] Resend send failed: ${detail} (to=${to})`);
+      return { ok: false, error: detail };
     }
+
+    const id =
+      payload && typeof payload === "object" && "id" in payload
+        ? String((payload as { id: unknown }).id)
+        : undefined;
+    console.log(`[email] sent to=${to} id=${id ?? "unknown"} subject="${subject}"`);
+    return { ok: true, id };
   } catch (err) {
-    console.error("[email] Failed to send:", err);
+    const msg = err instanceof Error ? err.message : "unknown error";
+    console.error(`[email] Failed to send to=${to}: ${msg}`);
+    return { ok: false, error: msg };
   }
 }
 
