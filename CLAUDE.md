@@ -63,9 +63,8 @@ The multi-step wizard was removed. `/onboarding` is now a simple sign-up screen:
 
 - **Layout**: `app/panel/layout.tsx` — sidebar + main content
 - **Sidebar**: `components/panel/sidebar.tsx` — full Spanish nav, user info, Cerrar sesión
-- **Nav items**: Inicio, Calendario, Clientes, Servicios, Disponibilidad, Equipo, Pagos, Facturas, Emails y avisos, Informes, Integraciones, Ajustes
+- **Nav items** (Spanish labels / English routes): Inicio `/panel`, Calendario `/panel/calendar`, Clientes `/panel/clients`, Servicios `/panel/services`, Disponibilidad `/panel/availability`, Equipo `/panel/team`, Pagos `/panel/payments`, Facturas `/panel/invoices`, Emails y avisos `/panel/notifications`, Informes `/panel/reports`, Integraciones `/panel/integrations`, Ajustes `/panel/settings`
 - **Home page**: Setup checklist with progress bar (Negocio, Servicios, Disponibilidad, Equipo), booking page link, quick access shortcuts
-- **Setup banner**: Shows when `onboarding_skipped_at` is set on `kalendar_profiles` — prompts user to complete setup
 
 ---
 
@@ -87,6 +86,17 @@ The multi-step wizard was removed. `/onboarding` is now a simple sign-up screen:
 
 ## Key Conventions
 
+- **Internationalization-ready — English-only code, no exceptions.** Every code
+  identifier, route path, file/folder name, table/column name, enum value, stored
+  code (business `type`, weekday `day`), slug, comment, and script is in English.
+  Spanish appears **only** in UI strings shown to the end customer, supplied as
+  display labels mapped from English codes (e.g. `BUSINESS_TYPES` maps
+  `psychology` -> `"Psicología"`, `DAYS` maps `mon` -> `"Lunes"`). The project
+  must port to another country by swapping the label layer alone, with zero code
+  changes. Business type codes: `psychology|nutrition|physiotherapy|beauty|fitness|coaching|tutoring|other`.
+  Weekday codes: `mon|tue|wed|thu|fri|sat|sun`. Panel routes are English
+  (`/panel/settings`, `/panel/services`, `/panel/availability`, `/panel/team`, etc.).
+
 - **Middleware**: Must be named `proxy.ts` (not `middleware.ts`) with exported function `proxy` — Next.js 16 convention
 - **Auth layering (two gates)**: The `/panel` layout (`app/panel/layout.tsx`) is a server-component UX gate — it redirects unauthenticated users and every nested route inherits it. It is **not** a security boundary: server actions are directly invocable, so each must verify auth itself. Because all DB access uses the Supabase service-role key (no RLS backstop), the app-level check is the *only* authorization boundary.
 - **New mutations**: Wrap in `authedAction` from `lib/auth-action.ts` — `export const createX = authedAction(async (session, input) => { ... })`. The verified session is the guaranteed first arg, so there is no path into the body that skips the check. (`authedAction` throws `UnauthorizedError`. The existing `support` / `onboarding` / `skip-onboarding` actions instead **return** a graceful Spanish `{ ok: false, error }`, so they keep their own inline `getSession()` check and are intentionally not wrapped — wrapping would change their error contract.)
@@ -100,8 +110,8 @@ The multi-step wizard was removed. `/onboarding` is now a simple sign-up screen:
 
 ## Testing — Deleting Test Users
 
-After applying `supabase/schema_003.sql`, every `kalendar_*` table has an
-`ON DELETE CASCADE` FK to `"user"(id)`, so deleting a user removes all of their data.
+Every `kalendar_*` table with a user-scoped column has an `ON DELETE CASCADE` FK
+to `"user"(id)` (defined in `schema_001.sql`), so deleting a user removes all of their data.
 
 1. Run in Supabase SQL editor: `DELETE FROM "user" WHERE email = 'user@example.com';`
    Cascades to: `account`, `session`, `verification` (Better Auth) **and**
@@ -135,10 +145,12 @@ clear them separately if needed:
 
 ## Migrations
 
-- `schema_001.sql` — base schema (profiles, businesses, services, hours, team)
-- `schema_002.sql` — support tickets
-- `schema_003.sql` — cascade user deletion to all Kalendar data; corrects
-  `kalendar_profiles.id` from `uuid` to `text` to match Better Auth's `user.id`
+- `schema_001.sql` — single consolidated schema. Drops and recreates all
+  `kalendar_*` tables (profiles, businesses, services, hours, team, support
+  tickets), the support enums, the `set_updated_at` trigger, and the
+  `support-attachments` storage bucket. Applied by pasting the whole file into
+  the Supabase SQL editor. There are no incremental migration files — when the
+  schema changes, edit this file and re-run it (destructive: it drops first).
 
 ---
 
@@ -148,4 +160,3 @@ clear them separately if needed:
 - **Supabase for DB only**: Keeps data ownership and avoids vendor lock-in on auth.
 - **Auth: Google OAuth + email/password**: Email/password requires email confirmation, enforced as a panel-level UI gate (not via `requireEmailVerification`, which would block the user from ever reaching the gate).
 - **sessionStorage for Zustand**: Survives Google OAuth redirect round-trip but clears when tab closes.
-- **`onboarding_skipped_at` flag**: Nullable timestamp — NULL means completed, timestamp means skipped. Drives the "complete your setup" banner in the panel.
