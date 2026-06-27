@@ -29,7 +29,8 @@ Kalendar is a SaaS online booking platform targeting Spanish-market professional
 - **Project ID**: rlxfcmijbesoblissmtd
 - **Connection**: Transaction pooler only — `aws-1-eu-central-1.pooler.supabase.com:6543`
 - Direct connection (port 5432) is blocked on Vercel free plan — always use pooler
-- **Kalendar tables** (all prefixed `kalendar_`): `kalendar_profiles`, `kalendar_businesses`, `kalendar_services`, `kalendar_business_hours`, `kalendar_team_members`
+- **Kalendar tables** (all prefixed `kalendar_`): `kalendar_businesses`, `kalendar_services`, `kalendar_business_hours`, `kalendar_team_members`, `kalendar_support_tickets`. There is **no** `kalendar_profiles` table — all per-user identity (id, name, email, `emailVerified`) comes from Better Auth's `user` table via `session.user`.
+- **Auth tables** (owned by Better Auth, created by `npx @better-auth/cli migrate`, **not** in `schema_001.sql`): `user`, `session`, `account`, `verification`
 
 ### Design System
 - **Fonts**: Bricolage Grotesque (display) + Plus Jakarta Sans (UI)
@@ -79,6 +80,7 @@ The multi-step wizard was removed. `/onboarding` is now a simple sign-up screen:
 | `NEXT_PUBLIC_APP_URL` | `https://kalendar.kaminolabs.dev` |
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service-role key — used by `lib/supabase/server.ts` for all server-side DB access (bypasses RLS). Server-only, never exposed to the browser |
 | `RESEND_API_KEY` | Resend API key for verification emails (without it, emails are skipped/logged, not sent) |
 | `EMAIL_FROM` | Sender, e.g. `Kalendar <no-reply@kaminolabs.dev>` (domain must be verified in Resend) |
 
@@ -115,7 +117,7 @@ to `"user"(id)` (defined in `schema_001.sql`), so deleting a user removes all of
 
 1. Run in Supabase SQL editor: `DELETE FROM "user" WHERE email = 'user@example.com';`
    Cascades to: `account`, `session`, `verification` (Better Auth) **and**
-   `kalendar_profiles`, `kalendar_support_tickets`, `kalendar_businesses`
+   `kalendar_support_tickets`, `kalendar_businesses`
    → `kalendar_services` / `kalendar_business_hours` / `kalendar_team_members`.
 2. Clear browser cookies for `kaminolabs.dev`.
 
@@ -131,7 +133,6 @@ truncate
   public.kalendar_business_hours,
   public.kalendar_services,
   public.kalendar_businesses,
-  public.kalendar_profiles,
   public."account",
   public."session",
   public."verification",
@@ -146,11 +147,12 @@ clear them separately if needed:
 ## Migrations
 
 - `schema_001.sql` — single consolidated schema. Drops and recreates all
-  `kalendar_*` tables (profiles, businesses, services, hours, team, support
+  `kalendar_*` tables (businesses, services, hours, team, support
   tickets), the support enums, the `set_updated_at` trigger, and the
   `support-attachments` storage bucket. Applied by pasting the whole file into
   the Supabase SQL editor. There are no incremental migration files — when the
   schema changes, edit this file and re-run it (destructive: it drops first).
+- **Migration order matters**: run `npx @better-auth/cli migrate` FIRST (creates `user`/`session`/`account`/`verification`), THEN run `schema_001.sql` — the Kalendar tables have cascade FKs to `public."user"(id)` and will fail if `user` does not yet exist.
 
 ---
 
