@@ -1,6 +1,6 @@
 import { requireSession } from "@/lib/auth-session";
 import { getSetupProgress } from "@/lib/business/data";
-import { BusinessSettingsForm } from "@/components/panel/business-settings-form";
+import { BusinessForm } from "@/components/panel/business-form";
 
 export default async function BusinessPage() {
   const session = await requireSession();
@@ -26,7 +26,7 @@ export default async function BusinessPage() {
         </p>
       </div>
 
-      <BusinessSettingsForm
+      <BusinessForm
         setupComplete={setupComplete}
         initial={
           business
