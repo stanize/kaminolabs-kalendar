@@ -57,7 +57,7 @@ The multi-step wizard was removed. `/onboarding` is now a simple sign-up screen:
 `components/onboarding/{onboarding-flow,step-cuenta,step-negocio,step-servicios,step-horario,step-equipo,step-listo,nav-buttons,split-shell}.tsx`, `lib/onboarding/{store,validation}.ts`, `lib/actions/{onboarding,skip-onboarding}.ts`.
 
 ### Kept (still used by landing + public booking pages)
-`components/onboarding/booking-preview.tsx`, `lib/onboarding/{data,types,slug}.ts` — imported by `app/page.tsx`, `app/[slug]/page.tsx`, and `lib/landing/ejemplos.ts`.
+`components/onboarding/booking-preview.tsx`, `lib/onboarding/{data,types,slug}.ts` — imported by `app/page.tsx`, `app/bookings/[slug]/page.tsx`, and `lib/landing/ejemplos.ts`.
 
 
 ## Panel (`/panel`)
@@ -86,11 +86,44 @@ The multi-step wizard was removed. `/onboarding` is now a simple sign-up screen:
 
 ---
 
+## Business settings & public booking
+
+- **First in-panel setup page is built**: `/panel/settings` ("Configura tu negocio")
+  manages the single business record (name, type, city, slug). Page:
+  `app/panel/settings/page.tsx` (server, `requireSession` + `getBusinessForUser`);
+  form: `components/panel/business-settings-form.tsx` (client). Server actions in
+  `lib/actions/business.ts`: `saveBusinessSettings` (create/update) and
+  `checkSlugAvailability` (live UX check) — both wrapped in `authedAction`.
+- **Public booking pages live under `/bookings/[slug]`** (moved from root
+  `/[slug]`). The namespace prevents slug/route collisions. Route:
+  `app/bookings/[slug]/page.tsx`, which renders only when `slug_status='active'`.
+- **Booking URL helper** (`lib/business/booking-url.ts`): `bookingPath(slug)`,
+  `bookingUrl(slug)`, `bookingUrlDisplay(slug)` — the single source of truth for
+  the public URL shape (`{NEXT_PUBLIC_APP_URL}/bookings/{slug}`). Never hardcode
+  the domain or `/bookings` segment anywhere; call these. (Old code wrongly used
+  a `kalendar.app/...` placeholder — all removed.)
+- **Slug rules** (`lib/business/slug-screen.ts`): lowercase a-z/0-9/hyphens,
+  3-40 chars, no leading/trailing/double hyphens; sanitized live as typed.
+  Suggestion is hyphenated from the business name (`suggestSlug`).
+- **Slug is permanent**: chosen once at creation, then **immutable** — the form
+  shows it read-only on edit, and `saveBusinessSettings` ignores any slug in the
+  payload on update. Changing a slug is a future support-handled operation.
+- **Slug moderation (model C+)**: every slug is human-reviewed regardless. At
+  creation an automated screen (`reserved-slugs.ts` blocklist + a small profanity
+  list) runs: clean slugs go live instantly (`slug_status='active'`) but still
+  enter the review queue (`slug_reviewed_at` null); flagged slugs start
+  `pending_review` (offline until approved). Statuses:
+  `active|pending_review|rejected`. Columns on `kalendar_businesses`:
+  `slug_status`, `slug_flag_reason`, `slug_reviewed_at`, `slug_reviewed_by`.
+  Review queue = `slug_reviewed_at IS NULL`. The future admin portal owns review.
+- **Reserved slugs** (`lib/business/reserved-slugs.ts`): vanity/abuse blocklist
+  (admin, support, kalendar, official, api, app, login, billing, ...), extend over time.
+
 ## Key Conventions
 
 - **Internationalization-ready — English-only code, no exceptions.** Every code
   identifier, route path, file/folder name, table/column name, enum value, stored
-  code (business `type`, weekday `day`), slug, comment, and script is in English.
+  code (business `type`, weekday `day`), slug, comment, and script is in English. (The icon registry export is `ICONS`, renamed from the former Spanish `ICONOS`.)
   Spanish appears **only** in UI strings shown to the end customer, supplied as
   display labels mapped from English codes (e.g. `BUSINESS_TYPES` maps
   `psychology` -> `"Psicología"`, `DAYS` maps `mon` -> `"Lunes"`). The project
