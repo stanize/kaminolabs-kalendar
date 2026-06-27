@@ -9,17 +9,17 @@ import { authClient } from "@/lib/auth-client";
 
 const NAV_ITEMS = [
   { href: "/panel", label: "Inicio", icon: "home", exact: true },
-  { href: "/panel/calendario", label: "Calendario", icon: "calendar" },
-  { href: "/panel/clientes", label: "Clientes", icon: "users" },
-  { href: "/panel/servicios", label: "Servicios", icon: "sparkles" },
-  { href: "/panel/disponibilidad", label: "Disponibilidad", icon: "clock" },
-  { href: "/panel/equipo", label: "Equipo", icon: "user" },
-  { href: "/panel/pagos", label: "Pagos", icon: "creditCard" },
-  { href: "/panel/facturas", label: "Facturas", icon: "fileText" },
-  { href: "/panel/notificaciones", label: "Emails y avisos", icon: "bell" },
-  { href: "/panel/informes", label: "Informes", icon: "barChart" },
-  { href: "/panel/integraciones", label: "Integraciones", icon: "grid" },
-  { href: "/panel/ajustes", label: "Ajustes", icon: "settings" },
+  { href: "/panel/calendar", label: "Calendario", icon: "calendar" },
+  { href: "/panel/clients", label: "Clientes", icon: "users" },
+  { href: "/panel/services", label: "Servicios", icon: "sparkles" },
+  { href: "/panel/availability", label: "Disponibilidad", icon: "clock" },
+  { href: "/panel/team", label: "Equipo", icon: "user" },
+  { href: "/panel/payments", label: "Pagos", icon: "creditCard" },
+  { href: "/panel/invoices", label: "Facturas", icon: "fileText" },
+  { href: "/panel/notifications", label: "Emails y avisos", icon: "bell" },
+  { href: "/panel/reports", label: "Informes", icon: "barChart" },
+  { href: "/panel/integrations", label: "Integraciones", icon: "grid" },
+  { href: "/panel/settings", label: "Ajustes", icon: "settings" },
 ];
 
 const BOTTOM_NAV_ITEMS = [
