@@ -132,8 +132,8 @@ export function AvailabilityManager({
         </div>
       )}
 
-      {/* Weekly grid — one flat container, a single row per day */}
-      <div className="overflow-hidden rounded-xl border border-line bg-surface">
+      {/* Weekly grid + booking window — one container */}
+      <div className="rounded-xl border border-line bg-surface">
         {WEEKDAY_ORDER.map((day, di) => {
           const ranges = week[day];
           const open = ranges.length > 0;
@@ -188,39 +188,41 @@ export function AvailabilityManager({
             </div>
           );
         })}
-      </div>
 
-      {saved && !error && (
-        <div className="flex items-center gap-2 rounded-xl border border-brand-line bg-brand-weak px-4 py-3 text-[13.5px] text-brand-ink">
-          <Icon name="check" size={16} strokeWidth={2.5} className="shrink-0" />
-          <span>Guardado correctamente.</span>
-        </div>
-      )}
-
-      {/* Booking window + confirm */}
-      <div className="flex flex-col gap-3 rounded-xl border border-line bg-surface p-4 sm:flex-row sm:items-end sm:justify-between">
-        <div className="flex flex-col gap-[7px]">
-          <span className="text-[13px] font-semibold text-ink">¿Con cuánta antelación pueden reservar?</span>
-          <div className="flex gap-2">
-            {BOOKING_WINDOW_OPTIONS.map((m) => (
-              <button
-                key={m}
-                type="button"
-                onClick={() => { setWindowMonths(m); setSaved(false); }}
-                className={`rounded-lg border px-3.5 py-2 text-[13px] font-semibold transition-all ${
-                  windowMonths === m
-                    ? "border-brand bg-brand text-white"
-                    : "border-line bg-surface text-ink-soft hover:border-brand-line hover:text-ink"
-                }`}
-              >
-                {m} {m === 1 ? "mes" : "meses"}
-              </button>
-            ))}
+        {/* Blank space after the last day so Sat/Sun dropdowns open cleanly,
+            then the booking window + confirm — all in the same container. */}
+        <div className="border-t border-line px-4 pb-4 pt-6 mt-4">
+          {saved && !error && (
+            <div className="mb-4 flex items-center gap-2 rounded-xl border border-brand-line bg-brand-weak px-4 py-3 text-[13.5px] text-brand-ink">
+              <Icon name="check" size={16} strokeWidth={2.5} className="shrink-0" />
+              <span>Guardado correctamente.</span>
+            </div>
+          )}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div className="flex flex-col gap-[7px]">
+              <span className="text-[13px] font-semibold text-ink">¿Con cuánta antelación pueden reservar?</span>
+              <div className="flex gap-2">
+                {BOOKING_WINDOW_OPTIONS.map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => { setWindowMonths(m); setSaved(false); }}
+                    className={`rounded-lg border px-3.5 py-2 text-[13px] font-semibold transition-all ${
+                      windowMonths === m
+                        ? "border-brand bg-brand text-white"
+                        : "border-line bg-surface text-ink-soft hover:border-brand-line hover:text-ink"
+                    }`}
+                  >
+                    {m} {m === 1 ? "mes" : "meses"}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <Btn onClick={handleSave} disabled={saving} size="lg">
+              {saving ? "Guardando…" : "Confirmar cambios"}
+            </Btn>
           </div>
         </div>
-        <Btn onClick={handleSave} disabled={saving} size="lg">
-          {saving ? "Guardando…" : "Confirmar cambios"}
-        </Btn>
       </div>
     </div>
   );
