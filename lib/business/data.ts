@@ -17,12 +17,13 @@ export interface Business {
   brand_color: string;
   team_mode: "solo" | "team";
   booking_window_months: number;
+  onboarding_completed_at: string | null;
   created_at: string;
 }
 
 const BUSINESS_TABLE = "kalendar_businesses";
 const BUSINESS_COLUMNS =
-  "id, owner_id, name, type, city, slug, slug_status, slug_flag_reason, slug_reviewed_at, brand_color, team_mode, booking_window_months, created_at";
+  "id, owner_id, name, type, city, slug, slug_status, slug_flag_reason, slug_reviewed_at, brand_color, team_mode, booking_window_months, onboarding_completed_at, created_at";
 
 /**
  * The business owned by a given user, or null. Always scoped by the userId

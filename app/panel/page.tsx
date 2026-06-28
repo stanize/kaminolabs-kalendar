@@ -4,6 +4,7 @@ import Link from "next/link";
 import { requireSession } from "@/lib/auth-session";
 import { getSetupProgress } from "@/lib/business/data";
 import { bookingPath, bookingUrlDisplay } from "@/lib/business/booking-url";
+import { SetupCompleteBanner } from "@/components/panel/setup-complete-banner";
 
 export default async function PanelHomePage() {
   const session = await requireSession();
@@ -98,17 +99,7 @@ export default async function PanelHomePage() {
             </div>
           )}
 
-          {allDone && (
-            <div className="mb-6 flex items-center gap-3 rounded-2xl border border-brand-line bg-brand-weak px-5 py-4">
-              <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-brand text-white">
-                <Icon name="check" size={18} strokeWidth={2.5} />
-              </div>
-              <div>
-                <p className="text-[14px] font-semibold text-brand-ink">¡Todo configurado!</p>
-                <p className="text-[13px] text-brand-ink/80">Tu página de reservas está lista para recibir clientes.</p>
-              </div>
-            </div>
-          )}
+          {allDone && !business?.onboarding_completed_at && <SetupCompleteBanner />}
         </div>
 
         <div className="flex flex-col gap-4">
