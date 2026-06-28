@@ -27,6 +27,7 @@ create extension if not exists "pgcrypto";
 -- Children before parents.
 -- ----------------------------------------------------------------------------
 drop table if exists public.kalendar_support_tickets cascade;
+drop table if exists public.kalendar_bookings        cascade;
 drop table if exists public.kalendar_team_members    cascade;
 drop table if exists public.kalendar_business_hours  cascade;
 drop table if exists public.kalendar_services        cascade;
@@ -34,6 +35,7 @@ drop table if exists public.kalendar_businesses      cascade;
 
 drop type if exists public.support_ticket_status   cascade;
 drop type if exists public.support_ticket_category cascade;
+drop type if exists public.booking_status          cascade;
 
 -- ----------------------------------------------------------------------------
 -- kalendar_businesses
@@ -166,6 +168,83 @@ create policy "Team: write"
   on public.kalendar_team_members for all using (true) with check (true);
 
 -- ----------------------------------------------------------------------------
+-- kalendar_bookings
+-- Guest bookings made on the public /bookings/[slug] page.
+--
+-- Lifecycle (v1): a guest submits -> 'pending_confirmation' (holds the slot);
+-- the client clicks the email link -> 'confirmed' (auto-accepted by default);
+-- either party can cancel via tokenized link -> 'cancelled'; past confirmed
+-- bookings become 'completed'. Owner review is surfaced in the panel calendar
+-- but is not a required gate in v1.
+--
+-- Service details are SNAPSHOT onto the row (service_name/duration/price) so a
+-- booking records what was actually booked and services can be edited/deleted
+-- freely afterwards. team_member_id is null for solo businesses (or "cualquiera"
+-- in team mode could pin a specific member at booking time).
+--
+-- Times are stored as timestamptz (UTC). The business timezone is Europe/Madrid
+-- for now (future: derived from the business location).
+-- ----------------------------------------------------------------------------
+create type public.booking_status as enum (
+  'pending_confirmation', 'confirmed', 'cancelled', 'completed'
+);
+
+create table public.kalendar_bookings (
+  id                   uuid                  primary key default gen_random_uuid(),
+  business_id          uuid                  not null references public.kalendar_businesses (id) on delete cascade,
+  service_id           uuid                  references public.kalendar_services (id) on delete set null,
+  team_member_id       uuid                  references public.kalendar_team_members (id) on delete set null,
+  service_name         text                  not null,
+  service_duration_min integer               not null check (service_duration_min > 0),
+  service_price        numeric(10, 2)        not null default 0 check (service_price >= 0),
+  starts_at            timestamptz           not null,
+  ends_at              timestamptz           not null,
+  status               public.booking_status not null default 'pending_confirmation',
+  client_name          text                  not null,
+  client_email         text                  not null,
+  client_phone         text,
+  confirm_token        text                  not null unique,
+  created_at           timestamptz           not null default now(),
+  updated_at           timestamptz           not null default now()
+);
+
+create index kalendar_bookings_business_id_idx on public.kalendar_bookings (business_id);
+create index kalendar_bookings_starts_at_idx   on public.kalendar_bookings (starts_at);
+create index kalendar_bookings_token_idx       on public.kalendar_bookings (confirm_token);
+
+-- Slot-collision guard: at most one active (pending or confirmed) booking per
+-- provider+start. A null team_member_id (solo / unassigned) collapses to a
+-- single "business chair" via coalesce to the all-zero uuid, so a solo business
+-- cannot double-book the same start time. Cancelled/completed rows are excluded
+-- so a freed slot can be rebooked.
+create unique index kalendar_bookings_active_slot_idx
+  on public.kalendar_bookings (
+    business_id,
+    coalesce(team_member_id, '00000000-0000-0000-0000-000000000000'::uuid),
+    starts_at
+  )
+  where status in ('pending_confirmation', 'confirmed');
+
+create or replace function public.set_updated_at()
+returns trigger language plpgsql as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
+create trigger kalendar_bookings_updated_at
+  before update on public.kalendar_bookings
+  for each row execute function public.set_updated_at();
+
+alter table public.kalendar_bookings enable row level security;
+
+create policy "Bookings: read"
+  on public.kalendar_bookings for select using (true);
+create policy "Bookings: write"
+  on public.kalendar_bookings for all using (true) with check (true);
+
+-- ----------------------------------------------------------------------------
 -- kalendar_support_tickets
 -- Support requests submitted by authenticated users via the panel.
 -- The help portal reads and updates this table (status, admin_notes).
@@ -190,14 +269,6 @@ create table public.kalendar_support_tickets (
 
 create index kalendar_support_tickets_user_id_idx on public.kalendar_support_tickets (user_id);
 create index kalendar_support_tickets_status_idx  on public.kalendar_support_tickets (status);
-
-create or replace function public.set_updated_at()
-returns trigger language plpgsql as $$
-begin
-  new.updated_at = now();
-  return new;
-end;
-$$;
 
 create trigger kalendar_support_tickets_updated_at
   before update on public.kalendar_support_tickets
