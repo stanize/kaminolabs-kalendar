@@ -66,6 +66,12 @@ create table public.kalendar_businesses (
   slug_reviewed_at        timestamptz, -- null = awaiting human review (the review queue)
   slug_reviewed_by        text,        -- admin user id who actioned the review; null until reviewed
   brand_color             text        not null default '#0d9488',
+  -- Solo vs multi-provider clinic. Controls whether per-member availability/
+  -- service rows are materialized (team) or availability is the clinic hours
+  -- read directly (solo).
+  team_mode               text        not null default 'solo' check (
+    team_mode in ('solo', 'team')
+  ),
   onboarding_completed_at timestamptz,
   created_at              timestamptz not null default now()
 );
