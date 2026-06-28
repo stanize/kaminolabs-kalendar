@@ -132,41 +132,39 @@ export function AvailabilityManager({
         </div>
       )}
 
-      {/* Weekly grid */}
-      <div className="flex flex-col gap-2">
-        {WEEKDAY_ORDER.map((day) => {
+      {/* Weekly grid — one flat container, a single row per day */}
+      <div className="overflow-hidden rounded-xl border border-line bg-surface">
+        {WEEKDAY_ORDER.map((day, di) => {
           const ranges = week[day];
           const open = ranges.length > 0;
           return (
-            <div key={day} className="rounded-xl border border-line bg-surface p-4">
-              <div className="flex items-center justify-between">
-                <label className="flex cursor-pointer items-center gap-2.5">
-                  <input
-                    type="checkbox"
-                    checked={open}
-                    onChange={(e) => toggleDay(day, e.target.checked)}
-                    className="h-4 w-4 accent-brand"
-                  />
-                  <span className={`text-[14px] font-semibold ${open ? "text-ink" : "text-ink-soft"}`}>
-                    {weekdayLabel(day)}
-                  </span>
-                </label>
-                {!open && <span className="text-[13px] text-ink-soft">Cerrado</span>}
-              </div>
+            <div
+              key={day}
+              className={`flex gap-3 px-4 py-3 ${di > 0 ? "border-t border-line" : ""}`}
+            >
+              {/* Day toggle + label (fixed width so time controls align) */}
+              <label className="flex w-[130px] shrink-0 cursor-pointer items-center gap-2.5 pt-1.5">
+                <input
+                  type="checkbox"
+                  checked={open}
+                  onChange={(e) => toggleDay(day, e.target.checked)}
+                  className="h-4 w-4 accent-brand"
+                />
+                <span className={`text-[14px] font-semibold ${open ? "text-ink" : "text-ink-soft"}`}>
+                  {weekdayLabel(day)}
+                </span>
+              </label>
 
-              {open && (
-                <div className="mt-3 flex flex-col gap-2 pl-[26px]">
+              {/* Right side: closed label, or the ranges (first inline, extras stacked) */}
+              {!open ? (
+                <div className="flex items-center pt-1.5 text-[13px] text-ink-soft">Cerrado</div>
+              ) : (
+                <div className="flex flex-1 flex-col gap-2">
                   {ranges.map((r, i) => (
                     <div key={i} className="flex items-center gap-2">
-                      <TimeSelect
-                        value={r.start}
-                        onChange={(v) => updateRange(day, i, { start: v })}
-                      />
+                      <TimeSelect value={r.start} onChange={(v) => updateRange(day, i, { start: v })} />
                       <span className="text-[13px] text-ink-soft">a</span>
-                      <TimeSelect
-                        value={r.end}
-                        onChange={(v) => updateRange(day, i, { end: v })}
-                      />
+                      <TimeSelect value={r.end} onChange={(v) => updateRange(day, i, { end: v })} />
                       <button
                         onClick={() => removeRange(day, i)}
                         className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-ink-soft hover:bg-error-weak hover:text-error"
@@ -174,14 +172,17 @@ export function AvailabilityManager({
                       >
                         <Icon name="x" size={15} />
                       </button>
+                      {/* "Añadir franja" sits at the end of the first row */}
+                      {i === 0 && (
+                        <button
+                          onClick={() => addRange(day)}
+                          className="flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-1.5 text-[13px] font-medium text-brand hover:bg-brand-weak"
+                        >
+                          <Icon name="plus" size={14} /> Añadir franja
+                        </button>
+                      )}
                     </div>
                   ))}
-                  <button
-                    onClick={() => addRange(day)}
-                    className="flex w-fit items-center gap-1.5 rounded-lg px-2 py-1.5 text-[13px] font-medium text-brand hover:bg-brand-weak"
-                  >
-                    <Icon name="plus" size={14} /> Añadir franja
-                  </button>
                 </div>
               )}
             </div>
