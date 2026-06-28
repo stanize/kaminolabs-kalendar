@@ -169,7 +169,7 @@ export function BookingWizard({
         <DetailsStep
           slug={slug}
           serviceId={service.id}
-          providerId={providerId}
+          providerId={slot.providerId}
           slot={slot}
           serviceName={service.name}
           onError={setError}
@@ -226,6 +226,16 @@ function ProviderButton({ label, sub, onClick }: { label: string; sub?: string; 
 }
 
 // ── Date + time step ─────────────────────────────────────────────────────────
+
+// ── Date + time step (week strip + slots below) ──────────────────────────────
+function startOfWeekMon(d: Date): Date {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  const dow = (x.getDay() + 6) % 7; // Mon=0
+  x.setDate(x.getDate() - dow);
+  return x;
+}
+
 function DateTimeStep({
   slug,
   serviceId,
@@ -248,21 +258,19 @@ function DateTimeStep({
   const maxDate = new Date(today);
   maxDate.setMonth(maxDate.getMonth() + bookingWindowMonths);
 
-  const [viewYear, setViewYear] = useState(today.getFullYear());
-  const [viewMonth, setViewMonth] = useState(today.getMonth()); // 0-11
+  const openSet = new Set(openDays);
+
+  const [weekStart, setWeekStart] = useState<Date>(startOfWeekMon(today));
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [slots, setSlots] = useState<SlotDTO[] | null>(null);
   const [loadingSlots, setLoadingSlots] = useState(false);
 
-  const openSet = new Set(openDays);
-
-  // Build the month grid (Mon-first).
-  const firstOfMonth = new Date(viewYear, viewMonth, 1);
-  const startDow = (firstOfMonth.getDay() + 6) % 7; // Mon=0
-  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
-  const cells: (Date | null)[] = [];
-  for (let i = 0; i < startDow; i++) cells.push(null);
-  for (let d = 1; d <= daysInMonth; d++) cells.push(new Date(viewYear, viewMonth, d));
+  // The 7 days of the current week strip.
+  const weekDays: Date[] = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(weekStart);
+    d.setDate(d.getDate() + i);
+    return d;
+  });
 
   function isSelectable(d: Date): boolean {
     if (d < today || d > maxDate) return false;
@@ -284,92 +292,100 @@ function DateTimeStep({
     setSlots(res.slots);
   }
 
-  function prevMonth() {
-    const d = new Date(viewYear, viewMonth - 1, 1);
-    setViewYear(d.getFullYear());
-    setViewMonth(d.getMonth());
-  }
-  function nextMonth() {
-    const d = new Date(viewYear, viewMonth + 1, 1);
-    setViewYear(d.getFullYear());
-    setViewMonth(d.getMonth());
+  function shiftWeek(deltaWeeks: number) {
+    const next = new Date(weekStart);
+    next.setDate(next.getDate() + deltaWeeks * 7);
+    setWeekStart(next);
   }
 
-  const canGoPrev = new Date(viewYear, viewMonth, 1) > new Date(today.getFullYear(), today.getMonth(), 1);
-  const canGoNext = new Date(viewYear, viewMonth + 1, 1) <= maxDate;
+  const thisWeekStart = startOfWeekMon(today);
+  const canPrev = weekStart > thisWeekStart;
+  const canNext = (() => {
+    const nextStart = new Date(weekStart);
+    nextStart.setDate(nextStart.getDate() + 7);
+    return nextStart <= maxDate;
+  })();
+
+  const isTeamAny = providerId === null; // "Cualquiera": slots carry provider labels
+
+  const monthLabel = `${MONTHS_ES[weekStart.getMonth()]} ${weekStart.getFullYear()}`;
 
   return (
     <Section title="Elige fecha y hora">
-      {/* Calendar */}
-      <div className="rounded-xl border border-line p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <button
-            onClick={prevMonth}
-            disabled={!canGoPrev}
-            className="grid h-8 w-8 place-items-center rounded-lg text-ink-soft hover:bg-surface-2 disabled:opacity-30"
-            aria-label="Mes anterior"
-          >
-            <Icon name="chevronLeft" size={16} />
-          </button>
-          <span className="text-[14px] font-semibold capitalize text-ink">
-            {MONTHS_ES[viewMonth]} {viewYear}
-          </span>
-          <button
-            onClick={nextMonth}
-            disabled={!canGoNext}
-            className="grid h-8 w-8 place-items-center rounded-lg text-ink-soft hover:bg-surface-2 disabled:opacity-30"
-            aria-label="Mes siguiente"
-          >
-            <Icon name="chevronRight" size={16} />
-          </button>
-        </div>
-        <div className="mb-1 grid grid-cols-7 gap-1 text-center text-[11px] font-semibold text-ink-soft">
-          {DOW_SHORT.map((d, i) => (
-            <span key={i}>{d}</span>
-          ))}
-        </div>
-        <div className="grid grid-cols-7 gap-1">
-          {cells.map((d, i) => {
-            if (!d) return <span key={i} />;
-            const ds = ymd(d);
-            const selectable = isSelectable(d);
-            const selected = ds === selectedDate;
-            return (
-              <button
-                key={i}
-                disabled={!selectable}
-                onClick={() => pickDay(d)}
-                className={`aspect-square rounded-lg text-[13px] font-medium transition-colors ${
-                  selected
-                    ? "bg-brand text-white"
-                    : selectable
-                      ? "text-ink hover:bg-brand-weak"
-                      : "cursor-default text-ink-soft/30"
-                }`}
-              >
-                {d.getDate()}
-              </button>
-            );
-          })}
-        </div>
+      {/* Week navigator */}
+      <div className="mb-3 flex items-center justify-between">
+        <button
+          onClick={() => shiftWeek(-1)}
+          disabled={!canPrev}
+          className="grid h-8 w-8 place-items-center rounded-lg text-ink-soft hover:bg-surface-2 disabled:opacity-30"
+          aria-label="Semana anterior"
+        >
+          <Icon name="chevronLeft" size={16} />
+        </button>
+        <span className="text-[14px] font-semibold capitalize text-ink">{monthLabel}</span>
+        <button
+          onClick={() => shiftWeek(1)}
+          disabled={!canNext}
+          className="grid h-8 w-8 place-items-center rounded-lg text-ink-soft hover:bg-surface-2 disabled:opacity-30"
+          aria-label="Semana siguiente"
+        >
+          <Icon name="chevronRight" size={16} />
+        </button>
       </div>
 
-      {/* Slots */}
+      {/* Week strip: 7 day chips */}
+      <div className="grid grid-cols-7 gap-1.5">
+        {weekDays.map((d, i) => {
+          const ds = ymd(d);
+          const selectable = isSelectable(d);
+          const selected = ds === selectedDate;
+          return (
+            <button
+              key={i}
+              disabled={!selectable}
+              onClick={() => pickDay(d)}
+              className={`flex flex-col items-center gap-0.5 rounded-xl border py-2 transition-all ${
+                selected
+                  ? "border-brand bg-brand text-white"
+                  : selectable
+                    ? "border-line bg-surface text-ink hover:border-brand-line hover:bg-brand-weak"
+                    : "cursor-default border-transparent text-ink-soft/30"
+              }`}
+            >
+              <span className="text-[10.5px] font-semibold uppercase">{DOW_SHORT[i]}</span>
+              <span className="text-[15px] font-semibold leading-none">{d.getDate()}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Slots for the selected day */}
       {selectedDate && (
-        <div className="mt-4">
+        <div className="mt-5">
           {loadingSlots && <p className="text-[13.5px] text-ink-soft">Buscando horarios…</p>}
           {!loadingSlots && slots && slots.length === 0 && (
             <p className="text-[13.5px] text-ink-soft">No hay horarios disponibles este día.</p>
           )}
           {!loadingSlots && slots && slots.length > 0 && (
-            <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
+            <div className={isTeamAny ? "flex flex-col gap-2" : "grid grid-cols-4 gap-2 sm:grid-cols-5"}>
               {slots.map((s) => (
                 <button
-                  key={s.startIso}
+                  key={`${s.startIso}-${s.providerId ?? ""}`}
                   onClick={() => onPick(selectedDate, s)}
-                  className="rounded-lg border border-line py-2 text-[13.5px] font-semibold text-ink transition-all hover:border-brand hover:bg-brand hover:text-white"
+                  className={
+                    isTeamAny
+                      ? "flex items-center justify-between rounded-lg border border-line px-4 py-2.5 text-[13.5px] transition-all hover:border-brand hover:bg-brand-weak"
+                      : "rounded-lg border border-line py-2 text-[13.5px] font-semibold text-ink transition-all hover:border-brand hover:bg-brand hover:text-white"
+                  }
                 >
-                  {s.label}
+                  {isTeamAny ? (
+                    <>
+                      <span className="font-semibold text-ink">{s.label}</span>
+                      <span className="text-ink-soft">{s.providerName}</span>
+                    </>
+                  ) : (
+                    s.label
+                  )}
                 </button>
               ))}
             </div>
@@ -380,7 +396,7 @@ function DateTimeStep({
   );
 }
 
-// ── Details step ─────────────────────────────────────────────────────────────
+
 function DetailsStep({
   slug,
   serviceId,
