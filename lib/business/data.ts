@@ -16,12 +16,13 @@ export interface Business {
   slug_reviewed_at: string | null;
   brand_color: string;
   team_mode: "solo" | "team";
+  booking_window_months: number;
   created_at: string;
 }
 
 const BUSINESS_TABLE = "kalendar_businesses";
 const BUSINESS_COLUMNS =
-  "id, owner_id, name, type, city, slug, slug_status, slug_flag_reason, slug_reviewed_at, brand_color, team_mode, created_at";
+  "id, owner_id, name, type, city, slug, slug_status, slug_flag_reason, slug_reviewed_at, brand_color, team_mode, booking_window_months, created_at";
 
 /**
  * The business owned by a given user, or null. Always scoped by the userId
@@ -86,8 +87,7 @@ export async function getSetupProgress(userId: string): Promise<SetupProgress> {
     supabase
       .from("kalendar_business_hours")
       .select("id", { count: "exact", head: true })
-      .eq("business_id", businessId)
-      .eq("active", true),
+      .eq("business_id", businessId),
     supabase
       .from("kalendar_team_members")
       .select("id", { count: "exact", head: true })

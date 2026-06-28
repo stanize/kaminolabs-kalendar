@@ -72,6 +72,10 @@ create table public.kalendar_businesses (
   team_mode               text        not null default 'solo' check (
     team_mode in ('solo', 'team')
   ),
+  -- How far ahead clients can book, in months (business-level policy).
+  booking_window_months   smallint    not null default 1 check (
+    booking_window_months in (1, 2, 3)
+  ),
   onboarding_completed_at timestamptz,
   created_at              timestamptz not null default now()
 );
@@ -116,16 +120,21 @@ create policy "Services: write"
 -- day is a language-neutral English weekday code.
 -- ----------------------------------------------------------------------------
 create table public.kalendar_business_hours (
-  id          uuid    primary key default gen_random_uuid(),
-  business_id uuid    not null references public.kalendar_businesses (id) on delete cascade,
-  day         text    not null check (day in ('mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun')),
-  active      boolean not null default false,
-  start_time  time,
-  end_time    time,
-  unique (business_id, day)
+  id          uuid        primary key default gen_random_uuid(),
+  business_id uuid        not null references public.kalendar_businesses (id) on delete cascade,
+  day         text        not null check (day in ('mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun')),
+  -- One row per working interval. A day is "open" if it has >= 1 interval and
+  -- "closed" if it has none. Multiple rows per (business, day) enable split
+  -- shifts (e.g. 09:00-14:00 and 16:00-20:00). end_time must be after start_time
+  -- and intervals on the same day must not overlap (enforced in the app layer).
+  start_time  time        not null,
+  end_time    time        not null,
+  sort_order  integer     not null default 0,
+  created_at  timestamptz not null default now()
 );
 
 create index kalendar_business_hours_business_id_idx on public.kalendar_business_hours (business_id);
+create index kalendar_business_hours_business_day_idx on public.kalendar_business_hours (business_id, day);
 
 alter table public.kalendar_business_hours enable row level security;
 
