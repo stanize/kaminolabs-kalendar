@@ -152,6 +152,70 @@ Constraints/validation in `lib/services/constants.ts`. Server actions in
 business_id): `createService`, `createServices` (bulk), `updateService`,
 `deleteService`, `reorderServices`; each revalidates `/panel` + `/panel/services`.
 
+## Disponibilidad & Equipo (setup pages, BUILT)
+
+- **Setup order** (sidebar + home checklist): Negocio -> Servicios -> Equipo -> Disponibilidad.
+- **Equipo** (`/panel/team`): `team_mode` on the business (`solo`|`team`). Owner
+  auto-seeded as a team member via `ensureOwnerSeeded` (render-safe helper in
+  `lib/team/data.ts`, not an action). Solo = only the owner, no add. Team =
+  add/edit/delete/reorder members (owner pinned, undeletable). Actions in
+  `lib/actions/team.ts`.
+- **Disponibilidad** (`/panel/availability`): business-level clinic hours,
+  multi-range per day (split shifts). `kalendar_business_hours` is multi-row per
+  (business, day) — a day is open if it has >=1 interval, no `active` column.
+  `booking_window_months` (1/2/3) on the business. 24h/15-min time dropdowns
+  (custom dropdown that scrolls selected to top); whole-week atomic save via
+  `saveAvailability`. `getBusinessHoursForUser` groups by day.
+
+## Booking system (public booking + engine, BUILT — 5 steps)
+
+The full guest-booking product loop. Public booking pages live at
+`/bookings/[slug]`; the owner manages bookings at `/panel/calendar`.
+
+- **Schema** (`kalendar_bookings`): snapshots `service_name/duration/price` onto
+  each row (so services stay editable/deletable). `booking_status` enum:
+  `pending_confirmation | confirmed | cancelled | completed`. `team_member_id`
+  nullable (null = solo). `confirm_token` (unguessable) is the auth for the
+  guest confirm + cancel links. **Double-booking is impossible at the DB level**:
+  a partial unique index `kalendar_bookings_active_slot_idx` on
+  `(business_id, coalesce(team_member_id, zero-uuid), starts_at)` WHERE status in
+  (pending, confirmed) — cancelled/completed rows excluded so freed slots rebook.
+- **Slot engine** (`lib/booking/slots.ts`): pure, timezone-aware. Slots step by
+  the SERVICE duration. Timezone is hardcoded `Europe/Madrid` (future: from
+  business location); `zonedTimeToUtc` is DST-correct (verified: 09:00 Madrid ->
+  07:00Z summer / 08:00Z winter). All instants stored as UTC timestamptz.
+- **Public flow** (`components/booking/booking-wizard.tsx`): service -> provider
+  (team only; "Cualquiera" shows one slot per free provider, each labelled, so
+  the client picks provider+time together; solo skips provider) -> **week-strip**
+  date picker (Mon-first day chips + slots below, prev/next week bounded by
+  today and booking window) -> guest details (name/email/phone) -> submit. The
+  chosen `YYYY-MM-DD` is interpreted in Madrid server-side.
+- **Public actions** (`lib/actions/booking.ts`, NOT authedAction — guest):
+  `getAvailableSlots`, `submitBooking` (creates `pending_confirmation`, sends
+  client confirm email), `confirmBooking(token)` (pending->confirmed, idempotent,
+  race-guarded, emails owner), `getBookingByToken`, `cancelBookingByToken`
+  (client cancel, emails owner + client), `notifyCancellation` helper.
+- **Confirm page** `/bookings/confirm/[token]`: confirms on GET (benign under
+  auto-accept). **Cancel page** `/bookings/cancel/[token]`: does NOT cancel on
+  GET — shows the booking + a confirm-cancel button (destructive).
+- **Owner side**: `/panel/calendar` (`components/panel/calendar-bookings.tsx`) —
+  upcoming bookings grouped by day (Hoy/Mañana/dated), Próximas/Pendientes tabs
+  (Pendientes = pending_confirmation review queue, with count badge), owner
+  cancel (notifies client). Reads via `getUpcomingBookings` (owner-scoped,
+  `lib/booking/owner-data.ts`). Owner action `cancelBookingAsOwner` in
+  `lib/actions/booking-owner.ts` (authedAction).
+- **Emails** (`lib/email.ts`, Resend, env-gated): client confirm (with cancel
+  link), owner new-booking notification, client+owner cancellation. All
+  best-effort (logged, never block the mutation). `formatBookingWhen` formats
+  Spanish date+time in Madrid.
+- **v1 model**: guest booking (no login), auto-accept default (client email
+  confirm = confirmed; owner review surfaced but not a required gate — future
+  owner "auto-accept on/off" setting). Unconfirmed bookings hold the slot with no
+  auto-expiry yet (future owner setting; owner review is the backstop).
+- **DEFERRED**: payment, owner notification preferences, per-member
+  availability/service overrides, slot-hold expiry, rescheduling (cancel+rebook
+  covers it), real calendar grid view.
+
 ## Key Conventions
 
 - **Internationalization-ready — English-only code, no exceptions.** Every code
@@ -197,6 +261,7 @@ One-off, destructive — run in the Supabase SQL editor:
 ```sql
 truncate
   public.kalendar_support_tickets,
+  public.kalendar_bookings,
   public.kalendar_team_members,
   public.kalendar_business_hours,
   public.kalendar_services,
