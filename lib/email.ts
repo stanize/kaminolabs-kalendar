@@ -101,3 +101,63 @@ function escapeHtml(s: string): string {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
 }
+
+/** Long Spanish date+time in Europe/Madrid, e.g. "martes, 15 de julio · 10:00". */
+export function formatBookingWhen(startIso: string): string {
+  const d = new Date(startIso);
+  const date = new Intl.DateTimeFormat("es-ES", {
+    timeZone: "Europe/Madrid",
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  }).format(d);
+  const time = new Intl.DateTimeFormat("es-ES", {
+    timeZone: "Europe/Madrid",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(d);
+  return `${date} · ${time}`;
+}
+
+/**
+ * Email asking a guest to confirm their pending booking. Clicking the link
+ * activates the reservation. Spanish copy.
+ */
+export function bookingConfirmEmailHtml(input: {
+  clientName: string;
+  businessName: string;
+  serviceName: string;
+  whenLabel: string;
+  providerName?: string | null;
+  confirmUrl: string;
+}): string {
+  const { clientName, businessName, serviceName, whenLabel, providerName, confirmUrl } = input;
+  const greeting = clientName ? `Hola ${escapeHtml(clientName)},` : "Hola,";
+  const providerLine = providerName
+    ? `<tr><td style="padding:4px 0;color:#64748b;font-size:14px;">Profesional</td><td style="padding:4px 0;font-size:14px;text-align:right;">${escapeHtml(providerName)}</td></tr>`
+    : "";
+  return `
+  <div style="font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px; color: #0f172a;">
+    <h1 style="font-size: 20px; margin: 0 0 16px;">Confirma tu reserva</h1>
+    <p style="font-size: 15px; line-height: 1.6; margin: 0 0 12px;">${greeting}</p>
+    <p style="font-size: 15px; line-height: 1.6; margin: 0 0 20px;">
+      Casi listo. Confirma tu reserva en <strong>${escapeHtml(businessName)}</strong> haciendo clic en el botón.
+    </p>
+    <table style="width:100%;border-collapse:collapse;background:#f8fafc;border-radius:12px;padding:8px;margin:0 0 24px;">
+      <tr><td style="padding:8px 12px;color:#64748b;font-size:14px;">Servicio</td><td style="padding:8px 12px;font-size:14px;text-align:right;font-weight:600;">${escapeHtml(serviceName)}</td></tr>
+      <tr><td style="padding:4px 12px;color:#64748b;font-size:14px;">Cuándo</td><td style="padding:4px 12px;font-size:14px;text-align:right;">${escapeHtml(whenLabel)}</td></tr>
+      ${providerLine}
+    </table>
+    <a href="${confirmUrl}" style="display: inline-block; background: #0d9488; color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 600; padding: 12px 24px; border-radius: 12px;">
+      Confirmar mi reserva
+    </a>
+    <p style="font-size: 13px; line-height: 1.6; color: #64748b; margin: 24px 0 0;">
+      Si el botón no funciona, copia y pega este enlace en tu navegador:<br />
+      <a href="${confirmUrl}" style="color: #0d9488; word-break: break-all;">${confirmUrl}</a>
+    </p>
+    <p style="font-size: 13px; line-height: 1.6; color: #64748b; margin: 16px 0 0;">
+      Si no has hecho esta reserva, puedes ignorar este mensaje.
+    </p>
+  </div>`;
+}

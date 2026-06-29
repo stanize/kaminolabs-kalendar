@@ -3,6 +3,7 @@
 import { randomBytes } from "crypto";
 import { createClient } from "@/lib/supabase/server";
 import { getPublicBookingData, getTakenIntervals } from "@/lib/booking/data";
+import { sendEmail, bookingConfirmEmailHtml, formatBookingWhen } from "@/lib/email";
 import {
   generateSlotsForDay,
   dayIdInTz,
@@ -203,6 +204,66 @@ export async function submitBooking(input: {
     return { ok: false, error: "No se pudo crear la reserva. Inténtalo de nuevo." };
   }
 
-  // Step 3 will send the confirmation email here.
+  // Send the client a confirmation link. The booking stays pending until they
+  // click it. Email failure does not roll back the booking (the owner can still
+  // see it in the calendar); we just log and proceed.
+  const base = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/+$/, "");
+  const confirmUrl = `${base}/bookings/confirm/${token}`;
+  const providerName = teamMemberId
+    ? data.members.find((mm) => mm.id === teamMemberId)?.name ?? null
+    : null;
+
+  await sendEmail({
+    to: email,
+    subject: `Confirma tu reserva en ${data.business.name}`,
+    html: bookingConfirmEmailHtml({
+      clientName: name,
+      businessName: data.business.name,
+      serviceName: service.name,
+      whenLabel: formatBookingWhen(start.toISOString()),
+      providerName,
+      confirmUrl,
+    }),
+  });
+
   return { ok: true, token };
+}
+
+// ── Confirm a pending booking via tokenized email link ─────────────────────
+export type ConfirmResult =
+  | { ok: true; status: "confirmed" | "already" }
+  | { ok: false; error: string };
+
+/**
+ * Activates a pending booking from the client's email link. Public/guest — the
+ * unguessable token is the authorization. Idempotent: confirming an
+ * already-confirmed booking reports success ("already"). Cancelled/completed
+ * bookings cannot be confirmed.
+ */
+export async function confirmBooking(token: string): Promise<ConfirmResult> {
+  if (!token || token.length < 10) return { ok: false, error: "Enlace no válido." };
+
+  const supabase = await createClient();
+  const { data: booking } = await supabase
+    .from("kalendar_bookings")
+    .select("id, status")
+    .eq("confirm_token", token)
+    .maybeSingle();
+
+  if (!booking) return { ok: false, error: "Reserva no encontrada." };
+  if (booking.status === "confirmed") return { ok: true, status: "already" };
+  if (booking.status !== "pending_confirmation") {
+    return { ok: false, error: "Esta reserva ya no se puede confirmar." };
+  }
+
+  const { error } = await supabase
+    .from("kalendar_bookings")
+    .update({ status: "confirmed" })
+    .eq("id", booking.id)
+    .eq("status", "pending_confirmation"); // guard against races
+
+  if (error) return { ok: false, error: "No se pudo confirmar la reserva." };
+
+  // Step 4 will notify the owner here.
+  return { ok: true, status: "confirmed" };
 }
