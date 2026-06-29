@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { Logo } from "@/components/ui/logo";
 import { SignupForm } from "@/components/auth/signup-form";
 
@@ -35,13 +34,6 @@ export default async function OnboardingPage() {
         </div>
 
         <SignupForm />
-
-        <p className="mt-6 text-center text-[13px] text-ink-soft">
-          ¿Ya tienes cuenta?{" "}
-          <Link href="/login" className="font-medium text-brand hover:underline">
-            Iniciar sesión
-          </Link>
-        </p>
       </div>
     </div>
   );

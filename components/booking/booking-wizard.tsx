@@ -38,6 +38,26 @@ function jsDowToDayId(dow: number): DayId {
   return (["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as DayId[])[dow];
 }
 
+/** Groups "Cualquiera" slots by provider, preserving provider order and sorting
+ *  each provider's slots by time. */
+function groupByProvider(
+  slots: SlotDTO[]
+): { providerId: string | null; providerName: string | null; slots: SlotDTO[] }[] {
+  const groups: { providerId: string | null; providerName: string | null; slots: SlotDTO[] }[] = [];
+  for (const s of slots) {
+    let g = groups.find((x) => x.providerId === s.providerId);
+    if (!g) {
+      g = { providerId: s.providerId, providerName: s.providerName, slots: [] };
+      groups.push(g);
+    }
+    g.slots.push(s);
+  }
+  for (const g of groups) g.slots.sort((a, b) => a.startIso.localeCompare(b.startIso));
+  // Order providers by name for stable display.
+  groups.sort((a, b) => (a.providerName ?? "").localeCompare(b.providerName ?? ""));
+  return groups;
+}
+
 export function BookingWizard({
   slug,
   services,
@@ -367,28 +387,42 @@ function DateTimeStep({
             <p className="text-[13.5px] text-ink-soft">No hay horarios disponibles este día.</p>
           )}
           {!loadingSlots && slots && slots.length > 0 && (
-            <div className={isTeamAny ? "flex flex-col gap-2" : "grid grid-cols-4 gap-2 sm:grid-cols-5"}>
-              {slots.map((s) => (
-                <button
-                  key={`${s.startIso}-${s.providerId ?? ""}`}
-                  onClick={() => onPick(selectedDate, s)}
-                  className={
-                    isTeamAny
-                      ? "flex items-center justify-between rounded-lg border border-line px-4 py-2.5 text-[13.5px] transition-all hover:border-brand hover:bg-brand-weak"
-                      : "rounded-lg border border-line py-2 text-[13.5px] font-semibold text-ink transition-all hover:border-brand hover:bg-brand hover:text-white"
-                  }
-                >
-                  {isTeamAny ? (
-                    <>
-                      <span className="font-semibold text-ink">{s.label}</span>
-                      <span className="text-ink-soft">{s.providerName}</span>
-                    </>
-                  ) : (
-                    s.label
-                  )}
-                </button>
-              ))}
-            </div>
+            isTeamAny ? (
+              // "Cualquiera": group by provider — each provider's name, then a
+              // chip grid of their available times below (like the solo view).
+              <div className="flex flex-col gap-5">
+                {groupByProvider(slots).map((group) => (
+                  <div key={group.providerId ?? "any"}>
+                    <h3 className="mb-2 text-[13px] font-bold uppercase tracking-[.04em] text-ink-soft">
+                      {group.providerName}
+                    </h3>
+                    <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
+                      {group.slots.map((s) => (
+                        <button
+                          key={`${s.startIso}-${s.providerId ?? ""}`}
+                          onClick={() => onPick(selectedDate, s)}
+                          className="rounded-lg border border-line py-2 text-[13.5px] font-semibold text-ink transition-all hover:border-brand hover:bg-brand hover:text-white"
+                        >
+                          {s.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
+                {slots.map((s) => (
+                  <button
+                    key={`${s.startIso}-${s.providerId ?? ""}`}
+                    onClick={() => onPick(selectedDate, s)}
+                    className="rounded-lg border border-line py-2 text-[13.5px] font-semibold text-ink transition-all hover:border-brand hover:bg-brand hover:text-white"
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            )
           )}
         </div>
       )}
