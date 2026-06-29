@@ -3,7 +3,14 @@
 import { randomBytes } from "crypto";
 import { createClient } from "@/lib/supabase/server";
 import { getPublicBookingData, getTakenIntervals } from "@/lib/booking/data";
-import { sendEmail, bookingConfirmEmailHtml, ownerBookingNotificationHtml, formatBookingWhen } from "@/lib/email";
+import {
+  sendEmail,
+  bookingConfirmEmailHtml,
+  ownerBookingNotificationHtml,
+  bookingCancelledClientHtml,
+  bookingCancelledOwnerHtml,
+  formatBookingWhen,
+} from "@/lib/email";
 import {
   generateSlotsForDay,
   dayIdInTz,
@@ -209,6 +216,7 @@ export async function submitBooking(input: {
   // see it in the calendar); we just log and proceed.
   const base = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/+$/, "");
   const confirmUrl = `${base}/bookings/confirm/${token}`;
+  const cancelUrl = `${base}/bookings/cancel/${token}`;
   const providerName = teamMemberId
     ? data.members.find((mm) => mm.id === teamMemberId)?.name ?? null
     : null;
@@ -223,6 +231,7 @@ export async function submitBooking(input: {
       whenLabel: formatBookingWhen(start.toISOString()),
       providerName,
       confirmUrl,
+      cancelUrl,
     }),
   });
 
@@ -324,4 +333,168 @@ async function notifyOwnerOfBooking(booking: {
       panelUrl: `${base}/panel/calendar`,
     }),
   });
+}
+
+// ── Cancellation (client side, via tokenized link) ─────────────────────────
+export interface BookingSummary {
+  serviceName: string;
+  whenLabel: string;
+  status: BookingStatusLite;
+  businessName: string;
+  providerName: string | null;
+}
+type BookingStatusLite = "pending_confirmation" | "confirmed" | "cancelled" | "completed";
+
+export type BookingLookupResult =
+  | { ok: true; booking: BookingSummary }
+  | { ok: false; error: string };
+
+/** Read-only lookup of a booking by token, for the cancel page to display. */
+export async function getBookingByToken(token: string): Promise<BookingLookupResult> {
+  if (!token || token.length < 10) return { ok: false, error: "Enlace no válido." };
+  const supabase = await createClient();
+  const { data: b } = await supabase
+    .from("kalendar_bookings")
+    .select("service_name, starts_at, status, business_id, team_member_id")
+    .eq("confirm_token", token)
+    .maybeSingle();
+  if (!b) return { ok: false, error: "Reserva no encontrada." };
+
+  const { data: biz } = await supabase
+    .from("kalendar_businesses")
+    .select("name")
+    .eq("id", b.business_id)
+    .maybeSingle();
+
+  let providerName: string | null = null;
+  if (b.team_member_id) {
+    const { data: m } = await supabase
+      .from("kalendar_team_members")
+      .select("name")
+      .eq("id", b.team_member_id)
+      .maybeSingle();
+    providerName = m?.name ?? null;
+  }
+
+  return {
+    ok: true,
+    booking: {
+      serviceName: b.service_name,
+      whenLabel: formatBookingWhen(b.starts_at),
+      status: b.status as BookingStatusLite,
+      businessName: biz?.name ?? "",
+      providerName,
+    },
+  };
+}
+
+export type CancelResult =
+  | { ok: true; status: "cancelled" | "already" }
+  | { ok: false; error: string };
+
+/**
+ * Cancels a booking from the client's tokenized link. Public/guest — the token
+ * is the authorization. Idempotent. Frees the slot and notifies the owner.
+ */
+export async function cancelBookingByToken(token: string): Promise<CancelResult> {
+  if (!token || token.length < 10) return { ok: false, error: "Enlace no válido." };
+
+  const supabase = await createClient();
+  const { data: booking } = await supabase
+    .from("kalendar_bookings")
+    .select(
+      "id, status, business_id, team_member_id, service_name, starts_at, client_name, client_email"
+    )
+    .eq("confirm_token", token)
+    .maybeSingle();
+
+  if (!booking) return { ok: false, error: "Reserva no encontrada." };
+  if (booking.status === "cancelled") return { ok: true, status: "already" };
+  if (!["pending_confirmation", "confirmed"].includes(booking.status)) {
+    return { ok: false, error: "Esta reserva ya no se puede cancelar." };
+  }
+
+  const { error } = await supabase
+    .from("kalendar_bookings")
+    .update({ status: "cancelled" })
+    .eq("id", booking.id)
+    .in("status", ["pending_confirmation", "confirmed"]);
+  if (error) return { ok: false, error: "No se pudo cancelar la reserva." };
+
+  // Notify owner + send the client their cancellation receipt. Best-effort.
+  await notifyCancellation(booking, false);
+
+  return { ok: true, status: "cancelled" };
+}
+
+/**
+ * Sends cancellation emails. byOwner=false -> client cancelled (notify owner +
+ * client receipt). byOwner=true -> owner cancelled (notify client only).
+ * Best-effort; failures are logged, never thrown.
+ */
+export async function notifyCancellation(
+  booking: {
+    business_id: string;
+    team_member_id: string | null;
+    service_name: string;
+    starts_at: string;
+    client_name: string;
+    client_email: string;
+  },
+  byOwner: boolean
+): Promise<void> {
+  const supabase = await createClient();
+
+  const { data: biz } = await supabase
+    .from("kalendar_businesses")
+    .select("name, owner_id")
+    .eq("id", booking.business_id)
+    .maybeSingle();
+  if (!biz) return;
+
+  let providerName: string | null = null;
+  if (booking.team_member_id) {
+    const { data: m } = await supabase
+      .from("kalendar_team_members")
+      .select("name")
+      .eq("id", booking.team_member_id)
+      .maybeSingle();
+    providerName = m?.name ?? null;
+  }
+
+  const whenLabel = formatBookingWhen(booking.starts_at);
+
+  // Always send the client a cancellation receipt.
+  await sendEmail({
+    to: booking.client_email,
+    subject: `Reserva cancelada · ${biz.name}`,
+    html: bookingCancelledClientHtml({
+      clientName: booking.client_name,
+      businessName: biz.name,
+      serviceName: booking.service_name,
+      whenLabel,
+      byOwner,
+    }),
+  });
+
+  // If the client cancelled, also notify the owner.
+  if (!byOwner) {
+    const { data: owner } = await supabase
+      .from("user")
+      .select("email")
+      .eq("id", biz.owner_id)
+      .maybeSingle();
+    if (owner?.email) {
+      await sendEmail({
+        to: owner.email,
+        subject: `Reserva cancelada: ${booking.service_name}`,
+        html: bookingCancelledOwnerHtml({
+          serviceName: booking.service_name,
+          whenLabel,
+          clientName: booking.client_name,
+          providerName,
+        }),
+      });
+    }
+  }
 }
