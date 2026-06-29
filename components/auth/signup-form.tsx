@@ -75,7 +75,7 @@ export function SignupForm({ dict }: { dict: AuthDict }) {
           callbackURL: "/panel",
         }),
         12000,
-        dict.errTimeout(12)
+        dict.errTimeout
       );
 
       if (result.error) {

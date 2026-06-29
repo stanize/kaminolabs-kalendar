@@ -38,7 +38,7 @@ export interface Dictionary {
     errEmailExists: string;
     errGeneric: string;
     errUnexpected: string;
-    errTimeout: (seconds: number) => string;
+    errTimeout: string;
   };
 }
 
@@ -73,7 +73,7 @@ const es: Dictionary = {
     errEmailExists: "Ya existe una cuenta con ese email.",
     errGeneric: "Error: inténtalo de nuevo.",
     errUnexpected: "Error inesperado.",
-    errTimeout: (s) => `Sin respuesta del servidor (${s}s). Inténtalo de nuevo.`,
+    errTimeout: "Sin respuesta del servidor. Inténtalo de nuevo.",
   },
 };
 
@@ -108,7 +108,7 @@ const en: Dictionary = {
     errEmailExists: "An account with that email already exists.",
     errGeneric: "Error: please try again.",
     errUnexpected: "Unexpected error.",
-    errTimeout: (s) => `No response from the server (${s}s). Please try again.`,
+    errTimeout: "No response from the server. Please try again.",
   },
 };
 
