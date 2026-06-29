@@ -5,15 +5,15 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { authClient } from "@/lib/auth-client";
 import { Icon } from "@/components/ui/icon";
+import type { Dictionary } from "@/lib/i18n/dictionaries";
 
 type View = "picker" | "register";
+type AuthDict = Dictionary["auth"];
 
-function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+function withTimeout<T>(promise: Promise<T>, ms: number, timeoutMsg: string): Promise<T> {
   return Promise.race([
     promise,
-    new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error(`Sin respuesta del servidor (${ms / 1000}s). Inténtalo de nuevo.`)), ms)
-    ),
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error(timeoutMsg)), ms)),
   ]);
 }
 
@@ -30,7 +30,7 @@ const GoogleIcon = () => (
 const inputClass =
   "w-full rounded-xl border border-line bg-surface px-4 py-3 text-[14px] text-ink placeholder:text-ink-soft focus:border-brand focus:outline-none disabled:opacity-50";
 
-export function SignupForm() {
+export function SignupForm({ dict }: { dict: AuthDict }) {
   const router = useRouter();
   const [view, setView] = useState<View>("picker");
 
@@ -52,17 +52,17 @@ export function SignupForm() {
       // Google emails are pre-verified, so the panel loads with no gate.
       await authClient.signIn.social({ provider: "google", callbackURL: "/panel" });
     } catch {
-      setError("No se pudo conectar con Google. Inténtalo de nuevo.");
+      setError(dict.errGoogle);
       setLoadingGoogle(false);
     }
   }
 
   async function handleRegister() {
     setError(null);
-    if (!name.trim())                 { setError("Introduce tu nombre."); return; }
-    if (!email.trim())                { setError("Introduce tu email."); return; }
-    if (password.length < 8)          { setError("La contraseña debe tener al menos 8 caracteres."); return; }
-    if (password !== confirmPassword) { setError("Las contraseñas no coinciden."); return; }
+    if (!name.trim())                 { setError(dict.errName); return; }
+    if (!email.trim())                { setError(dict.errEmail); return; }
+    if (password.length < 8)          { setError(dict.errPasswordLength); return; }
+    if (password !== confirmPassword) { setError(dict.errPasswordMismatch); return; }
 
     setLoading(true);
     try {
@@ -74,15 +74,16 @@ export function SignupForm() {
           // Drives the verification email link target after the user confirms.
           callbackURL: "/panel",
         }),
-        12000
+        12000,
+        dict.errTimeout(12)
       );
 
       if (result.error) {
         const msg = (result.error.message ?? "").toLowerCase();
         setError(
           msg.includes("already") || msg.includes("exist")
-            ? "Ya existe una cuenta con ese email."
-            : `Error: ${result.error.message || "inténtalo de nuevo."}`
+            ? dict.errEmailExists
+            : dict.errGeneric
         );
         setLoading(false);
         return;
@@ -93,10 +94,19 @@ export function SignupForm() {
       // blocking confirmation gate until the user verifies.
       router.push("/panel");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error inesperado.");
+      setError(e instanceof Error ? e.message : dict.errUnexpected);
       setLoading(false);
     }
   }
+
+  const haveAccount = (
+    <p className="text-center text-[13px] text-ink-soft">
+      {dict.haveAccount}{" "}
+      <Link href="/login" className="font-medium text-brand hover:underline">
+        {dict.signIn}
+      </Link>
+    </p>
+  );
 
   if (view === "picker") {
     return (
@@ -108,7 +118,7 @@ export function SignupForm() {
           className="flex w-full items-center justify-center gap-3 rounded-xl border border-line bg-surface px-5 py-4 text-[15px] font-semibold text-ink shadow-sm transition-all hover:border-brand-line hover:shadow-md disabled:cursor-wait disabled:opacity-60"
         >
           <GoogleIcon />
-          {loadingGoogle ? "Conectando…" : "Continuar con Google"}
+          {loadingGoogle ? dict.connecting : dict.continueGoogle}
         </button>
 
         <button
@@ -117,27 +127,22 @@ export function SignupForm() {
           className="flex w-full items-center justify-center gap-3 rounded-xl border border-line bg-surface px-5 py-4 text-[15px] font-semibold text-ink shadow-sm transition-all hover:border-brand-line hover:shadow-md"
         >
           <Icon name="mail" size={20} className="shrink-0 text-ink-soft" />
-          Continuar con email
+          {dict.continueEmail}
         </button>
 
         <p className="mt-1 text-center text-[12px] leading-[1.5] text-ink-soft">
-          Al continuar aceptas los{" "}
-          <a href="#" className="underline hover:text-ink">términos</a>{" "}
-          y la{" "}
-          <a href="#" className="underline hover:text-ink">política de privacidad</a>{" "}
-          de Kalendar.
+          {dict.termsPrefix}{" "}
+          <a href="#" className="underline hover:text-ink">{dict.terms}</a>{" "}
+          {dict.termsAnd}{" "}
+          <a href="#" className="underline hover:text-ink">{dict.privacy}</a>{" "}
+          {dict.termsSuffix}
         </p>
 
         {error && (
           <p className="rounded-xl bg-error-weak px-3.5 py-2.5 text-[13px] font-medium text-error">{error}</p>
         )}
 
-        <p className="text-center text-[13px] text-ink-soft">
-          ¿Ya tienes cuenta?{" "}
-          <Link href="/login" className="font-medium text-brand hover:underline">
-            Iniciar sesión
-          </Link>
-        </p>
+        {haveAccount}
       </div>
     );
   }
@@ -150,14 +155,14 @@ export function SignupForm() {
         disabled={loading}
         className="flex items-center gap-1.5 self-start text-[13.5px] font-medium text-ink-soft transition-colors hover:text-ink disabled:opacity-40"
       >
-        <Icon name="chevronLeft" size={16} /> Volver
+        <Icon name="chevronLeft" size={16} /> {dict.back}
       </button>
 
       <div className="flex flex-col gap-3">
-        <input type="text"     placeholder="Tu nombre"                 value={name}            onChange={(e) => setName(e.target.value)}            disabled={loading} className={inputClass} />
-        <input type="email"    placeholder="Email"                     value={email}           onChange={(e) => setEmail(e.target.value)}           disabled={loading} className={inputClass} />
-        <input type="password" placeholder="Contraseña (mín. 8 car.)"  value={password}        onChange={(e) => setPassword(e.target.value)}        disabled={loading} className={inputClass} />
-        <input type="password" placeholder="Repite la contraseña"      value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} disabled={loading}
+        <input type="text"     placeholder={dict.namePlaceholder}            value={name}            onChange={(e) => setName(e.target.value)}            disabled={loading} className={inputClass} />
+        <input type="email"    placeholder={dict.emailPlaceholder}           value={email}           onChange={(e) => setEmail(e.target.value)}           disabled={loading} className={inputClass} />
+        <input type="password" placeholder={dict.passwordPlaceholder}        value={password}        onChange={(e) => setPassword(e.target.value)}        disabled={loading} className={inputClass} />
+        <input type="password" placeholder={dict.confirmPasswordPlaceholder} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} disabled={loading}
           onKeyDown={(e) => e.key === "Enter" && handleRegister()} className={inputClass} />
         <button
           type="button"
@@ -165,7 +170,7 @@ export function SignupForm() {
           disabled={loading}
           className="w-full rounded-xl bg-brand px-5 py-3.5 text-[15px] font-semibold text-white transition-all hover:bg-brand/90 disabled:cursor-wait disabled:opacity-60"
         >
-          {loading ? "Un momento…" : "Crear cuenta"}
+          {loading ? dict.creating : dict.createAccount}
         </button>
       </div>
 
@@ -173,12 +178,7 @@ export function SignupForm() {
         <p className="rounded-xl bg-error-weak px-3.5 py-2.5 text-[13px] font-medium text-error">{error}</p>
       )}
 
-      <p className="text-center text-[13px] text-ink-soft">
-        ¿Ya tienes cuenta?{" "}
-        <Link href="/login" className="font-medium text-brand hover:underline">
-          Iniciar sesión
-        </Link>
-      </p>
+      {haveAccount}
     </div>
   );
 }
