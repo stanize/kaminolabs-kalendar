@@ -3,7 +3,7 @@
 import { randomBytes } from "crypto";
 import { createClient } from "@/lib/supabase/server";
 import { getPublicBookingData, getTakenIntervals } from "@/lib/booking/data";
-import { sendEmail, bookingConfirmEmailHtml, formatBookingWhen } from "@/lib/email";
+import { sendEmail, bookingConfirmEmailHtml, ownerBookingNotificationHtml, formatBookingWhen } from "@/lib/email";
 import {
   generateSlotsForDay,
   dayIdInTz,
@@ -246,7 +246,9 @@ export async function confirmBooking(token: string): Promise<ConfirmResult> {
   const supabase = await createClient();
   const { data: booking } = await supabase
     .from("kalendar_bookings")
-    .select("id, status")
+    .select(
+      "id, status, business_id, team_member_id, service_name, starts_at, client_name, client_email, client_phone"
+    )
     .eq("confirm_token", token)
     .maybeSingle();
 
@@ -264,6 +266,62 @@ export async function confirmBooking(token: string): Promise<ConfirmResult> {
 
   if (error) return { ok: false, error: "No se pudo confirmar la reserva." };
 
-  // Step 4 will notify the owner here.
+  // Notify the owner. Best-effort: failures are logged, never block confirmation.
+  await notifyOwnerOfBooking(booking);
+
   return { ok: true, status: "confirmed" };
+}
+
+/** Sends the owner the "new booking confirmed" email. Best-effort. */
+async function notifyOwnerOfBooking(booking: {
+  business_id: string;
+  team_member_id: string | null;
+  service_name: string;
+  starts_at: string;
+  client_name: string;
+  client_email: string;
+  client_phone: string | null;
+}): Promise<void> {
+  const supabase = await createClient();
+
+  // Business -> owner email + name, plus provider name if any.
+  const { data: biz } = await supabase
+    .from("kalendar_businesses")
+    .select("name, owner_id")
+    .eq("id", booking.business_id)
+    .maybeSingle();
+  if (!biz) return;
+
+  const { data: owner } = await supabase
+    .from("user")
+    .select("email")
+    .eq("id", biz.owner_id)
+    .maybeSingle();
+  if (!owner?.email) return;
+
+  let providerName: string | null = null;
+  if (booking.team_member_id) {
+    const { data: member } = await supabase
+      .from("kalendar_team_members")
+      .select("name")
+      .eq("id", booking.team_member_id)
+      .maybeSingle();
+    providerName = member?.name ?? null;
+  }
+
+  const base = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/+$/, "");
+  await sendEmail({
+    to: owner.email,
+    subject: `Nueva reserva: ${booking.service_name}`,
+    html: ownerBookingNotificationHtml({
+      businessName: biz.name,
+      serviceName: booking.service_name,
+      whenLabel: formatBookingWhen(booking.starts_at),
+      clientName: booking.client_name,
+      clientEmail: booking.client_email,
+      clientPhone: booking.client_phone,
+      providerName,
+      panelUrl: `${base}/panel/calendar`,
+    }),
+  });
 }

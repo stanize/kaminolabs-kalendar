@@ -94,6 +94,43 @@ export function verificationEmailHtml(name: string | null | undefined, url: stri
   </div>`;
 }
 
+/**
+ * Email notifying the business owner that a guest just confirmed a booking.
+ * Spanish copy.
+ */
+export function ownerBookingNotificationHtml(input: {
+  businessName: string;
+  serviceName: string;
+  whenLabel: string;
+  clientName: string;
+  clientEmail: string;
+  clientPhone?: string | null;
+  providerName?: string | null;
+  panelUrl: string;
+}): string {
+  const { serviceName, whenLabel, clientName, clientEmail, clientPhone, providerName, panelUrl } = input;
+  const row = (label: string, value: string) =>
+    `<tr><td style="padding:4px 12px;color:#64748b;font-size:14px;">${escapeHtml(label)}</td><td style="padding:4px 12px;font-size:14px;text-align:right;">${escapeHtml(value)}</td></tr>`;
+  return `
+  <div style="font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px; color: #0f172a;">
+    <h1 style="font-size: 20px; margin: 0 0 16px;">Nueva reserva confirmada</h1>
+    <p style="font-size: 15px; line-height: 1.6; margin: 0 0 20px;">
+      Tienes una nueva reserva confirmada.
+    </p>
+    <table style="width:100%;border-collapse:collapse;background:#f8fafc;border-radius:12px;padding:8px;margin:0 0 24px;">
+      ${row("Servicio", serviceName)}
+      ${row("Cuándo", whenLabel)}
+      ${providerName ? row("Profesional", providerName) : ""}
+      ${row("Cliente", clientName)}
+      ${row("Email", clientEmail)}
+      ${clientPhone ? row("Teléfono", clientPhone) : ""}
+    </table>
+    <a href="${panelUrl}" style="display: inline-block; background: #0d9488; color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 600; padding: 12px 24px; border-radius: 12px;">
+      Ver en mi calendario
+    </a>
+  </div>`;
+}
+
 function escapeHtml(s: string): string {
   return s
     .replace(/&/g, "&amp;")
