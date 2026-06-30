@@ -48,19 +48,32 @@ export type SlugFormatResult =
   | { valid: true }
   | { valid: false; reason: string };
 
-/** Validates slug FORMAT only (length + character rules). UI-facing reasons in Spanish. */
-export function validateSlugFormat(slug: string): SlugFormatResult {
+/** The translation slice validateSlugFormat needs. Keeps this module free of
+ *  any hardcoded language — callers supply the words via this shape, sourced
+ *  from lib/i18n/dictionaries/business.ts's `errors` section. */
+export interface SlugFormatDict {
+  errSlugTooShort: string; // contains "{min}"
+  errSlugTooLong: string; // contains "{max}"
+  errSlugInvalidChars: string;
+}
+
+/** Validates slug FORMAT only (length + character rules). `dict` supplies the
+ *  UI-facing reason text (with {min}/{max} placeholders replaced here). */
+export function validateSlugFormat(slug: string, dict: SlugFormatDict): SlugFormatResult {
   if (slug.length < SLUG_MIN_LENGTH) {
-    return { valid: false, reason: `El enlace debe tener al menos ${SLUG_MIN_LENGTH} caracteres.` };
-  }
-  if (slug.length > SLUG_MAX_LENGTH) {
-    return { valid: false, reason: `El enlace no puede superar los ${SLUG_MAX_LENGTH} caracteres.` };
-  }
-  if (!SLUG_PATTERN.test(slug)) {
     return {
       valid: false,
-      reason: "Usa solo minúsculas, números y guiones (sin espacios ni guiones al inicio o final).",
+      reason: dict.errSlugTooShort.replace("{min}", String(SLUG_MIN_LENGTH)),
     };
+  }
+  if (slug.length > SLUG_MAX_LENGTH) {
+    return {
+      valid: false,
+      reason: dict.errSlugTooLong.replace("{max}", String(SLUG_MAX_LENGTH)),
+    };
+  }
+  if (!SLUG_PATTERN.test(slug)) {
+    return { valid: false, reason: dict.errSlugInvalidChars };
   }
   return { valid: true };
 }

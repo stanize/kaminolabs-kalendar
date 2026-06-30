@@ -3,10 +3,9 @@ import type { Locale } from "../config";
 /**
  * Dictionary for the Negocio (business settings) panel page: the page itself,
  * BusinessForm, and the user-facing error messages from its server actions
- * (saveBusinessSettings, checkSlugAvailability). Deep slug-format validation
- * reasons (lib/business/slug-screen.ts, e.g. length/character rules) are NOT
- * covered here — that's a shared low-level utility, left in Spanish for now;
- * revisit if/when it needs full i18n.
+ * (saveBusinessSettings, checkSlugAvailability) and from slug FORMAT validation
+ * (lib/business/slug-screen.ts's validateSlugFormat, which takes this dict's
+ * errSlug* keys as a parameter so the shared utility has no hardcoded language).
  */
 export interface BusinessDictionary {
   page: {
@@ -50,6 +49,11 @@ export interface BusinessDictionary {
     errSlugTaken: string;
     errSaveFailed: string; // prefix; server detail appended
     errCreateFailed: string; // prefix; server detail appended
+    // slug FORMAT validation (lib/business/slug-screen.ts validateSlugFormat).
+    // {min}/{max} are placeholder tokens replaced with the actual numbers.
+    errSlugTooShort: string;
+    errSlugTooLong: string;
+    errSlugInvalidChars: string;
   };
 }
 
@@ -94,6 +98,9 @@ const es: BusinessDictionary = {
     errSlugTaken: "Ese enlace ya está en uso. Elige otro.",
     errSaveFailed: "No se pudo guardar:",
     errCreateFailed: "No se pudo crear el negocio:",
+    errSlugTooShort: "El enlace debe tener al menos {min} caracteres.",
+    errSlugTooLong: "El enlace no puede superar los {max} caracteres.",
+    errSlugInvalidChars: "Usa solo minúsculas, números y guiones (sin espacios ni guiones al inicio o final).",
   },
 };
 
@@ -138,6 +145,9 @@ const en: BusinessDictionary = {
     errSlugTaken: "That link is already taken. Choose another.",
     errSaveFailed: "Couldn't save:",
     errCreateFailed: "Couldn't create the business:",
+    errSlugTooShort: "The link must be at least {min} characters.",
+    errSlugTooLong: "The link can't be more than {max} characters.",
+    errSlugInvalidChars: "Use only lowercase letters, numbers, and hyphens (no spaces or leading/trailing hyphens).",
   },
 };
 

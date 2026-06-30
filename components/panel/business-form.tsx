@@ -78,6 +78,9 @@ export function BusinessForm({
         const result = await checkSlugAvailability(value, {
           errSlugReserved: dict.errors.errSlugReserved,
           errSlugFlagged: dict.errors.errSlugFlagged,
+          errSlugTooShort: dict.errors.errSlugTooShort,
+          errSlugTooLong: dict.errors.errSlugTooLong,
+          errSlugInvalidChars: dict.errors.errSlugInvalidChars,
         });
         setSlugCheck(result);
       } catch {
@@ -148,6 +151,9 @@ export function BusinessForm({
         errSlugTaken: dict.errors.errSlugTaken,
         errSaveFailed: dict.errors.errSaveFailed,
         errCreateFailed: dict.errors.errCreateFailed,
+        errSlugTooShort: dict.errors.errSlugTooShort,
+        errSlugTooLong: dict.errors.errSlugTooLong,
+        errSlugInvalidChars: dict.errors.errSlugInvalidChars,
       });
       if (!result.ok) {
         setError(result.error);

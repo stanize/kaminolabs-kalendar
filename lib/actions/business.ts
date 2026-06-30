@@ -32,11 +32,23 @@ export const checkSlugAvailability = authedAction(
   async (
     session,
     rawSlug: string,
-    dict?: { errSlugReserved: string; errSlugFlagged: string }
+    dict?: {
+      errSlugReserved: string;
+      errSlugFlagged: string;
+      errSlugTooShort: string;
+      errSlugTooLong: string;
+      errSlugInvalidChars: string;
+    }
   ): Promise<SlugCheckResult> => {
     const slug = sanitizeSlug(rawSlug);
 
-    const format = validateSlugFormat(slug);
+    const format = validateSlugFormat(slug, {
+      errSlugTooShort: dict?.errSlugTooShort ?? "El enlace debe tener al menos {min} caracteres.",
+      errSlugTooLong: dict?.errSlugTooLong ?? "El enlace no puede superar los {max} caracteres.",
+      errSlugInvalidChars:
+        dict?.errSlugInvalidChars ??
+        "Usa solo minúsculas, números y guiones (sin espacios ni guiones al inicio o final).",
+    });
     if (!format.valid) {
       return { status: "invalid", reason: format.reason };
     }
@@ -85,6 +97,9 @@ export const saveBusinessSettings = authedAction(
       errSlugTaken: string;
       errSaveFailed: string;
       errCreateFailed: string;
+      errSlugTooShort: string;
+      errSlugTooLong: string;
+      errSlugInvalidChars: string;
     }
   ): Promise<SaveBusinessResult> => {
     const name = (formData.get("name") as string | null)?.trim() ?? "";
@@ -133,7 +148,13 @@ export const saveBusinessSettings = authedAction(
     // ── CREATE ──────────────────────────────────────────────────────────────
     const slug = sanitizeSlug((formData.get("slug") as string | null) ?? "");
 
-    const format = validateSlugFormat(slug);
+    const format = validateSlugFormat(slug, {
+      errSlugTooShort: dict?.errSlugTooShort ?? "El enlace debe tener al menos {min} caracteres.",
+      errSlugTooLong: dict?.errSlugTooLong ?? "El enlace no puede superar los {max} caracteres.",
+      errSlugInvalidChars:
+        dict?.errSlugInvalidChars ??
+        "Usa solo minúsculas, números y guiones (sin espacios ni guiones al inicio o final).",
+    });
     if (!format.valid) {
       return { ok: false, error: format.reason };
     }
