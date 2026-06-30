@@ -1,16 +1,35 @@
 import clsx from "clsx";
 import { Icon } from "@/components/ui/icon";
-import { businessTypeIcon, businessTypeLabel } from "@/lib/onboarding/data";
+import { businessTypeIcon } from "@/lib/onboarding/data";
+import { businessTypeLabelFor } from "@/lib/i18n/dictionaries/business-types";
 import { slugify } from "@/lib/onboarding/slug";
 import { bookingUrlDisplay } from "@/lib/business/booking-url";
 import type { OnboardingData } from "@/lib/onboarding/types";
+import type { Locale } from "@/lib/i18n/config";
+import type { PublicDictionary } from "@/lib/i18n/dictionaries/public";
 
-const PREVIEW_DAYS = ["lun", "mar", "mié", "jue", "vie"];
+const PREVIEW_DAYS: Record<Locale, string[]> = {
+  es: ["lun", "mar", "mié", "jue", "vie"],
+  en: ["mon", "tue", "wed", "thu", "fri"],
+};
 
-export function BookingPreview({ d, compact }: { d: OnboardingData; compact?: boolean }) {
+export function BookingPreview({
+  d,
+  compact,
+  locale,
+  dict,
+}: {
+  d: OnboardingData;
+  compact?: boolean;
+  locale: Locale;
+  dict: PublicDictionary["home"];
+}) {
   const services = d.services.length
     ? d.services.slice(0, 3)
-    : [{ id: "ph", name: "Tu primer servicio", min: 60, price: 40, ph: true }];
+    : [{ id: "ph", name: dict.previewFirstService, min: 60, price: 40, ph: true }];
+
+  const typeLabel = d.business.type ? businessTypeLabelFor(d.business.type, locale) : "";
+  const previewDays = PREVIEW_DAYS[locale];
 
   return (
     <div
@@ -35,16 +54,16 @@ export function BookingPreview({ d, compact }: { d: OnboardingData; compact?: bo
           </div>
           <div className="min-w-0">
             <div className="truncate font-display text-[16px] font-semibold">
-              {d.business.name || "Tu negocio"}
+              {d.business.name || dict.previewYourBusiness}
             </div>
             <div className="truncate text-[12.5px] text-ink-soft">
-              {businessTypeLabel(d.business.type) || "Reserva tu cita online"}
+              {typeLabel || dict.previewDefaultTagline}
             </div>
           </div>
         </div>
 
         <div className="mb-2.5 text-[11.5px] font-bold uppercase tracking-[.04em] text-ink-soft">
-          Elige un servicio
+          {dict.previewChooseService}
         </div>
         <div className="mb-4 flex flex-col gap-2">
           {services.map((s) => (
@@ -56,7 +75,7 @@ export function BookingPreview({ d, compact }: { d: OnboardingData; compact?: bo
               )}
             >
               <div>
-                <div className="text-[13.5px] font-semibold">{s.name || "Servicio"}</div>
+                <div className="text-[13.5px] font-semibold">{s.name || dict.previewService}</div>
                 <div className="text-[12px] text-ink-soft">{s.min} min</div>
               </div>
               <span className="font-display text-[14px] font-semibold text-brand">{s.price} €</span>
@@ -65,10 +84,10 @@ export function BookingPreview({ d, compact }: { d: OnboardingData; compact?: bo
         </div>
 
         <div className="mb-2.5 text-[11.5px] font-bold uppercase tracking-[.04em] text-ink-soft">
-          Elige día
+          {dict.previewChooseDay}
         </div>
         <div className="grid grid-cols-5 gap-1.5">
-          {PREVIEW_DAYS.map((day, i) => (
+          {previewDays.map((day, i) => (
             <div
               key={day}
               className={clsx(

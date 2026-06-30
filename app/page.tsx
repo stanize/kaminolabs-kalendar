@@ -4,6 +4,7 @@ import { Btn } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { BookingPreview } from "@/components/onboarding/booking-preview";
 import { BUSINESS_TYPES } from "@/lib/onboarding/data";
+import { businessTypeLabelFor } from "@/lib/i18n/dictionaries/business-types";
 import { LANDING_EXAMPLES } from "@/lib/landing/ejemplos";
 import { getPublicServerDictionary } from "@/lib/i18n/server";
 
@@ -11,7 +12,7 @@ const ROTATIONS   = ["-rotate-3", "rotate-2", "-rotate-1", "rotate-3"];
 const OFFSETS     = ["md:translate-y-3", "md:-translate-y-2", "md:translate-y-4", "md:-translate-y-1"];
 
 export default async function LandingPage() {
-  const { dict } = await getPublicServerDictionary();
+  const { locale, dict } = await getPublicServerDictionary();
   const h = dict.home;
 
   const steps = [
@@ -51,7 +52,7 @@ export default async function LandingPage() {
                 key={example.business.name}
                 className={`w-[260px] shrink-0 transition-transform duration-300 hover:translate-y-0! hover:rotate-0! ${ROTATIONS[i]} ${OFFSETS[i]}`}
               >
-                <BookingPreview d={example} compact />
+                <BookingPreview d={example} compact locale={locale} dict={h} />
               </div>
             ))}
           </div>
@@ -71,7 +72,9 @@ export default async function LandingPage() {
                   <div className="grid h-10 w-10 place-items-center rounded-full bg-brand-weak text-brand">
                     <Icon name={bt.icon} size={19} />
                   </div>
-                  <span className="text-[13.5px] font-semibold text-ink">{bt.label}</span>
+                  <span className="text-[13.5px] font-semibold text-ink">
+                    {businessTypeLabelFor(bt.id, locale)}
+                  </span>
                 </div>
               ))}
             </div>
