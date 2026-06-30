@@ -11,6 +11,7 @@ import {
   BOOKING_WINDOW_OPTIONS,
   type TimeRange,
   type BookingWindowMonths,
+  type DayRangesValidationDict,
 } from "@/lib/availability/constants";
 
 export type AvailabilityResult =
@@ -18,6 +19,26 @@ export type AvailabilityResult =
   | { ok: false; error: string };
 
 export type WeekHours = Partial<Record<DayId, TimeRange[]>>;
+
+/** The translation slice this action needs for its own (non-day-range) error
+ *  messages. Day-range validation messages are a separate dict
+ *  (DayRangesValidationDict) consumed by validateDayRanges directly. */
+export interface AvailabilityActionDict {
+  errNoBusiness: string;
+  errInvalidWindow: string;
+  errSaveFailed: string;
+}
+
+const FALLBACK_ACTION: AvailabilityActionDict = {
+  errNoBusiness: "Primero configura tu negocio.",
+  errInvalidWindow: "Ventana de reservas no válida.",
+  errSaveFailed: "No se pudo guardar:",
+};
+
+const FALLBACK_VALIDATION: DayRangesValidationDict = {
+  errEndBeforeStart: "La hora de fin debe ser posterior a la de inicio.",
+  errOverlap: "Los horarios de un mismo día no pueden solaparse.",
+};
 
 /**
  * Saves the whole week atomically: validates every day, then replaces all of the
@@ -28,15 +49,22 @@ export type WeekHours = Partial<Record<DayId, TimeRange[]>>;
 export const saveAvailability = authedAction(
   async (
     session,
-    payload: { week: WeekHours; bookingWindowMonths: number }
+    payload: {
+      week: WeekHours;
+      bookingWindowMonths: number;
+      dict?: { action?: Partial<AvailabilityActionDict>; validation?: Partial<DayRangesValidationDict> };
+    }
   ): Promise<AvailabilityResult> => {
+    const a = { ...FALLBACK_ACTION, ...payload.dict?.action };
+    const v0 = { ...FALLBACK_VALIDATION, ...payload.dict?.validation };
+
     const business = await getBusinessForUser(session.user.id);
-    if (!business) return { ok: false, error: "Primero configura tu negocio." };
+    if (!business) return { ok: false, error: a.errNoBusiness };
 
     const { week, bookingWindowMonths } = payload;
 
     if (!BOOKING_WINDOW_OPTIONS.includes(bookingWindowMonths as BookingWindowMonths)) {
-      return { ok: false, error: "Ventana de reservas no válida." };
+      return { ok: false, error: a.errInvalidWindow };
     }
 
     // Validate each day; build the flat insert set.
@@ -51,9 +79,9 @@ export const saveAvailability = authedAction(
     let anyInterval = false;
     for (const day of WEEKDAY_ORDER) {
       const ranges = week[day] ?? [];
-      const v = validateDayRanges(ranges);
+      const v = validateDayRanges(ranges, v0);
       if (!v.valid) {
-        return { ok: false, error: `${v.error}` };
+        return { ok: false, error: v.error };
       }
       ranges
         .slice()
@@ -78,18 +106,18 @@ export const saveAvailability = authedAction(
       .update({ booking_window_months: bookingWindowMonths })
       .eq("id", business.id)
       .eq("owner_id", session.user.id);
-    if (bizErr) return { ok: false, error: `No se pudo guardar: ${bizErr.message}` };
+    if (bizErr) return { ok: false, error: `${a.errSaveFailed} ${bizErr.message}` };
 
     // Replace all intervals: delete existing, then insert the new set.
     const { error: delErr } = await supabase
       .from("kalendar_business_hours")
       .delete()
       .eq("business_id", business.id);
-    if (delErr) return { ok: false, error: `No se pudo guardar: ${delErr.message}` };
+    if (delErr) return { ok: false, error: `${a.errSaveFailed} ${delErr.message}` };
 
     if (rows.length > 0) {
       const { error: insErr } = await supabase.from("kalendar_business_hours").insert(rows);
-      if (insErr) return { ok: false, error: `No se pudo guardar: ${insErr.message}` };
+      if (insErr) return { ok: false, error: `${a.errSaveFailed} ${insErr.message}` };
     }
 
     revalidatePath("/panel");

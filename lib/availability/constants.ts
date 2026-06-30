@@ -1,13 +1,7 @@
 import type { DayId } from "@/lib/onboarding/types";
-import { DAYS } from "@/lib/onboarding/data";
 
 /** Ordered weekday codes for the editor (mon..sun). */
 export const WEEKDAY_ORDER: DayId[] = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
-
-/** Spanish label for a weekday code, from the shared DAYS map. */
-export function weekdayLabel(day: DayId): string {
-  return DAYS.find((d) => d.id === day)?.label ?? day;
-}
 
 /** Time-of-day options for the dropdowns: 00:00..23:45 in 15-min steps ("HH:MM"). */
 export const TIME_OPTIONS: string[] = (() => {
@@ -49,20 +43,28 @@ export type DayValidation =
   | { valid: true }
   | { valid: false; error: string };
 
+/** The translation slice validateDayRanges needs. Keeps this module free of
+ *  any hardcoded language — callers supply the words via this shape, sourced
+ *  from lib/i18n/dictionaries/availability.ts's `validation` section. */
+export interface DayRangesValidationDict {
+  errEndBeforeStart: string;
+  errOverlap: string;
+}
+
 /**
- * Validates a day's ranges: each end after start, and no overlaps. UI-facing
- * errors in Spanish. Empty list (closed day) is valid.
+ * Validates a day's ranges: each end after start, and no overlaps. `dict`
+ * supplies the UI-facing reason text. Empty list (closed day) is valid.
  */
-export function validateDayRanges(ranges: TimeRange[]): DayValidation {
+export function validateDayRanges(ranges: TimeRange[], dict: DayRangesValidationDict): DayValidation {
   for (const r of ranges) {
     if (toMinutes(r.end) <= toMinutes(r.start)) {
-      return { valid: false, error: "La hora de fin debe ser posterior a la de inicio." };
+      return { valid: false, error: dict.errEndBeforeStart };
     }
   }
   const sorted = [...ranges].sort((a, b) => toMinutes(a.start) - toMinutes(b.start));
   for (let i = 1; i < sorted.length; i++) {
     if (toMinutes(sorted[i].start) < toMinutes(sorted[i - 1].end)) {
-      return { valid: false, error: "Los horarios de un mismo día no pueden solaparse." };
+      return { valid: false, error: dict.errOverlap };
     }
   }
   return { valid: true };

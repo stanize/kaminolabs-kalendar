@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { cancelBookingAsOwner } from "@/lib/actions/booking-owner";
+import type { CalendarDictionary } from "@/lib/i18n/dictionaries/calendar";
 
 type Status = "pending_confirmation" | "confirmed" | "cancelled" | "completed";
 
@@ -26,25 +27,35 @@ function dayKey(iso: string): string {
     timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit",
   }).format(new Date(iso));
 }
-function dayHeading(iso: string): string {
+
+function dayHeading(iso: string, m: CalendarDictionary["manager"], intlLocale: string): string {
   const today = dayKey(new Date().toISOString());
   const tomorrow = dayKey(new Date(Date.now() + 86400000).toISOString());
   const k = dayKey(iso);
-  const label = new Intl.DateTimeFormat("es-ES", {
+  const label = new Intl.DateTimeFormat(intlLocale, {
     timeZone: TZ, weekday: "long", day: "numeric", month: "long",
   }).format(new Date(iso));
-  if (k === today) return `Hoy · ${label}`;
-  if (k === tomorrow) return `Mañana · ${label}`;
+  if (k === today) return `${m.today} · ${label}`;
+  if (k === tomorrow) return `${m.tomorrow} · ${label}`;
   return label;
 }
+
 function timeLabel(iso: string): string {
-  return new Intl.DateTimeFormat("es-ES", {
+  // 24h time display regardless of locale, matching the rest of the panel.
+  return new Intl.DateTimeFormat("en-GB", {
     timeZone: TZ, hour: "2-digit", minute: "2-digit", hour12: false,
   }).format(new Date(iso));
 }
 
-export function CalendarBookings({ bookings }: { bookings: BookingVM[] }) {
+export function CalendarBookings({
+  bookings,
+  dict,
+}: {
+  bookings: BookingVM[];
+  dict: CalendarDictionary;
+}) {
   const router = useRouter();
+  const m = dict.manager;
   const [tab, setTab] = useState<"upcoming" | "pending">("upcoming");
   const [list, setList] = useState<BookingVM[]>(bookings);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -59,7 +70,7 @@ export function CalendarBookings({ bookings }: { bookings: BookingVM[] }) {
     const k = dayKey(b.startIso);
     let g = groups.find((x) => x.key === k);
     if (!g) {
-      g = { key: k, heading: dayHeading(b.startIso), items: [] };
+      g = { key: k, heading: dayHeading(b.startIso, m, dict.intlLocale), items: [] };
       groups.push(g);
     }
     g.items.push(b);
@@ -71,14 +82,14 @@ export function CalendarBookings({ bookings }: { bookings: BookingVM[] }) {
     const prev = list;
     setList((l) => l.filter((b) => b.id !== id)); // optimistic
     try {
-      const res = await cancelBookingAsOwner(id);
+      const res = await cancelBookingAsOwner(id, dict.errors);
       if (!res.ok) {
         setList(prev);
         setError(res.error);
       }
     } catch {
       setList(prev);
-      setError("No se pudo cancelar. Inténtalo de nuevo.");
+      setError(m.errCancelFailed);
     } finally {
       setBusyId(null);
       router.refresh();
@@ -89,11 +100,11 @@ export function CalendarBookings({ bookings }: { bookings: BookingVM[] }) {
     <div className="flex flex-col gap-5">
       {/* Tabs */}
       <div className="flex gap-2">
-        <TabBtn active={tab === "upcoming"} onClick={() => setTab("upcoming")} label="Próximas" />
+        <TabBtn active={tab === "upcoming"} onClick={() => setTab("upcoming")} label={m.tabUpcoming} />
         <TabBtn
           active={tab === "pending"}
           onClick={() => setTab("pending")}
-          label="Pendientes"
+          label={m.tabPending}
           badge={pendingCount > 0 ? pendingCount : undefined}
         />
       </div>
@@ -111,11 +122,9 @@ export function CalendarBookings({ bookings }: { bookings: BookingVM[] }) {
             <Icon name="calendar" size={22} />
           </div>
           <p className="text-[14.5px] font-semibold text-ink">
-            {tab === "pending" ? "No hay reservas pendientes" : "No tienes reservas próximas"}
+            {tab === "pending" ? m.emptyPendingTitle : m.emptyUpcomingTitle}
           </p>
-          <p className="mt-1 text-[13px] text-ink-soft">
-            Las reservas de tu página aparecerán aquí.
-          </p>
+          <p className="mt-1 text-[13px] text-ink-soft">{m.emptySubtitle}</p>
         </div>
       ) : (
         <div className="flex flex-col gap-6">
@@ -138,14 +147,14 @@ export function CalendarBookings({ bookings }: { bookings: BookingVM[] }) {
                         <span className="truncate">{b.serviceName}</span>
                         {b.status === "pending_confirmation" && (
                           <span className="shrink-0 rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-semibold text-ink-soft">
-                            Pendiente
+                            {m.pendingLabel}
                           </span>
                         )}
                       </p>
                       <p className="truncate text-[12.5px] text-ink-soft">
                         {b.clientName}
                         {b.providerName ? ` · ${b.providerName}` : ""}
-                        {b.durationMin ? ` · ${b.durationMin} min` : ""}
+                        {b.durationMin ? ` · ${b.durationMin} ${m.minutesUnit}` : ""}
                       </p>
                     </div>
                     <button
@@ -153,7 +162,7 @@ export function CalendarBookings({ bookings }: { bookings: BookingVM[] }) {
                       disabled={busyId === b.id}
                       className="shrink-0 rounded-lg px-2.5 py-1.5 text-[12.5px] font-medium text-ink-soft hover:bg-error-weak hover:text-error disabled:opacity-50"
                     >
-                      Cancelar
+                      {m.cancel}
                     </button>
                   </div>
                 ))}

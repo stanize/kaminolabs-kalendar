@@ -7,7 +7,6 @@ import { Btn } from "@/components/ui/button";
 import { saveAvailability, type WeekHours } from "@/lib/actions/availability";
 import {
   WEEKDAY_ORDER,
-  weekdayLabel,
   TIME_OPTIONS,
   DEFAULT_RANGE_START,
   addMinutes,
@@ -16,8 +15,13 @@ import {
   type TimeRange,
 } from "@/lib/availability/constants";
 import type { DayId } from "@/lib/onboarding/types";
+import type { AvailabilityDictionary } from "@/lib/i18n/dictionaries/availability";
 
 type WeekState = Record<DayId, TimeRange[]>;
+
+function tmpl(s: string, vars: Record<string, string>): string {
+  return Object.entries(vars).reduce((acc, [k, v]) => acc.replace(`{${k}}`, v), s);
+}
 
 // Mon–Fri 09:00–17:00, weekend closed — the pre-fill for a fresh setup.
 function defaultWeek(): WeekState {
@@ -39,13 +43,16 @@ export function AvailabilityManager({
   hasSavedHours,
   bookingWindowMonths,
   returnToHome,
+  dict,
 }: {
   initialWeek: WeekHours;
   hasSavedHours: boolean;
   bookingWindowMonths: number;
   returnToHome: boolean;
+  dict: AvailabilityDictionary;
 }) {
   const router = useRouter();
+  const m = dict.manager;
   const [week, setWeek] = useState<WeekState>(
     hasSavedHours ? normalize(initialWeek) : defaultWeek()
   );
@@ -94,16 +101,20 @@ export function AvailabilityManager({
 
     // Client-side validation for immediate feedback (server re-validates).
     for (const day of WEEKDAY_ORDER) {
-      const v = validateDayRanges(week[day]);
+      const v = validateDayRanges(week[day], dict.validation);
       if (!v.valid) {
-        setError(`${weekdayLabel(day)}: ${v.error}`);
+        setError(tmpl(m.rangeAt, { day: dict.weekdays[day], error: v.error }));
         return;
       }
     }
 
     setSaving(true);
     try {
-      const result = await saveAvailability({ week, bookingWindowMonths: windowMonths });
+      const result = await saveAvailability({
+        week,
+        bookingWindowMonths: windowMonths,
+        dict: { action: dict.errors, validation: dict.validation },
+      });
       if (!result.ok) {
         setError(result.error);
         setSaving(false);
@@ -118,7 +129,7 @@ export function AvailabilityManager({
       }
       router.refresh();
     } catch {
-      setError("Ocurrió un error inesperado. Inténtalo de nuevo.");
+      setError(m.errUnexpected);
       setSaving(false);
     }
   }
@@ -151,13 +162,13 @@ export function AvailabilityManager({
                   className="h-4 w-4 accent-brand"
                 />
                 <span className={`text-[14px] font-semibold ${open ? "text-ink" : "text-ink-soft"}`}>
-                  {weekdayLabel(day)}
+                  {dict.weekdays[day]}
                 </span>
               </label>
 
               {/* Right side: closed label, or the ranges (first inline, extras stacked) */}
               {!open ? (
-                <div className="flex h-[42px] items-center text-[13px] text-ink-soft">Cerrado</div>
+                <div className="flex h-[42px] items-center text-[13px] text-ink-soft">{m.closed}</div>
               ) : (
                 <div className="flex flex-1 flex-col gap-2">
                   {ranges.map((r, i) => (
@@ -168,7 +179,7 @@ export function AvailabilityManager({
                       <button
                         onClick={() => removeRange(day, i)}
                         className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-ink-soft hover:bg-error-weak hover:text-error"
-                        aria-label="Quitar franja"
+                        aria-label={m.removeRange}
                       >
                         <Icon name="x" size={15} />
                       </button>
@@ -178,7 +189,7 @@ export function AvailabilityManager({
                           onClick={() => addRange(day)}
                           className="flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-1.5 text-[13px] font-medium text-brand hover:bg-brand-weak"
                         >
-                          <Icon name="plus" size={14} /> Añadir franja
+                          <Icon name="plus" size={14} /> {m.addRange}
                         </button>
                       )}
                     </div>
@@ -195,31 +206,31 @@ export function AvailabilityManager({
           {saved && !error && (
             <div className="mb-4 flex items-center gap-2 rounded-xl border border-brand-line bg-brand-weak px-4 py-3 text-[13.5px] text-brand-ink">
               <Icon name="check" size={16} strokeWidth={2.5} className="shrink-0" />
-              <span>Guardado correctamente.</span>
+              <span>{m.saved}</span>
             </div>
           )}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div className="flex flex-col gap-[7px]">
-              <span className="text-[13px] font-semibold text-ink">¿Con cuánta antelación pueden reservar?</span>
+              <span className="text-[13px] font-semibold text-ink">{m.bookingWindowQuestion}</span>
               <div className="flex gap-2">
-                {BOOKING_WINDOW_OPTIONS.map((m) => (
+                {BOOKING_WINDOW_OPTIONS.map((wm) => (
                   <button
-                    key={m}
+                    key={wm}
                     type="button"
-                    onClick={() => { setWindowMonths(m); setSaved(false); }}
+                    onClick={() => { setWindowMonths(wm); setSaved(false); }}
                     className={`rounded-lg border px-3.5 py-2 text-[13px] font-semibold transition-all ${
-                      windowMonths === m
+                      windowMonths === wm
                         ? "border-brand bg-brand text-white"
                         : "border-line bg-surface text-ink-soft hover:border-brand-line hover:text-ink"
                     }`}
                   >
-                    {m} {m === 1 ? "mes" : "meses"}
+                    {wm} {wm === 1 ? m.month : m.months}
                   </button>
                 ))}
               </div>
             </div>
             <Btn onClick={handleSave} disabled={saving} size="lg">
-              {saving ? "Guardando…" : "Confirmar cambios"}
+              {saving ? m.confirming : m.confirmButton}
             </Btn>
           </div>
         </div>
