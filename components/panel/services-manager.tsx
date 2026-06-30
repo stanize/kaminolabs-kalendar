@@ -21,6 +21,7 @@ import {
   PRICE_STEP,
   NAME_MAX_LENGTH,
 } from "@/lib/services/constants";
+import type { ServicesDictionary } from "@/lib/i18n/dictionaries/services";
 
 interface ServiceItem {
   id: string;
@@ -66,20 +67,27 @@ function draftFromTemplate(t: { name: string; duration_min: number; price: numbe
   return { ...t, durationCustom: !isPreset(t.duration_min) };
 }
 
-function formatPrice(euros: number): string {
-  return euros === 0 ? "Gratis" : `${euros} €`;
+function formatPrice(euros: number, freeLabel: string): string {
+  return euros === 0 ? freeLabel : `${euros} €`;
+}
+
+function tmpl(s: string, vars: Record<string, string | number>): string {
+  return Object.entries(vars).reduce((acc, [k, v]) => acc.replace(`{${k}}`, String(v)), s);
 }
 
 export function ServicesManager({
   initialServices,
   templates,
   returnToHome,
+  dict,
 }: {
   initialServices: ServiceItem[];
   templates: TemplateItem[];
   returnToHome: boolean;
+  dict: ServicesDictionary;
 }) {
   const router = useRouter();
+  const m = dict.manager;
   const [services, setServices] = useState<ServiceItem[]>(initialServices);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
@@ -106,7 +114,10 @@ export function ServicesManager({
     setError(null);
     setBusy(true);
     try {
-      const result = await createService(toServiceInput(draft));
+      const result = await createService(toServiceInput(draft), {
+        action: dict.errors,
+        validation: dict.validation,
+      });
       if (!result.ok) {
         setError(result.error);
         setBusy(false);
@@ -116,7 +127,7 @@ export function ServicesManager({
       setBusy(false);
       redirectAfterFirstAdd();
     } catch {
-      setError("Ocurrió un error inesperado. Inténtalo de nuevo.");
+      setError(m.errUnexpected);
       setBusy(false);
     }
   }
@@ -127,7 +138,10 @@ export function ServicesManager({
     setError(null);
     setBusy(true);
     try {
-      const result = await createServices(staged.map(toServiceInput));
+      const result = await createServices(staged.map(toServiceInput), {
+        action: dict.errors,
+        validation: dict.validation,
+      });
       if (!result.ok) {
         setError(result.error);
         setBusy(false);
@@ -137,7 +151,7 @@ export function ServicesManager({
       setBusy(false);
       redirectAfterFirstAdd();
     } catch {
-      setError("Ocurrió un error inesperado. Inténtalo de nuevo.");
+      setError(m.errUnexpected);
       setBusy(false);
     }
   }
@@ -147,7 +161,10 @@ export function ServicesManager({
     setError(null);
     setBusy(true);
     try {
-      const result = await updateService({ id, ...toServiceInput(draft) });
+      const result = await updateService(
+        { id, ...toServiceInput(draft) },
+        { action: dict.errors, validation: dict.validation }
+      );
       if (!result.ok) {
         setError(result.error);
         setBusy(false);
@@ -157,7 +174,7 @@ export function ServicesManager({
       setBusy(false);
       router.refresh();
     } catch {
-      setError("Ocurrió un error inesperado. Inténtalo de nuevo.");
+      setError(m.errUnexpected);
       setBusy(false);
     }
   }
@@ -169,14 +186,14 @@ export function ServicesManager({
     const prev = services;
     setServices((s) => s.filter((x) => x.id !== id));
     try {
-      const result = await deleteService(id);
+      const result = await deleteService(id, dict.errors);
       if (!result.ok) {
         setServices(prev);
         setError(result.error);
       }
     } catch {
       setServices(prev);
-      setError("No se pudo eliminar. Inténtalo de nuevo.");
+      setError(m.errDeleteFailed);
     } finally {
       setBusy(false);
       router.refresh();
@@ -196,7 +213,7 @@ export function ServicesManager({
     next.splice(targetIndex, 0, moved);
     setServices(next);
     setDragIndex(null);
-    void reorderServices(next.map((s) => s.id)).then(() => router.refresh());
+    void reorderServices(next.map((s) => s.id), dict.errors).then(() => router.refresh());
   }
 
   // While staging template drafts, that flow owns the screen.
@@ -227,6 +244,7 @@ export function ServicesManager({
                   durationCustom: !isPreset(svc.duration_min),
                 }}
                 busy={busy}
+                m={m}
                 onCancel={() => setEditingId(null)}
                 onSave={(draft) => handleUpdate(svc.id, draft)}
               />
@@ -247,20 +265,20 @@ export function ServicesManager({
                 <div className="flex-1">
                   <p className="text-[14px] font-semibold text-ink">{svc.name}</p>
                   <p className="text-[12.5px] text-ink-soft">
-                    {svc.duration_min} min · {formatPrice(svc.price)}
+                    {svc.duration_min} {m.durationUnit} · {formatPrice(svc.price, m.priceFree)}
                   </p>
                 </div>
                 <button
                   onClick={() => setEditingId(svc.id)}
                   className="rounded-lg px-2.5 py-1.5 text-[13px] font-medium text-ink-soft hover:bg-surface-2 hover:text-ink"
                 >
-                  Editar
+                  {m.edit}
                 </button>
                 <button
                   onClick={() => handleDelete(svc.id)}
                   disabled={busy}
                   className="grid h-8 w-8 place-items-center rounded-lg text-ink-soft hover:bg-error-weak hover:text-error disabled:opacity-50"
-                  aria-label="Eliminar"
+                  aria-label={m.delete}
                 >
                   <Icon name="x" size={15} />
                 </button>
@@ -275,6 +293,7 @@ export function ServicesManager({
         <ServiceEditor
           initial={EMPTY_DRAFT}
           busy={busy}
+          m={m}
           onCancel={() => setAdding(false)}
           onSave={handleCreate}
         />
@@ -284,7 +303,7 @@ export function ServicesManager({
       {!adding && !inStaging && (
         <div>
           <Btn variant="outline" onClick={() => { setError(null); setAdding(true); }}>
-            <Icon name="plus" size={15} /> Añadir servicio
+            <Icon name="plus" size={15} /> {m.addService}
           </Btn>
         </div>
       )}
@@ -294,6 +313,7 @@ export function ServicesManager({
         <TemplatePicker
           templates={templates}
           busy={busy}
+          m={m}
           onStage={(drafts) => { setError(null); setStaged(drafts); }}
         />
       )}
@@ -302,10 +322,8 @@ export function ServicesManager({
       {inStaging && staged && (
         <div className="flex flex-col gap-4">
           <div>
-            <p className="text-[14px] font-semibold text-ink">Personaliza tus servicios</p>
-            <p className="text-[13px] text-ink-soft">
-              Ajusta cada servicio antes de añadirlo. Puedes quitar los que no necesites.
-            </p>
+            <p className="text-[14px] font-semibold text-ink">{m.templatesTitle}</p>
+            <p className="text-[13px] text-ink-soft">{m.templatesSubtitle}</p>
           </div>
 
           <div className="flex flex-col gap-3">
@@ -313,6 +331,7 @@ export function ServicesManager({
               <StagedDraftCard
                 key={i}
                 draft={draft}
+                m={m}
                 onChange={(next) =>
                   setStaged((cur) => cur!.map((d, idx) => (idx === i ? next : d)))
                 }
@@ -328,10 +347,10 @@ export function ServicesManager({
 
           <div className="flex items-center gap-2">
             <Btn onClick={handleConfirmStaged} disabled={busy || staged.length === 0}>
-              {busy ? "Añadiendo…" : `Confirmar ${staged.length}`}
+              {busy ? m.adding : tmpl(m.confirmCount, { n: staged.length })}
             </Btn>
             <Btn variant="ghost" onClick={() => setStaged(null)} disabled={busy}>
-              Cancelar
+              {m.cancel}
             </Btn>
           </div>
         </div>
@@ -344,11 +363,13 @@ export function ServicesManager({
 function ServiceEditor({
   initial,
   busy,
+  m,
   onSave,
   onCancel,
 }: {
   initial: DraftService;
   busy: boolean;
+  m: ServicesDictionary["manager"];
   onSave: (draft: DraftService) => void;
   onCancel: () => void;
 }) {
@@ -356,13 +377,13 @@ function ServiceEditor({
 
   return (
     <div className="flex flex-col gap-4 rounded-xl border border-brand-line bg-brand-weak/40 p-4">
-      <ServiceFields draft={draft} onChange={setDraft} />
+      <ServiceFields draft={draft} onChange={setDraft} m={m} />
       <div className="flex items-center gap-2">
         <Btn onClick={() => onSave(draft)} disabled={busy}>
-          {busy ? "Guardando…" : "Guardar"}
+          {busy ? m.saving : m.save}
         </Btn>
         <Btn variant="ghost" onClick={onCancel} disabled={busy}>
-          Cancelar
+          {m.cancel}
         </Btn>
       </div>
     </div>
@@ -372,10 +393,12 @@ function ServiceEditor({
 // ── Staged draft card (template being customized) ─────────────────────────────
 function StagedDraftCard({
   draft,
+  m,
   onChange,
   onRemove,
 }: {
   draft: DraftService;
+  m: ServicesDictionary["manager"];
   onChange: (next: DraftService) => void;
   onRemove: () => void;
 }) {
@@ -384,11 +407,11 @@ function StagedDraftCard({
       <button
         onClick={onRemove}
         className="absolute right-3 top-3 grid h-7 w-7 place-items-center rounded-lg text-ink-soft hover:bg-error-weak hover:text-error"
-        aria-label="Quitar"
+        aria-label={m.delete}
       >
         <Icon name="x" size={15} />
       </button>
-      <ServiceFields draft={draft} onChange={onChange} />
+      <ServiceFields draft={draft} onChange={onChange} m={m} />
     </div>
   );
 }
@@ -397,9 +420,11 @@ function StagedDraftCard({
 function ServiceFields({
   draft,
   onChange,
+  m,
 }: {
   draft: DraftService;
   onChange: (next: DraftService) => void;
+  m: ServicesDictionary["manager"];
 }) {
   const customDuration = draft.durationCustom;
 
@@ -421,11 +446,11 @@ function ServiceFields({
     <>
       {/* Name */}
       <label className="flex flex-col gap-[7px]">
-        <span className="text-[13px] font-semibold text-ink">Nombre del servicio</span>
+        <span className="text-[13px] font-semibold text-ink">{m.nameLabel}</span>
         <input
           value={draft.name}
           onChange={(e) => onChange({ ...draft, name: e.target.value })}
-          placeholder="Primera consulta"
+          placeholder={m.namePlaceholder}
           maxLength={NAME_MAX_LENGTH}
           className={inputBase}
         />
@@ -433,7 +458,7 @@ function ServiceFields({
 
       {/* Duration */}
       <div className="flex flex-col gap-[7px]">
-        <span className="text-[13px] font-semibold text-ink">Duración</span>
+        <span className="text-[13px] font-semibold text-ink">{m.durationLabel}</span>
         <div className="flex flex-wrap items-center gap-2">
           {DURATION_PRESETS.map((d) => (
             <button
@@ -446,7 +471,7 @@ function ServiceFields({
                   : "border-line bg-surface text-ink-soft hover:border-brand-line hover:text-ink"
               }`}
             >
-              {d} min
+              {d} {m.durationUnit}
             </button>
           ))}
           <button
@@ -460,7 +485,7 @@ function ServiceFields({
                 : "border-line bg-surface text-ink-soft hover:border-brand-line hover:text-ink"
             }`}
           >
-            Otra
+            {m.durationOther}
           </button>
           {customDuration && (
             <div className="flex items-center gap-1.5">
@@ -472,7 +497,7 @@ function ServiceFields({
                 onChange={(e) => onChange({ ...draft, duration_min: Number(e.target.value) })}
                 className={`${inputBase} w-24 !py-2`}
               />
-              <span className="text-[13px] text-ink-soft">min</span>
+              <span className="text-[13px] text-ink-soft">{m.durationUnit}</span>
             </div>
           )}
         </div>
@@ -480,14 +505,14 @@ function ServiceFields({
 
       {/* Price: stepper − slider + synced box */}
       <div className="flex flex-col gap-[7px]">
-        <span className="text-[13px] font-semibold text-ink">Precio</span>
+        <span className="text-[13px] font-semibold text-ink">{m.priceLabel}</span>
         <div className="flex items-center gap-3">
           <button
             type="button"
             onClick={() => setPrice(draft.price - PRICE_STEP)}
             disabled={draft.price <= PRICE_MIN}
             className={stepBtn}
-            aria-label={`Bajar ${PRICE_STEP} €`}
+            aria-label={tmpl(m.priceLower, { step: PRICE_STEP })}
           >
             <Icon name="minus" size={15} />
           </button>
@@ -507,7 +532,7 @@ function ServiceFields({
             onClick={() => setPrice(draft.price + PRICE_STEP)}
             disabled={draft.price >= PRICE_MAX}
             className={stepBtn}
-            aria-label={`Subir ${PRICE_STEP} €`}
+            aria-label={tmpl(m.priceRaise, { step: PRICE_STEP })}
           >
             <Icon name="plus" size={15} />
           </button>
@@ -524,7 +549,7 @@ function ServiceFields({
             <span className="text-[14px] font-medium text-ink-soft">€</span>
           </div>
         </div>
-        <p className="text-[12px] text-ink-soft">{formatPrice(draft.price)}</p>
+        <p className="text-[12px] text-ink-soft">{formatPrice(draft.price, m.priceFree)}</p>
       </div>
     </>
   );
@@ -534,10 +559,12 @@ function ServiceFields({
 function TemplatePicker({
   templates,
   busy,
+  m,
   onStage,
 }: {
   templates: TemplateItem[];
   busy: boolean;
+  m: ServicesDictionary["manager"];
   onStage: (drafts: DraftService[]) => void;
 }) {
   const [selected, setSelected] = useState<Set<number>>(new Set());
@@ -560,10 +587,8 @@ function TemplatePicker({
 
   return (
     <div className="rounded-xl border border-line bg-surface p-5">
-      <p className="mb-1 text-[14px] font-semibold text-ink">¿No sabes por dónde empezar?</p>
-      <p className="mb-4 text-[13px] text-ink-soft">
-        Elige los servicios habituales de tu tipo de negocio y ajústalos a tus necesidades.
-      </p>
+      <p className="mb-1 text-[14px] font-semibold text-ink">{m.templatesTitle}</p>
+      <p className="mb-4 text-[13px] text-ink-soft">{m.templatesSubtitle}</p>
       <div className="flex flex-col gap-2">
         {templates.map((t, i) => {
           const checked = selected.has(i);
@@ -588,7 +613,7 @@ function TemplatePicker({
               <span className="flex-1">
                 <span className="block text-[14px] font-semibold text-ink">{t.name}</span>
                 <span className="block text-[12.5px] text-ink-soft">
-                  {t.duration_min} min · {formatPrice(t.price)}
+                  {t.duration_min} {m.durationUnit} · {formatPrice(t.price, m.priceFree)}
                 </span>
               </span>
             </button>
@@ -598,7 +623,7 @@ function TemplatePicker({
       <div className="mt-4">
         <Btn onClick={stageSelected} disabled={busy || selected.size === 0}>
           <Icon name="plus" size={15} />
-          {selected.size > 0 ? `Personalizar ${selected.size}` : "Añadir seleccionados"}
+          {selected.size > 0 ? tmpl(m.customizeCount, { n: selected.size }) : m.addSelected}
         </Btn>
       </div>
     </div>

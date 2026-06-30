@@ -4,11 +4,41 @@ import { revalidatePath } from "next/cache";
 import { authedAction } from "@/lib/auth-action";
 import { createClient } from "@/lib/supabase/server";
 import { getBusinessForUser } from "@/lib/business/data";
-import { validateService } from "@/lib/services/constants";
+import { validateService, type ServiceValidationDict } from "@/lib/services/constants";
 
 export type ServiceActionResult =
   | { ok: true; created?: boolean }
   | { ok: false; error: string };
+
+/** The translation slice these actions need for their own (non-validation)
+ *  error messages. Validation messages are a separate dict (ServiceValidationDict)
+ *  consumed by validateService directly. */
+export interface ServiceActionDict {
+  errNoBusiness: string;
+  errNoneToAdd: string;
+  errCreateFailed: string;
+  errCreateManyFailed: string;
+  errSaveFailed: string;
+  errDeleteFailed: string;
+  errReorderFailed: string;
+}
+
+const FALLBACK_VALIDATION: ServiceValidationDict = {
+  errNameRequired: "El nombre del servicio es obligatorio.",
+  errNameTooLong: "El nombre no puede superar los {max} caracteres.",
+  errDurationRange: "La duración debe estar entre {min} y {max} minutos.",
+  errPriceInvalid: "El precio no es válido.",
+};
+
+const FALLBACK_ACTION: ServiceActionDict = {
+  errNoBusiness: "Primero configura tu negocio.",
+  errNoneToAdd: "No hay servicios que añadir.",
+  errCreateFailed: "No se pudo crear el servicio:",
+  errCreateManyFailed: "No se pudieron añadir los servicios:",
+  errSaveFailed: "No se pudo guardar:",
+  errDeleteFailed: "No se pudo eliminar:",
+  errReorderFailed: "No se pudo reordenar:",
+};
 
 function revalidate() {
   revalidatePath("/panel");
@@ -31,14 +61,18 @@ async function resolveBusinessId(userId: string): Promise<string | null> {
 export const createService = authedAction(
   async (
     session,
-    input: { name: string; duration_min: number; price: number }
+    input: { name: string; duration_min: number; price: number },
+    dict?: { action?: Partial<ServiceActionDict>; validation?: Partial<ServiceValidationDict> }
   ): Promise<ServiceActionResult> => {
+    const a = { ...FALLBACK_ACTION, ...dict?.action };
+    const v0 = { ...FALLBACK_VALIDATION, ...dict?.validation };
+
     const businessId = await resolveBusinessId(session.user.id);
     if (!businessId) {
-      return { ok: false, error: "Primero configura tu negocio." };
+      return { ok: false, error: a.errNoBusiness };
     }
 
-    const v = validateService(input);
+    const v = validateService(input, v0);
     if (!v.valid) return { ok: false, error: v.error };
 
     const supabase = await createClient();
@@ -61,7 +95,7 @@ export const createService = authedAction(
       sort_order: nextOrder,
     });
 
-    if (error) return { ok: false, error: `No se pudo crear el servicio: ${error.message}` };
+    if (error) return { ok: false, error: `${a.errCreateFailed} ${error.message}` };
 
     revalidate();
     return { ok: true, created: true };
@@ -75,21 +109,25 @@ export const createService = authedAction(
 export const createServices = authedAction(
   async (
     session,
-    items: { name: string; duration_min: number; price: number }[]
+    items: { name: string; duration_min: number; price: number }[],
+    dict?: { action?: Partial<ServiceActionDict>; validation?: Partial<ServiceValidationDict> }
   ): Promise<ServiceActionResult> => {
+    const a = { ...FALLBACK_ACTION, ...dict?.action };
+    const v0 = { ...FALLBACK_VALIDATION, ...dict?.validation };
+
     const businessId = await resolveBusinessId(session.user.id);
     if (!businessId) {
-      return { ok: false, error: "Primero configura tu negocio." };
+      return { ok: false, error: a.errNoBusiness };
     }
 
     if (!Array.isArray(items) || items.length === 0) {
-      return { ok: false, error: "No hay servicios que añadir." };
+      return { ok: false, error: a.errNoneToAdd };
     }
 
     // Validate every draft before inserting any; report the first problem.
     const validated = [];
     for (const item of items) {
-      const v = validateService(item);
+      const v = validateService(item, v0);
       if (!v.valid) return { ok: false, error: v.error };
       validated.push(v.value);
     }
@@ -114,7 +152,7 @@ export const createServices = authedAction(
     }));
 
     const { error } = await supabase.from("kalendar_services").insert(rows);
-    if (error) return { ok: false, error: `No se pudieron añadir los servicios: ${error.message}` };
+    if (error) return { ok: false, error: `${a.errCreateManyFailed} ${error.message}` };
 
     revalidate();
     return { ok: true, created: true };
@@ -125,12 +163,16 @@ export const createServices = authedAction(
 export const updateService = authedAction(
   async (
     session,
-    input: { id: string; name: string; duration_min: number; price: number }
+    input: { id: string; name: string; duration_min: number; price: number },
+    dict?: { action?: Partial<ServiceActionDict>; validation?: Partial<ServiceValidationDict> }
   ): Promise<ServiceActionResult> => {
-    const businessId = await resolveBusinessId(session.user.id);
-    if (!businessId) return { ok: false, error: "Primero configura tu negocio." };
+    const a = { ...FALLBACK_ACTION, ...dict?.action };
+    const v0 = { ...FALLBACK_VALIDATION, ...dict?.validation };
 
-    const v = validateService(input);
+    const businessId = await resolveBusinessId(session.user.id);
+    if (!businessId) return { ok: false, error: a.errNoBusiness };
+
+    const v = validateService(input, v0);
     if (!v.valid) return { ok: false, error: v.error };
 
     const supabase = await createClient();
@@ -144,7 +186,7 @@ export const updateService = authedAction(
       .eq("id", input.id)
       .eq("business_id", businessId); // scope: only the caller's own service
 
-    if (error) return { ok: false, error: `No se pudo guardar: ${error.message}` };
+    if (error) return { ok: false, error: `${a.errSaveFailed} ${error.message}` };
 
     revalidate();
     return { ok: true };
@@ -153,9 +195,15 @@ export const updateService = authedAction(
 
 // ── Delete a service ───────────────────────────────────────────────────────
 export const deleteService = authedAction(
-  async (session, id: string): Promise<ServiceActionResult> => {
+  async (
+    session,
+    id: string,
+    dict?: Partial<ServiceActionDict>
+  ): Promise<ServiceActionResult> => {
+    const a = { ...FALLBACK_ACTION, ...dict };
+
     const businessId = await resolveBusinessId(session.user.id);
-    if (!businessId) return { ok: false, error: "Primero configura tu negocio." };
+    if (!businessId) return { ok: false, error: a.errNoBusiness };
 
     const supabase = await createClient();
     const { error } = await supabase
@@ -164,7 +212,7 @@ export const deleteService = authedAction(
       .eq("id", id)
       .eq("business_id", businessId);
 
-    if (error) return { ok: false, error: `No se pudo eliminar: ${error.message}` };
+    if (error) return { ok: false, error: `${a.errDeleteFailed} ${error.message}` };
 
     revalidate();
     return { ok: true };
@@ -176,9 +224,15 @@ export const deleteService = authedAction(
 // ids; writes each row's sort_order to its index. All scoped to the caller's
 // business, so ids outside it are no-ops.
 export const reorderServices = authedAction(
-  async (session, orderedIds: string[]): Promise<ServiceActionResult> => {
+  async (
+    session,
+    orderedIds: string[],
+    dict?: Partial<ServiceActionDict>
+  ): Promise<ServiceActionResult> => {
+    const a = { ...FALLBACK_ACTION, ...dict };
+
     const businessId = await resolveBusinessId(session.user.id);
-    if (!businessId) return { ok: false, error: "Primero configura tu negocio." };
+    if (!businessId) return { ok: false, error: a.errNoBusiness };
 
     const supabase = await createClient();
 
@@ -194,7 +248,7 @@ export const reorderServices = authedAction(
 
     const failed = results.find((r) => r.error);
     if (failed?.error) {
-      return { ok: false, error: `No se pudo reordenar: ${failed.error.message}` };
+      return { ok: false, error: `${a.errReorderFailed} ${failed.error.message}` };
     }
 
     revalidate();

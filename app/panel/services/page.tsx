@@ -5,6 +5,8 @@ import { getServicesForUser } from "@/lib/services/data";
 import { SERVICE_TEMPLATES } from "@/lib/onboarding/data";
 import type { BusinessType } from "@/lib/onboarding/types";
 import { ServicesManager } from "@/components/panel/services-manager";
+import { getLocale } from "@/lib/i18n/server";
+import { getServicesDictionary } from "@/lib/i18n/dictionaries/services";
 
 export default async function ServicesPage({
   searchParams,
@@ -28,16 +30,18 @@ export default async function ServicesPage({
   // Starter templates for this business type, as [name, duration_min, price].
   const templates = SERVICE_TEMPLATES[business.type as BusinessType] ?? [];
 
+  const locale = await getLocale();
+  const dict = getServicesDictionary(locale);
+
   return (
     <div className="mx-auto max-w-[680px] px-8 py-8">
       <div className="mb-8">
-        <h1 className="mb-1 text-[24px]">Tus servicios</h1>
-        <p className="text-[15px] text-ink-soft">
-          Define lo que tus clientes podrán reservar contigo.
-        </p>
+        <h1 className="mb-1 text-[24px]">{dict.page.title}</h1>
+        <p className="text-[15px] text-ink-soft">{dict.page.subtitle}</p>
       </div>
 
       <ServicesManager
+        dict={dict}
         initialServices={services.map((s) => ({
           id: s.id,
           name: s.name,
