@@ -6,6 +6,7 @@ import { Icon } from "@/components/ui/icon";
 import { Btn } from "@/components/ui/button";
 import { Field, inputClasses } from "@/components/ui/field";
 import { BUSINESS_TYPES } from "@/lib/onboarding/data";
+import { businessTypeLabelFor } from "@/lib/i18n/dictionaries/business-types";
 import type { BusinessType } from "@/lib/onboarding/types";
 import {
   saveBusinessSettings,
@@ -18,6 +19,8 @@ import {
 } from "@/lib/business/slug-screen";
 import { bookingUrlDisplay } from "@/lib/business/booking-url";
 import type { SlugStatus } from "@/lib/business/data";
+import type { Locale } from "@/lib/i18n/config";
+import type { BusinessDictionary } from "@/lib/i18n/dictionaries/business";
 
 interface InitialBusiness {
   name: string;
@@ -30,12 +33,17 @@ interface InitialBusiness {
 export function BusinessForm({
   initial,
   returnToHome,
+  dict,
+  locale,
 }: {
   initial: InitialBusiness | null;
   returnToHome: boolean;
+  dict: BusinessDictionary;
+  locale: Locale;
 }) {
   const router = useRouter();
   const isNew = !initial;
+  const f = dict.form;
 
   const [name, setName] = useState(initial?.name ?? "");
   const [type, setType] = useState<BusinessType | "">(initial?.type ?? "");
@@ -67,7 +75,10 @@ export function BusinessForm({
     setChecking(true);
     debounceRef.current = setTimeout(async () => {
       try {
-        const result = await checkSlugAvailability(value);
+        const result = await checkSlugAvailability(value, {
+          errSlugReserved: dict.errors.errSlugReserved,
+          errSlugFlagged: dict.errors.errSlugFlagged,
+        });
         setSlugCheck(result);
       } catch {
         setSlugCheck(null);
@@ -107,19 +118,19 @@ export function BusinessForm({
     setSaved(false);
 
     if (name.trim().length < 2) {
-      setError("El nombre del negocio es obligatorio.");
+      setError(f.errName);
       return;
     }
     if (!type) {
-      setError("Selecciona el tipo de negocio.");
+      setError(f.errType);
       return;
     }
     if (isNew && (!slug || slug.length < 3)) {
-      setError("Elige un enlace para tu página de reservas.");
+      setError(f.errSlugRequired);
       return;
     }
     if (isNew && slugCheck?.status === "taken") {
-      setError("Ese enlace ya está en uso. Elige otro.");
+      setError(f.errSlugTaken);
       return;
     }
 
@@ -131,7 +142,13 @@ export function BusinessForm({
 
     setSaving(true);
     try {
-      const result = await saveBusinessSettings(fd);
+      const result = await saveBusinessSettings(fd, {
+        errName: f.errName,
+        errType: f.errType,
+        errSlugTaken: dict.errors.errSlugTaken,
+        errSaveFailed: dict.errors.errSaveFailed,
+        errCreateFailed: dict.errors.errCreateFailed,
+      });
       if (!result.ok) {
         setError(result.error);
         setSaving(false);
@@ -150,7 +167,7 @@ export function BusinessForm({
       // Refresh server components (this page's create/edit mode, home checklist).
       router.refresh();
     } catch {
-      setError("Ocurrió un error inesperado. Inténtalo de nuevo.");
+      setError(f.errUnexpected);
       setSaving(false);
     }
   }
@@ -159,8 +176,8 @@ export function BusinessForm({
     <div className="flex flex-col gap-7">
       {/* Name */}
       <Field
-        label="Nombre del negocio"
-        placeholder="Centro Bienestar Serena"
+        label={f.nameLabel}
+        placeholder={f.namePlaceholder}
         value={name}
         onChange={(e) => handleNameChange(e.target.value)}
         maxLength={80}
@@ -168,7 +185,7 @@ export function BusinessForm({
 
       {/* Type */}
       <div className="flex flex-col gap-[9px]">
-        <span className="text-[13px] font-semibold text-ink">Tipo de negocio</span>
+        <span className="text-[13px] font-semibold text-ink">{f.typeLabel}</span>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {BUSINESS_TYPES.map((t) => {
             const active = type === t.id;
@@ -184,7 +201,9 @@ export function BusinessForm({
                 }`}
               >
                 <Icon name={t.icon} size={20} className={active ? "text-brand" : ""} />
-                <span className="text-[12.5px] font-semibold leading-tight">{t.label}</span>
+                <span className="text-[12.5px] font-semibold leading-tight">
+                  {businessTypeLabelFor(t.id, locale)}
+                </span>
               </button>
             );
           })}
@@ -193,9 +212,9 @@ export function BusinessForm({
 
       {/* City */}
       <Field
-        label="Ciudad"
-        hint="(opcional)"
-        placeholder="Valencia"
+        label={f.cityLabel}
+        hint={f.cityHint}
+        placeholder={f.cityPlaceholder}
         value={city}
         onChange={(e) => setCity(e.target.value)}
         maxLength={80}
@@ -204,9 +223,7 @@ export function BusinessForm({
       {/* Slug */}
       {isNew ? (
         <div className="flex flex-col gap-[7px]">
-          <span className="text-[13px] font-semibold text-ink">
-            Enlace de tu página de reservas
-          </span>
+          <span className="text-[13px] font-semibold text-ink">{f.slugLabel}</span>
           <div className="flex items-stretch overflow-hidden rounded-[10px] border border-line focus-within:border-brand focus-within:shadow-[0_0_0_3px_var(--color-brand-weak)]">
             <span className="flex select-none items-center bg-surface-2 px-3 text-[13px] text-ink-soft">
               /bookings/
@@ -214,29 +231,22 @@ export function BusinessForm({
             <input
               value={slug}
               onChange={(e) => handleSlugChange(e.target.value)}
-              placeholder="centro-bienestar"
+              placeholder={f.slugPlaceholder}
               maxLength={40}
               className="w-full bg-surface px-[13px] py-3 text-[15px] text-ink outline-none placeholder:text-ink-soft/60"
             />
           </div>
-          <SlugFeedback checking={checking} result={slugCheck} slug={slug} />
-          <p className="text-[12px] text-ink-soft">
-            Este enlace es permanente: no podrás cambiarlo más adelante. Todos los enlaces se
-            revisan antes de activarse por completo.
-          </p>
+          <SlugFeedback checking={checking} result={slugCheck} slug={slug} f={f} />
+          <p className="text-[12px] text-ink-soft">{f.slugImmutableNew}</p>
         </div>
       ) : (
         <div className="flex flex-col gap-[7px]">
-          <span className="text-[13px] font-semibold text-ink">
-            Enlace de tu página de reservas
-          </span>
+          <span className="text-[13px] font-semibold text-ink">{f.slugLabel}</span>
           <div className={`${inputClasses(false)} flex items-center justify-between !cursor-default bg-surface-2`}>
             <span className="truncate text-[14px] text-ink">{bookingUrlDisplay(initial.slug)}</span>
-            <SlugStatusBadge status={initial.slugStatus} />
+            <SlugStatusBadge status={initial.slugStatus} f={f} />
           </div>
-          <p className="text-[12px] text-ink-soft">
-            El enlace es permanente. Si necesitas cambiarlo, contacta con soporte.
-          </p>
+          <p className="text-[12px] text-ink-soft">{f.slugImmutableEdit}</p>
         </div>
       )}
 
@@ -250,13 +260,13 @@ export function BusinessForm({
       {saved && !error && (
         <div className="flex items-center gap-2 rounded-xl border border-brand-line bg-brand-weak px-4 py-3 text-[13.5px] text-brand-ink">
           <Icon name="check" size={16} strokeWidth={2.5} className="shrink-0" />
-          <span>Guardado correctamente.</span>
+          <span>{f.saved}</span>
         </div>
       )}
 
       <div>
         <Btn onClick={handleSave} disabled={saving} size="lg">
-          {saving ? "Guardando…" : isNew ? "Crear negocio" : "Guardar cambios"}
+          {saving ? f.saving : isNew ? f.createButton : f.saveButton}
         </Btn>
       </div>
     </div>
@@ -267,14 +277,16 @@ function SlugFeedback({
   checking,
   result,
   slug,
+  f,
 }: {
   checking: boolean;
   result: SlugCheckResult | null;
   slug: string;
+  f: BusinessDictionary["form"];
 }) {
   if (!slug) return null;
   if (checking) {
-    return <p className="text-[12.5px] text-ink-soft">Comprobando disponibilidad…</p>;
+    return <p className="text-[12.5px] text-ink-soft">{f.slugChecking}</p>;
   }
   if (!result) return null;
 
@@ -282,11 +294,11 @@ function SlugFeedback({
     case "available":
       return (
         <p className="flex items-center gap-1.5 text-[12.5px] font-medium text-brand-ink">
-          <Icon name="check" size={13} strokeWidth={2.5} /> Disponible
+          <Icon name="check" size={13} strokeWidth={2.5} /> {f.slugAvailable}
         </p>
       );
     case "taken":
-      return <p className="text-[12.5px] font-medium text-error">Ya está en uso. Prueba otra variación.</p>;
+      return <p className="text-[12.5px] font-medium text-error">{f.slugTaken}</p>;
     case "invalid":
       return <p className="text-[12.5px] text-error">{result.reason}</p>;
     case "flagged":
@@ -296,11 +308,11 @@ function SlugFeedback({
   }
 }
 
-function SlugStatusBadge({ status }: { status: SlugStatus }) {
+function SlugStatusBadge({ status, f }: { status: SlugStatus; f: BusinessDictionary["form"] }) {
   const map: Record<SlugStatus, { label: string; className: string }> = {
-    active: { label: "Activo", className: "bg-brand-weak text-brand-ink border-brand-line" },
-    pending_review: { label: "En revisión", className: "bg-surface text-ink-soft border-line" },
-    rejected: { label: "Rechazado", className: "bg-error-weak text-error border-error" },
+    active: { label: f.statusActive, className: "bg-brand-weak text-brand-ink border-brand-line" },
+    pending_review: { label: f.statusPending, className: "bg-surface text-ink-soft border-line" },
+    rejected: { label: f.statusRejected, className: "bg-error-weak text-error border-error" },
   };
   const s = map[status];
   return (

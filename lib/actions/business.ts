@@ -29,7 +29,11 @@ export type SlugCheckResult =
   | { status: "flagged"; reason: string };
 
 export const checkSlugAvailability = authedAction(
-  async (session, rawSlug: string): Promise<SlugCheckResult> => {
+  async (
+    session,
+    rawSlug: string,
+    dict?: { errSlugReserved: string; errSlugFlagged: string }
+  ): Promise<SlugCheckResult> => {
     const slug = sanitizeSlug(rawSlug);
 
     const format = validateSlugFormat(slug);
@@ -46,8 +50,9 @@ export const checkSlugAvailability = authedAction(
         status: "flagged",
         reason:
           screen.reason === "reserved"
-            ? "Ese enlace está reservado. Elige otro."
-            : "Ese enlace podría no estar permitido y quedará pendiente de revisión.",
+            ? dict?.errSlugReserved ?? "Ese enlace está reservado. Elige otro."
+            : dict?.errSlugFlagged ??
+              "Ese enlace podría no estar permitido y quedará pendiente de revisión.",
       };
     }
 
@@ -71,16 +76,26 @@ export type SaveBusinessResult =
   | { ok: false; error: string };
 
 export const saveBusinessSettings = authedAction(
-  async (session, formData: FormData): Promise<SaveBusinessResult> => {
+  async (
+    session,
+    formData: FormData,
+    dict?: {
+      errName: string;
+      errType: string;
+      errSlugTaken: string;
+      errSaveFailed: string;
+      errCreateFailed: string;
+    }
+  ): Promise<SaveBusinessResult> => {
     const name = (formData.get("name") as string | null)?.trim() ?? "";
     const type = (formData.get("type") as string | null)?.trim() ?? "";
     const city = (formData.get("city") as string | null)?.trim() ?? "";
 
     if (name.length < 2) {
-      return { ok: false, error: "El nombre del negocio es obligatorio." };
+      return { ok: false, error: dict?.errName ?? "El nombre del negocio es obligatorio." };
     }
     if (!isValidType(type)) {
-      return { ok: false, error: "Selecciona el tipo de negocio." };
+      return { ok: false, error: dict?.errType ?? "Selecciona el tipo de negocio." };
     }
 
     const supabase = await createClient();
@@ -105,7 +120,10 @@ export const saveBusinessSettings = authedAction(
         .eq("owner_id", session.user.id); // defence in depth
 
       if (error) {
-        return { ok: false, error: `No se pudo guardar: ${error.message}` };
+        return {
+          ok: false,
+          error: `${dict?.errSaveFailed ?? "No se pudo guardar:"} ${error.message}`,
+        };
       }
       revalidatePath("/panel");
       revalidatePath("/panel/business");
@@ -136,7 +154,7 @@ export const saveBusinessSettings = authedAction(
     if (clash) {
       return {
         ok: false,
-        error: "Ese enlace ya está en uso. Elige otro.",
+        error: dict?.errSlugTaken ?? "Ese enlace ya está en uso. Elige otro.",
       };
     }
 
@@ -153,9 +171,12 @@ export const saveBusinessSettings = authedAction(
     if (error) {
       // Unique-constraint race between the check and the insert.
       if (error.code === "23505") {
-        return { ok: false, error: "Ese enlace ya está en uso. Elige otro." };
+        return { ok: false, error: dict?.errSlugTaken ?? "Ese enlace ya está en uso. Elige otro." };
       }
-      return { ok: false, error: `No se pudo crear el negocio: ${error.message}` };
+      return {
+        ok: false,
+        error: `${dict?.errCreateFailed ?? "No se pudo crear el negocio:"} ${error.message}`,
+      };
     }
 
     revalidatePath("/panel");

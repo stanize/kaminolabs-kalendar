@@ -1,6 +1,8 @@
 import { requireSession } from "@/lib/auth-session";
 import { getBusinessForUser } from "@/lib/business/data";
 import { BusinessForm } from "@/components/panel/business-form";
+import { getLocale } from "@/lib/i18n/server";
+import { getBusinessDictionary } from "@/lib/i18n/dictionaries/business";
 
 export default async function BusinessPage({
   searchParams,
@@ -18,18 +20,21 @@ export default async function BusinessPage({
 
   const isNew = !business;
 
+  const locale = await getLocale();
+  const dict = getBusinessDictionary(locale);
+
   return (
     <div className="mx-auto max-w-[680px] px-8 py-8">
       <div className="mb-8">
-        <h1 className="mb-1 text-[24px]">Configura tu negocio</h1>
+        <h1 className="mb-1 text-[24px]">{dict.page.titleNew}</h1>
         <p className="text-[15px] text-ink-soft">
-          {isNew
-            ? "Cuéntanos de tu negocio. Así te verán tus clientes al reservar."
-            : "Edita los datos de tu negocio."}
+          {isNew ? dict.page.subtitleNew : dict.page.subtitleEdit}
         </p>
       </div>
 
       <BusinessForm
+        dict={dict}
+        locale={locale}
         returnToHome={returnToHome}
         initial={
           business

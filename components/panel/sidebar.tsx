@@ -6,6 +6,8 @@ import clsx from "clsx";
 import { Logo } from "@/components/ui/logo";
 import { Icon } from "@/components/ui/icon";
 import { authClient } from "@/lib/auth-client";
+import { LanguageSwitcher } from "@/components/i18n/language-switcher";
+import type { Locale } from "@/lib/i18n/config";
 import type { PanelShellDictionary } from "@/lib/i18n/dictionaries/panel-shell";
 
 type SidebarDict = PanelShellDictionary["sidebar"];
@@ -13,9 +15,11 @@ type SidebarDict = PanelShellDictionary["sidebar"];
 export function PanelSidebar({
   user,
   dict,
+  locale,
 }: {
   user: { name?: string | null; email?: string | null; image?: string | null };
   dict: SidebarDict;
+  locale: Locale;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -92,6 +96,9 @@ export function PanelSidebar({
         </div>
 
         <div className="border-t border-line pt-2">
+          <div className="mb-2 flex justify-center">
+            <LanguageSwitcher current={locale} revalidate="/panel" />
+          </div>
           <div className="mb-1 flex items-center gap-2.5 rounded-[9px] px-3 py-2">
             <div className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-brand text-[11px] font-bold text-white">
               {user.name?.charAt(0).toUpperCase() ?? "?"}

@@ -9,7 +9,7 @@ export default async function PanelLayout({ children }: { children: ReactNode })
   const session = await getSession();
   if (!session?.user) redirect("/login");
 
-  const { dict } = await getPanelShellServerDictionary();
+  const { locale, dict } = await getPanelShellServerDictionary();
 
   // Email/password sign-ups land here unverified — the panel renders but is
   // blocked by a confirmation overlay until `emailVerified` is true. Google
@@ -18,7 +18,7 @@ export default async function PanelLayout({ children }: { children: ReactNode })
 
   return (
     <div className="flex min-h-screen bg-bg">
-      <PanelSidebar user={session.user} dict={dict.sidebar} />
+      <PanelSidebar user={session.user} dict={dict.sidebar} locale={locale} />
       <main className="flex-1 overflow-y-auto">
         {children}
       </main>
