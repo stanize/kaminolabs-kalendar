@@ -6,30 +6,39 @@ import clsx from "clsx";
 import { Logo } from "@/components/ui/logo";
 import { Icon } from "@/components/ui/icon";
 import { authClient } from "@/lib/auth-client";
+import type { PanelShellDictionary } from "@/lib/i18n/dictionaries/panel-shell";
 
-const NAV_ITEMS = [
-  { href: "/panel", label: "Inicio", icon: "home", exact: true },
-  { href: "/panel/calendar", label: "Calendario", icon: "calendar" },
-  { href: "/panel/clients", label: "Clientes", icon: "users" },
-  { href: "/panel/business", label: "Negocio", icon: "building" },
-  { href: "/panel/services", label: "Servicios", icon: "sparkles" },
-  { href: "/panel/team", label: "Equipo", icon: "user" },
-  { href: "/panel/availability", label: "Disponibilidad", icon: "clock" },
-  { href: "/panel/payments", label: "Pagos", icon: "creditCard" },
-  { href: "/panel/invoices", label: "Facturas", icon: "fileText" },
-  { href: "/panel/notifications", label: "Emails y avisos", icon: "bell" },
-  { href: "/panel/reports", label: "Informes", icon: "barChart" },
-  { href: "/panel/integrations", label: "Integraciones", icon: "grid" },
-  { href: "/panel/settings", label: "Ajustes", icon: "settings" },
-];
+type SidebarDict = PanelShellDictionary["sidebar"];
 
-const BOTTOM_NAV_ITEMS = [
-  { href: "/panel/support", label: "Soporte", icon: "lifeBuoy" },
-];
-
-export function PanelSidebar({ user }: { user: { name?: string | null; email?: string | null; image?: string | null } }) {
+export function PanelSidebar({
+  user,
+  dict,
+}: {
+  user: { name?: string | null; email?: string | null; image?: string | null };
+  dict: SidebarDict;
+}) {
   const pathname = usePathname();
   const router = useRouter();
+
+  const NAV_ITEMS = [
+    { href: "/panel", label: dict.home, icon: "home", exact: true },
+    { href: "/panel/calendar", label: dict.calendar, icon: "calendar" },
+    { href: "/panel/clients", label: dict.clients, icon: "users" },
+    { href: "/panel/business", label: dict.business, icon: "building" },
+    { href: "/panel/services", label: dict.services, icon: "sparkles" },
+    { href: "/panel/team", label: dict.team, icon: "user" },
+    { href: "/panel/availability", label: dict.availability, icon: "clock" },
+    { href: "/panel/payments", label: dict.payments, icon: "creditCard" },
+    { href: "/panel/invoices", label: dict.invoices, icon: "fileText" },
+    { href: "/panel/notifications", label: dict.notifications, icon: "bell" },
+    { href: "/panel/reports", label: dict.reports, icon: "barChart" },
+    { href: "/panel/integrations", label: dict.integrations, icon: "grid" },
+    { href: "/panel/settings", label: dict.settings, icon: "settings" },
+  ];
+
+  const BOTTOM_NAV_ITEMS = [
+    { href: "/panel/support", label: dict.support, icon: "lifeBuoy" },
+  ];
 
   async function handleSignOut() {
     await authClient.signOut();
@@ -97,7 +106,7 @@ export function PanelSidebar({ user }: { user: { name?: string | null; email?: s
             className="flex w-full items-center gap-2.5 rounded-[9px] px-3 py-[8px] text-[13.5px] font-medium text-ink-soft transition-colors duration-100 hover:bg-surface-2 hover:text-ink cursor-pointer"
           >
             <Icon name="logOut" size={16} />
-            Cerrar sesión
+            {dict.signOut}
           </button>
         </div>
       </div>

@@ -5,6 +5,7 @@ import { requireSession } from "@/lib/auth-session";
 import { getSetupProgress } from "@/lib/business/data";
 import { bookingPath, bookingUrlDisplay } from "@/lib/business/booking-url";
 import { SetupCompleteBanner } from "@/components/panel/setup-complete-banner";
+import { getPanelShellServerDictionary } from "@/lib/i18n/server";
 
 export default async function PanelHomePage() {
   const session = await requireSession();
@@ -12,37 +13,40 @@ export default async function PanelHomePage() {
     session.user.id
   );
 
+  const { dict } = await getPanelShellServerDictionary();
+  const h = dict.home;
+
   const firstName = session.user.name?.split(" ")[0] ?? "";
 
   const setupItems = [
     {
       id:    "business",
-      label: "Configura tu negocio",
-      sub:   "Nombre, tipo y ciudad",
+      label: h.step1Label,
+      sub:   h.step1Sub,
       done:  !!business,
       href:  "/panel/business?from=home",
       icon:  "building",
     },
     {
       id:    "services",
-      label: "Crea tus servicios",
-      sub:   "Lo que tus clientes podrán reservar",
+      label: h.step2Label,
+      sub:   h.step2Sub,
       done:  hasServices,
       href:  "/panel/services?from=home",
       icon:  "sparkles",
     },
     {
       id:    "team",
-      label: "Añade tu equipo",
-      sub:   "Tú y las personas que trabajan contigo",
+      label: h.step3Label,
+      sub:   h.step3Sub,
       done:  hasTeam,
       href:  "/panel/team?from=home",
       icon:  "users",
     },
     {
       id:    "schedule",
-      label: "Define tu disponibilidad",
-      sub:   "Los días y horas en que aceptas citas",
+      label: h.step4Label,
+      sub:   h.step4Sub,
       done:  hasActiveHours,
       href:  "/panel/availability?from=home",
       icon:  "clock",
@@ -53,13 +57,20 @@ export default async function PanelHomePage() {
   const percentage     = Math.round((completedCount / setupItems.length) * 100);
   const allDone        = completedCount === setupItems.length;
 
+  const quickLinks = [
+    { label: dict.sidebar.services,      href: "/panel/services",      icon: "sparkles" },
+    { label: dict.sidebar.availability, href: "/panel/availability", icon: "clock" },
+    { label: dict.sidebar.team,         href: "/panel/team",         icon: "users" },
+    { label: dict.sidebar.settings,        href: "/panel/settings",        icon: "settings" },
+  ];
+
   return (
     <div className="mx-auto max-w-[860px] px-8 py-8">
       <div className="mb-8">
         <h1 className="mb-1 text-[24px]">
-          {firstName ? `Hola, ${firstName}` : "Inicio"}
+          {firstName ? `${h.greetingPrefix}${firstName}` : h.greetingFallback}
         </h1>
-        <p className="text-[15px] text-ink-soft">Bienvenido a tu panel de Kalendar.</p>
+        <p className="text-[15px] text-ink-soft">{h.subtitle}</p>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
@@ -67,7 +78,7 @@ export default async function PanelHomePage() {
           {!allDone && (
             <div className="mb-6 rounded-2xl border border-line bg-surface p-6 shadow-sm">
               <div className="mb-4 flex items-center justify-between">
-                <h2 className="text-[17px]">Configura tu página de reservas</h2>
+                <h2 className="text-[17px]">{h.setupCardTitle}</h2>
                 <span className="text-[14px] font-semibold text-ink-soft">{percentage}%</span>
               </div>
               <div className="mb-5 h-1.5 overflow-hidden rounded-full bg-surface-2">
@@ -99,21 +110,26 @@ export default async function PanelHomePage() {
             </div>
           )}
 
-          {allDone && !business?.onboarding_completed_at && <SetupCompleteBanner />}
+          {allDone && !business?.onboarding_completed_at && (
+            <SetupCompleteBanner
+              title={h.setupComplete}
+              subtitle={h.setupCompleteSub}
+            />
+          )}
         </div>
 
         <div className="flex flex-col gap-4">
           {business?.slug && (
             <div className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
               <p className="mb-1 text-[12px] font-bold uppercase tracking-[.05em] text-ink-soft">
-                Tu página de reservas
+                {h.bookingPageTitle}
               </p>
               <p className="mb-3 truncate text-[14px] font-semibold text-ink">
                 {bookingUrlDisplay(business.slug)}
               </p>
               <Link href={bookingPath(business.slug)} target="_blank">
                 <Btn variant="outline" size="sm" full>
-                  <Icon name="externalLink" size={14} /> Ver página
+                  <Icon name="externalLink" size={14} /> {h.viewPage}
                 </Btn>
               </Link>
             </div>
@@ -121,15 +137,10 @@ export default async function PanelHomePage() {
 
           <div className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
             <p className="mb-1 text-[12px] font-bold uppercase tracking-[.05em] text-ink-soft">
-              Accesos rápidos
+              {h.quickAccess}
             </p>
             <div className="mt-3 flex flex-col gap-1">
-              {[
-                { label: "Servicios",      href: "/panel/services",      icon: "sparkles" },
-                { label: "Disponibilidad", href: "/panel/availability", icon: "clock" },
-                { label: "Equipo",         href: "/panel/team",         icon: "users" },
-                { label: "Ajustes",        href: "/panel/settings",        icon: "settings" },
-              ].map((item) => (
+              {quickLinks.map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}

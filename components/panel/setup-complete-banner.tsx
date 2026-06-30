@@ -5,7 +5,13 @@ import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { dismissSetupComplete } from "@/lib/actions/onboarding";
 
-export function SetupCompleteBanner() {
+export function SetupCompleteBanner({
+  title,
+  subtitle,
+}: {
+  title: string;
+  subtitle: string;
+}) {
   const router = useRouter();
   const [hidden, setHidden] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -35,10 +41,8 @@ export function SetupCompleteBanner() {
         <Icon name="check" size={18} strokeWidth={2.5} />
       </div>
       <div className="flex-1">
-        <p className="text-[14px] font-semibold text-brand-ink">¡Todo configurado!</p>
-        <p className="text-[13px] text-brand-ink/80">
-          Tu página de reservas está lista para recibir clientes.
-        </p>
+        <p className="text-[14px] font-semibold text-brand-ink">{title}</p>
+        <p className="text-[13px] text-brand-ink/80">{subtitle}</p>
       </div>
       <button
         onClick={dismiss}

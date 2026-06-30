@@ -4,6 +4,9 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import { Icon } from "@/components/ui/icon";
+import type { PanelShellDictionary } from "@/lib/i18n/dictionaries/panel-shell";
+
+type VerificationDict = PanelShellDictionary["verification"];
 
 /**
  * Full-screen blocking overlay shown in the panel when the signed-in user's
@@ -11,7 +14,7 @@ import { Icon } from "@/components/ui/icon";
  * pre-verified and never see this. The panel renders behind it but cannot be
  * interacted with until the email is confirmed.
  */
-export function EmailVerificationGate({ email }: { email: string }) {
+export function EmailVerificationGate({ email, dict }: { email: string; dict: VerificationDict }) {
   const router = useRouter();
 
   const [resendState, setResendState] = useState<"idle" | "sending" | "sent" | "error">("idle");
@@ -77,6 +80,9 @@ export function EmailVerificationGate({ email }: { email: string }) {
     router.push("/login");
   }
 
+  const resendLabel =
+    cooldown > 0 ? dict.resendCountdownTemplate.replace("{seconds}", String(cooldown)) : dict.resend;
+
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-ink/40 px-5 backdrop-blur-sm">
       <div className="w-full max-w-[440px] rounded-2xl border border-line bg-surface p-7 shadow-xl">
@@ -84,11 +90,10 @@ export function EmailVerificationGate({ email }: { email: string }) {
           <Icon name="mail" size={22} />
         </div>
 
-        <h2 className="mb-1.5 text-[20px]">Confirma tu email</h2>
+        <h2 className="mb-1.5 text-[20px]">{dict.title}</h2>
         <p className="text-[14.5px] leading-relaxed text-ink-soft">
-          Hemos enviado un enlace de confirmación a{" "}
-          <span className="font-semibold text-ink">{email}</span>. Ábrelo para
-          activar tu cuenta y empezar a usar Kalendar.
+          {dict.bodyPrefix}{" "}
+          <span className="font-semibold text-ink">{email}</span>. {dict.bodySuffix}
         </p>
 
         <div className="mt-6 flex flex-col gap-2.5">
@@ -98,7 +103,7 @@ export function EmailVerificationGate({ email }: { email: string }) {
             disabled={checking}
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand px-5 py-3.5 text-[15px] font-semibold text-white transition-all hover:bg-brand/90 disabled:cursor-wait disabled:opacity-60"
           >
-            {checking ? "Comprobando…" : "Ya he confirmado mi email"}
+            {checking ? dict.checking : dict.confirmedButton}
           </button>
 
           <button
@@ -107,28 +112,23 @@ export function EmailVerificationGate({ email }: { email: string }) {
             disabled={cooldown > 0 || resendState === "sending"}
             className="w-full rounded-xl border border-line bg-surface px-5 py-3 text-[14px] font-semibold text-ink transition-all hover:border-brand-line disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {resendState === "sending"
-              ? "Enviando…"
-              : cooldown > 0
-                ? `Reenviar enlace (${cooldown}s)`
-                : "Reenviar enlace"}
+            {resendState === "sending" ? dict.resending : resendLabel}
           </button>
         </div>
 
         {notYet && (
           <p className="mt-4 rounded-xl bg-surface-2 px-3.5 py-2.5 text-[13px] text-ink-soft">
-            Todavía no detectamos la confirmación. Revisa tu correo (y la carpeta
-            de spam) y vuelve a intentarlo.
+            {dict.notYet}
           </p>
         )}
         {resendState === "sent" && (
           <p className="mt-4 rounded-xl bg-brand-weak px-3.5 py-2.5 text-[13px] font-medium text-brand">
-            Te hemos reenviado el enlace de confirmación.
+            {dict.resent}
           </p>
         )}
         {resendState === "error" && (
           <p className="mt-4 rounded-xl bg-error-weak px-3.5 py-2.5 text-[13px] font-medium text-error">
-            No se pudo reenviar el enlace. Inténtalo de nuevo en un momento.
+            {dict.resendError}
           </p>
         )}
 
@@ -138,7 +138,7 @@ export function EmailVerificationGate({ email }: { email: string }) {
             onClick={handleSignOut}
             className="text-[13px] font-medium text-ink-soft underline-offset-2 hover:text-ink hover:underline"
           >
-            Cerrar sesión
+            {dict.signOut}
           </button>
         </div>
       </div>
