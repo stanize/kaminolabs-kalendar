@@ -17,7 +17,7 @@ export default async function PanelLayout({ children }: { children: ReactNode })
   const needsVerification = session.user.emailVerified === false;
 
   return (
-    <div className="flex min-h-screen bg-bg">
+    <div className="flex min-h-screen flex-col bg-bg md:flex-row">
       <PanelSidebar user={session.user} dict={dict.sidebar} locale={locale} />
       <main className="flex-1 overflow-y-auto">
         {children}
