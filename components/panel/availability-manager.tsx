@@ -151,10 +151,10 @@ export function AvailabilityManager({
           return (
             <div
               key={day}
-              className={`flex gap-3 px-4 py-3 ${di > 0 ? "border-t border-line" : ""}`}
+              className={`flex flex-col gap-2 px-4 py-3 sm:flex-row sm:gap-3 ${di > 0 ? "border-t border-line" : ""}`}
             >
-              {/* Day toggle + label — pinned to the first range's row */}
-              <label className="flex h-[42px] w-[130px] shrink-0 cursor-pointer items-center gap-2.5">
+              {/* Day toggle + label — pinned to the first range's row on sm+ */}
+              <label className="flex h-[28px] w-full shrink-0 cursor-pointer items-center gap-2.5 sm:h-[42px] sm:w-[130px]">
                 <input
                   type="checkbox"
                   checked={open}
@@ -168,11 +168,11 @@ export function AvailabilityManager({
 
               {/* Right side: closed label, or the ranges (first inline, extras stacked) */}
               {!open ? (
-                <div className="flex h-[42px] items-center text-[13px] text-ink-soft">{m.closed}</div>
+                <div className="flex h-[28px] items-center text-[13px] text-ink-soft sm:h-[42px]">{m.closed}</div>
               ) : (
                 <div className="flex flex-1 flex-col gap-2">
                   {ranges.map((r, i) => (
-                    <div key={i} className="flex h-[42px] items-center gap-2">
+                    <div key={i} className="flex flex-wrap items-center gap-2 sm:h-[42px] sm:flex-nowrap">
                       <TimeSelect value={r.start} onChange={(v) => updateRange(day, i, { start: v })} />
                       <span className="text-[13px] text-ink-soft">a</span>
                       <TimeSelect value={r.end} onChange={(v) => updateRange(day, i, { end: v })} />
@@ -183,7 +183,8 @@ export function AvailabilityManager({
                       >
                         <Icon name="x" size={15} />
                       </button>
-                      {/* "Añadir franja" sits at the end of the first row */}
+                      {/* "Añadir franja" sits at the end of the first row; wraps
+                          to its own line on narrow screens if needed. */}
                       {i === 0 && (
                         <button
                           onClick={() => addRange(day)}

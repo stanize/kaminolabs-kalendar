@@ -65,7 +65,7 @@ export default async function PanelHomePage() {
   ];
 
   return (
-    <div className="mx-auto max-w-[860px] px-8 py-8">
+    <div className="mx-auto max-w-[860px] px-4 py-6 sm:px-8 sm:py-8">
       <div className="mb-8">
         <h1 className="mb-1 text-[24px]">
           {firstName ? `${h.greetingPrefix}${firstName}` : h.greetingFallback}

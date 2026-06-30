@@ -262,9 +262,9 @@ export function ServicesManager({
                 <span className="cursor-grab text-ink-soft active:cursor-grabbing" aria-hidden>
                   <Icon name="list" size={16} />
                 </span>
-                <div className="flex-1">
-                  <p className="text-[14px] font-semibold text-ink">{svc.name}</p>
-                  <p className="text-[12.5px] text-ink-soft">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[14px] font-semibold text-ink">{svc.name}</p>
+                  <p className="truncate text-[12.5px] text-ink-soft">
                     {svc.duration_min} {m.durationUnit} · {formatPrice(svc.price, m.priceFree)}
                   </p>
                 </div>
@@ -506,7 +506,7 @@ function ServiceFields({
       {/* Price: stepper − slider + synced box */}
       <div className="flex flex-col gap-[7px]">
         <span className="text-[13px] font-semibold text-ink">{m.priceLabel}</span>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <button
             type="button"
             onClick={() => setPrice(draft.price - PRICE_STEP)}
@@ -525,7 +525,7 @@ function ServiceFields({
             // range; the number box remains the source of truth.
             value={Math.min(draft.price, PRICE_SLIDER_MAX)}
             onChange={(e) => setPrice(Number(e.target.value))}
-            className="h-1.5 flex-1 cursor-pointer appearance-none rounded-full bg-surface-2 accent-brand"
+            className="h-1.5 min-w-[90px] flex-1 cursor-pointer appearance-none rounded-full bg-surface-2 accent-brand"
           />
           <button
             type="button"
@@ -536,7 +536,7 @@ function ServiceFields({
           >
             <Icon name="plus" size={15} />
           </button>
-          <div className="flex items-center gap-1.5">
+          <div className="flex w-full items-center gap-1.5 sm:w-auto">
             <input
               type="number"
               min={PRICE_MIN}
@@ -544,7 +544,7 @@ function ServiceFields({
               step={1}
               value={draft.price}
               onChange={(e) => setPrice(Number(e.target.value))}
-              className={`${inputBase} w-24 !py-2`}
+              className={`${inputBase} w-full sm:w-24 !py-2`}
             />
             <span className="text-[14px] font-medium text-ink-soft">€</span>
           </div>
@@ -610,9 +610,9 @@ function TemplatePicker({
               >
                 {checked && <Icon name="check" size={12} strokeWidth={3} />}
               </span>
-              <span className="flex-1">
-                <span className="block text-[14px] font-semibold text-ink">{t.name}</span>
-                <span className="block text-[12.5px] text-ink-soft">
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[14px] font-semibold text-ink">{t.name}</span>
+                <span className="block truncate text-[12.5px] text-ink-soft">
                   {t.duration_min} {m.durationUnit} · {formatPrice(t.price, m.priceFree)}
                 </span>
               </span>

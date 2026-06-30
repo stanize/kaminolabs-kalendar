@@ -73,7 +73,7 @@ export default function SoportePage() {
 
   if (success) {
     return (
-      <div className="flex min-h-full flex-col items-center justify-center px-8 py-20">
+      <div className="flex min-h-full flex-col items-center justify-center px-4 py-6 sm:px-8 sm:py-20">
         <div className="flex flex-col items-center gap-4 text-center max-w-sm">
           <div className="grid h-14 w-14 place-items-center rounded-full bg-brand-weak">
             <Icon name="check" size={24} className="text-brand" strokeWidth={2.5} />
@@ -100,7 +100,7 @@ export default function SoportePage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl px-8 py-10">
+    <div className="mx-auto max-w-2xl px-4 py-6 sm:px-8 sm:py-10">
       {/* Header */}
       <div className="mb-8">
         <div className="flex items-center gap-2.5 mb-1">

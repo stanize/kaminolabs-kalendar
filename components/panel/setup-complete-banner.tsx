@@ -40,7 +40,7 @@ export function SetupCompleteBanner({
       <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-brand text-white">
         <Icon name="check" size={18} strokeWidth={2.5} />
       </div>
-      <div className="flex-1">
+      <div className="min-w-0 flex-1">
         <p className="text-[14px] font-semibold text-brand-ink">{title}</p>
         <p className="text-[13px] text-brand-ink/80">{subtitle}</p>
       </div>

@@ -211,16 +211,16 @@ export function TeamManager({
               <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-brand-weak text-brand">
                 <Icon name="user" size={17} />
               </div>
-              <div className="flex-1">
+              <div className="min-w-0 flex-1">
                 <p className="flex items-center gap-2 text-[14px] font-semibold text-ink">
-                  {mem.name}
+                  <span className="truncate">{mem.name}</span>
                   {mem.is_owner && (
-                    <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-semibold text-ink-soft">
+                    <span className="shrink-0 rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-semibold text-ink-soft">
                       {m.you}
                     </span>
                   )}
                 </p>
-                {mem.role && <p className="text-[12.5px] text-ink-soft">{mem.role}</p>}
+                {mem.role && <p className="truncate text-[12.5px] text-ink-soft">{mem.role}</p>}
               </div>
               <button
                 onClick={() => setEditingId(mem.id)}

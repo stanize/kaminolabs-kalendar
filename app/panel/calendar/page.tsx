@@ -20,7 +20,7 @@ export default async function CalendarPage() {
   const dict = getCalendarDictionary(locale);
 
   return (
-    <div className="mx-auto max-w-[760px] px-8 py-8">
+    <div className="mx-auto max-w-[760px] px-4 py-6 sm:px-8 sm:py-8">
       <div className="mb-8">
         <h1 className="mb-1 text-[24px]">{dict.page.title}</h1>
         <p className="text-[15px] text-ink-soft">{dict.page.subtitle}</p>
