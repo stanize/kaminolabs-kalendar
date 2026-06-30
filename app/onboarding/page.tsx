@@ -4,11 +4,10 @@ import { auth } from "@/lib/auth";
 import type { Metadata } from "next";
 import { Logo } from "@/components/ui/logo";
 import { SignupForm } from "@/components/auth/signup-form";
-import { LanguageSwitcher } from "@/components/i18n/language-switcher";
-import { getServerDictionary } from "@/lib/i18n/server";
+import { getPublicServerDictionary } from "@/lib/i18n/server";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const { dict } = await getServerDictionary();
+  const { dict } = await getPublicServerDictionary();
   return { title: `${dict.onboarding.title} — Kalendar` };
 }
 
@@ -23,15 +22,13 @@ export default async function OnboardingPage() {
     // No session — show the sign-up screen.
   }
 
-  const { locale, dict } = await getServerDictionary();
+  // Language was chosen on the home page (navbar switcher); this page just
+  // reads the cookie and carries it forward — no switcher shown here.
+  const { dict } = await getPublicServerDictionary();
 
   return (
     <div className="grid min-h-screen place-items-center px-5 py-12">
       <div className="w-full max-w-[420px]">
-        <div className="mb-6 flex justify-end">
-          <LanguageSwitcher current={locale} revalidate="/onboarding" />
-        </div>
-
         <div className="mb-8 flex flex-col items-center gap-3 text-center">
           <Logo size={22} />
           <div>

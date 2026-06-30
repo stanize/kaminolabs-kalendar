@@ -5,10 +5,10 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { authClient } from "@/lib/auth-client";
 import { Icon } from "@/components/ui/icon";
-import type { Dictionary } from "@/lib/i18n/dictionaries";
+import type { PublicDictionary } from "@/lib/i18n/dictionaries/public";
 
 type View = "picker" | "register";
-type AuthDict = Dictionary["auth"];
+type AuthDict = PublicDictionary["auth"];
 
 function withTimeout<T>(promise: Promise<T>, ms: number, timeoutMsg: string): Promise<T> {
   return Promise.race([

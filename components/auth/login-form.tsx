@@ -4,15 +4,15 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import { Icon } from "@/components/ui/icon";
+import type { PublicDictionary } from "@/lib/i18n/dictionaries/public";
 
 type View = "picker" | "login";
+type AuthDict = PublicDictionary["auth"];
 
-function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+function withTimeout<T>(promise: Promise<T>, ms: number, timeoutMsg: string): Promise<T> {
   return Promise.race([
     promise,
-    new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error(`Sin respuesta del servidor (${ms / 1000}s). Inténtalo de nuevo.`)), ms)
-    ),
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error(timeoutMsg)), ms)),
   ]);
 }
 
@@ -26,7 +26,7 @@ const GoogleIcon = () => (
   </svg>
 );
 
-export function LoginForm() {
+export function LoginForm({ dict }: { dict: AuthDict }) {
   const router = useRouter();
   const [view, setView]         = useState<View>("picker");
   const [email, setEmail]       = useState("");
@@ -40,7 +40,7 @@ export function LoginForm() {
     try {
       await authClient.signIn.social({ provider: "google", callbackURL: "/panel" });
     } catch {
-      setError("No se pudo conectar con Google. Inténtalo de nuevo.");
+      setError(dict.errGoogle);
       setLoading(false);
     }
   }
@@ -48,23 +48,24 @@ export function LoginForm() {
   async function handleEmailLogin() {
     setError(null);
     if (!email.trim() || !password.trim()) {
-      setError("Por favor rellena todos los campos.");
+      setError(dict.errEmptyFields);
       return;
     }
     setLoading(true);
     try {
       const result = await withTimeout(
         authClient.signIn.email({ email: email.trim(), password }),
-        12000
+        12000,
+        dict.errTimeout
       );
       if (result.error || !result.data?.user) {
-        setError("Email o contraseña incorrectos.");
+        setError(dict.errBadCredentials);
         setLoading(false);
         return;
       }
       router.push("/panel");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error inesperado.");
+      setError(e instanceof Error ? e.message : dict.errUnexpected);
       setLoading(false);
     }
   }
@@ -81,7 +82,7 @@ export function LoginForm() {
           className="flex w-full items-center justify-center gap-3 rounded-xl border border-line bg-surface px-5 py-4 text-[15px] font-semibold text-ink shadow-sm transition-all hover:border-brand-line hover:shadow-md disabled:cursor-wait disabled:opacity-60"
         >
           <GoogleIcon />
-          {loading ? "Conectando…" : "Continuar con Google"}
+          {loading ? dict.connecting : dict.continueGoogle}
         </button>
 
         <button
@@ -90,7 +91,7 @@ export function LoginForm() {
           className="flex w-full items-center justify-center gap-3 rounded-xl border border-line bg-surface px-5 py-4 text-[15px] font-semibold text-ink shadow-sm transition-all hover:border-brand-line hover:shadow-md"
         >
           <Icon name="mail" size={20} className="shrink-0 text-ink-soft" />
-          Continuar con email
+          {dict.continueEmail}
         </button>
       </div>
     );
@@ -104,13 +105,13 @@ export function LoginForm() {
         disabled={loading}
         className="flex items-center gap-1.5 self-start text-[13.5px] font-medium text-ink-soft transition-colors hover:text-ink disabled:opacity-40"
       >
-        <Icon name="chevronLeft" size={16} /> Volver
+        <Icon name="chevronLeft" size={16} /> {dict.back}
       </button>
 
       <div className="flex flex-col gap-3">
         <input
           type="email"
-          placeholder="Email"
+          placeholder={dict.emailPlaceholder}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           disabled={loading}
@@ -118,7 +119,7 @@ export function LoginForm() {
         />
         <input
           type="password"
-          placeholder="Contraseña"
+          placeholder={dict.passwordPlaceholder}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           disabled={loading}
@@ -131,7 +132,7 @@ export function LoginForm() {
           disabled={loading}
           className="w-full rounded-xl bg-brand px-5 py-3.5 text-[15px] font-semibold text-white transition-all hover:bg-brand/90 disabled:cursor-wait disabled:opacity-60"
         >
-          {loading ? "Un momento…" : "Iniciar sesión"}
+          {loading ? dict.loggingIn : dict.signIn}
         </button>
       </div>
 

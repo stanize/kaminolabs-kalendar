@@ -1,8 +1,12 @@
 import Link from "next/link";
 import { Logo } from "@/components/ui/logo";
 import { Btn } from "@/components/ui/button";
+import { LanguageSwitcher } from "@/components/i18n/language-switcher";
+import { getPublicServerDictionary } from "@/lib/i18n/server";
 
-export function Navbar() {
+export async function Navbar() {
+  const { locale, dict } = await getPublicServerDictionary();
+
   return (
     <header className="sticky top-0 z-20 border-b border-line/70 bg-bg/85 backdrop-blur">
       <div className="mx-auto flex max-w-[1180px] items-center justify-between px-5 py-4 sm:px-8">
@@ -10,26 +14,30 @@ export function Navbar() {
 
         <nav className="hidden items-center gap-8 text-[14.5px] font-medium text-ink-soft md:flex">
           <a href="#como-funciona" className="transition-colors hover:text-ink">
-            Cómo funciona
+            {dict.navbar.howItWorks}
           </a>
           <a href="#para-quien" className="transition-colors hover:text-ink">
-            Para quién es
+            {dict.navbar.whoFor}
           </a>
           <a href="#precios" className="transition-colors hover:text-ink">
-            Precios
+            {dict.navbar.pricing}
           </a>
         </nav>
 
         <div className="flex items-center gap-3">
+          {/* The language choice is made here, on the home page. It carries
+              forward via cookie into onboarding/login — they show no switcher. */}
+          <LanguageSwitcher current={locale} revalidate="/" />
+
           {/* /panel redirects to /onboarding if no session, or shows the panel if logged in */}
           <Link
             href="/panel"
             className="hidden text-[14.5px] font-semibold text-ink-soft transition-colors hover:text-ink sm:inline"
           >
-            Iniciar sesión
+            {dict.navbar.signIn}
           </Link>
           <Link href="/onboarding">
-            <Btn size="sm">Empezar gratis</Btn>
+            <Btn size="sm">{dict.navbar.startFree}</Btn>
           </Link>
         </div>
       </div>

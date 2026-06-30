@@ -1,7 +1,7 @@
 import "server-only";
 import { cookies } from "next/headers";
 import { DEFAULT_LOCALE, LOCALE_COOKIE, isLocale, type Locale } from "./config";
-import { getDictionary, type Dictionary } from "./dictionaries";
+import { getPublicDictionary, type PublicDictionary } from "./dictionaries/public";
 
 /** Current UI locale from the cookie, defaulting to Spanish. */
 export async function getLocale(): Promise<Locale> {
@@ -10,8 +10,8 @@ export async function getLocale(): Promise<Locale> {
   return isLocale(value) ? value : DEFAULT_LOCALE;
 }
 
-/** Current dictionary (server-side). */
-export async function getServerDictionary(): Promise<{ locale: Locale; dict: Dictionary }> {
+/** Locale + the public-surface dictionary (home, onboarding, login, auth). */
+export async function getPublicServerDictionary(): Promise<{ locale: Locale; dict: PublicDictionary }> {
   const locale = await getLocale();
-  return { locale, dict: getDictionary(locale) };
+  return { locale, dict: getPublicDictionary(locale) };
 }
