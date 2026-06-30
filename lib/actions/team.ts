@@ -12,6 +12,37 @@ export type TeamActionResult =
 const NAME_MAX = 80;
 const ROLE_MAX = 60;
 
+/** The translation slice these actions need for their own error messages. */
+export interface TeamActionDict {
+  errInvalidMode: string;
+  errNoBusiness: string;
+  errCannotGoSolo: string;
+  errSaveFailed: string;
+  errTeamModeRequired: string;
+  errNameRequired: string;
+  errNameTooLong: string; // contains "{max}"
+  errRoleTooLong: string; // contains "{max}"
+  errAddFailed: string;
+  errCannotDeleteOwner: string;
+  errDeleteFailed: string;
+  errReorderFailed: string;
+}
+
+const FALLBACK: TeamActionDict = {
+  errInvalidMode: "Modo no válido.",
+  errNoBusiness: "Primero configura tu negocio.",
+  errCannotGoSolo: "Para cambiar a modo individual, elimina primero a los demás miembros.",
+  errSaveFailed: "No se pudo guardar:",
+  errTeamModeRequired: "Activa el modo equipo para añadir miembros.",
+  errNameRequired: "El nombre del miembro es obligatorio.",
+  errNameTooLong: "El nombre no puede superar los {max} caracteres.",
+  errRoleTooLong: "El rol no puede superar los {max} caracteres.",
+  errAddFailed: "No se pudo añadir el miembro:",
+  errCannotDeleteOwner: "No puedes eliminar al propietario.",
+  errDeleteFailed: "No se pudo eliminar:",
+  errReorderFailed: "No se pudo reordenar:",
+};
+
 function revalidate() {
   revalidatePath("/panel");
   revalidatePath("/panel/team");
@@ -28,12 +59,18 @@ async function resolveBusinessId(userId: string): Promise<string | null> {
  * allowed when at most one member exists (otherwise members would be orphaned).
  */
 export const setTeamMode = authedAction(
-  async (session, mode: "solo" | "team"): Promise<TeamActionResult> => {
+  async (
+    session,
+    mode: "solo" | "team",
+    dict?: Partial<TeamActionDict>
+  ): Promise<TeamActionResult> => {
+    const t = { ...FALLBACK, ...dict };
+
     if (mode !== "solo" && mode !== "team") {
-      return { ok: false, error: "Modo no válido." };
+      return { ok: false, error: t.errInvalidMode };
     }
     const business = await getBusinessForUser(session.user.id);
-    if (!business) return { ok: false, error: "Primero configura tu negocio." };
+    if (!business) return { ok: false, error: t.errNoBusiness };
 
     const supabase = await createClient();
 
@@ -43,10 +80,7 @@ export const setTeamMode = authedAction(
         .select("id", { count: "exact", head: true })
         .eq("business_id", business.id);
       if ((count ?? 0) > 1) {
-        return {
-          ok: false,
-          error: "Para cambiar a modo individual, elimina primero a los demás miembros.",
-        };
+        return { ok: false, error: t.errCannotGoSolo };
       }
     }
 
@@ -55,7 +89,7 @@ export const setTeamMode = authedAction(
       .update({ team_mode: mode })
       .eq("id", business.id)
       .eq("owner_id", session.user.id);
-    if (error) return { ok: false, error: `No se pudo guardar: ${error.message}` };
+    if (error) return { ok: false, error: `${t.errSaveFailed} ${error.message}` };
 
     revalidate();
     return { ok: true };
@@ -66,19 +100,26 @@ export const setTeamMode = authedAction(
 export const createMember = authedAction(
   async (
     session,
-    input: { name: string; role: string }
+    input: { name: string; role: string },
+    dict?: Partial<TeamActionDict>
   ): Promise<TeamActionResult> => {
+    const t = { ...FALLBACK, ...dict };
+
     const business = await getBusinessForUser(session.user.id);
-    if (!business) return { ok: false, error: "Primero configura tu negocio." };
+    if (!business) return { ok: false, error: t.errNoBusiness };
     if (business.team_mode !== "team") {
-      return { ok: false, error: "Activa el modo equipo para añadir miembros." };
+      return { ok: false, error: t.errTeamModeRequired };
     }
 
     const name = input.name.trim();
     const role = input.role.trim();
-    if (name.length < 2) return { ok: false, error: "El nombre del miembro es obligatorio." };
-    if (name.length > NAME_MAX) return { ok: false, error: `El nombre no puede superar los ${NAME_MAX} caracteres.` };
-    if (role.length > ROLE_MAX) return { ok: false, error: `El rol no puede superar los ${ROLE_MAX} caracteres.` };
+    if (name.length < 2) return { ok: false, error: t.errNameRequired };
+    if (name.length > NAME_MAX) {
+      return { ok: false, error: t.errNameTooLong.replace("{max}", String(NAME_MAX)) };
+    }
+    if (role.length > ROLE_MAX) {
+      return { ok: false, error: t.errRoleTooLong.replace("{max}", String(ROLE_MAX)) };
+    }
 
     const supabase = await createClient();
     const { data: last } = await supabase
@@ -97,7 +138,7 @@ export const createMember = authedAction(
       is_owner: false,
       sort_order: nextOrder,
     });
-    if (error) return { ok: false, error: `No se pudo añadir el miembro: ${error.message}` };
+    if (error) return { ok: false, error: `${t.errAddFailed} ${error.message}` };
 
     revalidate();
     return { ok: true, created: true };
@@ -108,16 +149,23 @@ export const createMember = authedAction(
 export const updateMember = authedAction(
   async (
     session,
-    input: { id: string; name: string; role: string }
+    input: { id: string; name: string; role: string },
+    dict?: Partial<TeamActionDict>
   ): Promise<TeamActionResult> => {
+    const t = { ...FALLBACK, ...dict };
+
     const businessId = await resolveBusinessId(session.user.id);
-    if (!businessId) return { ok: false, error: "Primero configura tu negocio." };
+    if (!businessId) return { ok: false, error: t.errNoBusiness };
 
     const name = input.name.trim();
     const role = input.role.trim();
-    if (name.length < 2) return { ok: false, error: "El nombre del miembro es obligatorio." };
-    if (name.length > NAME_MAX) return { ok: false, error: `El nombre no puede superar los ${NAME_MAX} caracteres.` };
-    if (role.length > ROLE_MAX) return { ok: false, error: `El rol no puede superar los ${ROLE_MAX} caracteres.` };
+    if (name.length < 2) return { ok: false, error: t.errNameRequired };
+    if (name.length > NAME_MAX) {
+      return { ok: false, error: t.errNameTooLong.replace("{max}", String(NAME_MAX)) };
+    }
+    if (role.length > ROLE_MAX) {
+      return { ok: false, error: t.errRoleTooLong.replace("{max}", String(ROLE_MAX)) };
+    }
 
     const supabase = await createClient();
     const { error } = await supabase
@@ -125,7 +173,7 @@ export const updateMember = authedAction(
       .update({ name, role: role || null })
       .eq("id", input.id)
       .eq("business_id", businessId);
-    if (error) return { ok: false, error: `No se pudo guardar: ${error.message}` };
+    if (error) return { ok: false, error: `${t.errSaveFailed} ${error.message}` };
 
     revalidate();
     return { ok: true };
@@ -134,9 +182,15 @@ export const updateMember = authedAction(
 
 /** Deletes a member. The owner cannot be deleted. */
 export const deleteMember = authedAction(
-  async (session, id: string): Promise<TeamActionResult> => {
+  async (
+    session,
+    id: string,
+    dict?: Partial<TeamActionDict>
+  ): Promise<TeamActionResult> => {
+    const t = { ...FALLBACK, ...dict };
+
     const businessId = await resolveBusinessId(session.user.id);
-    if (!businessId) return { ok: false, error: "Primero configura tu negocio." };
+    if (!businessId) return { ok: false, error: t.errNoBusiness };
 
     const supabase = await createClient();
 
@@ -147,7 +201,7 @@ export const deleteMember = authedAction(
       .eq("business_id", businessId)
       .maybeSingle();
     if (member?.is_owner) {
-      return { ok: false, error: "No puedes eliminar al propietario." };
+      return { ok: false, error: t.errCannotDeleteOwner };
     }
 
     const { error } = await supabase
@@ -155,7 +209,7 @@ export const deleteMember = authedAction(
       .delete()
       .eq("id", id)
       .eq("business_id", businessId);
-    if (error) return { ok: false, error: `No se pudo eliminar: ${error.message}` };
+    if (error) return { ok: false, error: `${t.errDeleteFailed} ${error.message}` };
 
     revalidate();
     return { ok: true };
@@ -164,9 +218,15 @@ export const deleteMember = authedAction(
 
 /** Persists a new ordering. Owner is kept first by sort_order regardless. */
 export const reorderMembers = authedAction(
-  async (session, orderedIds: string[]): Promise<TeamActionResult> => {
+  async (
+    session,
+    orderedIds: string[],
+    dict?: Partial<TeamActionDict>
+  ): Promise<TeamActionResult> => {
+    const t = { ...FALLBACK, ...dict };
+
     const businessId = await resolveBusinessId(session.user.id);
-    if (!businessId) return { ok: false, error: "Primero configura tu negocio." };
+    if (!businessId) return { ok: false, error: t.errNoBusiness };
 
     const supabase = await createClient();
     const results = await Promise.all(
@@ -179,7 +239,7 @@ export const reorderMembers = authedAction(
       )
     );
     const failed = results.find((r) => r.error);
-    if (failed?.error) return { ok: false, error: `No se pudo reordenar: ${failed.error.message}` };
+    if (failed?.error) return { ok: false, error: `${t.errReorderFailed} ${failed.error.message}` };
 
     revalidate();
     return { ok: true };

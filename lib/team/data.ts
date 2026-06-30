@@ -37,9 +37,15 @@ export async function getTeamForUser(userId: string): Promise<TeamMember[]> {
 /**
  * Ensures the owner exists as a team member, seeding from the account name if
  * not. Safe to call during a server-component render (no revalidatePath — unlike
- * the ensureOwnerMember action). Idempotent. Returns nothing.
+ * the ensureOwnerMember action). Idempotent. Returns nothing. `fallbackName` is
+ * used when the account has no name set (e.g. "Yo"/"Me", locale-appropriate —
+ * sourced from lib/i18n/dictionaries/team.ts's ownerFallbackName).
  */
-export async function ensureOwnerSeeded(userId: string, ownerName: string): Promise<void> {
+export async function ensureOwnerSeeded(
+  userId: string,
+  ownerName: string,
+  fallbackName: string = "Yo"
+): Promise<void> {
   const business = await getBusinessForUser(userId);
   if (!business) return;
 
@@ -54,7 +60,7 @@ export async function ensureOwnerSeeded(userId: string, ownerName: string): Prom
 
   await supabase.from("kalendar_team_members").insert({
     business_id: business.id,
-    name: ownerName.trim() || "Yo",
+    name: ownerName.trim() || fallbackName,
     role: null,
     is_owner: true,
     sort_order: 0,

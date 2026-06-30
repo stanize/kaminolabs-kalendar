@@ -3,6 +3,8 @@ import { requireSession } from "@/lib/auth-session";
 import { getBusinessForUser } from "@/lib/business/data";
 import { getTeamForUser, ensureOwnerSeeded } from "@/lib/team/data";
 import { TeamManager } from "@/components/panel/team-manager";
+import { getLocale } from "@/lib/i18n/server";
+import { getTeamDictionary } from "@/lib/i18n/dictionaries/team";
 
 export default async function TeamPage({
   searchParams,
@@ -17,9 +19,12 @@ export default async function TeamPage({
     redirect("/panel/business?from=home");
   }
 
+  const locale = await getLocale();
+  const dict = getTeamDictionary(locale);
+
   // Seed the owner as a team member if not already present, so a solo user never
   // has to add themselves. Idempotent; render-safe (no revalidatePath).
-  await ensureOwnerSeeded(session.user.id, session.user.name ?? "");
+  await ensureOwnerSeeded(session.user.id, session.user.name ?? "", dict.ownerFallbackName);
 
   const team = await getTeamForUser(session.user.id);
 
@@ -29,13 +34,12 @@ export default async function TeamPage({
   return (
     <div className="mx-auto max-w-[680px] px-8 py-8">
       <div className="mb-8">
-        <h1 className="mb-1 text-[24px]">Tu equipo</h1>
-        <p className="text-[15px] text-ink-soft">
-          ¿Trabajas en solitario o con un equipo? Configúralo aquí.
-        </p>
+        <h1 className="mb-1 text-[24px]">{dict.page.title}</h1>
+        <p className="text-[15px] text-ink-soft">{dict.page.subtitle}</p>
       </div>
 
       <TeamManager
+        dict={dict}
         teamMode={business.team_mode}
         initialMembers={team.map((m) => ({
           id: m.id,

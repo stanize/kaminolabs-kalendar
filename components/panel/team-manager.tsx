@@ -11,6 +11,7 @@ import {
   deleteMember,
   reorderMembers,
 } from "@/lib/actions/team";
+import type { TeamDictionary } from "@/lib/i18n/dictionaries/team";
 
 type TeamMode = "solo" | "team";
 
@@ -30,12 +31,15 @@ export function TeamManager({
   teamMode,
   initialMembers,
   returnToHome,
+  dict,
 }: {
   teamMode: TeamMode;
   initialMembers: MemberItem[];
   returnToHome: boolean;
+  dict: TeamDictionary;
 }) {
   const router = useRouter();
+  const m = dict.manager;
   const [mode, setMode] = useState<TeamMode>(teamMode);
   const [members, setMembers] = useState<MemberItem[]>(initialMembers);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -49,7 +53,7 @@ export function TeamManager({
     setError(null);
     setBusy(true);
     try {
-      const result = await setTeamMode(next);
+      const result = await setTeamMode(next, dict.errors);
       if (!result.ok) {
         setError(result.error);
         setBusy(false);
@@ -59,7 +63,7 @@ export function TeamManager({
       setBusy(false);
       router.refresh();
     } catch {
-      setError("Ocurrió un error inesperado. Inténtalo de nuevo.");
+      setError(m.errUnexpected);
       setBusy(false);
     }
   }
@@ -69,7 +73,7 @@ export function TeamManager({
     setError(null);
     setBusy(true);
     try {
-      const result = await createMember(draft);
+      const result = await createMember(draft, dict.errors);
       if (!result.ok) {
         setError(result.error);
         setBusy(false);
@@ -79,7 +83,7 @@ export function TeamManager({
       setBusy(false);
       router.refresh();
     } catch {
-      setError("Ocurrió un error inesperado. Inténtalo de nuevo.");
+      setError(m.errUnexpected);
       setBusy(false);
     }
   }
@@ -89,7 +93,7 @@ export function TeamManager({
     setError(null);
     setBusy(true);
     try {
-      const result = await updateMember({ id, ...draft });
+      const result = await updateMember({ id, ...draft }, dict.errors);
       if (!result.ok) {
         setError(result.error);
         setBusy(false);
@@ -99,7 +103,7 @@ export function TeamManager({
       setBusy(false);
       router.refresh();
     } catch {
-      setError("Ocurrió un error inesperado. Inténtalo de nuevo.");
+      setError(m.errUnexpected);
       setBusy(false);
     }
   }
@@ -111,14 +115,14 @@ export function TeamManager({
     const prev = members;
     setMembers((m) => m.filter((x) => x.id !== id));
     try {
-      const result = await deleteMember(id);
+      const result = await deleteMember(id, dict.errors);
       if (!result.ok) {
         setMembers(prev);
         setError(result.error);
       }
     } catch {
       setMembers(prev);
-      setError("No se pudo eliminar. Inténtalo de nuevo.");
+      setError(m.errDeleteFailed);
     } finally {
       setBusy(false);
       router.refresh();
@@ -137,7 +141,7 @@ export function TeamManager({
     next.splice(targetIndex, 0, moved);
     setMembers(next);
     setDragIndex(null);
-    void reorderMembers(next.map((m) => m.id)).then(() => router.refresh());
+    void reorderMembers(next.map((m) => m.id), dict.errors).then(() => router.refresh());
   }
 
   const isTeam = mode === "team";
@@ -154,42 +158,43 @@ export function TeamManager({
 
       {/* Mode selector */}
       <div className="flex flex-col gap-[9px]">
-        <span className="text-[13px] font-semibold text-ink">¿Cómo trabajas?</span>
+        <span className="text-[13px] font-semibold text-ink">{m.howDoYouWork}</span>
         <div className="grid grid-cols-2 gap-2">
           <ModeCard
             active={!isTeam}
             disabled={busy}
             onClick={() => handleMode("solo")}
             icon="user"
-            title="En solitario"
-            sub="Solo tú atiendes las citas"
+            title={m.soloTitle}
+            sub={m.soloSub}
           />
           <ModeCard
             active={isTeam}
             disabled={busy}
             onClick={() => handleMode("team")}
             icon="users"
-            title="En equipo"
-            sub="Varias personas atienden citas"
+            title={m.teamTitle}
+            sub={m.teamSub}
           />
         </div>
       </div>
 
       {/* Members */}
       <div className="flex flex-col gap-2">
-        {members.map((m, index) =>
-          editingId === m.id ? (
+        {members.map((mem, index) =>
+          editingId === mem.id ? (
             <MemberEditor
-              key={m.id}
-              initial={{ name: m.name, role: m.role }}
+              key={mem.id}
+              initial={{ name: mem.name, role: mem.role }}
               busy={busy}
-              isOwner={m.is_owner}
+              isOwner={mem.is_owner}
+              m={m}
               onCancel={() => setEditingId(null)}
-              onSave={(draft) => handleUpdate(m.id, draft)}
+              onSave={(draft) => handleUpdate(mem.id, draft)}
             />
           ) : (
             <div
-              key={m.id}
+              key={mem.id}
               draggable={canDrag}
               onDragStart={() => canDrag && setDragIndex(index)}
               onDragOver={(e) => canDrag && e.preventDefault()}
@@ -208,27 +213,27 @@ export function TeamManager({
               </div>
               <div className="flex-1">
                 <p className="flex items-center gap-2 text-[14px] font-semibold text-ink">
-                  {m.name}
-                  {m.is_owner && (
+                  {mem.name}
+                  {mem.is_owner && (
                     <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-semibold text-ink-soft">
-                      Tú
+                      {m.you}
                     </span>
                   )}
                 </p>
-                {m.role && <p className="text-[12.5px] text-ink-soft">{m.role}</p>}
+                {mem.role && <p className="text-[12.5px] text-ink-soft">{mem.role}</p>}
               </div>
               <button
-                onClick={() => setEditingId(m.id)}
+                onClick={() => setEditingId(mem.id)}
                 className="rounded-lg px-2.5 py-1.5 text-[13px] font-medium text-ink-soft hover:bg-surface-2 hover:text-ink"
               >
-                Editar
+                {m.edit}
               </button>
-              {!m.is_owner && (
+              {!mem.is_owner && (
                 <button
-                  onClick={() => handleDelete(m.id)}
+                  onClick={() => handleDelete(mem.id)}
                   disabled={busy}
                   className="grid h-8 w-8 place-items-center rounded-lg text-ink-soft hover:bg-error-weak hover:text-error disabled:opacity-50"
-                  aria-label="Eliminar"
+                  aria-label={m.delete}
                 >
                   <Icon name="x" size={15} />
                 </button>
@@ -244,6 +249,7 @@ export function TeamManager({
           initial={{ name: "", role: "" }}
           busy={busy}
           isOwner={false}
+          m={m}
           onCancel={() => setAdding(false)}
           onSave={handleCreate}
         />
@@ -251,7 +257,7 @@ export function TeamManager({
       {isTeam && !adding && (
         <div>
           <Btn variant="outline" onClick={() => { setError(null); setAdding(true); }}>
-            <Icon name="plus" size={15} /> Añadir miembro
+            <Icon name="plus" size={15} /> {m.addMember}
           </Btn>
         </div>
       )}
@@ -260,7 +266,7 @@ export function TeamManager({
       {returnToHome && (
         <div className="pt-2">
           <Btn onClick={() => router.push("/panel")} disabled={busy}>
-            Continuar
+            {m.continueButton}
           </Btn>
         </div>
       )}
@@ -307,12 +313,14 @@ function MemberEditor({
   initial,
   busy,
   isOwner,
+  m,
   onSave,
   onCancel,
 }: {
   initial: Draft;
   busy: boolean;
   isOwner: boolean;
+  m: TeamDictionary["manager"];
   onSave: (draft: Draft) => void;
   onCancel: () => void;
 }) {
@@ -326,34 +334,34 @@ function MemberEditor({
     <div className="flex flex-col gap-4 rounded-xl border border-brand-line bg-brand-weak/40 p-4">
       <label className="flex flex-col gap-[7px]">
         <span className="text-[13px] font-semibold text-ink">
-          Nombre {isOwner && <span className="font-normal text-ink-soft">(tú)</span>}
+          {m.nameLabel} {isOwner && <span className="font-normal text-ink-soft">{m.nameYouHint}</span>}
         </span>
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="Nombre y apellido"
+          placeholder={m.namePlaceholder}
           maxLength={80}
           className={inputBase}
         />
       </label>
       <label className="flex flex-col gap-[7px]">
         <span className="text-[13px] font-semibold text-ink">
-          Rol <span className="font-normal text-ink-soft">(opcional)</span>
+          {m.roleLabel} <span className="font-normal text-ink-soft">{m.roleOptionalHint}</span>
         </span>
         <input
           value={role}
           onChange={(e) => setRole(e.target.value)}
-          placeholder="Fisioterapeuta"
+          placeholder={m.rolePlaceholder}
           maxLength={60}
           className={inputBase}
         />
       </label>
       <div className="flex items-center gap-2">
         <Btn onClick={() => onSave({ name, role })} disabled={busy}>
-          {busy ? "Guardando…" : "Guardar"}
+          {busy ? m.saving : m.save}
         </Btn>
         <Btn variant="ghost" onClick={onCancel} disabled={busy}>
-          Cancelar
+          {m.cancel}
         </Btn>
       </div>
     </div>
