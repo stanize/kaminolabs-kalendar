@@ -1,10 +1,14 @@
 import { notFound } from "next/navigation";
-import { Logo } from "@/components/ui/logo";
-import { Icon } from "@/components/ui/icon";
-import { businessTypeLabel } from "@/lib/onboarding/data";
 import { getPublicBookingData } from "@/lib/booking/data";
 import { WEEKDAY_ORDER } from "@/lib/availability/constants";
-import { BookingWizard } from "@/components/booking/booking-wizard";
+import { BookingPageShell } from "@/components/booking/booking-page-shell";
+import type { Locale } from "@/lib/i18n/config";
+
+// INTERIM: the page always starts in Spanish. FUTURE: once kalendar_businesses
+// has a `language` field, read it here (e.g. business.language) and use it as
+// the initial locale instead — the guest can still switch via the page's own
+// switcher either way. See memory for the planned Negocio field expansion.
+const INITIAL_LOCALE: Locale = "es";
 
 export default async function BusinessPublicPage({
   params,
@@ -21,38 +25,20 @@ export default async function BusinessPublicPage({
   const isTeam = business.team_mode === "team";
 
   return (
-    <div className="min-h-screen bg-surface-2 px-5 py-10">
-      <div className="mx-auto w-full max-w-[560px]">
-        {/* Business header */}
-        <div className="mb-6 text-center">
-          <div
-            className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-2xl text-white"
-            style={{ backgroundColor: business.brand_color }}
-          >
-            <Icon name="calendar" size={28} />
-          </div>
-          <h1 className="mb-1 text-[24px]">{business.name}</h1>
-          <p className="text-[14.5px] text-ink-soft">
-            {businessTypeLabel(business.type)}
-            {business.city ? ` · ${business.city}` : ""}
-          </p>
-        </div>
-
-        <BookingWizard
-          slug={slug}
-          services={services}
-          members={members}
-          openDays={openDays}
-          bookingWindowMonths={business.booking_window_months}
-          isTeam={isTeam}
-        />
-
-        {/* Footer */}
-        <div className="mt-6 flex items-center justify-center gap-1.5 text-[12px] text-ink-soft">
-          <span>Reservas con</span>
-          <Logo size={14} />
-        </div>
-      </div>
-    </div>
+    <BookingPageShell
+      slug={slug}
+      business={{
+        name: business.name,
+        type: business.type,
+        city: business.city,
+        brand_color: business.brand_color,
+      }}
+      services={services}
+      members={members}
+      openDays={openDays}
+      bookingWindowMonths={business.booking_window_months}
+      isTeam={isTeam}
+      initialLocale={INITIAL_LOCALE}
+    />
   );
 }

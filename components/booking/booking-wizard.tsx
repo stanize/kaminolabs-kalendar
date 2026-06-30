@@ -5,6 +5,8 @@ import { Icon } from "@/components/ui/icon";
 import { Btn } from "@/components/ui/button";
 import { getAvailableSlots, submitBooking, type SlotDTO } from "@/lib/actions/booking";
 import type { DayId } from "@/lib/onboarding/types";
+import type { Locale } from "@/lib/i18n/config";
+import { getBookingPageDictionary, type BookingPageDictionary } from "@/lib/i18n/dictionaries/booking-page";
 
 interface Service {
   id: string;
@@ -18,14 +20,8 @@ interface Member {
   role: string | null;
 }
 
-const MONTHS_ES = [
-  "enero", "febrero", "marzo", "abril", "mayo", "junio",
-  "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
-];
-const DOW_SHORT = ["L", "M", "X", "J", "V", "S", "D"]; // Mon-first
-
-function priceLabel(p: number): string {
-  return p === 0 ? "Gratis" : `${p} €`;
+function priceLabel(p: number, freeLabel: string): string {
+  return p === 0 ? freeLabel : `${p} €`;
 }
 
 // Local calendar helpers (operate on the visitor's local date for the picker UI;
@@ -65,6 +61,7 @@ export function BookingWizard({
   openDays,
   bookingWindowMonths,
   isTeam,
+  locale,
 }: {
   slug: string;
   services: Service[];
@@ -72,9 +69,15 @@ export function BookingWizard({
   openDays: DayId[]; // weekdays that have any hours
   bookingWindowMonths: number;
   isTeam: boolean;
+  // Controlled by the parent BookingPageShell, which owns the guest's language
+  // choice for the whole page (header, wizard, footer) so they stay in sync.
+  locale: Locale;
 }) {
   type Step = "service" | "provider" | "date" | "details" | "done";
   const [step, setStep] = useState<Step>("service");
+
+  const dict = getBookingPageDictionary(locale);
+  const w = dict.wizard;
 
   const [service, setService] = useState<Service | null>(null);
   const [providerId, setProviderId] = useState<string | null>(null); // null = cualquiera
@@ -116,7 +119,7 @@ export function BookingWizard({
           }}
           className="mb-4 flex items-center gap-1.5 text-[13px] font-medium text-ink-soft hover:text-ink"
         >
-          <Icon name="chevronLeft" size={15} /> Atrás
+          <Icon name="chevronLeft" size={15} /> {w.back}
         </button>
       )}
 
@@ -128,10 +131,10 @@ export function BookingWizard({
       )}
 
       {step === "service" && (
-        <Section title="Elige un servicio">
+        <Section title={w.chooseService}>
           <div className="flex flex-col gap-2">
             {services.length === 0 && (
-              <p className="text-[14px] text-ink-soft">Este negocio aún no tiene servicios disponibles.</p>
+              <p className="text-[14px] text-ink-soft">{w.noServices}</p>
             )}
             {services.map((s) => (
               <button
@@ -142,7 +145,7 @@ export function BookingWizard({
                 <span>
                   <span className="block text-[14.5px] font-semibold text-ink">{s.name}</span>
                   <span className="block text-[12.5px] text-ink-soft">
-                    {s.duration_min} min · {priceLabel(s.price)}
+                    {s.duration_min} {w.minutesUnit} · {priceLabel(s.price, w.freeLabel)}
                   </span>
                 </span>
                 <Icon name="chevronRight" size={16} className="text-ink-soft" />
@@ -153,9 +156,9 @@ export function BookingWizard({
       )}
 
       {step === "provider" && (
-        <Section title="Elige profesional">
+        <Section title={w.chooseProvider}>
           <div className="flex flex-col gap-2">
-            <ProviderButton label="Cualquiera" sub="Primer hueco disponible" onClick={() => chooseProvider(null)} />
+            <ProviderButton label={w.anyProvider} sub={w.anyProviderSub} onClick={() => chooseProvider(null)} />
             {members.map((m) => (
               <ProviderButton
                 key={m.id}
@@ -175,6 +178,7 @@ export function BookingWizard({
           providerId={providerId}
           openDays={openDays}
           bookingWindowMonths={bookingWindowMonths}
+          dict={dict}
           onError={setError}
           onPick={(d, s) => {
             setDate(d);
@@ -192,6 +196,7 @@ export function BookingWizard({
           providerId={slot.providerId}
           slot={slot}
           serviceName={service.name}
+          dict={dict}
           onError={setError}
           onDone={() => setStep("done")}
         />
@@ -202,13 +207,10 @@ export function BookingWizard({
           <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-full bg-brand-weak text-brand">
             <Icon name="mail" size={24} />
           </div>
-          <h2 className="mb-1.5 text-[20px]">Revisa tu correo</h2>
-          <p className="mx-auto mb-6 max-w-[360px] text-[14px] text-ink-soft">
-            Te hemos enviado un email para confirmar tu reserva. Haz clic en el enlace para
-            completarla.
-          </p>
+          <h2 className="mb-1.5 text-[20px]">{w.doneTitle}</h2>
+          <p className="mx-auto mb-6 max-w-[360px] text-[14px] text-ink-soft">{w.doneBody}</p>
           <Btn variant="outline" onClick={reset}>
-            Hacer otra reserva
+            {w.bookAnother}
           </Btn>
         </div>
       )}
@@ -245,8 +247,6 @@ function ProviderButton({ label, sub, onClick }: { label: string; sub?: string; 
   );
 }
 
-// ── Date + time step ─────────────────────────────────────────────────────────
-
 // ── Date + time step (week strip + slots below) ──────────────────────────────
 function startOfWeekMon(d: Date): Date {
   const x = new Date(d);
@@ -262,6 +262,7 @@ function DateTimeStep({
   providerId,
   openDays,
   bookingWindowMonths,
+  dict,
   onError,
   onPick,
 }: {
@@ -270,9 +271,11 @@ function DateTimeStep({
   providerId: string | null;
   openDays: DayId[];
   bookingWindowMonths: number;
+  dict: BookingPageDictionary;
   onError: (e: string | null) => void;
   onPick: (date: string, slot: SlotDTO) => void;
 }) {
+  const w = dict.wizard;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const maxDate = new Date(today);
@@ -303,7 +306,7 @@ function DateTimeStep({
     setSlots(null);
     setLoadingSlots(true);
     onError(null);
-    const res = await getAvailableSlots({ slug, serviceId, providerId, date: ds });
+    const res = await getAvailableSlots({ slug, serviceId, providerId, date: ds, dict: dict.errors });
     setLoadingSlots(false);
     if (!res.ok) {
       onError(res.error);
@@ -328,17 +331,17 @@ function DateTimeStep({
 
   const isTeamAny = providerId === null; // "Cualquiera": slots carry provider labels
 
-  const monthLabel = `${MONTHS_ES[weekStart.getMonth()]} ${weekStart.getFullYear()}`;
+  const monthLabel = `${dict.months[weekStart.getMonth()]} ${weekStart.getFullYear()}`;
 
   return (
-    <Section title="Elige fecha y hora">
+    <Section title={w.chooseDateTime}>
       {/* Week navigator */}
       <div className="mb-3 flex items-center justify-between">
         <button
           onClick={() => shiftWeek(-1)}
           disabled={!canPrev}
           className="grid h-8 w-8 place-items-center rounded-lg text-ink-soft hover:bg-surface-2 disabled:opacity-30"
-          aria-label="Semana anterior"
+          aria-label={w.prevWeek}
         >
           <Icon name="chevronLeft" size={16} />
         </button>
@@ -347,7 +350,7 @@ function DateTimeStep({
           onClick={() => shiftWeek(1)}
           disabled={!canNext}
           className="grid h-8 w-8 place-items-center rounded-lg text-ink-soft hover:bg-surface-2 disabled:opacity-30"
-          aria-label="Semana siguiente"
+          aria-label={w.nextWeek}
         >
           <Icon name="chevronRight" size={16} />
         </button>
@@ -372,7 +375,7 @@ function DateTimeStep({
                     : "cursor-default border-transparent text-ink-soft/30"
               }`}
             >
-              <span className="text-[10.5px] font-semibold uppercase">{DOW_SHORT[i]}</span>
+              <span className="text-[10.5px] font-semibold uppercase">{dict.weekdaysShort[i]}</span>
               <span className="text-[15px] font-semibold leading-none">{d.getDate()}</span>
             </button>
           );
@@ -382,9 +385,9 @@ function DateTimeStep({
       {/* Slots for the selected day */}
       {selectedDate && (
         <div className="mt-5">
-          {loadingSlots && <p className="text-[13.5px] text-ink-soft">Buscando horarios…</p>}
+          {loadingSlots && <p className="text-[13.5px] text-ink-soft">{w.searchingSlots}</p>}
           {!loadingSlots && slots && slots.length === 0 && (
-            <p className="text-[13.5px] text-ink-soft">No hay horarios disponibles este día.</p>
+            <p className="text-[13.5px] text-ink-soft">{w.noSlotsThisDay}</p>
           )}
           {!loadingSlots && slots && slots.length > 0 && (
             isTeamAny ? (
@@ -430,13 +433,13 @@ function DateTimeStep({
   );
 }
 
-
 function DetailsStep({
   slug,
   serviceId,
   providerId,
   slot,
   serviceName,
+  dict,
   onError,
   onDone,
 }: {
@@ -445,9 +448,11 @@ function DetailsStep({
   providerId: string | null;
   slot: SlotDTO;
   serviceName: string;
+  dict: BookingPageDictionary;
   onError: (e: string | null) => void;
   onDone: () => void;
 }) {
+  const w = dict.wizard;
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -458,8 +463,8 @@ function DetailsStep({
 
   async function submit() {
     onError(null);
-    if (name.trim().length < 2) return onError("Indica tu nombre.");
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return onError("Indica un email válido.");
+    if (name.trim().length < 2) return onError(w.errNameRequired);
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return onError(w.errEmailInvalid);
     setBusy(true);
     const res = await submitBooking({
       slug,
@@ -469,6 +474,7 @@ function DetailsStep({
       clientName: name,
       clientEmail: email,
       clientPhone: phone,
+      dict: dict.errors,
     });
     setBusy(false);
     if (!res.ok) return onError(res.error);
@@ -476,18 +482,18 @@ function DetailsStep({
   }
 
   return (
-    <Section title="Tus datos">
+    <Section title={w.yourDetails}>
       <div className="mb-4 rounded-xl bg-surface-2 px-4 py-3 text-[13.5px] text-ink">
         <span className="font-semibold">{serviceName}</span> · {slot.label}
       </div>
       <div className="flex flex-col gap-3">
-        <input className={inputBase} placeholder="Nombre y apellido" value={name} onChange={(e) => setName(e.target.value)} maxLength={80} />
-        <input className={inputBase} placeholder="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={120} />
-        <input className={inputBase} placeholder="Teléfono (opcional)" value={phone} onChange={(e) => setPhone(e.target.value)} maxLength={30} />
+        <input className={inputBase} placeholder={w.namePlaceholder} value={name} onChange={(e) => setName(e.target.value)} maxLength={80} />
+        <input className={inputBase} placeholder={w.emailPlaceholder} type="email" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={120} />
+        <input className={inputBase} placeholder={w.phonePlaceholder} value={phone} onChange={(e) => setPhone(e.target.value)} maxLength={30} />
       </div>
       <div className="mt-5">
         <Btn onClick={submit} disabled={busy} size="lg" full>
-          {busy ? "Reservando…" : "Reservar"}
+          {busy ? w.booking : w.bookButton}
         </Btn>
       </div>
     </Section>

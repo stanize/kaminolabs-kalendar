@@ -17,6 +17,33 @@ import {
   BUSINESS_TZ,
 } from "@/lib/booking/slots";
 
+// ── Translation slice for guest-facing wizard errors ────────────────────────
+// Shared by getAvailableSlots and submitBooking. Sourced from
+// lib/i18n/dictionaries/booking-page.ts's `errors` section.
+export interface BookingWizardErrorDict {
+  errBusinessUnavailable: string;
+  errInvalidService: string;
+  errInvalidDate: string;
+  errNameRequired: string;
+  errEmailInvalid: string;
+  errInvalidSlot: string;
+  errInvalidProvider: string;
+  errSlotTaken: string;
+  errCreateFailed: string;
+}
+
+const FALLBACK_WIZARD_ERRORS: BookingWizardErrorDict = {
+  errBusinessUnavailable: "Negocio no disponible.",
+  errInvalidService: "Servicio no válido.",
+  errInvalidDate: "Fecha no válida.",
+  errNameRequired: "Indica tu nombre.",
+  errEmailInvalid: "Indica un email válido.",
+  errInvalidSlot: "La hora seleccionada no es válida.",
+  errInvalidProvider: "Profesional no válido.",
+  errSlotTaken: "Ese horario ya no está disponible. Elige otro.",
+  errCreateFailed: "No se pudo crear la reserva. Inténtalo de nuevo.",
+};
+
 // ── Available slots for a service/provider/date ────────────────────────────
 export interface SlotDTO {
   startIso: string; // UTC ISO
@@ -46,15 +73,18 @@ export async function getAvailableSlots(input: {
   serviceId: string;
   providerId: string | null;
   date: string; // "YYYY-MM-DD" in business tz
+  dict?: Partial<BookingWizardErrorDict>;
 }): Promise<SlotsResult> {
+  const t = { ...FALLBACK_WIZARD_ERRORS, ...input.dict };
+
   const data = await getPublicBookingData(input.slug);
-  if (!data) return { ok: false, error: "Negocio no disponible." };
+  if (!data) return { ok: false, error: t.errBusinessUnavailable };
 
   const service = data.services.find((s) => s.id === input.serviceId);
-  if (!service) return { ok: false, error: "Servicio no válido." };
+  if (!service) return { ok: false, error: t.errInvalidService };
 
   const [y, m, d] = input.date.split("-").map(Number);
-  if (!y || !m || !d) return { ok: false, error: "Fecha no válida." };
+  if (!y || !m || !d) return { ok: false, error: t.errInvalidDate };
 
   const noonUtcGuess = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
   const day = dayIdInTz(noonUtcGuess, BUSINESS_TZ);
@@ -152,22 +182,25 @@ export async function submitBooking(input: {
   clientName: string;
   clientEmail: string;
   clientPhone: string;
+  dict?: Partial<BookingWizardErrorDict>;
 }): Promise<SubmitResult> {
+  const t = { ...FALLBACK_WIZARD_ERRORS, ...input.dict };
+
   const data = await getPublicBookingData(input.slug);
-  if (!data) return { ok: false, error: "Negocio no disponible." };
+  if (!data) return { ok: false, error: t.errBusinessUnavailable };
 
   const service = data.services.find((s) => s.id === input.serviceId);
-  if (!service) return { ok: false, error: "Servicio no válido." };
+  if (!service) return { ok: false, error: t.errInvalidService };
 
   const name = input.clientName.trim();
   const email = input.clientEmail.trim();
   const phone = input.clientPhone.trim();
-  if (name.length < 2) return { ok: false, error: "Indica tu nombre." };
-  if (!EMAIL_RE.test(email)) return { ok: false, error: "Indica un email válido." };
+  if (name.length < 2) return { ok: false, error: t.errNameRequired };
+  if (!EMAIL_RE.test(email)) return { ok: false, error: t.errEmailInvalid };
 
   const start = new Date(input.startIso);
   if (Number.isNaN(start.getTime()) || start < new Date()) {
-    return { ok: false, error: "La hora seleccionada no es válida." };
+    return { ok: false, error: t.errInvalidSlot };
   }
   const end = new Date(start.getTime() + service.duration_min * 60_000);
 
@@ -179,7 +212,7 @@ export async function submitBooking(input: {
   let teamMemberId: string | null = null;
   if (isTeam) {
     if (!input.providerId || !data.members.some((m) => m.id === input.providerId)) {
-      return { ok: false, error: "Profesional no válido." };
+      return { ok: false, error: t.errInvalidProvider };
     }
     teamMemberId = input.providerId;
   }
@@ -206,9 +239,9 @@ export async function submitBooking(input: {
   if (error) {
     // Unique active-slot index violation -> the slot was just taken.
     if (error.code === "23505") {
-      return { ok: false, error: "Ese horario ya no está disponible. Elige otro." };
+      return { ok: false, error: t.errSlotTaken };
     }
-    return { ok: false, error: "No se pudo crear la reserva. Inténtalo de nuevo." };
+    return { ok: false, error: t.errCreateFailed };
   }
 
   // Send the client a confirmation link. The booking stays pending until they
