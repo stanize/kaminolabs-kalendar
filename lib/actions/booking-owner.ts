@@ -46,7 +46,7 @@ export const cancelBookingAsOwner = authedAction(
     const { data: booking } = await supabase
       .from("kalendar_bookings")
       .select(
-        "id, status, business_id, team_member_id, service_name, starts_at, client_name, client_email"
+        "id, status, business_id, team_member_id, service_name, starts_at, client_name, client_email, guest_locale"
       )
       .eq("id", bookingId)
       .eq("business_id", business.id)

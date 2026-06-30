@@ -1,6 +1,7 @@
 import { Logo } from "@/components/ui/logo";
 import { Icon } from "@/components/ui/icon";
 import { confirmBooking } from "@/lib/actions/booking";
+import { getBookingResultDictionary } from "@/lib/i18n/dictionaries/booking-result";
 
 export default async function ConfirmBookingPage({
   params,
@@ -12,6 +13,10 @@ export default async function ConfirmBookingPage({
 
   const success = result.ok;
   const alreadyConfirmed = result.ok && result.status === "already";
+  // The page's own language follows the booking's stored guest_locale (the
+  // language the guest was using when they originally booked) — there is no
+  // switcher here, since this page is reached only via a one-time email link.
+  const dict = getBookingResultDictionary(result.ok ? result.guestLocale : "es").confirm;
 
   return (
     <div className="grid min-h-screen place-items-center bg-surface-2 px-5 py-16">
@@ -26,12 +31,10 @@ export default async function ConfirmBookingPage({
               <Icon name="check" size={26} strokeWidth={2.5} />
             </div>
             <h1 className="mb-1.5 text-[22px]">
-              {alreadyConfirmed ? "Reserva ya confirmada" : "¡Reserva confirmada!"}
+              {alreadyConfirmed ? dict.alreadyTitle : dict.successTitle}
             </h1>
             <p className="m-0 text-[14.5px] text-ink-soft">
-              {alreadyConfirmed
-                ? "Esta reserva ya estaba confirmada. Te esperamos."
-                : "Tu reserva está confirmada. Te esperamos."}
+              {alreadyConfirmed ? dict.alreadyBody : dict.successBody}
             </p>
           </>
         ) : (
@@ -39,7 +42,7 @@ export default async function ConfirmBookingPage({
             <div className="mx-auto mb-5 grid h-14 w-14 place-items-center rounded-full bg-surface-2 text-ink-soft">
               <Icon name="x" size={24} />
             </div>
-            <h1 className="mb-1.5 text-[22px]">No se pudo confirmar</h1>
+            <h1 className="mb-1.5 text-[22px]">{dict.failTitle}</h1>
             <p className="m-0 text-[14.5px] text-ink-soft">{result.error}</p>
           </>
         )}

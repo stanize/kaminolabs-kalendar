@@ -182,6 +182,7 @@ export async function submitBooking(input: {
   clientName: string;
   clientEmail: string;
   clientPhone: string;
+  guestLocale: "es" | "en";
   dict?: Partial<BookingWizardErrorDict>;
 }): Promise<SubmitResult> {
   const t = { ...FALLBACK_WIZARD_ERRORS, ...input.dict };
@@ -233,6 +234,7 @@ export async function submitBooking(input: {
     client_name: name,
     client_email: email,
     client_phone: phone || null,
+    guest_locale: input.guestLocale,
     confirm_token: token,
   });
 
@@ -256,15 +258,19 @@ export async function submitBooking(input: {
 
   await sendEmail({
     to: email,
-    subject: `Confirma tu reserva en ${data.business.name}`,
+    subject:
+      input.guestLocale === "en"
+        ? `Confirm your booking at ${data.business.name}`
+        : `Confirma tu reserva en ${data.business.name}`,
     html: bookingConfirmEmailHtml({
       clientName: name,
       businessName: data.business.name,
       serviceName: service.name,
-      whenLabel: formatBookingWhen(start.toISOString()),
+      whenLabel: formatBookingWhen(start.toISOString(), input.guestLocale),
       providerName,
       confirmUrl,
       cancelUrl,
+      locale: input.guestLocale,
     }),
   });
 
@@ -273,7 +279,7 @@ export async function submitBooking(input: {
 
 // ── Confirm a pending booking via tokenized email link ─────────────────────
 export type ConfirmResult =
-  | { ok: true; status: "confirmed" | "already" }
+  | { ok: true; status: "confirmed" | "already"; guestLocale: "es" | "en" }
   | { ok: false; error: string };
 
 /**
@@ -289,13 +295,15 @@ export async function confirmBooking(token: string): Promise<ConfirmResult> {
   const { data: booking } = await supabase
     .from("kalendar_bookings")
     .select(
-      "id, status, business_id, team_member_id, service_name, starts_at, client_name, client_email, client_phone"
+      "id, status, business_id, team_member_id, service_name, starts_at, client_name, client_email, client_phone, guest_locale"
     )
     .eq("confirm_token", token)
     .maybeSingle();
 
   if (!booking) return { ok: false, error: "Reserva no encontrada." };
-  if (booking.status === "confirmed") return { ok: true, status: "already" };
+  if (booking.status === "confirmed") {
+    return { ok: true, status: "already", guestLocale: booking.guest_locale };
+  }
   if (booking.status !== "pending_confirmation") {
     return { ok: false, error: "Esta reserva ya no se puede confirmar." };
   }
@@ -311,7 +319,7 @@ export async function confirmBooking(token: string): Promise<ConfirmResult> {
   // Notify the owner. Best-effort: failures are logged, never block confirmation.
   await notifyOwnerOfBooking(booking);
 
-  return { ok: true, status: "confirmed" };
+  return { ok: true, status: "confirmed", guestLocale: booking.guest_locale };
 }
 
 /** Sends the owner the "new booking confirmed" email. Best-effort. */
@@ -375,6 +383,7 @@ export interface BookingSummary {
   status: BookingStatusLite;
   businessName: string;
   providerName: string | null;
+  guestLocale: "es" | "en";
 }
 type BookingStatusLite = "pending_confirmation" | "confirmed" | "cancelled" | "completed";
 
@@ -388,7 +397,7 @@ export async function getBookingByToken(token: string): Promise<BookingLookupRes
   const supabase = await createClient();
   const { data: b } = await supabase
     .from("kalendar_bookings")
-    .select("service_name, starts_at, status, business_id, team_member_id")
+    .select("service_name, starts_at, status, business_id, team_member_id, guest_locale")
     .eq("confirm_token", token)
     .maybeSingle();
   if (!b) return { ok: false, error: "Reserva no encontrada." };
@@ -413,10 +422,11 @@ export async function getBookingByToken(token: string): Promise<BookingLookupRes
     ok: true,
     booking: {
       serviceName: b.service_name,
-      whenLabel: formatBookingWhen(b.starts_at),
+      whenLabel: formatBookingWhen(b.starts_at, b.guest_locale),
       status: b.status as BookingStatusLite,
       businessName: biz?.name ?? "",
       providerName,
+      guestLocale: b.guest_locale,
     },
   };
 }
@@ -436,7 +446,7 @@ export async function cancelBookingByToken(token: string): Promise<CancelResult>
   const { data: booking } = await supabase
     .from("kalendar_bookings")
     .select(
-      "id, status, business_id, team_member_id, service_name, starts_at, client_name, client_email"
+      "id, status, business_id, team_member_id, service_name, starts_at, client_name, client_email, guest_locale"
     )
     .eq("confirm_token", token)
     .maybeSingle();
@@ -463,7 +473,9 @@ export async function cancelBookingByToken(token: string): Promise<CancelResult>
 /**
  * Sends cancellation emails. byOwner=false -> client cancelled (notify owner +
  * client receipt). byOwner=true -> owner cancelled (notify client only).
- * Best-effort; failures are logged, never thrown.
+ * Best-effort; failures are logged, never thrown. The CLIENT receipt is
+ * localized to guest_locale; the OWNER notification stays Spanish (no
+ * owner-language setting exists yet).
  */
 export async function notifyCancellation(
   booking: {
@@ -473,10 +485,12 @@ export async function notifyCancellation(
     starts_at: string;
     client_name: string;
     client_email: string;
+    guest_locale?: "es" | "en";
   },
   byOwner: boolean
 ): Promise<void> {
   const supabase = await createClient();
+  const guestLocale = booking.guest_locale ?? "es";
 
   const { data: biz } = await supabase
     .from("kalendar_businesses")
@@ -495,22 +509,27 @@ export async function notifyCancellation(
     providerName = m?.name ?? null;
   }
 
-  const whenLabel = formatBookingWhen(booking.starts_at);
+  const guestWhenLabel = formatBookingWhen(booking.starts_at, guestLocale);
+  const ownerWhenLabel = formatBookingWhen(booking.starts_at); // owner emails stay Spanish
 
-  // Always send the client a cancellation receipt.
+  // Always send the client a cancellation receipt, in their own language.
   await sendEmail({
     to: booking.client_email,
-    subject: `Reserva cancelada · ${biz.name}`,
+    subject:
+      guestLocale === "en"
+        ? `Booking cancelled · ${biz.name}`
+        : `Reserva cancelada · ${biz.name}`,
     html: bookingCancelledClientHtml({
       clientName: booking.client_name,
       businessName: biz.name,
       serviceName: booking.service_name,
-      whenLabel,
+      whenLabel: guestWhenLabel,
       byOwner,
+      locale: guestLocale,
     }),
   });
 
-  // If the client cancelled, also notify the owner.
+  // If the client cancelled, also notify the owner (Spanish).
   if (!byOwner) {
     const { data: owner } = await supabase
       .from("user")
@@ -523,7 +542,7 @@ export async function notifyCancellation(
         subject: `Reserva cancelada: ${booking.service_name}`,
         html: bookingCancelledOwnerHtml({
           serviceName: booking.service_name,
-          whenLabel,
+          whenLabel: ownerWhenLabel,
           clientName: booking.client_name,
           providerName,
         }),

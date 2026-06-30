@@ -197,6 +197,7 @@ export function BookingWizard({
           slot={slot}
           serviceName={service.name}
           dict={dict}
+          locale={locale}
           onError={setError}
           onDone={() => setStep("done")}
         />
@@ -440,6 +441,7 @@ function DetailsStep({
   slot,
   serviceName,
   dict,
+  locale,
   onError,
   onDone,
 }: {
@@ -449,6 +451,7 @@ function DetailsStep({
   slot: SlotDTO;
   serviceName: string;
   dict: BookingPageDictionary;
+  locale: Locale;
   onError: (e: string | null) => void;
   onDone: () => void;
 }) {
@@ -474,6 +477,7 @@ function DetailsStep({
       clientName: name,
       clientEmail: email,
       clientPhone: phone,
+      guestLocale: locale,
       dict: dict.errors,
     });
     setBusy(false);

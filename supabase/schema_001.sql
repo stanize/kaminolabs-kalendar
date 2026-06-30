@@ -203,6 +203,12 @@ create table public.kalendar_bookings (
   client_name          text                  not null,
   client_email         text                  not null,
   client_phone         text,
+  -- The UI language the guest was using when they booked (session-only choice
+  -- on the public page, not persisted anywhere else). Drives the language of
+  -- the confirm/cancel pages and guest-facing emails for this booking.
+  guest_locale         text                  not null default 'es' check (
+    guest_locale in ('es', 'en')
+  ),
   confirm_token        text                  not null unique,
   created_at           timestamptz           not null default now(),
   updated_at           timestamptz           not null default now()
