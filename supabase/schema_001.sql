@@ -23,11 +23,60 @@
 create extension if not exists "pgcrypto";
 
 -- ----------------------------------------------------------------------------
+-- user_roles
+-- A single user (Better Auth "user" table) can hold multiple roles. The role
+-- is assigned at the point the user first enters the system through a specific
+-- entry point:
+--   • signing up / logging in via /login         → 'clinic' role
+--   • signing up / logging in via the booking    → 'patient' role
+--     page auth gate or /patient/login
+-- A user who enters via both paths over time accumulates both roles — they are
+-- never in conflict. Route guards (/panel vs /patient) check for the relevant
+-- role rather than treating it as a global user type.
+-- ----------------------------------------------------------------------------
+create table public.user_roles (
+  user_id    text        not null references public."user" (id) on delete cascade,
+  role       text        not null check (role in ('clinic', 'patient')),
+  created_at timestamptz not null default now(),
+  primary key (user_id, role)
+);
+
+create index user_roles_user_id_idx on public.user_roles (user_id);
+
+alter table public.user_roles enable row level security;
+
+create policy "UserRoles: write"
+  on public.user_roles for all using (true) with check (true);
+
+-- ----------------------------------------------------------------------------
+-- kalendar_patients
+-- Patient profile linked to an authenticated user. Created the first time a
+-- user completes the patient registration flow (booking page auth gate or
+-- /patient/login). phone is optional. name and email are read from the linked
+-- "user" record rather than duplicated here.
+-- ----------------------------------------------------------------------------
+create table public.kalendar_patients (
+  id         uuid        primary key default gen_random_uuid(),
+  user_id    text        not null unique references public."user" (id) on delete cascade,
+  phone      text,
+  created_at timestamptz not null default now()
+);
+
+create index kalendar_patients_user_id_idx on public.kalendar_patients (user_id);
+
+alter table public.kalendar_patients enable row level security;
+
+create policy "Patients: write"
+  on public.kalendar_patients for all using (true) with check (true);
+
+-- ----------------------------------------------------------------------------
 -- Drop existing tables (cascade removes dependent objects: policies, indexes).
 -- Children before parents.
 -- ----------------------------------------------------------------------------
 drop table if exists public.kalendar_support_tickets cascade;
 drop table if exists public.kalendar_bookings        cascade;
+drop table if exists public.kalendar_patients        cascade;
+drop table if exists public.user_roles               cascade;
 drop table if exists public.kalendar_team_members    cascade;
 drop table if exists public.kalendar_business_hours  cascade;
 drop table if exists public.kalendar_services        cascade;
@@ -169,21 +218,26 @@ create policy "Team: write"
 
 -- ----------------------------------------------------------------------------
 -- kalendar_bookings
--- Guest bookings made on the public /bookings/[slug] page.
+-- Bookings made on the public /bookings/[slug] page.
 --
--- Lifecycle (v1): a guest submits -> 'pending_confirmation' (holds the slot);
--- the client clicks the email link -> 'confirmed' (auto-accepted by default);
--- either party can cancel via tokenized link -> 'cancelled'; past confirmed
--- bookings become 'completed'. Owner review is surfaced in the panel calendar
--- but is not a required gate in v1.
+-- Two booking paths coexist:
 --
--- Service details are SNAPSHOT onto the row (service_name/duration/price) so a
--- booking records what was actually booked and services can be edited/deleted
--- freely afterwards. team_member_id is null for solo businesses (or "cualquiera"
--- in team mode could pin a specific member at booking time).
+--   Authenticated patient (patient_id IS NOT NULL):
+--     • Booked while signed in as a patient.
+--     • Status starts as 'confirmed' immediately — no clinic review needed.
+--     • confirm_token is still generated but never emailed.
+--     • pending_expiry_at is NULL (no expiry — already confirmed).
 --
--- Times are stored as timestamptz (UTC). The business timezone is Europe/Madrid
--- for now (future: derived from the business location).
+--   Guest (patient_id IS NULL):
+--     • Booked without an account.
+--     • Status starts as 'pending_confirmation'.
+--     • Clinic has a 24h window (pending_expiry_at = created_at + 24h) to
+--       confirm. A cron sweep auto-cancels and emails the guest if ignored.
+--     • When the clinic confirms, a confirmation email is sent to the guest.
+--     • confirm_token is kept in schema for safety but no longer emailed.
+--
+-- Service details are SNAPSHOT onto the row so bookings survive service edits.
+-- Times are stored as timestamptz (UTC); business timezone is Europe/Madrid.
 -- ----------------------------------------------------------------------------
 create type public.booking_status as enum (
   'pending_confirmation', 'confirmed', 'cancelled', 'completed'
@@ -194,6 +248,8 @@ create table public.kalendar_bookings (
   business_id          uuid                  not null references public.kalendar_businesses (id) on delete cascade,
   service_id           uuid                  references public.kalendar_services (id) on delete set null,
   team_member_id       uuid                  references public.kalendar_team_members (id) on delete set null,
+  -- Patient who booked (null for guest bookings).
+  patient_id           uuid                  references public.kalendar_patients (id) on delete set null,
   service_name         text                  not null,
   service_duration_min integer               not null check (service_duration_min > 0),
   service_price        numeric(10, 2)        not null default 0 check (service_price >= 0),
@@ -203,20 +259,29 @@ create table public.kalendar_bookings (
   client_name          text                  not null,
   client_email         text                  not null,
   client_phone         text,
-  -- The UI language the guest was using when they booked (session-only choice
-  -- on the public page, not persisted anywhere else). Drives the language of
-  -- the confirm/cancel pages and guest-facing emails for this booking.
+  -- The UI language the guest/patient was using when they booked.
+  -- Drives the language of guest-facing emails and the confirm/cancel pages.
   guest_locale         text                  not null default 'es' check (
     guest_locale in ('es', 'en')
   ),
+  -- For guest bookings: clinic must confirm before this timestamp or the booking
+  -- is auto-cancelled by the cron sweep. NULL for authenticated-patient bookings
+  -- (already confirmed, no expiry needed).
+  pending_expiry_at    timestamptz,
+  -- Generated for every booking; only used by the legacy token-link flow (guest
+  -- bookings pre-auth). Kept for schema continuity but no longer emailed.
   confirm_token        text                  not null unique,
   created_at           timestamptz           not null default now(),
   updated_at           timestamptz           not null default now()
 );
 
-create index kalendar_bookings_business_id_idx on public.kalendar_bookings (business_id);
-create index kalendar_bookings_starts_at_idx   on public.kalendar_bookings (starts_at);
-create index kalendar_bookings_token_idx       on public.kalendar_bookings (confirm_token);
+create index kalendar_bookings_business_id_idx  on public.kalendar_bookings (business_id);
+create index kalendar_bookings_patient_id_idx   on public.kalendar_bookings (patient_id) where patient_id is not null;
+create index kalendar_bookings_starts_at_idx    on public.kalendar_bookings (starts_at);
+create index kalendar_bookings_token_idx        on public.kalendar_bookings (confirm_token);
+-- Cron sweep: find expired guest bookings efficiently.
+create index kalendar_bookings_expiry_idx       on public.kalendar_bookings (pending_expiry_at)
+  where status = 'pending_confirmation' and pending_expiry_at is not null;
 
 -- Slot-collision guard: at most one active (pending or confirmed) booking per
 -- provider+start. A null team_member_id (solo / unassigned) collapses to a
