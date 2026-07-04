@@ -284,11 +284,11 @@ create index kalendar_bookings_token_idx        on public.kalendar_bookings (con
 create index kalendar_bookings_expiry_idx       on public.kalendar_bookings (pending_expiry_at)
   where status = 'pending_confirmation' and pending_expiry_at is not null;
 
--- FK added after both tables exist to avoid parse-time validation errors when
--- kalendar_patients does not yet exist in the target database.
-alter table public.kalendar_bookings
-  add constraint kalendar_bookings_patient_id_fkey
-  foreign key (patient_id) references public.kalendar_patients (id) on delete set null;
+-- NOTE: patient_id intentionally has no FK constraint in this file. The
+-- Supabase SQL editor validates all FK references against the live catalog
+-- before executing, so a forward reference to kalendar_patients would fail on
+-- a fresh database. The app layer enforces the reference integrity: it always
+-- resolves patient_id from kalendar_patients.user_id before inserting.
 
 -- Slot-collision guard: at most one active (pending or confirmed) booking per
 -- provider+start. A null team_member_id (solo / unassigned) collapses to a
