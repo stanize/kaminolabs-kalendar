@@ -84,6 +84,22 @@ The schema also installs:
 
 ---
 
+## Full reset (wipe everything and start clean)
+
+Useful during development when you want a completely clean database.
+
+**In the Supabase SQL Editor, run these files in order:**
+
+1. [`schema_better_auth_001.sql`](./schema_better_auth_001.sql) — drops and recreates the 4 Better Auth tables (`user`, `session`, `account`, `verification`). The `cascade` on the drops wipes all `kalendar_*` tables too.
+2. [`schema_001.sql`](./schema_001.sql) — recreates all `kalendar_*` tables.
+3. Run this to refresh the PostgREST schema cache:
+   ```sql
+   NOTIFY pgrst, 'reload schema';
+   ```
+4. Clear browser cookies for `kaminolabs.dev`.
+
+---
+
 ## 5. Environment variables
 
 Create `.env.local` at the project root, and set the same values in **Vercel →
