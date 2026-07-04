@@ -1,11 +1,11 @@
 import { cache } from "react";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
+import { hasRole, type Role } from "@/lib/roles/data";
 
 /**
- * Thrown by requireSession()/authedAction when no valid session is present.
- * The panel layout already gates UI access, so reaching this normally means a
- * server action was invoked directly, or a session expired mid-flight.
+ * Thrown by requireSession()/requireRole()/authedAction when no valid session
+ * is present, or when the user does not hold the required role.
  */
 export class UnauthorizedError extends Error {
   constructor(message = "Unauthorized") {
@@ -33,5 +33,19 @@ export async function requireSession() {
   if (!session?.user?.id) {
     throw new UnauthorizedError();
   }
+  return session;
+}
+
+/**
+ * Returns a guaranteed-non-null session AND verifies the user holds the given
+ * role. Throws UnauthorizedError if either check fails. Use this in server
+ * actions and server components that require a specific role beyond just being
+ * authenticated — e.g. panel actions require 'clinic', patient portal actions
+ * require 'patient'.
+ */
+export async function requireRole(role: Role) {
+  const session = await requireSession();
+  const ok = await hasRole(session.user.id, role);
+  if (!ok) throw new UnauthorizedError(`Role '${role}' required`);
   return session;
 }

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth-session";
+import { assignRole } from "@/lib/roles/data";
 import { PanelSidebar } from "@/components/panel/sidebar";
 import { EmailVerificationGate } from "@/components/panel/email-verification-gate";
 import { getPanelShellServerDictionary } from "@/lib/i18n/server";
@@ -8,6 +9,11 @@ import { getPanelShellServerDictionary } from "@/lib/i18n/server";
 export default async function PanelLayout({ children }: { children: ReactNode }) {
   const session = await getSession();
   if (!session?.user) redirect("/login");
+
+  // Assign the 'clinic' role on every panel visit — safe because assignRole
+  // uses upsert and is idempotent. This covers both email/password and Google
+  // OAuth sign-ups without needing a hook, and self-heals after schema resets.
+  await assignRole(session.user.id, "clinic");
 
   const { locale, dict } = await getPanelShellServerDictionary();
 
