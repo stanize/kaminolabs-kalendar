@@ -23,6 +23,23 @@
 create extension if not exists "pgcrypto";
 
 -- ----------------------------------------------------------------------------
+-- Drop existing tables (cascade removes dependent objects: policies, indexes).
+-- Children before parents.
+-- ----------------------------------------------------------------------------
+drop table if exists public.kalendar_support_tickets cascade;
+drop table if exists public.kalendar_bookings        cascade;
+drop table if exists public.kalendar_patients        cascade;
+drop table if exists public.user_roles               cascade;
+drop table if exists public.kalendar_team_members    cascade;
+drop table if exists public.kalendar_business_hours  cascade;
+drop table if exists public.kalendar_services        cascade;
+drop table if exists public.kalendar_businesses      cascade;
+
+drop type if exists public.support_ticket_status   cascade;
+drop type if exists public.support_ticket_category cascade;
+drop type if exists public.booking_status          cascade;
+
+-- ----------------------------------------------------------------------------
 -- user_roles
 -- A single user (Better Auth "user" table) can hold multiple roles. The role
 -- is assigned at the point the user first enters the system through a specific
@@ -68,23 +85,6 @@ alter table public.kalendar_patients enable row level security;
 
 create policy "Patients: write"
   on public.kalendar_patients for all using (true) with check (true);
-
--- ----------------------------------------------------------------------------
--- Drop existing tables (cascade removes dependent objects: policies, indexes).
--- Children before parents.
--- ----------------------------------------------------------------------------
-drop table if exists public.kalendar_support_tickets cascade;
-drop table if exists public.kalendar_bookings        cascade;
-drop table if exists public.kalendar_patients        cascade;
-drop table if exists public.user_roles               cascade;
-drop table if exists public.kalendar_team_members    cascade;
-drop table if exists public.kalendar_business_hours  cascade;
-drop table if exists public.kalendar_services        cascade;
-drop table if exists public.kalendar_businesses      cascade;
-
-drop type if exists public.support_ticket_status   cascade;
-drop type if exists public.support_ticket_category cascade;
-drop type if exists public.booking_status          cascade;
 
 -- ----------------------------------------------------------------------------
 -- kalendar_businesses
