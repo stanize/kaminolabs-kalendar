@@ -30,35 +30,30 @@ export async function provisionPatient(phone?: string): Promise<ProvisionResult>
 
   const supabase = await createClient();
 
-  // 2. Upsert the kalendar_patients row. Supabase's upsert with onConflict
-  //    does not always return the row when the record already exists and nothing
-  //    changed — so we do the upsert then fetch separately to guarantee we get
-  //    the id regardless of whether it was an insert or a no-op update.
-  const { error: upsertError } = await supabase
+  // 2. Try to insert the patient row. Ignore conflict errors (user already
+  //    has a profile from a previous sign-up). We always fetch separately
+  //    in step 3 so it doesn't matter whether this was a new insert or not.
+  await supabase
     .from("kalendar_patients")
-    .upsert(
-      {
-        user_id: userId,
-        ...(phone ? { phone: phone.trim() || null } : {}),
-      },
-      { onConflict: "user_id" }
-    );
+    .insert({ user_id: userId, ...(phone ? { phone: phone.trim() || null } : {}) })
+    .select("id")
+    .maybeSingle();
 
-  if (upsertError) {
-    console.error("[provisionPatient] upsert error:", upsertError.message, upsertError.code);
-    return { ok: false, error: `No se pudo crear el perfil de paciente. (${upsertError.message})` };
-  }
-
-  // 3. Fetch the id we just upserted.
+  // 3. Fetch the row — works whether we just inserted or it already existed.
   const { data, error: fetchError } = await supabase
     .from("kalendar_patients")
     .select("id")
     .eq("user_id", userId)
-    .single();
+    .maybeSingle();
 
-  if (fetchError || !data) {
-    console.error("[provisionPatient] fetch error:", fetchError?.message);
-    return { ok: false, error: "No se pudo obtener el perfil de paciente." };
+  if (fetchError) {
+    console.error("[provisionPatient] fetch error:", fetchError.message, fetchError.code);
+    return { ok: false, error: `No se pudo obtener el perfil. (${fetchError.message})` };
+  }
+
+  if (!data) {
+    console.error("[provisionPatient] no row found for userId:", userId);
+    return { ok: false, error: "No se pudo crear el perfil de paciente." };
   }
 
   return { ok: true, patientId: data.id };
