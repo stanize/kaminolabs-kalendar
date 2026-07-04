@@ -38,8 +38,10 @@ export interface BookingPageDictionary {
     phonePlaceholder: string;
     bookButton: string;
     booking: string;
-    doneTitle: string;
-    doneBody: string;
+    doneTitle: string;      // authenticated: "Reserva confirmada"
+    doneBody: string;       // authenticated: "Tu reserva está confirmada..."
+    doneTitleGuest: string; // guest: "Solicitud enviada"
+    doneBodyGuest: string;  // guest: "La clínica revisará tu solicitud..."
     bookAnother: string;
     freeLabel: string;
     minutesUnit: string;
@@ -86,9 +88,10 @@ const es: BookingPageDictionary = {
     phonePlaceholder: "Teléfono (opcional)",
     bookButton: "Reservar",
     booking: "Reservando…",
-    doneTitle: "Revisa tu correo",
-    doneBody:
-      "Te hemos enviado un email para confirmar tu reserva. Haz clic en el enlace para completarla.",
+    doneTitle: "¡Reserva confirmada!",
+    doneBody: "Tu reserva está confirmada. Te esperamos.",
+    doneTitleGuest: "Solicitud enviada",
+    doneBodyGuest: "La clínica revisará tu solicitud en las próximas 24 horas. Te enviaremos un email cuando sea confirmada.",
     bookAnother: "Hacer otra reserva",
     freeLabel: "Gratis",
     minutesUnit: "min",
@@ -135,8 +138,10 @@ const en: BookingPageDictionary = {
     phonePlaceholder: "Phone (optional)",
     bookButton: "Book",
     booking: "Booking…",
-    doneTitle: "Check your email",
-    doneBody: "We've sent you an email to confirm your booking. Click the link to complete it.",
+    doneTitle: "Booking confirmed!",
+    doneBody: "Your booking is confirmed. See you soon.",
+    doneTitleGuest: "Request sent",
+    doneBodyGuest: "The clinic will review your request within 24 hours. We'll send you an email once it's confirmed.",
     bookAnother: "Make another booking",
     freeLabel: "Free",
     minutesUnit: "min",

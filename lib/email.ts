@@ -135,6 +135,66 @@ export function ownerBookingNotificationHtml(input: {
  * Email to the client confirming their booking was cancelled. Localized to the
  * guest's chosen language (booking.guest_locale) — GUEST-facing email.
  */
+/**
+ * Email sent to a GUEST (no account) immediately after they submit a booking.
+ * Tells them their request was received and is under clinic review (24h window).
+ * GUEST-facing — localized to guest_locale.
+ */
+export function bookingUnderReviewEmailHtml(input: {
+  clientName: string;
+  businessName: string;
+  serviceName: string;
+  whenLabel: string;
+  providerName?: string | null;
+  cancelUrl: string;
+  locale?: "es" | "en";
+}): string {
+  const { clientName, businessName, serviceName, whenLabel, providerName, cancelUrl } = input;
+  const locale = input.locale ?? "es";
+  const t =
+    locale === "en"
+      ? {
+          title:        "Booking request received",
+          greeting:     clientName ? `Hi ${escapeHtml(clientName)},` : "Hi,",
+          intro:        `We've received your booking request at <strong>${escapeHtml(businessName)}</strong>. The clinic will confirm it shortly.`,
+          note:         "You'll receive a confirmation email once it's approved.",
+          service:      "Service",
+          when:         "When",
+          professional: "Professional",
+          cancelPrefix: "Changed your mind?",
+          cancelLink:   "Cancel your request here",
+        }
+      : {
+          title:        "Solicitud de reserva recibida",
+          greeting:     clientName ? `Hola ${escapeHtml(clientName)},` : "Hola,",
+          intro:        `Hemos recibido tu solicitud de reserva en <strong>${escapeHtml(businessName)}</strong>. La clínica la confirmará en breve.`,
+          note:         "Recibirás un email de confirmación en cuanto sea aprobada.",
+          service:      "Servicio",
+          when:         "Cuándo",
+          professional: "Profesional",
+          cancelPrefix: "¿Has cambiado de opinión?",
+          cancelLink:   "Cancela tu solicitud aquí",
+        };
+  const providerLine = providerName
+    ? `<tr><td style="padding:4px 12px;color:#64748b;font-size:14px;">${t.professional}</td><td style="padding:4px 12px;font-size:14px;text-align:right;">${escapeHtml(providerName)}</td></tr>`
+    : "";
+  return `
+  <div style="font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px; color: #0f172a;">
+    <h1 style="font-size: 20px; margin: 0 0 16px;">${t.title}</h1>
+    <p style="font-size: 15px; line-height: 1.6; margin: 0 0 12px;">${t.greeting}</p>
+    <p style="font-size: 15px; line-height: 1.6; margin: 0 0 20px;">${t.intro}</p>
+    <table style="width:100%;border-collapse:collapse;background:#f8fafc;border-radius:12px;padding:8px;margin:0 0 16px;">
+      <tr><td style="padding:8px 12px;color:#64748b;font-size:14px;">${t.service}</td><td style="padding:8px 12px;font-size:14px;text-align:right;font-weight:600;">${escapeHtml(serviceName)}</td></tr>
+      <tr><td style="padding:4px 12px;color:#64748b;font-size:14px;">${t.when}</td><td style="padding:4px 12px;font-size:14px;text-align:right;">${escapeHtml(whenLabel)}</td></tr>
+      ${providerLine}
+    </table>
+    <p style="font-size: 13px; line-height: 1.6; color: #64748b; margin: 0 0 16px;">${t.note}</p>
+    <p style="font-size: 13px; line-height: 1.6; color: #64748b; margin: 0;">
+      ${t.cancelPrefix} <a href="${cancelUrl}" style="color: #0d9488;">${t.cancelLink}</a>.
+    </p>
+  </div>`;
+}
+
 export function bookingCancelledClientHtml(input: {
   clientName: string;
   businessName: string;
@@ -244,50 +304,62 @@ export function bookingConfirmEmailHtml(input: {
   confirmUrl: string;
   cancelUrl: string;
   locale?: "es" | "en";
+  // When true, the booking is already confirmed (authenticated patient).
+  // Renders a receipt rather than a "please click to confirm" email.
+  isConfirmed?: boolean;
 }): string {
   const { clientName, businessName, serviceName, whenLabel, providerName, confirmUrl, cancelUrl } = input;
+  const isConfirmed = input.isConfirmed ?? false;
   const locale = input.locale ?? "es";
   const t =
     locale === "en"
       ? {
-          title: "Confirm your booking",
+          titlePending:   "Confirm your booking",
+          titleConfirmed: "Booking confirmed!",
           greeting: clientName ? `Hi ${escapeHtml(clientName)},` : "Hi,",
-          intro: `Almost there. Confirm your booking at <strong>${escapeHtml(businessName)}</strong> by clicking the button.`,
-          service: "Service",
-          when: "When",
+          introPending:   `Almost there. Confirm your booking at <strong>${escapeHtml(businessName)}</strong> by clicking the button.`,
+          introConfirmed: `Your booking at <strong>${escapeHtml(businessName)}</strong> is confirmed. See you soon!`,
+          service:      "Service",
+          when:         "When",
           professional: "Professional",
-          button: "Confirm my booking",
-          fallback: "If the button doesn't work, copy and paste this link into your browser:",
-          ignore: "If you didn't make this booking, you can ignore this message.",
+          button:       "Confirm my booking",
+          fallback:     "If the button doesn't work, copy and paste this link into your browser:",
+          ignore:       "If you didn't make this booking, you can ignore this message.",
           cancelPrefix: "Need to cancel?",
-          cancelLink: "Cancel your booking here",
+          cancelLink:   "Cancel your booking here",
         }
       : {
-          title: "Confirma tu reserva",
+          titlePending:   "Confirma tu reserva",
+          titleConfirmed: "¡Reserva confirmada!",
           greeting: clientName ? `Hola ${escapeHtml(clientName)},` : "Hola,",
-          intro: `Casi listo. Confirma tu reserva en <strong>${escapeHtml(businessName)}</strong> haciendo clic en el botón.`,
-          service: "Servicio",
-          when: "Cuándo",
+          introPending:   `Casi listo. Confirma tu reserva en <strong>${escapeHtml(businessName)}</strong> haciendo clic en el botón.`,
+          introConfirmed: `Tu reserva en <strong>${escapeHtml(businessName)}</strong> está confirmada. ¡Hasta pronto!`,
+          service:      "Servicio",
+          when:         "Cuándo",
           professional: "Profesional",
-          button: "Confirmar mi reserva",
-          fallback: "Si el botón no funciona, copia y pega este enlace en tu navegador:",
-          ignore: "Si no has hecho esta reserva, puedes ignorar este mensaje.",
+          button:       "Confirmar mi reserva",
+          fallback:     "Si el botón no funciona, copia y pega este enlace en tu navegador:",
+          ignore:       "Si no has hecho esta reserva, puedes ignorar este mensaje.",
           cancelPrefix: "¿Necesitas cancelar?",
-          cancelLink: "Cancela tu reserva aquí",
+          cancelLink:   "Cancela tu reserva aquí",
         };
   const providerLine = providerName
     ? `<tr><td style="padding:4px 0;color:#64748b;font-size:14px;">${t.professional}</td><td style="padding:4px 0;font-size:14px;text-align:right;">${escapeHtml(providerName)}</td></tr>`
     : "";
+  const title = isConfirmed ? t.titleConfirmed : t.titlePending;
+  const intro = isConfirmed ? t.introConfirmed : t.introPending;
+
   return `
   <div style="font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px; color: #0f172a;">
-    <h1 style="font-size: 20px; margin: 0 0 16px;">${t.title}</h1>
+    <h1 style="font-size: 20px; margin: 0 0 16px;">${title}</h1>
     <p style="font-size: 15px; line-height: 1.6; margin: 0 0 12px;">${t.greeting}</p>
-    <p style="font-size: 15px; line-height: 1.6; margin: 0 0 20px;">${t.intro}</p>
+    <p style="font-size: 15px; line-height: 1.6; margin: 0 0 20px;">${intro}</p>
     <table style="width:100%;border-collapse:collapse;background:#f8fafc;border-radius:12px;padding:8px;margin:0 0 24px;">
       <tr><td style="padding:8px 12px;color:#64748b;font-size:14px;">${t.service}</td><td style="padding:8px 12px;font-size:14px;text-align:right;font-weight:600;">${escapeHtml(serviceName)}</td></tr>
       <tr><td style="padding:4px 12px;color:#64748b;font-size:14px;">${t.when}</td><td style="padding:4px 12px;font-size:14px;text-align:right;">${escapeHtml(whenLabel)}</td></tr>
       ${providerLine}
     </table>
+    ${!isConfirmed ? `
     <a href="${confirmUrl}" style="display: inline-block; background: #0d9488; color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 600; padding: 12px 24px; border-radius: 12px;">
       ${t.button}
     </a>
@@ -297,8 +369,8 @@ export function bookingConfirmEmailHtml(input: {
     </p>
     <p style="font-size: 13px; line-height: 1.6; color: #64748b; margin: 16px 0 0;">
       ${t.ignore}
-    </p>
-    <p style="font-size: 13px; line-height: 1.6; color: #64748b; margin: 8px 0 0;">
+    </p>` : ""}
+    <p style="font-size: 13px; line-height: 1.6; color: #64748b; margin: ${isConfirmed ? "0" : "8px"} 0 0;">
       ${t.cancelPrefix} <a href="${cancelUrl}" style="color: #0d9488;">${t.cancelLink}</a>.
     </p>
   </div>`;

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Logo } from "@/components/ui/logo";
 import { Icon } from "@/components/ui/icon";
 import { BookingWizard } from "@/components/booking/booking-wizard";
@@ -21,11 +22,16 @@ interface Member {
   role: string | null;
 }
 
+export interface PatientInfo {
+  id: string;
+  name: string;
+  email: string;
+}
+
 /**
  * Owns the guest's language choice for the WHOLE public booking page (header,
- * wizard, footer) so switching language is consistent across all of it, not
- * just inside the wizard. Session-only (component state) — does not persist
- * across visits or businesses, unlike the home/panel cookie-based switcher.
+ * wizard, footer) so switching language is consistent across all of it.
+ * Session-only (component state) — does not persist across visits or businesses.
  */
 export function BookingPageShell({
   slug,
@@ -36,6 +42,7 @@ export function BookingPageShell({
   bookingWindowMonths,
   isTeam,
   initialLocale,
+  initialPatient,
 }: {
   slug: string;
   business: {
@@ -50,14 +57,33 @@ export function BookingPageShell({
   bookingWindowMonths: number;
   isTeam: boolean;
   initialLocale: Locale;
+  // Non-null when a patient is already signed in — wizard skips the auth gate.
+  initialPatient: PatientInfo | null;
 }) {
   const [locale, setLocale] = useState<Locale>(initialLocale);
+  // Patient state can change mid-session (user signs in via the auth gate).
+  const [patient, setPatient] = useState<PatientInfo | null>(initialPatient);
   const dict = getBookingPageDictionary(locale);
 
   return (
     <div className="min-h-screen bg-surface-2 px-5 py-10">
       <div className="mx-auto w-full max-w-[560px]">
-        <div className="mb-4 flex justify-end">
+        {/* Top bar: language switcher + returning patient link */}
+        <div className="mb-4 flex items-center justify-between">
+          {patient ? (
+            <span className="flex items-center gap-1.5 text-[13px] text-ink-soft">
+              <Icon name="user" size={14} />
+              {patient.name || patient.email}
+            </span>
+          ) : (
+            <Link
+              href="/patient/login"
+              className="flex items-center gap-1.5 text-[13px] font-medium text-brand hover:underline"
+            >
+              <Icon name="user" size={14} />
+              Iniciar sesión
+            </Link>
+          )}
           <LocaleSwitcher current={locale} onChange={setLocale} />
         </div>
 
@@ -84,6 +110,8 @@ export function BookingPageShell({
           bookingWindowMonths={bookingWindowMonths}
           isTeam={isTeam}
           locale={locale}
+          patient={patient}
+          onPatientChange={setPatient}
         />
 
         {/* Footer */}

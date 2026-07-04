@@ -6,6 +6,7 @@ import { getPublicBookingData, getTakenIntervals } from "@/lib/booking/data";
 import {
   sendEmail,
   bookingConfirmEmailHtml,
+  bookingUnderReviewEmailHtml,
   ownerBookingNotificationHtml,
   bookingCancelledClientHtml,
   bookingCancelledOwnerHtml,
@@ -183,6 +184,9 @@ export async function submitBooking(input: {
   clientEmail: string;
   clientPhone: string;
   guestLocale: "es" | "en";
+  // When set, the booking is for an authenticated patient: status is 'confirmed'
+  // immediately, pending_expiry_at is null, and patient_id is stored.
+  patientId?: string | null;
   dict?: Partial<BookingWizardErrorDict>;
 }): Promise<SubmitResult> {
   const t = { ...FALLBACK_WIZARD_ERRORS, ...input.dict };
@@ -220,17 +224,27 @@ export async function submitBooking(input: {
 
   const supabase = await createClient();
   const token = randomBytes(24).toString("base64url");
+  const isAuthenticated = !!input.patientId;
+
+  // Authenticated patients: confirmed immediately, no expiry window.
+  // Guests: pending_confirmation, clinic has 24h to confirm.
+  const bookingStatus = isAuthenticated ? "confirmed" : "pending_confirmation";
+  const pendingExpiryAt = isAuthenticated
+    ? null
+    : new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
   const { error } = await supabase.from("kalendar_bookings").insert({
     business_id: data.business.id,
     service_id: service.id,
     team_member_id: teamMemberId,
+    patient_id: input.patientId ?? null,
     service_name: service.name,
     service_duration_min: service.duration_min,
     service_price: service.price,
     starts_at: start.toISOString(),
     ends_at: end.toISOString(),
-    status: "pending_confirmation",
+    status: bookingStatus,
+    pending_expiry_at: pendingExpiryAt,
     client_name: name,
     client_email: email,
     client_phone: phone || null,
@@ -246,32 +260,64 @@ export async function submitBooking(input: {
     return { ok: false, error: t.errCreateFailed };
   }
 
-  // Send the client a confirmation link. The booking stays pending until they
-  // click it. Email failure does not roll back the booking (the owner can still
-  // see it in the calendar); we just log and proceed.
   const base = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/+$/, "");
-  const confirmUrl = `${base}/bookings/confirm/${token}`;
   const cancelUrl = `${base}/bookings/cancel/${token}`;
   const providerName = teamMemberId
     ? data.members.find((mm) => mm.id === teamMemberId)?.name ?? null
     : null;
+  const whenLabel = formatBookingWhen(start.toISOString(), input.guestLocale);
 
-  await sendEmail({
-    to: email,
-    subject:
-      input.guestLocale === "en"
-        ? `Confirm your booking at ${data.business.name}`
-        : `Confirma tu reserva en ${data.business.name}`,
-    html: bookingConfirmEmailHtml({
-      clientName: name,
-      businessName: data.business.name,
-      serviceName: service.name,
-      whenLabel: formatBookingWhen(start.toISOString(), input.guestLocale),
-      providerName,
-      confirmUrl,
-      cancelUrl,
-      locale: input.guestLocale,
-    }),
+  if (isAuthenticated) {
+    // Authenticated patient: booking is already confirmed. Send a receipt email.
+    await sendEmail({
+      to: email,
+      subject:
+        input.guestLocale === "en"
+          ? `Booking confirmed · ${data.business.name}`
+          : `Reserva confirmada · ${data.business.name}`,
+      html: bookingConfirmEmailHtml({
+        clientName: name,
+        businessName: data.business.name,
+        serviceName: service.name,
+        whenLabel,
+        providerName,
+        // Authenticated bookings are already confirmed — no confirm link needed.
+        // We pass the cancel URL only so the template can show it.
+        confirmUrl: cancelUrl, // unused in the authenticated template variant
+        cancelUrl,
+        locale: input.guestLocale,
+        isConfirmed: true,
+      }),
+    });
+  } else {
+    // Guest booking: send "under review" email — clinic has 24h to confirm.
+    await sendEmail({
+      to: email,
+      subject:
+        input.guestLocale === "en"
+          ? `Booking request received · ${data.business.name}`
+          : `Solicitud de reserva recibida · ${data.business.name}`,
+      html: bookingUnderReviewEmailHtml({
+        clientName: name,
+        businessName: data.business.name,
+        serviceName: service.name,
+        whenLabel,
+        providerName,
+        cancelUrl,
+        locale: input.guestLocale,
+      }),
+    });
+  }
+
+  // Notify the clinic owner of the new booking (Spanish, regardless of guest locale).
+  await notifyOwnerOfBooking({
+    business_id: data.business.id,
+    team_member_id: teamMemberId,
+    service_name: service.name,
+    starts_at: start.toISOString(),
+    client_name: name,
+    client_email: email,
+    client_phone: phone || null,
   });
 
   return { ok: true, token };
