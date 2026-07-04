@@ -28,11 +28,13 @@ export async function provisionPatient(phone?: string): Promise<ProvisionResult>
   // 1. Assign the patient role (idempotent upsert).
   await assignRole(userId, "patient");
 
-  // 2. Upsert the kalendar_patients row. The user may already have a patient
-  //    profile from a previous sign-up attempt — using upsert ensures we never
-  //    create duplicates and we can update the phone if provided.
   const supabase = await createClient();
-  const { data, error } = await supabase
+
+  // 2. Upsert the kalendar_patients row. Supabase's upsert with onConflict
+  //    does not always return the row when the record already exists and nothing
+  //    changed — so we do the upsert then fetch separately to guarantee we get
+  //    the id regardless of whether it was an insert or a no-op update.
+  const { error: upsertError } = await supabase
     .from("kalendar_patients")
     .upsert(
       {
@@ -40,12 +42,23 @@ export async function provisionPatient(phone?: string): Promise<ProvisionResult>
         ...(phone ? { phone: phone.trim() || null } : {}),
       },
       { onConflict: "user_id" }
-    )
+    );
+
+  if (upsertError) {
+    console.error("[provisionPatient] upsert error:", upsertError.message, upsertError.code);
+    return { ok: false, error: `No se pudo crear el perfil de paciente. (${upsertError.message})` };
+  }
+
+  // 3. Fetch the id we just upserted.
+  const { data, error: fetchError } = await supabase
+    .from("kalendar_patients")
     .select("id")
+    .eq("user_id", userId)
     .single();
 
-  if (error || !data) {
-    return { ok: false, error: "No se pudo crear el perfil de paciente." };
+  if (fetchError || !data) {
+    console.error("[provisionPatient] fetch error:", fetchError?.message);
+    return { ok: false, error: "No se pudo obtener el perfil de paciente." };
   }
 
   return { ok: true, patientId: data.id };
