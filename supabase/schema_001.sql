@@ -248,8 +248,9 @@ create table public.kalendar_bookings (
   business_id          uuid                  not null references public.kalendar_businesses (id) on delete cascade,
   service_id           uuid                  references public.kalendar_services (id) on delete set null,
   team_member_id       uuid                  references public.kalendar_team_members (id) on delete set null,
-  -- Patient who booked (null for guest bookings).
-  patient_id           uuid                  references public.kalendar_patients (id) on delete set null,
+  -- Patient who booked (null for guest bookings). FK added below via ALTER TABLE
+  -- after kalendar_patients is guaranteed to exist in this same script.
+  patient_id           uuid,
   service_name         text                  not null,
   service_duration_min integer               not null check (service_duration_min > 0),
   service_price        numeric(10, 2)        not null default 0 check (service_price >= 0),
@@ -282,6 +283,12 @@ create index kalendar_bookings_token_idx        on public.kalendar_bookings (con
 -- Cron sweep: find expired guest bookings efficiently.
 create index kalendar_bookings_expiry_idx       on public.kalendar_bookings (pending_expiry_at)
   where status = 'pending_confirmation' and pending_expiry_at is not null;
+
+-- FK added after both tables exist to avoid parse-time validation errors when
+-- kalendar_patients does not yet exist in the target database.
+alter table public.kalendar_bookings
+  add constraint kalendar_bookings_patient_id_fkey
+  foreign key (patient_id) references public.kalendar_patients (id) on delete set null;
 
 -- Slot-collision guard: at most one active (pending or confirmed) booking per
 -- provider+start. A null team_member_id (solo / unassigned) collapses to a
