@@ -1,4 +1,4 @@
-# Kalendar — Claude Context
+# Kalendar — Claude Context 
 
 > **Per-feature detail lives in `MODULES.md`, not here.** This file covers only
 > project-wide architecture that spans multiple modules (auth model, database,
