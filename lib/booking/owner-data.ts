@@ -16,6 +16,8 @@ export interface OwnerBooking {
   client_name: string;
   client_email: string;
   client_phone: string | null;
+  pending_expiry_at: string | null;
+  guest_locale: string | null;
 }
 
 export interface OwnerBookingWithProvider extends OwnerBooking {
@@ -23,7 +25,7 @@ export interface OwnerBookingWithProvider extends OwnerBooking {
 }
 
 const BOOKING_COLUMNS =
-  "id, service_name, service_duration_min, service_price, team_member_id, starts_at, ends_at, status, client_name, client_email, client_phone";
+  "id, service_name, service_duration_min, service_price, team_member_id, starts_at, ends_at, status, client_name, client_email, client_phone, pending_expiry_at, guest_locale";
 
 /**
  * Bookings for the owner's business, scoped by userId via the owning business.

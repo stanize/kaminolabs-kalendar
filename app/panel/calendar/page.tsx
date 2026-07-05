@@ -38,6 +38,8 @@ export default async function CalendarPage() {
           clientEmail: b.client_email,
           clientPhone: b.client_phone,
           providerName: b.provider_name,
+          pendingExpiryAt: b.pending_expiry_at,
+          guestLocale: (b.guest_locale ?? "es") as "es" | "en",
         }))}
       />
     </div>

@@ -22,8 +22,12 @@ export interface CalendarDictionary {
     emptyUpcomingTitle: string;
     emptySubtitle: string;
     cancel: string;
+    confirm: string;
+    confirming: string;
     minutesUnit: string;
     errCancelFailed: string;
+    expiresIn: string; // e.g. "Caduca en {h}h {m}m" — {h} and {m} replaced client-side
+    expired: string;
   };
   errors: {
     // lib/actions/booking-owner.ts
@@ -51,8 +55,12 @@ const es: CalendarDictionary = {
     emptyUpcomingTitle: "No tienes reservas próximas",
     emptySubtitle: "Las reservas de tu página aparecerán aquí.",
     cancel: "Cancelar",
+    confirm: "Confirmar",
+    confirming: "Confirmando…",
     minutesUnit: "min",
     errCancelFailed: "No se pudo cancelar. Inténtalo de nuevo.",
+    expiresIn: "Caduca en {h}h {m}m",
+    expired: "Caducada",
   },
   errors: {
     errNoBusiness: "No hay negocio.",
@@ -78,8 +86,12 @@ const en: CalendarDictionary = {
     emptyUpcomingTitle: "You have no upcoming bookings",
     emptySubtitle: "Bookings from your page will show up here.",
     cancel: "Cancel",
+    confirm: "Confirm",
+    confirming: "Confirming…",
     minutesUnit: "min",
     errCancelFailed: "Couldn't cancel. Please try again.",
+    expiresIn: "Expires in {h}h {m}m",
+    expired: "Expired",
   },
   errors: {
     errNoBusiness: "No business found.",
