@@ -31,7 +31,9 @@ export default async function LoginPage() {
     <div className="grid min-h-screen place-items-center px-5 py-12">
       <div className="w-full max-w-[420px]">
         <div className="mb-8 flex flex-col items-center gap-3 text-center">
-          <Logo size={22} />
+          <Link href="/" aria-label="Kalendar — volver al inicio">
+            <Logo size={22} />
+          </Link>
           <div>
             <h1 className="text-[24px]">{dict.login.title}</h1>
             <p className="mt-1 text-[15px] text-ink-soft">{dict.login.subtitle}</p>
