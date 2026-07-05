@@ -23,7 +23,7 @@ Kalendar is a SaaS online booking platform targeting Spanish-market professional
 - **Provider**: Better Auth — Google OAuth + email/password
 - **Email verification**: required for email/password sign-ups. `requireEmailVerification` is **false** (a session is created on sign-up so the user reaches the panel), but the panel renders a full-screen blocking gate (`components/panel/email-verification-gate.tsx`) until `user.emailVerified` is true. Google sign-ups arrive pre-verified and never see the gate.
 - **Verification email**: sent on sign-up via `emailVerification.sendVerificationEmail` in `lib/auth.ts` → `lib/email.ts` (Resend REST API, env-gated). `autoSignInAfterVerification: true`; link `callbackURL` is `/panel`.
-- **Tables**: `user`, `session`, `account`, `verification` (no RLS — Better Auth managed)
+- **Tables**: `user`, `session`, `account`, `verification` (no RLS — Better Auth managed), created by `supabase/schema_better_auth_001.sql` (no longer via `npx @better-auth/cli migrate`)
 - **Google OAuth app name**: "Kalendar by Kaminolabs"
 - **Callback URI**: `https://kalendar.kaminolabs.dev/api/auth/callback/google`
 - **Route handler**: `app/api/auth/[...all]/route.ts`
@@ -39,7 +39,7 @@ Kalendar is a SaaS online booking platform targeting Spanish-market professional
 - **Connection**: Transaction pooler only — `aws-1-eu-central-1.pooler.supabase.com:6543`
 - Direct connection (port 5432) is blocked on Vercel free plan — always use pooler
 - **Kalendar tables** (all prefixed `kalendar_`): see `MODULES.md` for the current table-to-module map. There is **no** `kalendar_profiles` table — all per-user identity (id, name, email, `emailVerified`) comes from Better Auth's `user` table via `session.user`.
-- **Auth tables** (owned by Better Auth, created by `npx @better-auth/cli migrate`, **not** in `schema_001.sql`): `user`, `session`, `account`, `verification`
+- **Auth tables** (owned by Better Auth, created by `schema_better_auth_001.sql`, **not** in `schema_001.sql`): `user`, `session`, `account`, `verification`
 
 ### Design System
 - **Fonts**: Bricolage Grotesque (display) + Plus Jakarta Sans (UI)
@@ -126,7 +126,8 @@ separately if needed: `delete from storage.objects where bucket_id = 'support-at
 - `schema_001.sql` — single consolidated schema, destructive (drops and
   recreates all `kalendar_*` tables). No incremental migration files — when the
   schema changes, edit this file and re-run it.
-- **Migration order matters**: run `npx @better-auth/cli migrate` FIRST (creates `user`/`session`/`account`/`verification`), THEN run `schema_001.sql` — the Kalendar tables have cascade FKs to `public."user"(id)` and will fail if `user` does not yet exist.
+- `schema_better_auth_001.sql` — single consolidated schema for Better Auth's `user`/`session`/`account`/`verification` tables.
+- **Migration order matters**: run `schema_better_auth_001.sql` FIRST (creates `user`/`session`/`account`/`verification`), THEN run `schema_001.sql` — the Kalendar tables have cascade FKs to `public."user"(id)` and will fail if `user` does not yet exist.
 
 ---
 

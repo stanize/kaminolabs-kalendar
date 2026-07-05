@@ -23,7 +23,7 @@ Login, sign-up, session handling, role assignment.
 - Proxy/middleware: `proxy.ts`
 - DB tables: `user`, `session`, `account`, `verification` (Better Auth, in `schema_better_auth_001.sql`), `user_roles` (in `schema_001.sql`)
 - Depends on shared infra: i18n (`public.ts` dictionary), email (verification emails)
-- Gotchas: `lib/auth-action.ts` must stay free of `"use server"`. Better Auth migration must run before `schema_001.sql`. `requireEmailVerification: false` — verification gate is UI-side (see panel-shell).
+- Gotchas: `lib/auth-action.ts` must stay free of `"use server"`. `schema_better_auth_001.sql` must run before `schema_001.sql` (no longer via `npx @better-auth/cli migrate`). `requireEmailVerification: false` — verification gate is UI-side (see panel-shell).
 
 ---
 
