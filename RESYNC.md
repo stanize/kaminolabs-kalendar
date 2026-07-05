@@ -1,8 +1,12 @@
-# RESYNC — Maintenance Prompt for MODULES.md
+# RESYNC — Maintenance Prompt for Project Documentation
 
 Run this in a dedicated session after a feature has shipped and been tested,
 before starting the next feature. Do NOT run this mid-feature — it assumes the
 repo is in a clean, working state.
+
+Scope: this resyncs **both** `MODULES.md` and `CLAUDE.md` against the actual
+codebase. Nothing gets edited without your go-ahead — this session's job is to
+produce a point-by-point proposal, not to rewrite files on its own judgment.
 
 To use: tell Claude "execute RESYNC.md" (or paste this file's contents as the prompt).
 
@@ -29,35 +33,53 @@ steps in order:
      no longer matches current behavior (e.g. a hardcoded value that changed,
      a pattern that was refactored away).
 
-4. **Check the "Not yet modularized" section** at the bottom — for each item,
-   confirm whether it now exists. If it exists, draft a new module section for
-   it (following the same format as existing modules) instead of leaving it
-   in that list.
+4. **Check the "Not yet modularized" section** at the bottom of `MODULES.md` —
+   for each item, confirm whether it now exists. If it exists, draft a new
+   module section for it (following the same format as existing modules)
+   instead of leaving it in that list.
 
 5. **Check for entirely new top-level areas** not covered by any module or by
    "Shared infra" — e.g. a new route group, a new `lib/` subfolder. Propose
    a new module section for anything found.
 
-6. **Do NOT blindly rewrite the whole file.** Present a diff-style summary of
-   proposed changes first (additions, removals, corrections) and wait for
-   confirmation before editing `MODULES.md`. This file is a trusted reference —
-   silent, sweeping rewrites defeat the point.
+6. **Read the current `CLAUDE.md` line by line against the actual code and
+   against `MODULES.md`.** Give this file extra scrutiny — it's the first
+   thing every session reads, so stale or wrong content here has the widest
+   blast radius. Specifically check:
+   - Every claim under Architecture / Key Conventions / Migrations / Known
+     Decisions still holds (env var names, file paths, auth flow behavior,
+     naming rules).
+   - No per-feature detail has crept back in that belongs in `MODULES.md`
+     instead (duplication drifts the two docs apart over time).
+   - No contradictions between `CLAUDE.md` and the current `MODULES.md`.
 
-7. Once confirmed, edit `MODULES.md` with the approved changes, update the
-   `_Last resynced: <date>_` line at the bottom to today's date, and push via
-   `gitpush.py` in a single commit with message `chore: resync MODULES.md`.
+7. **Produce a single combined report**, organized as:
+   - **CLAUDE.md proposals** (own section, listed first, clearly marked as
+     high-attention) — one point per issue: what's wrong or stale, what you
+     propose instead, why.
+   - **MODULES.md proposals** — same point-by-point format, grouped by module.
 
-8. Also do a quick sanity check on `CLAUDE.md` — it should only contain
-   cross-cutting/project-wide info (auth model, DB connection, deploy, i18n
-   mechanism), not per-panel-page detail that now belongs in `MODULES.md`.
-   Flag (don't auto-fix) anything in `CLAUDE.md` that duplicates or
-   contradicts `MODULES.md`.
+   Do NOT bury these in prose. Number each point so it's easy to say "apply
+   1, 3, 5" or "explain point 2 more" or "skip 4."
+
+8. **Wait for explicit go-ahead before editing either file.** Acceptable
+   responses from the user: approve all, approve a subset by number, or ask
+   for clarification on specific points before deciding. Do not proceed to
+   edits on an ambiguous response — ask which points are approved.
+
+9. Once approved, apply only the approved points to `CLAUDE.md` and/or
+   `MODULES.md`. Update the `_Last resynced: <date>_` line at the bottom of
+   `MODULES.md` to today's date. Push both changed files via `gitpush.py` in
+   a single commit with message `chore: resync CLAUDE.md and MODULES.md`.
 
 ## What NOT to do during a resync
 
 - Don't fix bugs, refactor code, or start any feature work — flag issues,
   don't fix them, unless explicitly asked.
-- Don't remove a module's "Gotchas" bullet just because you didn't verify it
-  in this pass — only remove/change what you actually confirmed is wrong.
-- Don't skip step 6 (the confirm-before-write step) even if the changes look
-  obviously correct.
+- Don't remove a module's "Gotchas" bullet, or a CLAUDE.md claim, just because
+  you didn't verify it in this pass — only propose changing what you actually
+  confirmed is wrong or stale.
+- Don't skip step 8 (the confirm-before-write step) even if the changes look
+  obviously correct or small.
+- Don't mix unrelated fixes into the approved edit — if the user approves
+  points 1-3, don't also sneak in a point 7 you thought of while editing.
