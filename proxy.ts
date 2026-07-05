@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getSessionCookie } from "better-auth/cookies";
 
-// Deploy-trigger test comment (retest after env var change) — safe to ignore.
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
