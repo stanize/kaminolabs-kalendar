@@ -201,29 +201,33 @@ export function bookingCancelledClientHtml(input: {
   serviceName: string;
   whenLabel: string;
   byOwner: boolean;
+  byExpiry?: boolean;
   locale?: "es" | "en";
 }): string {
   const { clientName, businessName, serviceName, whenLabel, byOwner } = input;
+  const byExpiry = input.byExpiry ?? false;
   const locale = input.locale ?? "es";
   const t =
     locale === "en"
       ? {
           title: "Booking cancelled",
           greeting: clientName ? `Hi ${escapeHtml(clientName)},` : "Hi,",
-          reasonByOwner: `Your booking at <strong>${escapeHtml(businessName)}</strong> has been cancelled by the business.`,
-          reasonByGuest: `Your booking at <strong>${escapeHtml(businessName)}</strong> has been cancelled.`,
+          reasonByOwner:  `Your booking at <strong>${escapeHtml(businessName)}</strong> has been cancelled by the business.`,
+          reasonByGuest:  `Your booking at <strong>${escapeHtml(businessName)}</strong> has been cancelled.`,
+          reasonByExpiry: `Your booking request at <strong>${escapeHtml(businessName)}</strong> was not confirmed in time and has been automatically cancelled.`,
           service: "Service",
           when: "When",
         }
       : {
           title: "Reserva cancelada",
           greeting: clientName ? `Hola ${escapeHtml(clientName)},` : "Hola,",
-          reasonByOwner: `Tu reserva en <strong>${escapeHtml(businessName)}</strong> ha sido cancelada por el negocio.`,
-          reasonByGuest: `Tu reserva en <strong>${escapeHtml(businessName)}</strong> ha sido cancelada.`,
+          reasonByOwner:  `Tu reserva en <strong>${escapeHtml(businessName)}</strong> ha sido cancelada por el negocio.`,
+          reasonByGuest:  `Tu reserva en <strong>${escapeHtml(businessName)}</strong> ha sido cancelada.`,
+          reasonByExpiry: `Tu solicitud de reserva en <strong>${escapeHtml(businessName)}</strong> no fue confirmada a tiempo y ha sido cancelada automáticamente.`,
           service: "Servicio",
           when: "Cuándo",
         };
-  const reason = byOwner ? t.reasonByOwner : t.reasonByGuest;
+  const reason = byExpiry ? t.reasonByExpiry : byOwner ? t.reasonByOwner : t.reasonByGuest;
   return `
   <div style="font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px; color: #0f172a;">
     <h1 style="font-size: 20px; margin: 0 0 16px;">${t.title}</h1>
