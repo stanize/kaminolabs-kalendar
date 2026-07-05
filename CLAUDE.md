@@ -1,5 +1,13 @@
 # Kalendar — Claude Context
 
+> **Per-feature detail lives in `MODULES.md`, not here.** This file covers only
+> project-wide architecture that spans multiple modules (auth model, database,
+> deploy, conventions). If you're working on one feature (business, services,
+> team, availability, booking, patient portal, etc.), read `MODULES.md` first
+> and jump to that module's section — don't expect it here.
+>
+> Keep this file and `MODULES.md` in sync via `RESYNC.md`.
+
 ## Project Overview
 Kalendar is a SaaS online booking platform targeting Spanish-market professionals (psychologists, nutritionists, physiotherapists, beauty centers, fitness trainers, coaches, tutors, etc.).
 
@@ -24,48 +32,30 @@ Kalendar is a SaaS online booking platform targeting Spanish-market professional
 - **Session helpers**: `lib/auth-session.ts` — `getSession()` (React `cache()`-deduped per request), `requireSession()` (throws `UnauthorizedError` when absent), and the `UnauthorizedError` class
 - **Action wrapper**: `lib/auth-action.ts` — `authedAction(handler)` injects a verified session as the guaranteed first arg (this file must stay free of `"use server"`)
 - Supabase is used for DB only — never for auth
+- Per-feature auth detail (patient login, panel role self-heal, onboarding routing guards) — see `MODULES.md` → `auth`, `panel-shell`, `patient-portal`.
 
 ### Database — Supabase
 - **Project ID**: rlxfcmijbesoblissmtd
 - **Connection**: Transaction pooler only — `aws-1-eu-central-1.pooler.supabase.com:6543`
 - Direct connection (port 5432) is blocked on Vercel free plan — always use pooler
-- **Kalendar tables** (all prefixed `kalendar_`): `kalendar_businesses`, `kalendar_services`, `kalendar_business_hours`, `kalendar_team_members`, `kalendar_support_tickets`. There is **no** `kalendar_profiles` table — all per-user identity (id, name, email, `emailVerified`) comes from Better Auth's `user` table via `session.user`.
+- **Kalendar tables** (all prefixed `kalendar_`): see `MODULES.md` for the current table-to-module map. There is **no** `kalendar_profiles` table — all per-user identity (id, name, email, `emailVerified`) comes from Better Auth's `user` table via `session.user`.
 - **Auth tables** (owned by Better Auth, created by `npx @better-auth/cli migrate`, **not** in `schema_001.sql`): `user`, `session`, `account`, `verification`
 
 ### Design System
 - **Fonts**: Bricolage Grotesque (display) + Plus Jakarta Sans (UI)
 - **Brand color**: `#0d9488` (teal)
 - **Tokens**: Tailwind v4 `@theme inline` in `app/globals.css`
-- **Language**: Spanish throughout (UI copy, variable names where applicable)
+- **Language**: Spanish throughout (UI copy only — see Key Conventions)
 
----
+### i18n
+- Cookie-based (`kalendar_locale`), `es`/`en`. Mechanism: `lib/i18n/config.ts`, `lib/i18n/server.ts`, `lib/actions/locale.ts`.
+- One dictionary file per module under `lib/i18n/dictionaries/` — see `MODULES.md` for which dictionary belongs to which module. Don't create a second i18n mechanism; add strings to the relevant module's dictionary file.
 
-## Onboarding (`/onboarding`) — sign-up only
+### Email
+- `lib/email.ts` — Resend REST API (no SDK), env-gated on `RESEND_API_KEY` + `EMAIL_FROM`, degrades gracefully without them. Used by auth (verification) and public-booking (confirm/cancel/owner-notify) — see `MODULES.md` for the full list of emails each module sends.
 
-The multi-step wizard was removed. `/onboarding` is now a simple sign-up screen:
-
-- **Component**: `components/auth/signup-form.tsx` (mirrors `components/auth/login-form.tsx`), rendered by `app/onboarding/page.tsx` in a centered layout.
-- **Google sign-up** → `callbackURL: "/panel"`. Email is pre-verified, so the panel loads with no gate.
-- **Email sign-up** → `authClient.signUp.email({ ..., callbackURL: "/panel" })`, then `router.push("/panel")`. A session is created immediately; the verification email is sent automatically; the panel shows the blocking confirmation gate until the user verifies.
-- Business/services/schedule/team data collection is **no longer part of sign-up** — it will move to a separate in-panel setup flow (the panel home already shows a setup checklist that gracefully reflects an empty account).
-
-### Routing guards
-- `/onboarding` → redirects to `/panel` if a valid session exists
-- `/panel` → redirects to `/login` if no session; if signed in but email unverified, renders the verification gate over the panel
-
-### Removed files
-`components/onboarding/{onboarding-flow,step-cuenta,step-negocio,step-servicios,step-horario,step-equipo,step-listo,nav-buttons,split-shell}.tsx`, `lib/onboarding/{store,validation}.ts`, `lib/actions/{onboarding,skip-onboarding}.ts`.
-
-### Kept (still used by landing + public booking pages)
-`components/onboarding/booking-preview.tsx`, `lib/onboarding/{data,types,slug}.ts` — imported by `app/page.tsx`, `app/bookings/[slug]/page.tsx`, and `lib/landing/ejemplos.ts`.
-
-
-## Panel (`/panel`)
-
-- **Layout**: `app/panel/layout.tsx` — sidebar + main content
-- **Sidebar**: `components/panel/sidebar.tsx` — full Spanish nav, user info, Cerrar sesión
-- **Nav items** (Spanish labels / English routes): Inicio `/panel`, Calendario `/panel/calendar`, Clientes `/panel/clients`, Negocio `/panel/business`, Servicios `/panel/services`, Disponibilidad `/panel/availability`, Equipo `/panel/team`, Pagos `/panel/payments`, Facturas `/panel/invoices`, Emails y avisos `/panel/notifications`, Informes `/panel/reports`, Integraciones `/panel/integrations`, Ajustes `/panel/settings`
-- **Home page**: Setup checklist with progress bar (Negocio, Servicios, Disponibilidad, Equipo), booking page link, quick access shortcuts
+### Cron
+- `app/api/cron/sweep-expired-bookings/route.ts` (Vercel Cron). See `MODULES.md` → `public-booking` / `panel-calendar` for what it touches.
 
 ---
 
@@ -86,141 +76,11 @@ The multi-step wizard was removed. `/onboarding` is now a simple sign-up screen:
 
 ---
 
-## Business settings & public booking
-
-- **First in-panel setup page is built**: `/panel/business` ("Configura tu negocio"; sidebar label "Negocio")
-  manages the single business record (name, type, city, slug). Page:
-  `app/panel/business/page.tsx` (server, `requireSession` + `getSetupProgress`);
-  form: `components/panel/business-form.tsx` (`BusinessForm`) (client). Each setup-checklist
-  block maps to its own sidebar nav item + page, built one block at a time; Negocio
-  is the first. **Return-intent pattern**: links from the home page (`/panel`)
-  carry `?from=home` (checklist items today, dashboard widgets later). The target
-  page reads it and, after a successful PRIMARY mutation, redirects back to
-  `/panel`; direct nav from the sidebar (no param) stays put. Secondary mutations
-  (edit/delete/reorder) never redirect. Negocio redirects on any successful save
-  when `from=home`; Servicios redirects only on the FIRST service added (0->1
-  transition) when `from=home`. Server actions in
-  `lib/actions/business.ts`: `saveBusinessSettings` (create/update) and
-  `checkSlugAvailability` (live UX check) — both wrapped in `authedAction`.
-- **Public booking pages live under `/bookings/[slug]`** (moved from root
-  `/[slug]`). The namespace prevents slug/route collisions. Route:
-  `app/bookings/[slug]/page.tsx`, which renders only when `slug_status='active'`.
-- **Booking URL helper** (`lib/business/booking-url.ts`): `bookingPath(slug)`,
-  `bookingUrl(slug)`, `bookingUrlDisplay(slug)` — the single source of truth for
-  the public URL shape (`{NEXT_PUBLIC_APP_URL}/bookings/{slug}`). Never hardcode
-  the domain or `/bookings` segment anywhere; call these. (Old code wrongly used
-  a `kalendar.app/...` placeholder — all removed.)
-- **Slug rules** (`lib/business/slug-screen.ts`): lowercase a-z/0-9/hyphens,
-  3-40 chars, no leading/trailing/double hyphens; sanitized live as typed.
-  Suggestion is hyphenated from the business name (`suggestSlug`).
-- **Slug is permanent**: chosen once at creation, then **immutable** — the form
-  shows it read-only on edit, and `saveBusinessSettings` ignores any slug in the
-  payload on update. Changing a slug is a future support-handled operation.
-- **Slug moderation (model C+)**: every slug is human-reviewed regardless. At
-  creation an automated screen (`reserved-slugs.ts` blocklist + a small profanity
-  list) runs: clean slugs go live instantly (`slug_status='active'`) but still
-  enter the review queue (`slug_reviewed_at` null); flagged slugs start
-  `pending_review` (offline until approved). Statuses:
-  `active|pending_review|rejected`. Columns on `kalendar_businesses`:
-  `slug_status`, `slug_flag_reason`, `slug_reviewed_at`, `slug_reviewed_by`.
-  Review queue = `slug_reviewed_at IS NULL`. The future admin portal owns review.
-- **Reserved slugs** (`lib/business/reserved-slugs.ts`): vanity/abuse blocklist
-  (admin, support, kalendar, official, api, app, login, billing, ...), extend over time.
-
-### Servicios (second in-panel setup page, BUILT)
-Route `/panel/services` (label "Servicios"), heading "Tus servicios". Manages the
-business's services (name, duration_min, price — no other fields yet; more in
-later releases). Server page `app/panel/services/page.tsx` (redirects to
-`/panel/business?from=home` if no business yet). Client component
-`components/panel/services-manager.tsx`: list with native HTML5 drag-reorder
-(persists immediately via `reorderServices`), inline add/edit editor, and a
-templates picker shown only when the user has zero services. Editor: name; a
-duration preset row (15/30/45/60/90/120 + "Otra" custom, bounded 5-120 min); a
-**price slider 0-100 € synced with an editable number box** — the box is the
-source of truth and the slider clamps to its max when the price exceeds 100
-(whole euros, no decimals, 0 = "Gratis"). Templates come from
-`SERVICE_TEMPLATES[businessType]` (`[name, duration_min, price]`). **Template flow
-(customize-before-confirm)**: the user multi-selects templates, hits
-"Personalizar N" to stage them as pre-filled, individually-removable editable
-draft cards (reusing the shared `ServiceFields`), tweaks each, then "Confirmar N"
-bulk-saves the EDITED values via `createServices`. "Cancelar" discards; removing
-all drafts returns to the picker; the manual "Añadir servicio" button is hidden
-while staging. Reads: `getServicesForUser(userId)` in
-`lib/services/data.ts` (resolves business via owner_id, scopes by business_id).
-Constraints/validation in `lib/services/constants.ts`. Server actions in
-`lib/actions/services.ts` (all `authedAction`, all scope by the caller's
-business_id): `createService`, `createServices` (bulk), `updateService`,
-`deleteService`, `reorderServices`; each revalidates `/panel` + `/panel/services`.
-
-## Disponibilidad & Equipo (setup pages, BUILT)
-
-- **Setup order** (sidebar + home checklist): Negocio -> Servicios -> Equipo -> Disponibilidad.
-- **Equipo** (`/panel/team`): `team_mode` on the business (`solo`|`team`). Owner
-  auto-seeded as a team member via `ensureOwnerSeeded` (render-safe helper in
-  `lib/team/data.ts`, not an action). Solo = only the owner, no add. Team =
-  add/edit/delete/reorder members (owner pinned, undeletable). Actions in
-  `lib/actions/team.ts`.
-- **Disponibilidad** (`/panel/availability`): business-level clinic hours,
-  multi-range per day (split shifts). `kalendar_business_hours` is multi-row per
-  (business, day) — a day is open if it has >=1 interval, no `active` column.
-  `booking_window_months` (1/2/3) on the business. 24h/15-min time dropdowns
-  (custom dropdown that scrolls selected to top); whole-week atomic save via
-  `saveAvailability`. `getBusinessHoursForUser` groups by day.
-
-## Booking system (public booking + engine, BUILT — 5 steps)
-
-The full guest-booking product loop. Public booking pages live at
-`/bookings/[slug]`; the owner manages bookings at `/panel/calendar`.
-
-- **Schema** (`kalendar_bookings`): snapshots `service_name/duration/price` onto
-  each row (so services stay editable/deletable). `booking_status` enum:
-  `pending_confirmation | confirmed | cancelled | completed`. `team_member_id`
-  nullable (null = solo). `confirm_token` (unguessable) is the auth for the
-  guest confirm + cancel links. **Double-booking is impossible at the DB level**:
-  a partial unique index `kalendar_bookings_active_slot_idx` on
-  `(business_id, coalesce(team_member_id, zero-uuid), starts_at)` WHERE status in
-  (pending, confirmed) — cancelled/completed rows excluded so freed slots rebook.
-- **Slot engine** (`lib/booking/slots.ts`): pure, timezone-aware. Slots step by
-  the SERVICE duration. Timezone is hardcoded `Europe/Madrid` (future: from
-  business location); `zonedTimeToUtc` is DST-correct (verified: 09:00 Madrid ->
-  07:00Z summer / 08:00Z winter). All instants stored as UTC timestamptz.
-- **Public flow** (`components/booking/booking-wizard.tsx`): service -> provider
-  (team only; "Cualquiera" shows one slot per free provider, each labelled, so
-  the client picks provider+time together; solo skips provider) -> **week-strip**
-  date picker (Mon-first day chips + slots below, prev/next week bounded by
-  today and booking window) -> guest details (name/email/phone) -> submit. The
-  chosen `YYYY-MM-DD` is interpreted in Madrid server-side.
-- **Public actions** (`lib/actions/booking.ts`, NOT authedAction — guest):
-  `getAvailableSlots`, `submitBooking` (creates `pending_confirmation`, sends
-  client confirm email), `confirmBooking(token)` (pending->confirmed, idempotent,
-  race-guarded, emails owner), `getBookingByToken`, `cancelBookingByToken`
-  (client cancel, emails owner + client), `notifyCancellation` helper.
-- **Confirm page** `/bookings/confirm/[token]`: confirms on GET (benign under
-  auto-accept). **Cancel page** `/bookings/cancel/[token]`: does NOT cancel on
-  GET — shows the booking + a confirm-cancel button (destructive).
-- **Owner side**: `/panel/calendar` (`components/panel/calendar-bookings.tsx`) —
-  upcoming bookings grouped by day (Hoy/Mañana/dated), Próximas/Pendientes tabs
-  (Pendientes = pending_confirmation review queue, with count badge), owner
-  cancel (notifies client). Reads via `getUpcomingBookings` (owner-scoped,
-  `lib/booking/owner-data.ts`). Owner action `cancelBookingAsOwner` in
-  `lib/actions/booking-owner.ts` (authedAction).
-- **Emails** (`lib/email.ts`, Resend, env-gated): client confirm (with cancel
-  link), owner new-booking notification, client+owner cancellation. All
-  best-effort (logged, never block the mutation). `formatBookingWhen` formats
-  Spanish date+time in Madrid.
-- **v1 model**: guest booking (no login), auto-accept default (client email
-  confirm = confirmed; owner review surfaced but not a required gate — future
-  owner "auto-accept on/off" setting). Unconfirmed bookings hold the slot with no
-  auto-expiry yet (future owner setting; owner review is the backstop).
-- **DEFERRED**: payment, owner notification preferences, per-member
-  availability/service overrides, slot-hold expiry, rescheduling (cancel+rebook
-  covers it), real calendar grid view.
-
-## Key Conventions
+## Key Conventions (apply across ALL modules)
 
 - **Internationalization-ready — English-only code, no exceptions.** Every code
   identifier, route path, file/folder name, table/column name, enum value, stored
-  code (business `type`, weekday `day`), slug, comment, and script is in English. (The icon registry export is `ICONS`, renamed from the former Spanish `ICONOS`.)
+  code (business `type`, weekday `day`), slug, comment, and script is in English.
   Spanish appears **only** in UI strings shown to the end customer, supplied as
   display labels mapped from English codes (e.g. `BUSINESS_TYPES` maps
   `psychology` -> `"Psicología"`, `DAYS` maps `mon` -> `"Lunes"`). The project
@@ -230,15 +90,15 @@ The full guest-booking product loop. Public booking pages live at
   (`/panel/business`, `/panel/services`, `/panel/availability`, `/panel/team`, etc.).
   `/panel/settings` (label "Ajustes") is reserved for FUTURE app/account settings —
   the business record lives at `/panel/business`, not settings.
-
 - **Middleware**: Must be named `proxy.ts` (not `middleware.ts`) with exported function `proxy` — Next.js 16 convention
 - **Auth layering (two gates)**: The `/panel` layout (`app/panel/layout.tsx`) is a server-component UX gate — it redirects unauthenticated users and every nested route inherits it. It is **not** a security boundary: server actions are directly invocable, so each must verify auth itself. Because all DB access uses the Supabase service-role key (no RLS backstop), the app-level check is the *only* authorization boundary.
-- **New mutations**: Wrap in `authedAction` from `lib/auth-action.ts` — `export const createX = authedAction(async (session, input) => { ... })`. The verified session is the guaranteed first arg, so there is no path into the body that skips the check. (`authedAction` throws `UnauthorizedError`. The existing `support` / `onboarding` / `skip-onboarding` actions instead **return** a graceful Spanish `{ ok: false, error }`, so they keep their own inline `getSession()` check and are intentionally not wrapped — wrapping would change their error contract.)
+- **New mutations**: Wrap in `authedAction` from `lib/auth-action.ts` — `export const createX = authedAction(async (session, input) => { ... })`. The verified session is the guaranteed first arg, so there is no path into the body that skips the check. (`authedAction` throws `UnauthorizedError`. The `support` action instead **returns** a graceful Spanish `{ ok: false, error }`, so it keeps its own inline `getSession()` check and is intentionally not wrapped — wrapping would change its error contract.)
 - **Reads in server components**: Plain query functions taking `userId` as a required first arg — `getServices(userId)` — scoping every query by it (e.g. `.eq("owner_id", userId)`). Obtain the id via `requireSession()` (already guaranteed by the layout). The required parameter is what makes "scope to current user" impossible to forget; there is no unscoped overload to call by accident.
 - **Never trust client-passed user IDs** — always derive from the session.
 - **DB queries**: Always use `createClient()` from `lib/supabase/server.ts` in server components/actions
 - **Icons**: Add new icons to `components/ui/icon.tsx` ICONOS registry before using
-- **Copy**: All UI copy in Spanish
+- **Copy**: All UI copy in Spanish (except guest-facing emails/booking pages, which are locale-aware — see `MODULES.md` → `public-booking`)
+- **Server→client serialization**: dictionary values crossing the boundary must be plain serializable data — never functions. Use placeholder-token strings + `.replace()`, not function fields.
 
 ---
 
@@ -248,43 +108,24 @@ Every `kalendar_*` table with a user-scoped column has an `ON DELETE CASCADE` FK
 to `"user"(id)` (defined in `schema_001.sql`), so deleting a user removes all of their data.
 
 1. Run in Supabase SQL editor: `DELETE FROM "user" WHERE email = 'user@example.com';`
-   Cascades to: `account`, `session`, `verification` (Better Auth) **and**
-   `kalendar_support_tickets`, `kalendar_businesses`
-   → `kalendar_services` / `kalendar_business_hours` / `kalendar_team_members`.
 2. Clear browser cookies for `kaminolabs.dev`.
 
 Both steps required for a clean reset.
 
 ### Full database reset (wipe all users)
-One-off, destructive — run in the Supabase SQL editor:
+One-off, destructive — run in the Supabase SQL editor. Truncate every
+`kalendar_*` table plus `account`, `session`, `verification`, `"user"` with
+`restart identity cascade`. Check `schema_001.sql` for the current full table
+list before running (it changes as modules add tables).
 
-```sql
-truncate
-  public.kalendar_support_tickets,
-  public.kalendar_bookings,
-  public.kalendar_team_members,
-  public.kalendar_business_hours,
-  public.kalendar_services,
-  public.kalendar_businesses,
-  public."account",
-  public."session",
-  public."verification",
-  public."user"
-restart identity cascade;
-```
-
-Storage files in `support-attachments` are not removed by the truncate above;
-clear them separately if needed:
-`delete from storage.objects where bucket_id = 'support-attachments';`
+Storage files in `support-attachments` are not removed by truncate; clear
+separately if needed: `delete from storage.objects where bucket_id = 'support-attachments';`
 
 ## Migrations
 
-- `schema_001.sql` — single consolidated schema. Drops and recreates all
-  `kalendar_*` tables (businesses, services, hours, team, support
-  tickets), the support enums, the `set_updated_at` trigger, and the
-  `support-attachments` storage bucket. Applied by pasting the whole file into
-  the Supabase SQL editor. There are no incremental migration files — when the
-  schema changes, edit this file and re-run it (destructive: it drops first).
+- `schema_001.sql` — single consolidated schema, destructive (drops and
+  recreates all `kalendar_*` tables). No incremental migration files — when the
+  schema changes, edit this file and re-run it.
 - **Migration order matters**: run `npx @better-auth/cli migrate` FIRST (creates `user`/`session`/`account`/`verification`), THEN run `schema_001.sql` — the Kalendar tables have cascade FKs to `public."user"(id)` and will fail if `user` does not yet exist.
 
 ---
