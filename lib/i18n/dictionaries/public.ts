@@ -102,10 +102,9 @@ const es: PublicDictionary = {
     startFree: "Empezar gratis",
   },
   home: {
-    heroTitle: "Software de reservas para profesionales que cuidan de sus clientes",
-    heroSubtitle:
-      "Crea tu página de reservas online, gestiona tus servicios y tu disponibilidad, y deja que tus clientes reserven solos — todo en español, listo en menos de 2 minutos.",
-    startFree: "Empezar gratis",
+    heroTitle: "Reservas para tu clínica, sin llamadas",
+    heroSubtitle: "Tu página de reservas, lista en 2 minutos.",
+    startFree: "Crear cuenta gratis",
     heroEmailPlaceholder: "tu@email.com",
     noCreditCard: "Sin tarjeta de crédito",
     whoForTitle: "Pensado para quien atiende citas, no agendas",
@@ -182,10 +181,9 @@ const en: PublicDictionary = {
     startFree: "Start for free",
   },
   home: {
-    heroTitle: "Booking software for professionals who care for their clients",
-    heroSubtitle:
-      "Create your online booking page, manage your services and availability, and let your clients book themselves — ready in under 2 minutes.",
-    startFree: "Start for free",
+    heroTitle: "Bookings for your clinic, no phone calls",
+    heroSubtitle: "Your booking page, ready in 2 minutes.",
+    startFree: "Create free account",
     heroEmailPlaceholder: "you@email.com",
     noCreditCard: "No credit card required",
     whoForTitle: "Built for people who handle appointments, not spreadsheets",
