@@ -1,8 +1,1 @@
-{
-  "crons": [
-    {
-      "path": "/api/cron/sweep-expired-bookings",
-      "schedule": "0 * * * *"
-    }
-  ]
-}
+{}
