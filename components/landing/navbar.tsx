@@ -35,11 +35,11 @@ export async function Navbar() {
           {/* /panel redirects to /onboarding if no session, or shows the panel if logged in */}
           <Link
             href="/panel"
-            className="hidden text-[14.5px] font-semibold text-ink-soft transition-colors hover:text-ink md:inline"
+            className="text-[14.5px] font-semibold text-ink-soft transition-colors hover:text-ink"
           >
             {dict.navbar.signIn}
           </Link>
-          <Link href="/onboarding">
+          <Link href="/onboarding" className="hidden md:inline">
             <Btn size="sm" className="rounded-full">{dict.navbar.startFree}</Btn>
           </Link>
         </div>

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { Icon } from "@/components/ui/icon";
 import { LanguageSwitcher } from "@/components/i18n/language-switcher";
 import type { PublicDictionary } from "@/lib/i18n/dictionaries/public";
@@ -55,9 +54,7 @@ export function MobileNav({ navbar, locale }: MobileNavProps) {
               {navbar.pricing}
             </a>
             <div className="flex items-center justify-between py-3">
-              <Link href="/panel" onClick={() => setOpen(false)} className="font-semibold text-ink-soft transition-colors hover:text-ink">
-                {navbar.signIn}
-              </Link>
+              <span className="text-[13px] text-ink-soft">{navbar.language}</span>
               <LanguageSwitcher current={locale} revalidate="/" />
             </div>
           </nav>

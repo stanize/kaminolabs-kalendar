@@ -19,6 +19,7 @@ export interface PublicDictionary {
     pricing: string;
     signIn: string;
     startFree: string;
+    language: string;
   };
   home: {
     heroTitle: string;
@@ -100,6 +101,7 @@ const es: PublicDictionary = {
     pricing: "Precios",
     signIn: "Iniciar sesión",
     startFree: "Empezar gratis",
+    language: "Idioma",
   },
   home: {
     heroTitle: "Reservas para tu clínica, sin llamadas",
@@ -179,6 +181,7 @@ const en: PublicDictionary = {
     pricing: "Pricing",
     signIn: "Sign in",
     startFree: "Start for free",
+    language: "Language",
   },
   home: {
     heroTitle: "Bookings for your clinic, no phone calls",
