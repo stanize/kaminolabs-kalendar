@@ -1,4 +1,4 @@
-import { Calendar } from "lucide-react";
+import { Bird } from "lucide-react";
 
 export function Logo({
   size = 22,
@@ -35,7 +35,7 @@ export function Logo({
           boxShadow: onColor ? "none" : "0 2px 8px color-mix(in oklab, var(--color-brand) 45%, transparent)",
         }}
       >
-        <Calendar size={size - 4} strokeWidth={2} />
+        <Bird size={size - 4} strokeWidth={2} />
       </div>
       {showText && compactOnMobile && (
         <span
