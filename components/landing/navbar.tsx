@@ -13,7 +13,7 @@ export async function Navbar() {
       <div className="relative mx-auto flex max-w-[1180px] items-center justify-between px-5 py-4 sm:px-8">
         <div className="flex items-center gap-3">
           <MobileNav navbar={dict.navbar} locale={locale} />
-          <Logo size={20} tagline />
+          <Logo size={20} tagline compactOnMobile />
         </div>
 
         <nav className="hidden items-center gap-8 text-[14.5px] font-medium text-ink-soft md:flex">
@@ -35,7 +35,7 @@ export async function Navbar() {
           {/* /panel redirects to /onboarding if no session, or shows the panel if logged in */}
           <Link
             href="/panel"
-            className="text-[14.5px] font-semibold text-ink-soft transition-colors hover:text-ink"
+            className="rounded-full border border-line px-4 py-1.5 text-[14.5px] font-semibold text-ink-soft transition-colors hover:border-brand-line hover:text-ink"
           >
             {dict.navbar.signIn}
           </Link>

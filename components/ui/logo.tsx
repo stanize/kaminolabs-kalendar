@@ -6,6 +6,7 @@ export function Logo({
   light = false,
   onColor = false,
   tagline = false,
+  compactOnMobile = false,
   className,
 }: {
   size?: number;
@@ -15,8 +16,13 @@ export function Logo({
   // Appends " : kaminolabs" after the wordmark, muted/regular weight —
   // used only on the home page navbar (Acuity-style "product : company").
   tagline?: boolean;
+  // Below the sm breakpoint, collapse the wordmark (+ tagline) to just "K" —
+  // used on the home page navbar so it doesn't crowd the mobile header.
+  compactOnMobile?: boolean;
   className?: string;
 }) {
+  const textColor = light || onColor ? "#fff" : "var(--color-ink)";
+
   return (
     <div className={`flex items-center gap-2.5 ${className ?? ""}`}>
       <div
@@ -31,13 +37,18 @@ export function Logo({
       >
         <Calendar size={size - 4} strokeWidth={2} />
       </div>
+      {showText && compactOnMobile && (
+        <span
+          className="font-display text-[1.05em] font-semibold tracking-tight sm:hidden"
+          style={{ fontSize: size - 2, color: textColor }}
+        >
+          K
+        </span>
+      )}
       {showText && (
         <span
-          className="font-display text-[1.05em] font-semibold tracking-tight"
-          style={{
-            fontSize: size - 2,
-            color: light || onColor ? "#fff" : "var(--color-ink)",
-          }}
+          className={`font-display text-[1.05em] font-semibold tracking-tight ${compactOnMobile ? "hidden sm:inline" : ""}`}
+          style={{ fontSize: size - 2, color: textColor }}
         >
           Kalendar
           {tagline && (
