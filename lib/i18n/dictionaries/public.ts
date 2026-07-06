@@ -24,6 +24,7 @@ export interface PublicDictionary {
     heroTitle: string;
     heroSubtitle: string;
     startFree: string;
+    heroEmailPlaceholder: string;
     noCreditCard: string;
     whoForTitle: string;
     whoForSubtitle: string;
@@ -105,6 +106,7 @@ const es: PublicDictionary = {
     heroSubtitle:
       "Crea tu página de reservas online, gestiona tus servicios y tu disponibilidad, y deja que tus clientes reserven solos — todo en español, listo en menos de 2 minutos.",
     startFree: "Empezar gratis",
+    heroEmailPlaceholder: "tu@email.com",
     noCreditCard: "Sin tarjeta de crédito",
     whoForTitle: "Pensado para quien atiende citas, no agendas",
     whoForSubtitle:
@@ -184,6 +186,7 @@ const en: PublicDictionary = {
     heroSubtitle:
       "Create your online booking page, manage your services and availability, and let your clients book themselves — ready in under 2 minutes.",
     startFree: "Start for free",
+    heroEmailPlaceholder: "you@email.com",
     noCreditCard: "No credit card required",
     whoForTitle: "Built for people who handle appointments, not spreadsheets",
     whoForSubtitle: "Kalendar adapts to your profession from minute one, with service templates for every sector.",

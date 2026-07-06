@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Navbar } from "@/components/landing/navbar";
+import { HeroSignup } from "@/components/landing/hero-signup";
 import { Btn } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { BookingPreview } from "@/components/onboarding/booking-preview";
@@ -35,11 +36,7 @@ export default async function LandingPage() {
             {h.heroSubtitle}
           </p>
           <div className="mt-8 flex flex-col items-center gap-3">
-            <Link href="/onboarding">
-              <Btn size="lg">
-                {h.startFree} <Icon name="arrowRight" size={18} />
-              </Btn>
-            </Link>
+            <HeroSignup emailPlaceholder={h.heroEmailPlaceholder} ctaLabel={h.startFree} />
             <span className="text-[13px] font-medium text-ink-soft">{h.noCreditCard}</span>
           </div>
         </section>
