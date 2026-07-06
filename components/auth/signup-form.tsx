@@ -4,11 +4,22 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { authClient } from "@/lib/auth-client";
-import { Icon } from "@/components/ui/icon";
 import type { PublicDictionary } from "@/lib/i18n/dictionaries/public";
 
-type View = "picker" | "register";
 type AuthDict = PublicDictionary["auth"];
+
+// Small fixed list for now — country isn't persisted anywhere yet, this is
+// just the visual field GitHub-style signup screens show. Spain is the
+// default since Madrid is the initial market. Expand/wire up to a real
+// field later if the business needs it.
+const COUNTRIES = [
+  { code: "ES", label: "España" },
+  { code: "PT", label: "Portugal" },
+  { code: "MX", label: "México" },
+  { code: "AR", label: "Argentina" },
+  { code: "CO", label: "Colombia" },
+  { code: "OTHER", label: "Otro" },
+];
 
 function withTimeout<T>(promise: Promise<T>, ms: number, timeoutMsg: string): Promise<T> {
   return Promise.race([
@@ -18,7 +29,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number, timeoutMsg: string): Pr
 }
 
 const GoogleIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
+  <svg width="18" height="18" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
     <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
     <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
     <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
@@ -32,16 +43,13 @@ const inputClass =
 
 export function SignupForm({ dict }: { dict: AuthDict }) {
   const router = useRouter();
-  const [view, setView] = useState<View>("picker");
 
-  // Picker state
   const [loadingGoogle, setLoadingGoogle] = useState(false);
-
-  // Register state
   const [name, setName]                       = useState("");
   const [email, setEmail]                     = useState("");
   const [password, setPassword]               = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [country, setCountry]                 = useState("ES");
   const [loading, setLoading]                 = useState(false);
   const [error, setError]                     = useState<string | null>(null);
 
@@ -99,76 +107,78 @@ export function SignupForm({ dict }: { dict: AuthDict }) {
     }
   }
 
-  const haveAccount = (
-    <p className="text-center text-[13px] text-ink-soft">
-      {dict.haveAccount}{" "}
-      <Link href="/login" className="font-medium text-brand hover:underline">
-        {dict.signIn}
-      </Link>
-    </p>
-  );
-
-  if (view === "picker") {
-    return (
-      <div className="flex flex-col gap-3">
-        <button
-          type="button"
-          onClick={handleGoogle}
-          disabled={loadingGoogle}
-          className="flex w-full items-center justify-center gap-3 rounded-xl border border-line bg-surface px-5 py-4 text-[15px] font-semibold text-ink shadow-sm transition-all hover:border-brand-line hover:shadow-md disabled:cursor-wait disabled:opacity-60"
-        >
-          <GoogleIcon />
-          {loadingGoogle ? dict.connecting : dict.continueGoogle}
-        </button>
-
-        <button
-          type="button"
-          onClick={() => { setError(null); setView("register"); }}
-          className="flex w-full items-center justify-center gap-3 rounded-xl border border-line bg-surface px-5 py-4 text-[15px] font-semibold text-ink shadow-sm transition-all hover:border-brand-line hover:shadow-md"
-        >
-          <Icon name="mail" size={20} className="shrink-0 text-ink-soft" />
-          {dict.continueEmail}
-        </button>
-
-        <p className="mt-1 text-center text-[12px] leading-[1.5] text-ink-soft">
-          {dict.termsPrefix}{" "}
-          <a href="#" className="underline hover:text-ink">{dict.terms}</a>{" "}
-          {dict.termsAnd}{" "}
-          <a href="#" className="underline hover:text-ink">{dict.privacy}</a>{" "}
-          {dict.termsSuffix}
-        </p>
-
-        {error && (
-          <p className="rounded-xl bg-error-weak px-3.5 py-2.5 text-[13px] font-medium text-error">{error}</p>
-        )}
-
-        {haveAccount}
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-col gap-4">
       <button
         type="button"
-        onClick={() => { setView("picker"); setError(null); }}
-        disabled={loading}
-        className="flex items-center gap-1.5 self-start text-[13.5px] font-medium text-ink-soft transition-colors hover:text-ink disabled:opacity-40"
+        onClick={handleGoogle}
+        disabled={loadingGoogle}
+        className="flex w-full items-center justify-center gap-3 rounded-xl border border-line bg-surface px-5 py-3 text-[14.5px] font-semibold text-ink shadow-sm transition-all hover:border-brand-line hover:shadow-md disabled:cursor-wait disabled:opacity-60"
       >
-        <Icon name="chevronLeft" size={16} /> {dict.back}
+        <GoogleIcon />
+        {loadingGoogle ? dict.connecting : dict.continueGoogle}
       </button>
 
+      <div className="flex items-center gap-3 text-[12px] font-medium text-ink-soft">
+        <div className="h-px flex-1 bg-line" />
+        o
+        <div className="h-px flex-1 bg-line" />
+      </div>
+
       <div className="flex flex-col gap-3">
-        <input type="text"     placeholder={dict.namePlaceholder}            value={name}            onChange={(e) => setName(e.target.value)}            disabled={loading} className={inputClass} />
-        <input type="email"    placeholder={dict.emailPlaceholder}           value={email}           onChange={(e) => setEmail(e.target.value)}           disabled={loading} className={inputClass} />
-        <input type="password" placeholder={dict.passwordPlaceholder}        value={password}        onChange={(e) => setPassword(e.target.value)}        disabled={loading} className={inputClass} />
-        <input type="password" placeholder={dict.confirmPasswordPlaceholder} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} disabled={loading}
-          onKeyDown={(e) => e.key === "Enter" && handleRegister()} className={inputClass} />
+        <input
+          type="text"
+          placeholder={dict.namePlaceholder}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          disabled={loading}
+          className={inputClass}
+        />
+        <input
+          type="email"
+          placeholder={dict.emailPlaceholder}
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          disabled={loading}
+          className={inputClass}
+        />
+        <input
+          type="password"
+          placeholder={dict.passwordPlaceholder}
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          disabled={loading}
+          className={inputClass}
+        />
+        <input
+          type="password"
+          placeholder={dict.confirmPasswordPlaceholder}
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
+          disabled={loading}
+          onKeyDown={(e) => e.key === "Enter" && handleRegister()}
+          className={inputClass}
+        />
+
+        <div className="flex flex-col gap-1.5">
+          <label className="text-[13px] font-medium text-ink-soft">{dict.countryLabel}</label>
+          <select
+            value={country}
+            onChange={(e) => setCountry(e.target.value)}
+            disabled={loading}
+            className={inputClass}
+          >
+            {COUNTRIES.map((c) => (
+              <option key={c.code} value={c.code}>{c.label}</option>
+            ))}
+          </select>
+        </div>
+
         <button
           type="button"
           onClick={handleRegister}
           disabled={loading}
-          className="w-full rounded-xl bg-brand px-5 py-3.5 text-[15px] font-semibold text-white transition-all hover:bg-brand/90 disabled:cursor-wait disabled:opacity-60"
+          className="mt-1 w-full rounded-xl bg-brand px-5 py-3.5 text-[15px] font-semibold text-white transition-all hover:bg-brand/90 disabled:cursor-wait disabled:opacity-60"
         >
           {loading ? dict.creating : dict.createAccount}
         </button>
@@ -178,7 +188,20 @@ export function SignupForm({ dict }: { dict: AuthDict }) {
         <p className="rounded-xl bg-error-weak px-3.5 py-2.5 text-[13px] font-medium text-error">{error}</p>
       )}
 
-      {haveAccount}
+      <p className="text-center text-[12px] leading-[1.5] text-ink-soft">
+        {dict.termsPrefix}{" "}
+        <a href="#" className="underline hover:text-ink">{dict.terms}</a>{" "}
+        {dict.termsAnd}{" "}
+        <a href="#" className="underline hover:text-ink">{dict.privacy}</a>{" "}
+        {dict.termsSuffix}
+      </p>
+
+      <p className="text-center text-[13px] text-ink-soft sm:hidden">
+        {dict.haveAccount}{" "}
+        <Link href="/login" className="font-medium text-brand hover:underline">
+          {dict.signIn}
+        </Link>
+      </p>
     </div>
   );
 }

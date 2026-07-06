@@ -44,7 +44,7 @@ export default async function LoginPage() {
 
         <p className="mt-6 text-center text-[13px] text-ink-soft">
           {dict.login.noAccount}{" "}
-          <Link href="/onboarding" className="font-medium text-brand hover:underline">
+          <Link href="/signup" className="font-medium text-brand hover:underline">
             {dict.login.createFree}
           </Link>
         </p>

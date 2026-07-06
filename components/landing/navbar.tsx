@@ -50,7 +50,7 @@ export async function Navbar() {
           >
             {dict.navbar.signIn}
           </Link>
-          <Link href="/onboarding" className="hidden md:inline">
+          <Link href="/signup" className="hidden md:inline">
             <Btn size="sm" className="rounded-full">{dict.navbar.startFree}</Btn>
           </Link>
         </div>

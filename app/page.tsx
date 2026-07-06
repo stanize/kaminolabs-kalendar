@@ -108,7 +108,7 @@ export default async function LandingPage() {
             {h.ctaTitle}
           </h2>
           <p className="mx-auto mt-3 max-w-[440px] text-[15.5px] text-white/85">{h.ctaSubtitle}</p>
-          <Link href="/onboarding" className="mt-7 inline-block">
+          <Link href="/signup" className="mt-7 inline-block">
             <Btn size="lg" variant="outline" className="border-white bg-white text-brand-ink hover:text-brand-ink">
               {h.ctaButton} <Icon name="arrowRight" size={18} />
             </Btn>

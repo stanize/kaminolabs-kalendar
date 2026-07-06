@@ -18,7 +18,7 @@ export function HeroSignup({ emailPlaceholder, ctaLabel }: HeroSignupProps) {
 
   function handleSubmit() {
     const trimmed = email.trim();
-    router.push(trimmed ? `/onboarding?email=${encodeURIComponent(trimmed)}` : "/onboarding");
+    router.push(trimmed ? `/signup?email=${encodeURIComponent(trimmed)}` : "/signup");
   }
 
   return (

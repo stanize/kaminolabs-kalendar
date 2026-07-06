@@ -17,7 +17,7 @@ after every feature is shipped and tested, before starting the next one.
 ## Module: auth
 Login, sign-up, session handling, role assignment.
 
-- Routes: `app/api/auth/[...all]/route.ts`, `app/login/page.tsx`, `app/onboarding/page.tsx`
+- Routes: `app/api/auth/[...all]/route.ts`, `app/login/page.tsx`, `app/signup/page.tsx`
 - Components: `components/auth/login-form.tsx`, `components/auth/signup-form.tsx`, `components/auth/patient-login-form.tsx`
 - Lib: `lib/auth.ts`, `lib/auth-client.ts`, `lib/auth-session.ts`, `lib/auth-action.ts`, `lib/roles/*`
 - Proxy/middleware: `proxy.ts`

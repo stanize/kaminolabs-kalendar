@@ -49,7 +49,8 @@ export interface PublicDictionary {
     previewService: string;
     previewChooseDay: string;
   };
-  onboarding: {
+  signup: {
+    // Left dark panel (split-screen layout).
     title: string;
     subtitle: string;
   };
@@ -76,6 +77,7 @@ export interface PublicDictionary {
     emailPlaceholder: string;
     passwordPlaceholder: string;
     confirmPasswordPlaceholder: string;
+    countryLabel: string;
     createAccount: string;
     creating: string;
     loggingIn: string;
@@ -131,9 +133,9 @@ const es: PublicDictionary = {
     previewService: "Servicio",
     previewChooseDay: "Elige día",
   },
-  onboarding: {
-    title: "Crea tu cuenta",
-    subtitle: "Tu página de reservas, lista en 2 minutos.",
+  signup: {
+    title: "Crea tu cuenta gratis",
+    subtitle: "Automatiza las tareas administrativas de tu clínica y dedica tu tiempo a tus clientes.",
   },
   login: {
     title: "Bienvenido de nuevo",
@@ -157,6 +159,7 @@ const es: PublicDictionary = {
     emailPlaceholder: "Email",
     passwordPlaceholder: "Contraseña (mín. 8 car.)",
     confirmPasswordPlaceholder: "Repite la contraseña",
+    countryLabel: "Tu país",
     createAccount: "Crear cuenta",
     creating: "Un momento…",
     loggingIn: "Un momento…",
@@ -210,9 +213,9 @@ const en: PublicDictionary = {
     previewService: "Service",
     previewChooseDay: "Choose a day",
   },
-  onboarding: {
-    title: "Create your account",
-    subtitle: "Your booking page, ready in 2 minutes.",
+  signup: {
+    title: "Create your free account",
+    subtitle: "Automate your clinic's admin work and spend your time on your clients.",
   },
   login: {
     title: "Welcome back",
@@ -236,6 +239,7 @@ const en: PublicDictionary = {
     emailPlaceholder: "Email",
     passwordPlaceholder: "Password (min. 8 chars)",
     confirmPasswordPlaceholder: "Repeat password",
+    countryLabel: "Your country",
     createAccount: "Create account",
     creating: "One moment…",
     loggingIn: "One moment…",
