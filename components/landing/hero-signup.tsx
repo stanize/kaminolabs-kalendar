@@ -22,7 +22,7 @@ export function HeroSignup({ emailPlaceholder, ctaLabel }: HeroSignupProps) {
   }
 
   return (
-    <div className="flex w-full max-w-[440px] items-center gap-1 rounded-full border border-line bg-surface p-1">
+    <div className="flex w-full max-w-[440px] flex-col gap-2 rounded-2xl border border-line bg-surface p-1 sm:flex-row sm:items-center sm:gap-1 sm:rounded-full">
       <input
         type="email"
         value={email}
@@ -34,7 +34,7 @@ export function HeroSignup({ emailPlaceholder, ctaLabel }: HeroSignupProps) {
       <button
         type="button"
         onClick={handleSubmit}
-        className="shrink-0 whitespace-nowrap rounded-full bg-brand px-5 py-2.5 text-[14px] font-semibold text-white transition-all hover:brightness-[1.06]"
+        className="w-full shrink-0 whitespace-nowrap rounded-xl bg-brand px-5 py-2.5 text-[14px] font-semibold text-white transition-all hover:brightness-[1.06] sm:w-auto sm:rounded-full"
       >
         {ctaLabel}
       </button>
