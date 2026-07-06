@@ -1,0 +1,25 @@
+name: Sweep expired bookings
+
+# Replaces Vercel Cron (Hobby plan only allows daily cron jobs).
+# Calls the existing /api/cron/sweep-expired-bookings endpoint on Vercel,
+# authenticated with the same CRON_SECRET used to protect that route.
+on:
+  schedule:
+    - cron: "0 * * * *" # every hour, on the hour (UTC)
+  workflow_dispatch: {} # allow manual runs from the Actions tab
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call sweep-expired-bookings endpoint
+        run: |
+          response=$(curl -s -o /tmp/response.txt -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "https://kalendar.kaminolabs.dev/api/cron/sweep-expired-bookings")
+          echo "HTTP status: $response"
+          cat /tmp/response.txt
+          if [ "$response" -ge 400 ]; then
+            echo "Sweep endpoint returned an error"
+            exit 1
+          fi
