@@ -6,19 +6,15 @@ export function Logo({
   light = false,
   onColor = false,
   tagline = false,
-  compactOnMobile = false,
   className,
 }: {
   size?: number;
   showText?: boolean;
   light?: boolean;
   onColor?: boolean;
-  // Appends " : kaminolabs" after the wordmark, muted/regular weight —
+  // Appends " : Kaminolabs" after the wordmark, muted/regular weight —
   // used only on the home page navbar (Acuity-style "product : company").
   tagline?: boolean;
-  // Below the sm breakpoint, collapse the wordmark (+ tagline) to just "K" —
-  // used on the home page navbar so it doesn't crowd the mobile header.
-  compactOnMobile?: boolean;
   className?: string;
 }) {
   const textColor = light || onColor ? "#fff" : "var(--color-ink)";
@@ -37,17 +33,9 @@ export function Logo({
       >
         <Bird size={size - 4} strokeWidth={2} />
       </div>
-      {showText && compactOnMobile && (
-        <span
-          className="font-display text-[1.05em] font-semibold tracking-tight sm:hidden"
-          style={{ fontSize: size - 2, color: textColor }}
-        >
-          K
-        </span>
-      )}
       {showText && (
         <span
-          className={`font-display text-[1.05em] font-semibold tracking-tight ${compactOnMobile ? "hidden sm:inline" : ""}`}
+          className="font-display text-[1.05em] font-semibold tracking-tight"
           style={{ fontSize: size - 2, color: textColor }}
         >
           Kalendar
@@ -56,7 +44,7 @@ export function Logo({
               className="font-normal"
               style={{ color: light || onColor ? "rgba(255,255,255,.7)" : "var(--color-ink-soft)" }}
             >
-              {" "}: kaminolabs
+              {" "}: Kaminolabs
             </span>
           )}
         </span>

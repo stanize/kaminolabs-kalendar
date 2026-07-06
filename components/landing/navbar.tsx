@@ -13,7 +13,18 @@ export async function Navbar() {
       <div className="relative mx-auto flex max-w-[1180px] items-center justify-between px-5 py-4 sm:px-8">
         <div className="flex items-center gap-3">
           <MobileNav navbar={dict.navbar} locale={locale} />
-          <Logo size={20} tagline compactOnMobile />
+          {/* Full wordmark on desktop only — mobile shows just the icon,
+              centered in the header (see below). */}
+          <div className="hidden md:block">
+            <Logo size={20} tagline />
+          </div>
+        </div>
+
+        {/* Mobile-only centered icon, absolutely positioned so it sits in
+            the middle of the header regardless of the hamburger/sign-in
+            widths on either side. */}
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 md:hidden">
+          <Logo size={20} showText={false} />
         </div>
 
         <nav className="hidden items-center gap-8 text-[14.5px] font-medium text-ink-soft md:flex">
