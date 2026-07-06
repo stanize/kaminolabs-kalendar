@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Logo } from "@/components/ui/logo";
 import { Btn } from "@/components/ui/button";
 import { LanguageSwitcher } from "@/components/i18n/language-switcher";
+import { MobileNav } from "@/components/landing/mobile-nav";
 import { getPublicServerDictionary } from "@/lib/i18n/server";
 
 export async function Navbar() {
@@ -9,7 +10,7 @@ export async function Navbar() {
 
   return (
     <header className="sticky top-0 z-20 border-b border-line/70 bg-bg/85 backdrop-blur">
-      <div className="mx-auto flex max-w-[1180px] items-center justify-between px-5 py-4 sm:px-8">
+      <div className="relative mx-auto flex max-w-[1180px] items-center justify-between px-5 py-4 sm:px-8">
         <Logo size={20} tagline />
 
         <nav className="hidden items-center gap-8 text-[14.5px] font-medium text-ink-soft md:flex">
@@ -31,10 +32,11 @@ export async function Navbar() {
           {/* /panel redirects to /onboarding if no session, or shows the panel if logged in */}
           <Link
             href="/panel"
-            className="hidden text-[14.5px] font-semibold text-ink-soft transition-colors hover:text-ink sm:inline"
+            className="hidden text-[14.5px] font-semibold text-ink-soft transition-colors hover:text-ink md:inline"
           >
             {dict.navbar.signIn}
           </Link>
+          <MobileNav navbar={dict.navbar} locale={locale} />
           <Link href="/onboarding">
             <Btn size="sm" className="rounded-full">{dict.navbar.startFree}</Btn>
           </Link>
