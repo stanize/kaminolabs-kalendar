@@ -28,18 +28,27 @@ export default async function SignupPage() {
 
   return (
     <div className="grid min-h-screen md:grid-cols-[42%_58%]">
-      {/* Left dark panel — headline + subtitle only, GitHub-style. Hidden on
-          mobile since there's no room for a split layout there. */}
-      <div className="hidden flex-col justify-center bg-ink px-14 py-16 md:flex">
-        <h1 className="max-w-[360px] text-[32px] leading-[1.15] text-white">{dict.signup.title}</h1>
-        <p className="mt-4 max-w-[340px] text-[15.5px] leading-relaxed text-white/70">
+      {/* Top (mobile) / left (desktop) panel — dark, headline + subtitle.
+          On mobile it also carries the "already have an account" line,
+          since there's no room for the desktop's top-right placement. */}
+      <div className="flex flex-col justify-center bg-ink px-6 py-10 sm:px-10 md:px-14 md:py-16">
+        <p className="mb-6 text-[13.5px] text-white/70 md:hidden">
+          {dict.auth.haveAccount}{" "}
+          <Link href="/login" className="font-semibold text-white hover:underline">
+            {dict.auth.signIn} →
+          </Link>
+        </p>
+        <h1 className="max-w-[360px] text-[26px] leading-[1.2] text-white md:text-[32px] md:leading-[1.15]">
+          {dict.signup.title}
+        </h1>
+        <p className="mt-3 max-w-[340px] text-[15px] leading-relaxed text-white/70 md:mt-4 md:text-[15.5px]">
           {dict.signup.subtitle}
         </p>
       </div>
 
-      {/* Right panel — the form itself. */}
-      <div className="relative flex flex-col justify-center px-6 py-16 sm:px-12 md:px-16">
-        <p className="absolute right-6 top-6 hidden text-[13.5px] text-ink-soft sm:block">
+      {/* Bottom (mobile) / right (desktop) panel — the form. */}
+      <div className="relative flex flex-col justify-center px-6 py-10 sm:px-12 md:py-16 md:px-16">
+        <p className="absolute right-6 top-6 hidden text-[13.5px] text-ink-soft md:block">
           {dict.auth.haveAccount}{" "}
           <Link href="/login" className="font-semibold text-ink hover:underline">
             {dict.auth.signIn} →

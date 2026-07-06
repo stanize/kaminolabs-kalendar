@@ -2,30 +2,31 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { authClient } from "@/lib/auth-client";
 import type { PublicDictionary } from "@/lib/i18n/dictionaries/public";
 
 type AuthDict = PublicDictionary["auth"];
-
-// Small fixed list for now — country isn't persisted anywhere yet, this is
-// just the visual field GitHub-style signup screens show. Spain is the
-// default since Madrid is the initial market. Expand/wire up to a real
-// field later if the business needs it.
-const COUNTRIES = [
-  { code: "ES", label: "España" },
-  { code: "PT", label: "Portugal" },
-  { code: "MX", label: "México" },
-  { code: "AR", label: "Argentina" },
-  { code: "CO", label: "Colombia" },
-  { code: "OTHER", label: "Otro" },
-];
 
 function withTimeout<T>(promise: Promise<T>, ms: number, timeoutMsg: string): Promise<T> {
   return Promise.race([
     promise,
     new Promise<never>((_, reject) => setTimeout(() => reject(new Error(timeoutMsg)), ms)),
   ]);
+}
+
+// No name field on this form — derive a display name from the email's local
+// part (e.g. "ana.garcia@x.com" -> "Ana Garcia") so Better Auth's required
+// `name` still gets something reasonable. The user can rename themselves
+// later from the panel if they want.
+function nameFromEmail(email: string): string {
+  const local = email.split("@")[0] ?? "";
+  return local
+    .replace(/[._-]+/g, " ")
+    .trim()
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ") || "Usuario";
 }
 
 const GoogleIcon = () => (
@@ -45,11 +46,9 @@ export function SignupForm({ dict }: { dict: AuthDict }) {
   const router = useRouter();
 
   const [loadingGoogle, setLoadingGoogle] = useState(false);
-  const [name, setName]                       = useState("");
   const [email, setEmail]                     = useState("");
   const [password, setPassword]               = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [country, setCountry]                 = useState("ES");
   const [loading, setLoading]                 = useState(false);
   const [error, setError]                     = useState<string | null>(null);
 
@@ -67,7 +66,6 @@ export function SignupForm({ dict }: { dict: AuthDict }) {
 
   async function handleRegister() {
     setError(null);
-    if (!name.trim())                 { setError(dict.errName); return; }
     if (!email.trim())                { setError(dict.errEmail); return; }
     if (password.length < 8)          { setError(dict.errPasswordLength); return; }
     if (password !== confirmPassword) { setError(dict.errPasswordMismatch); return; }
@@ -76,7 +74,7 @@ export function SignupForm({ dict }: { dict: AuthDict }) {
     try {
       const result = await withTimeout(
         authClient.signUp.email({
-          name: name.trim(),
+          name: nameFromEmail(email.trim()),
           email: email.trim(),
           password,
           // Drives the verification email link target after the user confirms.
@@ -121,19 +119,11 @@ export function SignupForm({ dict }: { dict: AuthDict }) {
 
       <div className="flex items-center gap-3 text-[12px] font-medium text-ink-soft">
         <div className="h-px flex-1 bg-line" />
-        o
+        {dict.orDivider}
         <div className="h-px flex-1 bg-line" />
       </div>
 
       <div className="flex flex-col gap-3">
-        <input
-          type="text"
-          placeholder={dict.namePlaceholder}
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          disabled={loading}
-          className={inputClass}
-        />
         <input
           type="email"
           placeholder={dict.emailPlaceholder}
@@ -160,20 +150,6 @@ export function SignupForm({ dict }: { dict: AuthDict }) {
           className={inputClass}
         />
 
-        <div className="flex flex-col gap-1.5">
-          <label className="text-[13px] font-medium text-ink-soft">{dict.countryLabel}</label>
-          <select
-            value={country}
-            onChange={(e) => setCountry(e.target.value)}
-            disabled={loading}
-            className={inputClass}
-          >
-            {COUNTRIES.map((c) => (
-              <option key={c.code} value={c.code}>{c.label}</option>
-            ))}
-          </select>
-        </div>
-
         <button
           type="button"
           onClick={handleRegister}
@@ -194,13 +170,6 @@ export function SignupForm({ dict }: { dict: AuthDict }) {
         {dict.termsAnd}{" "}
         <a href="#" className="underline hover:text-ink">{dict.privacy}</a>{" "}
         {dict.termsSuffix}
-      </p>
-
-      <p className="text-center text-[13px] text-ink-soft sm:hidden">
-        {dict.haveAccount}{" "}
-        <Link href="/login" className="font-medium text-brand hover:underline">
-          {dict.signIn}
-        </Link>
       </p>
     </div>
   );

@@ -65,6 +65,7 @@ export interface PublicDictionary {
     continueGoogle: string;
     connecting: string;
     continueEmail: string;
+    orDivider: string;
     termsPrefix: string;
     terms: string;
     termsAnd: string;
@@ -73,17 +74,14 @@ export interface PublicDictionary {
     haveAccount: string;
     signIn: string;
     back: string;
-    namePlaceholder: string;
     emailPlaceholder: string;
     passwordPlaceholder: string;
     confirmPasswordPlaceholder: string;
-    countryLabel: string;
     createAccount: string;
     creating: string;
     loggingIn: string;
     // errors
     errGoogle: string;
-    errName: string;
     errEmail: string;
     errPasswordLength: string;
     errPasswordMismatch: string;
@@ -147,6 +145,7 @@ const es: PublicDictionary = {
     continueGoogle: "Continuar con Google",
     connecting: "Conectando…",
     continueEmail: "Continuar con email",
+    orDivider: "o",
     termsPrefix: "Al continuar aceptas los",
     terms: "términos",
     termsAnd: "y la",
@@ -155,16 +154,13 @@ const es: PublicDictionary = {
     haveAccount: "¿Ya tienes cuenta?",
     signIn: "Iniciar sesión",
     back: "Volver",
-    namePlaceholder: "Tu nombre",
     emailPlaceholder: "Email",
     passwordPlaceholder: "Contraseña (mín. 8 car.)",
     confirmPasswordPlaceholder: "Repite la contraseña",
-    countryLabel: "Tu país",
     createAccount: "Crear cuenta",
     creating: "Un momento…",
     loggingIn: "Un momento…",
     errGoogle: "No se pudo conectar con Google. Inténtalo de nuevo.",
-    errName: "Introduce tu nombre.",
     errEmail: "Introduce tu email.",
     errPasswordLength: "La contraseña debe tener al menos 8 caracteres.",
     errPasswordMismatch: "Las contraseñas no coinciden.",
@@ -227,6 +223,7 @@ const en: PublicDictionary = {
     continueGoogle: "Continue with Google",
     connecting: "Connecting…",
     continueEmail: "Continue with email",
+    orDivider: "or",
     termsPrefix: "By continuing you accept Kalendar's",
     terms: "terms",
     termsAnd: "and",
@@ -235,16 +232,13 @@ const en: PublicDictionary = {
     haveAccount: "Already have an account?",
     signIn: "Sign in",
     back: "Back",
-    namePlaceholder: "Your name",
     emailPlaceholder: "Email",
     passwordPlaceholder: "Password (min. 8 chars)",
     confirmPasswordPlaceholder: "Repeat password",
-    countryLabel: "Your country",
     createAccount: "Create account",
     creating: "One moment…",
     loggingIn: "One moment…",
     errGoogle: "Couldn't connect to Google. Please try again.",
-    errName: "Enter your name.",
     errEmail: "Enter your email.",
     errPasswordLength: "Password must be at least 8 characters.",
     errPasswordMismatch: "Passwords don't match.",
