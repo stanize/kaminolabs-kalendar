@@ -5,12 +5,16 @@ export function Logo({
   showText = true,
   light = false,
   onColor = false,
+  tagline = false,
   className,
 }: {
   size?: number;
   showText?: boolean;
   light?: boolean;
   onColor?: boolean;
+  // Appends " : kaminolabs" after the wordmark, muted/regular weight —
+  // used only on the home page navbar (Acuity-style "product : company").
+  tagline?: boolean;
   className?: string;
 }) {
   return (
@@ -36,6 +40,14 @@ export function Logo({
           }}
         >
           Kalendar
+          {tagline && (
+            <span
+              className="font-normal"
+              style={{ color: light || onColor ? "rgba(255,255,255,.7)" : "var(--color-ink-soft)" }}
+            >
+              {" "}: kaminolabs
+            </span>
+          )}
         </span>
       )}
     </div>
