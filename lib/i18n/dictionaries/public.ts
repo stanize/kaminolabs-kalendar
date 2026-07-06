@@ -107,7 +107,7 @@ const es: PublicDictionary = {
     heroTitle: "Reservas para tu clínica, sin llamadas",
     heroSubtitle: "Tu página de reservas, lista en 2 minutos.",
     startFree: "Crear cuenta gratis",
-    heroEmailPlaceholder: "tu@email.com",
+    heroEmailPlaceholder: "Introduce tu email",
     noCreditCard: "Sin tarjeta de crédito",
     whoForTitle: "Pensado para quien atiende citas, no agendas",
     whoForSubtitle:
@@ -187,7 +187,7 @@ const en: PublicDictionary = {
     heroTitle: "Bookings for your clinic, no phone calls",
     heroSubtitle: "Your booking page, ready in 2 minutes.",
     startFree: "Create free account",
-    heroEmailPlaceholder: "you@email.com",
+    heroEmailPlaceholder: "Enter your email",
     noCreditCard: "No credit card required",
     whoForTitle: "Built for people who handle appointments, not spreadsheets",
     whoForSubtitle: "Kalendar adapts to your profession from minute one, with service templates for every sector.",
