@@ -15,7 +15,7 @@ const jakarta = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Kalendar — Software de reservas para profesionales",
+  title: "Kalendar · Menos llamadas, más reservas. Kalendar lo hace fácil. · Kalendar",
   description:
     "Kalendar es el software de reservas online para psicólogos, nutricionistas, fisioterapeutas y clínicas. Crea tu página de reservas gratis en menos de 2 minutos.",
 };
