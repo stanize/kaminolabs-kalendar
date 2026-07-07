@@ -1,6 +1,18 @@
 import { betterAuth } from "better-auth";
 import { Pool } from "pg";
 import { sendEmail, verificationEmailHtml } from "@/lib/email";
+import { LOCALE_COOKIE, DEFAULT_LOCALE, isLocale } from "@/lib/i18n/config";
+
+// Reads the `kalendar_locale` cookie off the raw sign-up request (Better Auth
+// hands the callback a cloned Request, not Next's cookies() helper) so the
+// verification email matches whichever language the user had selected on the
+// home page navbar before signing up.
+function localeFromRequest(request: Request | undefined): "es" | "en" {
+  const cookieHeader = request?.headers.get("cookie") ?? "";
+  const match = cookieHeader.match(new RegExp(`${LOCALE_COOKIE}=([^;]+)`));
+  const value = match?.[1];
+  return isLocale(value) ? value : DEFAULT_LOCALE;
+}
 
 export const auth = betterAuth({
   database: new Pool({
@@ -20,11 +32,15 @@ export const auth = betterAuth({
     // Once the user clicks the link, sign them in and send them to the panel.
     autoSignInAfterVerification: true,
     expiresIn: 60 * 60 * 24, // 24h
-    sendVerificationEmail: async ({ user, url }) => {
+    sendVerificationEmail: async ({ user, url }, request) => {
+      const locale = localeFromRequest(request);
       await sendEmail({
         to: user.email,
-        subject: "Confirma tu email — Kalendar",
-        html: verificationEmailHtml(user.name, url),
+        subject:
+          locale === "en"
+            ? "Welcome to Kalendar! Confirm your email"
+            : "¡Bienvenido a Kalendar! Confirma tu email",
+        html: verificationEmailHtml(url, locale),
       });
     },
   },

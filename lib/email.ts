@@ -71,25 +71,50 @@ export async function sendEmail({ to, subject, html }: SendEmailInput): Promise<
   }
 }
 
-/** Spanish-language verification email body. */
-export function verificationEmailHtml(name: string | null | undefined, url: string): string {
-  const greeting = name ? `Hola ${escapeHtml(name)},` : "Hola,";
+/**
+ * Verification email sent right after sign-up. Owner-facing (the clinic
+ * owner creating their account) — localized to whichever language they had
+ * selected on the home page navbar (read from the locale cookie), since
+ * there's no business.language field yet to drive this properly.
+ */
+export function verificationEmailHtml(url: string, locale: "es" | "en" = "es"): string {
+  const t =
+    locale === "en"
+      ? {
+          heading: "Welcome to Kalendar!",
+          greeting: "Hi,",
+          intro:
+            "Thanks for creating your account. We're glad to have you here — just one step left before you can automate your clinic's admin work and spend more time on your clients.",
+          button: "Confirm my email",
+          fallback: "If the button doesn't work, copy and paste this link into your browser:",
+          ignore: "If you didn't create this account, you can ignore this message.",
+        }
+      : {
+          heading: "¡Bienvenido a Kalendar!",
+          greeting: "Hola,",
+          intro:
+            "Gracias por crear tu cuenta. Nos alegra tenerte aquí — solo falta un paso para que puedas automatizar la gestión de tu clínica y dedicar más tiempo a tus clientes.",
+          button: "Confirmar mi email",
+          fallback: "Si el botón no funciona, copia y pega este enlace en tu navegador:",
+          ignore: "Si no has creado esta cuenta, puedes ignorar este mensaje.",
+        };
+
   return `
   <div style="font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px; color: #0f172a;">
-    <h1 style="font-size: 20px; margin: 0 0 16px;">Confirma tu email</h1>
-    <p style="font-size: 15px; line-height: 1.6; margin: 0 0 12px;">${greeting}</p>
+    <h1 style="font-size: 20px; margin: 0 0 16px;">${t.heading}</h1>
+    <p style="font-size: 15px; line-height: 1.6; margin: 0 0 12px;">${t.greeting}</p>
     <p style="font-size: 15px; line-height: 1.6; margin: 0 0 24px;">
-      Gracias por crear tu cuenta en Kalendar. Confirma tu dirección de email para empezar a usar tu panel.
+      ${t.intro}
     </p>
     <a href="${url}" style="display: inline-block; background: #0d9488; color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 600; padding: 12px 24px; border-radius: 12px;">
-      Confirmar mi email
+      ${t.button}
     </a>
     <p style="font-size: 13px; line-height: 1.6; color: #64748b; margin: 24px 0 0;">
-      Si el botón no funciona, copia y pega este enlace en tu navegador:<br />
+      ${t.fallback}<br />
       <a href="${url}" style="color: #0d9488; word-break: break-all;">${url}</a>
     </p>
     <p style="font-size: 13px; line-height: 1.6; color: #64748b; margin: 16px 0 0;">
-      Si no has creado esta cuenta, puedes ignorar este mensaje.
+      ${t.ignore}
     </p>
   </div>`;
 }
