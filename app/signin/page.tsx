@@ -28,21 +28,19 @@ export default async function SigninPage() {
   const { dict } = await getPublicServerDictionary();
 
   return (
-    <div className="grid min-h-screen place-items-center px-5 py-12">
-      <div className="w-full max-w-[420px]">
-        <div className="mb-8 flex flex-col items-center gap-3 text-center">
-          <Link href="/" aria-label="Kalendar — volver al inicio">
-            <Logo size={22} />
+    <div className="grid min-h-screen place-items-center bg-surface-2 px-5 py-12">
+      <div className="w-full max-w-[360px] rounded-2xl border border-line bg-surface px-7 py-6">
+        <div className="mb-5 flex flex-col items-center gap-1 text-center">
+          <Link href="/" aria-label="Kalendar — volver al inicio" className="mb-1.5">
+            <Logo size={18} showText={false} />
           </Link>
-          <div>
-            <h1 className="text-[24px]">{dict.signin.title}</h1>
-            <p className="mt-1 text-[15px] text-ink-soft">{dict.signin.subtitle}</p>
-          </div>
+          <h1 className="text-[17px] font-medium">{dict.signin.title}</h1>
+          <p className="text-[12.5px] text-ink-soft">{dict.signin.subtitle}</p>
         </div>
 
         <LoginForm dict={dict.auth} />
 
-        <p className="mt-6 text-center text-[13px] text-ink-soft">
+        <p className="mt-4 text-center text-[11.5px] text-ink-soft">
           {dict.signin.noAccount}{" "}
           <Link href="/signup" className="font-medium text-brand hover:underline">
             {dict.signin.createFree}
