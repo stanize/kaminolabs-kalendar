@@ -58,6 +58,28 @@ export async function getActiveBusinessBySlug(slug: string): Promise<Business | 
   return (data as Business | null) ?? null;
 }
 
+export interface PublicBusinessListing {
+  name: string;
+  type: BusinessType;
+  city: string | null;
+  slug: string;
+}
+
+/**
+ * All publicly bookable businesses (slug_status = 'active'), most recent
+ * first. Used by the public /bookings directory page. Only the fields needed
+ * for a listing card are selected — no owner_id or moderation internals.
+ */
+export async function getActiveBusinesses(): Promise<PublicBusinessListing[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from(BUSINESS_TABLE)
+    .select("name, type, city, slug")
+    .eq("slug_status", "active")
+    .order("created_at", { ascending: false });
+  return (data as PublicBusinessListing[] | null) ?? [];
+}
+
 export interface SetupProgress {
   business: Business | null;
   hasServices: boolean;
