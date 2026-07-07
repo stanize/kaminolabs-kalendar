@@ -9,10 +9,10 @@ import { getPublicServerDictionary } from "@/lib/i18n/server";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { dict } = await getPublicServerDictionary();
-  return { title: `${dict.login.title} — Kalendar` };
+  return { title: `${dict.signin.title} — Kalendar` };
 }
 
-export default async function LoginPage() {
+export default async function SigninPage() {
   // Already logged in — go straight to panel
   try {
     const session = await auth.api.getSession({ headers: await headers() });
@@ -20,7 +20,7 @@ export default async function LoginPage() {
       redirect("/panel");
     }
   } catch {
-    // No session — show login
+    // No session — show sign-in
   }
 
   // Language was chosen on the home page; carried forward via cookie. No
@@ -35,17 +35,17 @@ export default async function LoginPage() {
             <Logo size={22} />
           </Link>
           <div>
-            <h1 className="text-[24px]">{dict.login.title}</h1>
-            <p className="mt-1 text-[15px] text-ink-soft">{dict.login.subtitle}</p>
+            <h1 className="text-[24px]">{dict.signin.title}</h1>
+            <p className="mt-1 text-[15px] text-ink-soft">{dict.signin.subtitle}</p>
           </div>
         </div>
 
         <LoginForm dict={dict.auth} />
 
         <p className="mt-6 text-center text-[13px] text-ink-soft">
-          {dict.login.noAccount}{" "}
+          {dict.signin.noAccount}{" "}
           <Link href="/signup" className="font-medium text-brand hover:underline">
-            {dict.login.createFree}
+            {dict.signin.createFree}
           </Link>
         </p>
       </div>

@@ -54,7 +54,7 @@ export interface PublicDictionary {
     title: string;
     subtitle: string;
   };
-  login: {
+  signin: {
     title: string;
     subtitle: string;
     noAccount: string;
@@ -135,7 +135,7 @@ const es: PublicDictionary = {
     title: "Crea tu cuenta gratis",
     subtitle: "Automatiza las tareas administrativas de tu clínica y dedica tu tiempo a tus clientes.",
   },
-  login: {
+  signin: {
     title: "Bienvenido de nuevo",
     subtitle: "Inicia sesión en tu cuenta de Kalendar.",
     noAccount: "¿No tienes cuenta?",
@@ -213,7 +213,7 @@ const en: PublicDictionary = {
     title: "Create your free account",
     subtitle: "Automate your clinic's admin work and spend your time on your clients.",
   },
-  login: {
+  signin: {
     title: "Welcome back",
     subtitle: "Sign in to your Kalendar account.",
     noAccount: "Don't have an account?",

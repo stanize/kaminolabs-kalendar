@@ -15,11 +15,11 @@ export async function proxy(request: NextRequest) {
   // checks (clinic vs patient) happen in the layouts, which have DB access.
   const session = getSessionCookie(request);
 
-  // /panel/** — redirect to /login if not authenticated.
+  // /panel/** — redirect to /signin if not authenticated.
   if (pathname.startsWith("/panel")) {
     if (!session) {
       const url = request.nextUrl.clone();
-      url.pathname = "/login";
+      url.pathname = "/signin";
       return NextResponse.redirect(url);
     }
   }

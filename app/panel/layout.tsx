@@ -8,7 +8,7 @@ import { getPanelShellServerDictionary } from "@/lib/i18n/server";
 
 export default async function PanelLayout({ children }: { children: ReactNode }) {
   const session = await getSession();
-  if (!session?.user) redirect("/login");
+  if (!session?.user) redirect("/signin");
 
   // Role is sticky from first sign-up: a patient-only account must never be
   // silently promoted to clinic just by landing on /panel (e.g. via the

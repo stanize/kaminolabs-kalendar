@@ -77,7 +77,7 @@ export function EmailVerificationGate({ email, dict }: { email: string; dict: Ve
 
   async function handleSignOut() {
     await authClient.signOut();
-    router.push("/login");
+    router.push("/signin");
   }
 
   const resendLabel =
