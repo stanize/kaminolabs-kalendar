@@ -24,12 +24,14 @@ export interface BookingPageDictionary {
   authModal: {
     close: string; // aria-label for the X button
     title: string; // "Completa tu reserva"
+    advantagesHeading: string; // bold "Con Kalendar tienes estas ventajas" heading above the perks list
     perk1: string;
     perk2: string;
+    perk3: string;
     joinOrLogin: string; // primary button: "Únete a Kalendar o inicia sesión"
     or: string;
     continueAsGuest: string;
-    guestNote: string; // "La clínica revisará tu solicitud en un plazo de 24h."
+    guestNote: string; // "Si continúas como invitado, la clínica revisará tu solicitud en un plazo de 24 horas."
     confirmTitle: string; // "Confirmar reserva" (already-authenticated view)
     confirmButton: string;
     confirming: string;
@@ -88,12 +90,14 @@ const es: BookingPageDictionary = {
   authModal: {
     close: "Cerrar",
     title: "Completa tu reserva",
+    advantagesHeading: "Con Kalendar tienes estas ventajas",
     perk1: "Consulta el estado de tus citas",
     perk2: "Recibe recordatorios automáticos",
+    perk3: "Modifica o cancela tus citas fácilmente",
     joinOrLogin: "Únete a Kalendar o inicia sesión",
     or: "o",
     continueAsGuest: "Continuar como invitado",
-    guestNote: "La clínica revisará tu solicitud en un plazo de 24 horas.",
+    guestNote: "Si continúas como invitado, la clínica revisará tu solicitud en un plazo de 24 horas.",
     confirmTitle: "Confirmar reserva",
     confirmButton: "Confirmar reserva",
     confirming: "Reservando…",
@@ -152,12 +156,14 @@ const en: BookingPageDictionary = {
   authModal: {
     close: "Close",
     title: "Complete your booking",
+    advantagesHeading: "With Kalendar you get these advantages",
     perk1: "Check the status of your appointments",
     perk2: "Get automatic reminders",
+    perk3: "Reschedule or cancel your appointments easily",
     joinOrLogin: "Join Kalendar or sign in",
     or: "or",
     continueAsGuest: "Continue as guest",
-    guestNote: "The clinic will review your request within 24 hours.",
+    guestNote: "If you continue as a guest, the clinic will review your request within 24 hours.",
     confirmTitle: "Confirm booking",
     confirmButton: "Confirm booking",
     confirming: "Booking…",

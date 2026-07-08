@@ -337,8 +337,9 @@ function ConfirmAuthModal({
           <Section title={am.title}>
             {slotSummary}
 
+            <p className="mb-3 text-[16px] font-bold text-ink">{am.advantagesHeading}</p>
             <ul className="mb-5 flex flex-col gap-2">
-              {[am.perk1, am.perk2].map((perk) => (
+              {[am.perk1, am.perk2, am.perk3].map((perk) => (
                 <li key={perk} className="flex items-center gap-2 text-[13.5px] text-ink-soft">
                   <Icon name="check" size={14} className="shrink-0 text-brand" />
                   {perk}
