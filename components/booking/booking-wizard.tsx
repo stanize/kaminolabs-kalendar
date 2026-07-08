@@ -366,97 +366,80 @@ function ConfirmAuthModal({
             {localError && <p className="mt-3 text-[13px] text-error">{localError}</p>}
           </Section>
         ) : view === "login" ? (
-          <div className="flex flex-col items-center text-center">
-            <div className="mb-3 grid h-11 w-11 place-items-center rounded-[10px] bg-brand text-white">
-              <Icon name="calendar" size={20} />
-            </div>
-            <h2 className="mb-1 text-[19px]">{af.loginTitle}</h2>
-            <p className="mb-5 text-[14px] text-ink-soft">{af.loginSubtitle}</p>
-
-            <div className="w-full">
-              {slotSummary}
-              <div className="flex flex-col gap-3">
-                <input type="email" placeholder={af.emailPlaceholder} value={email}
-                  onChange={(e) => setEmail(e.target.value)} disabled={busy} className={`${inputBase} rounded-full`} />
-                <input type="password" placeholder={af.passwordPlaceholder} value={password}
-                  onChange={(e) => setPassword(e.target.value)} disabled={busy}
-                  onKeyDown={(e) => e.key === "Enter" && handleLogin()} className={`${inputBase} rounded-full`} />
-                <button type="button" onClick={handleLogin} disabled={busy}
-                  className="w-full rounded-full bg-brand px-4 py-3.5 text-[14.5px] font-semibold text-white transition-all hover:opacity-90 disabled:opacity-60">
-                  {busy ? af.signingIn : af.signIn}
-                </button>
-              </div>
-
-              <div className="my-4 flex items-center gap-3">
-                <div className="h-px flex-1 bg-line" />
-                <span className="text-[12px] text-ink-soft">{af.or}</span>
-                <div className="h-px flex-1 bg-line" />
-              </div>
-
-              <button type="button" onClick={handleGoogle} disabled={busy}
-                className="flex w-full items-center justify-center gap-2.5 rounded-full border border-line bg-surface px-4 py-3.5 text-[14.5px] font-semibold text-ink shadow-sm transition-all hover:border-brand-line hover:shadow-md disabled:opacity-60">
-                <GoogleIcon /> {af.continueGoogle}
+          <div>
+            <div className="flex flex-col gap-3">
+              <input type="email" placeholder={af.emailPlaceholder} value={email}
+                onChange={(e) => setEmail(e.target.value)} disabled={busy} className={`${inputBase} rounded-full`} />
+              <input type="password" placeholder={af.passwordPlaceholder} value={password}
+                onChange={(e) => setPassword(e.target.value)} disabled={busy}
+                onKeyDown={(e) => e.key === "Enter" && handleLogin()} className={`${inputBase} rounded-full`} />
+              <button type="button" onClick={handleLogin} disabled={busy}
+                className="w-full rounded-full bg-brand px-4 py-3.5 text-[14.5px] font-semibold text-white transition-all hover:opacity-90 disabled:opacity-60">
+                {busy ? af.signingIn : af.signIn}
               </button>
-
-              {localError && <p className="mt-3 text-[13px] text-error">{localError}</p>}
-
-              <p className="mt-4 text-center text-[13px] text-ink-soft">
-                {af.noAccount}{" "}
-                <button type="button" onClick={() => { setView("register"); setLocalError(null); }}
-                  className="font-medium text-brand hover:underline">
-                  {af.createFreeLink}
-                </button>
-              </p>
             </div>
+
+            <div className="my-4 flex items-center gap-3">
+              <div className="h-px flex-1 bg-line" />
+              <span className="text-[12px] text-ink-soft">{af.or}</span>
+              <div className="h-px flex-1 bg-line" />
+            </div>
+
+            <button type="button" onClick={handleGoogle} disabled={busy}
+              className="flex w-full items-center justify-center gap-2.5 rounded-full border border-line bg-surface px-4 py-3.5 text-[14.5px] font-semibold text-ink shadow-sm transition-all hover:border-brand-line hover:shadow-md disabled:opacity-60">
+              <GoogleIcon /> {af.continueGoogle}
+            </button>
+
+            {localError && <p className="mt-3 text-[13px] text-error">{localError}</p>}
+
+            <p className="mt-4 text-center text-[13px] text-ink-soft">
+              {af.noAccount}{" "}
+              <button type="button" onClick={() => { setView("register"); setLocalError(null); }}
+                className="font-medium text-brand hover:underline">
+                {af.createFreeLink}
+              </button>
+            </p>
           </div>
         ) : (
-          <div className="flex flex-col items-center text-center">
-            <div className="mb-3 grid h-11 w-11 place-items-center rounded-[10px] bg-brand text-white">
-              <Icon name="calendar" size={20} />
-            </div>
-            <h2 className="mb-5 text-[19px]">{af.registerTitle}</h2>
+          <div>
+            <button type="button" onClick={handleGoogle} disabled={busy}
+              className="flex w-full items-center justify-center gap-2.5 rounded-full border border-line bg-surface px-4 py-3.5 text-[14.5px] font-semibold text-ink shadow-sm transition-all hover:border-brand-line hover:shadow-md disabled:opacity-60">
+              <GoogleIcon /> {af.continueGoogle}
+            </button>
 
-            <div className="w-full">
-              {slotSummary}
-              <button type="button" onClick={handleGoogle} disabled={busy}
-                className="flex w-full items-center justify-center gap-2.5 rounded-full border border-line bg-surface px-4 py-3.5 text-[14.5px] font-semibold text-ink shadow-sm transition-all hover:border-brand-line hover:shadow-md disabled:opacity-60">
-                <GoogleIcon /> {af.continueGoogle}
+            <div className="my-4 flex items-center gap-3">
+              <div className="h-px flex-1 bg-line" />
+              <span className="text-[12px] text-ink-soft">{af.or}</span>
+              <div className="h-px flex-1 bg-line" />
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <input type="text" placeholder={af.namePlaceholder} value={name}
+                onChange={(e) => setName(e.target.value)} disabled={busy} className={`${inputBase} rounded-full`} />
+              <input type="email" placeholder={af.emailPlaceholder} value={email}
+                onChange={(e) => setEmail(e.target.value)} disabled={busy} className={`${inputBase} rounded-full`} />
+              <input type="password" placeholder={af.passwordPlaceholder} value={password}
+                onChange={(e) => setPassword(e.target.value)} disabled={busy} className={`${inputBase} rounded-full`} />
+              <input type="password" placeholder={af.confirmPasswordPlaceholder} value={confirmPassword}
+                onChange={(e) => setConfirm(e.target.value)} disabled={busy}
+                onKeyDown={(e) => e.key === "Enter" && handleRegister()} className={`${inputBase} rounded-full`} />
+              <button type="button" onClick={handleRegister} disabled={busy}
+                className="w-full rounded-full bg-brand px-4 py-3.5 text-[14.5px] font-semibold text-white transition-all hover:opacity-90 disabled:opacity-60">
+                {busy ? af.creatingAccount : af.createAccount}
               </button>
-
-              <div className="my-4 flex items-center gap-3">
-                <div className="h-px flex-1 bg-line" />
-                <span className="text-[12px] text-ink-soft">{af.or}</span>
-                <div className="h-px flex-1 bg-line" />
-              </div>
-
-              <div className="flex flex-col gap-3">
-                <input type="text" placeholder={af.namePlaceholder} value={name}
-                  onChange={(e) => setName(e.target.value)} disabled={busy} className={`${inputBase} rounded-full`} />
-                <input type="email" placeholder={af.emailPlaceholder} value={email}
-                  onChange={(e) => setEmail(e.target.value)} disabled={busy} className={`${inputBase} rounded-full`} />
-                <input type="password" placeholder={af.passwordPlaceholder} value={password}
-                  onChange={(e) => setPassword(e.target.value)} disabled={busy} className={`${inputBase} rounded-full`} />
-                <input type="password" placeholder={af.confirmPasswordPlaceholder} value={confirmPassword}
-                  onChange={(e) => setConfirm(e.target.value)} disabled={busy}
-                  onKeyDown={(e) => e.key === "Enter" && handleRegister()} className={`${inputBase} rounded-full`} />
-                <button type="button" onClick={handleRegister} disabled={busy}
-                  className="w-full rounded-full bg-brand px-4 py-3.5 text-[14.5px] font-semibold text-white transition-all hover:opacity-90 disabled:opacity-60">
-                  {busy ? af.creatingAccount : af.createAccount}
-                </button>
-              </div>
-
-              {localError && <p className="mt-3 text-[13px] text-error">{localError}</p>}
-
-              <p className="mt-3 text-center text-[12px] text-ink-soft">{af.termsNote}</p>
-
-              <p className="mt-3 text-center text-[13px] text-ink-soft">
-                {af.haveAccount}{" "}
-                <button type="button" onClick={() => { setView("login"); setLocalError(null); }}
-                  className="font-medium text-brand hover:underline">
-                  {af.signInLink}
-                </button>
-              </p>
             </div>
+
+            {localError && <p className="mt-3 text-[13px] text-error">{localError}</p>}
+
+            <p className="mt-3 text-center text-[12px] text-ink-soft">{af.termsNote}</p>
+
+            <p className="mt-3 text-center text-[13px] text-ink-soft">
+              {af.haveAccount}{" "}
+              <button type="button" onClick={() => { setView("login"); setLocalError(null); }}
+                className="font-medium text-brand hover:underline">
+                {af.signInLink}
+              </button>
+            </p>
           </div>
         )}
       </div>
