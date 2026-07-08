@@ -1,12 +1,30 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import { assignRole } from "@/lib/roles/data";
+import { assignRole, getUserRoles } from "@/lib/roles/data";
 import { requireSession } from "@/lib/auth-session";
 
 export type ProvisionResult =
   | { ok: true; patientId: string }
   | { ok: false; error: string };
+
+/**
+ * Checks whether granting the 'patient' role to the current session's user
+ * would be a silent cross-role addition (i.e. the account already holds a
+ * DIFFERENT role, such as 'clinic', and does not yet hold 'patient'). Callers
+ * should show a confirmation prompt before calling provisionPatient() when
+ * this returns true — brand-new accounts (no roles yet) never need to ask.
+ */
+export async function checkPatientRoleConflict(): Promise<{ needsConfirm: boolean }> {
+  let session;
+  try {
+    session = await requireSession();
+  } catch {
+    return { needsConfirm: false };
+  }
+  const roles = await getUserRoles(session.user.id);
+  return { needsConfirm: roles.length > 0 && !roles.includes("patient") };
+}
 
 /**
  * Provisions a patient account for the currently authenticated user.

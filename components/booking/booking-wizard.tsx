@@ -5,7 +5,7 @@ import { Icon } from "@/components/ui/icon";
 import { Logo } from "@/components/ui/logo";
 import { Btn } from "@/components/ui/button";
 import { getAvailableSlots, submitBooking, type SlotDTO } from "@/lib/actions/booking";
-import { provisionPatient } from "@/lib/actions/patient";
+import { provisionPatient, checkPatientRoleConflict } from "@/lib/actions/patient";
 import { authClient } from "@/lib/auth-client";
 import type { DayId } from "@/lib/onboarding/types";
 import type { Locale } from "@/lib/i18n/config";
@@ -198,7 +198,7 @@ function ConfirmAuthModal({
   const am = dict.authModal;
   const af = dict.authForm;
   const w = dict.wizard;
-  type AuthView = "start" | "login" | "register" | "guest";
+  type AuthView = "start" | "login" | "register" | "guest" | "roleConfirm";
   const [view, setView] = useState<AuthView>("start");
   const [email, setEmail]               = useState("");
   const [password, setPassword]         = useState("");
@@ -223,7 +223,7 @@ function ConfirmAuthModal({
     onDone(false); // authenticated — not a guest
   }
 
-  async function afterAuth() {
+  async function completeProvision() {
     setBusy(true);
     setLocalError(null);
     const result = await provisionPatient();
@@ -235,6 +235,29 @@ function ConfirmAuthModal({
     const p: PatientInfo = { id: result.patientId, name: user.name ?? "", email: user.email ?? "" };
     onPatientChange(p);
     await submitAuthenticated(p);
+  }
+
+  async function afterAuth() {
+    setBusy(true);
+    setLocalError(null);
+    const conflict = await checkPatientRoleConflict();
+    if (conflict.needsConfirm) {
+      // This account already holds a different role (e.g. clinic) — don't
+      // silently add "patient" to it. Ask first.
+      setBusy(false);
+      setView("roleConfirm");
+      return;
+    }
+    await completeProvision();
+  }
+
+  async function declineRoleAdd() {
+    setBusy(true);
+    await authClient.signOut();
+    onPatientChange(null);
+    setBusy(false);
+    setLocalError(null);
+    setView("start");
   }
 
   async function handleGoogle() {
@@ -412,6 +435,25 @@ function ConfirmAuthModal({
                 {af.createFreeLink}
               </button>
             </p>
+          </div>
+        ) : view === "roleConfirm" ? (
+          <div>
+            <div className="mb-4 flex items-center gap-2">
+              <Logo showText={false} size={18} />
+              <h2 className="text-[16px] font-semibold text-ink">{am.roleConfirmTitle}</h2>
+            </div>
+            <p className="mb-5 text-[14px] text-ink-soft">{am.roleConfirmBody}</p>
+            <div className="flex flex-col gap-2">
+              <button type="button" onClick={completeProvision} disabled={busy}
+                className="w-full rounded-full bg-brand px-4 py-3.5 text-[14.5px] font-semibold text-white transition-all hover:opacity-90 disabled:opacity-60">
+                {busy ? am.confirming : am.roleConfirmYes}
+              </button>
+              <button type="button" onClick={declineRoleAdd} disabled={busy}
+                className="w-full rounded-full border border-line px-4 py-3.5 text-[14.5px] font-semibold text-ink transition-all hover:border-brand-line hover:bg-brand-weak">
+                {am.roleConfirmNo}
+              </button>
+            </div>
+            {localError && <p className="mt-3 text-[13px] text-error">{localError}</p>}
           </div>
         ) : view === "guest" ? (
           <div>

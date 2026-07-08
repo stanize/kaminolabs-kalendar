@@ -64,6 +64,12 @@ export interface PanelShellDictionary {
     resendError: string;
     signOut: string;
   };
+  roleUpgrade: {
+    title: string;
+    body: string;
+    yes: string;
+    no: string;
+  };
 }
 
 const es: PanelShellDictionary = {
@@ -117,6 +123,12 @@ const es: PanelShellDictionary = {
     resendError: "No se pudo reenviar el enlace. Inténtalo de nuevo en un momento.",
     signOut: "Cerrar sesión",
   },
+  roleUpgrade: {
+    title: "Un momento",
+    body: "Esta cuenta ya existe como cuenta de paciente. Continuar añadirá el rol de clínica a tu cuenta. ¿Quieres continuar?",
+    yes: "Sí, continuar",
+    no: "No, volver a mi cuenta de paciente",
+  },
 };
 
 const en: PanelShellDictionary = {
@@ -169,6 +181,12 @@ const en: PanelShellDictionary = {
     resent: "We've resent the confirmation link.",
     resendError: "Couldn't resend the link. Please try again in a moment.",
     signOut: "Sign out",
+  },
+  roleUpgrade: {
+    title: "One moment",
+    body: "This account already exists as a patient account. Continuing will add the clinic role to your account. Do you want to continue?",
+    yes: "Yes, continue",
+    no: "No, go back to my patient account",
   },
 };
 

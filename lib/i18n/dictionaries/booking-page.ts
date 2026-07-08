@@ -35,6 +35,10 @@ export interface BookingPageDictionary {
     confirmTitle: string; // "Confirmar reserva" (already-authenticated view)
     confirmButton: string;
     confirming: string;
+    roleConfirmTitle: string;
+    roleConfirmBody: string; // "Iniciar sesión añadirá el rol de paciente a tu cuenta. ¿Continuar?"
+    roleConfirmYes: string;
+    roleConfirmNo: string;
   };
   authForm: {
     loginTitle: string; // "Bienvenido de nuevo"
@@ -122,6 +126,10 @@ const es: BookingPageDictionary = {
     confirmTitle: "Confirmar reserva",
     confirmButton: "Confirmar reserva",
     confirming: "Reservando…",
+    roleConfirmTitle: "Un momento",
+    roleConfirmBody: "Esta cuenta ya existe con otro tipo de acceso. Continuar añadirá el rol de paciente a tu cuenta. ¿Quieres continuar?",
+    roleConfirmYes: "Sí, continuar",
+    roleConfirmNo: "No, cancelar",
   },
   authForm: {
     loginTitle: "Inicia sesión en Kalendar",
@@ -209,6 +217,10 @@ const en: BookingPageDictionary = {
     confirmTitle: "Confirm booking",
     confirmButton: "Confirm booking",
     confirming: "Booking…",
+    roleConfirmTitle: "One moment",
+    roleConfirmBody: "This account already exists with a different type of access. Continuing will add the patient role to your account. Do you want to continue?",
+    roleConfirmYes: "Yes, continue",
+    roleConfirmNo: "No, cancel",
   },
   authForm: {
     loginTitle: "Sign in to Kalendar",

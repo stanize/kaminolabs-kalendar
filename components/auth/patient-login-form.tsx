@@ -4,9 +4,9 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import { Icon } from "@/components/ui/icon";
-import { provisionPatient } from "@/lib/actions/patient";
+import { provisionPatient, checkPatientRoleConflict } from "@/lib/actions/patient";
 
-type View = "picker" | "login" | "register";
+type View = "picker" | "login" | "register" | "roleConfirm";
 
 function withTimeout<T>(promise: Promise<T>, ms: number, msg: string): Promise<T> {
   return Promise.race([
@@ -67,6 +67,10 @@ interface PatientLabels {
   errGeneric: string;
   errEmailExists: string;
   errUnexpected: string;
+  roleConfirmTitle: string;
+  roleConfirmBody: string;
+  roleConfirmYes: string;
+  roleConfirmNo: string;
 }
 
 const DEFAULT_LABELS: PatientLabels = {
@@ -99,6 +103,10 @@ const DEFAULT_LABELS: PatientLabels = {
   errGeneric: "Ocurrió un error. Inténtalo de nuevo.",
   errEmailExists: "Ya existe una cuenta con ese email.",
   errUnexpected: "Error inesperado. Inténtalo de nuevo.",
+  roleConfirmTitle: "Un momento",
+  roleConfirmBody: "Esta cuenta ya existe con otro tipo de acceso. Continuar añadirá el rol de paciente a tu cuenta. ¿Quieres continuar?",
+  roleConfirmYes: "Sí, continuar",
+  roleConfirmNo: "No, cancelar",
 };
 
 export function PatientLoginForm({ redirectTo = "/patient", labels }: PatientLoginFormProps) {
@@ -113,8 +121,10 @@ export function PatientLoginForm({ redirectTo = "/patient", labels }: PatientLog
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // After any successful auth, provision the patient role + profile then redirect.
-  async function afterAuth() {
+  // After any successful auth, check for a cross-role conflict before
+  // silently adding the patient role, then provision + redirect.
+  async function completeProvision() {
+    setLoading(true);
     const result = await provisionPatient();
     if (!result.ok) {
       setError(result.error);
@@ -122,6 +132,24 @@ export function PatientLoginForm({ redirectTo = "/patient", labels }: PatientLog
       return;
     }
     router.push(redirectTo);
+  }
+
+  async function afterAuth() {
+    const conflict = await checkPatientRoleConflict();
+    if (conflict.needsConfirm) {
+      setLoading(false);
+      setView("roleConfirm");
+      return;
+    }
+    await completeProvision();
+  }
+
+  async function declineRoleAdd() {
+    setLoading(true);
+    await authClient.signOut();
+    setLoading(false);
+    setError(null);
+    setView("picker");
   }
 
   async function handleGoogle() {
@@ -195,6 +223,26 @@ export function PatientLoginForm({ redirectTo = "/patient", labels }: PatientLog
       setError(e instanceof Error ? e.message : L.errUnexpected);
       setLoading(false);
     }
+  }
+
+  if (view === "roleConfirm") {
+    return (
+      <div className="flex flex-col gap-4">
+        <h2 className="text-[16px] font-semibold text-ink">{L.roleConfirmTitle}</h2>
+        <p className="text-[14px] text-ink-soft">{L.roleConfirmBody}</p>
+        <button type="button" onClick={completeProvision} disabled={loading}
+          className="w-full rounded-xl bg-brand px-5 py-3.5 text-[15px] font-semibold text-white transition-all hover:bg-brand/90 disabled:cursor-wait disabled:opacity-60">
+          {L.roleConfirmYes}
+        </button>
+        <button type="button" onClick={declineRoleAdd} disabled={loading}
+          className="w-full rounded-xl border border-line bg-surface px-5 py-3.5 text-[15px] font-semibold text-ink transition-all hover:border-brand-line disabled:cursor-wait disabled:opacity-60">
+          {L.roleConfirmNo}
+        </button>
+        {error && (
+          <p className="rounded-xl bg-error-weak px-3.5 py-2.5 text-[13px] font-medium text-error">{error}</p>
+        )}
+      </div>
+    );
   }
 
   if (view === "picker") {
