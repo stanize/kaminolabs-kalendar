@@ -16,7 +16,7 @@ export default async function PatientLoginPage() {
   }
 
   return (
-    <div className="grid min-h-screen place-items-center bg-surface-2 px-5 py-12">
+    <div className="grid min-h-screen items-start justify-items-center bg-surface-2 px-5 pb-12 pt-16 sm:pt-20">
       <div className="w-full max-w-[420px]">
         <div className="mb-8 flex flex-col items-center gap-3 text-center">
           <Logo size={22} />

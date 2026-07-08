@@ -270,6 +270,14 @@ export function PatientLoginForm({ redirectTo = "/patient", labels }: PatientLog
         {error && (
           <p className="rounded-xl bg-error-weak px-3.5 py-2.5 text-[13px] font-medium text-error">{error}</p>
         )}
+
+        <p className="text-center text-[13px] text-ink-soft">
+          {L.noAccount}{" "}
+          <button type="button" onClick={() => { setError(null); setView("register"); }}
+            className="font-medium text-brand hover:underline">
+            {L.switchToRegister}
+          </button>
+        </p>
       </div>
     );
   }
