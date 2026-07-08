@@ -578,7 +578,7 @@ function DateTimeStep({ slug, serviceId, providerId, openDays, bookingWindowMont
         </button>
       </div>
 
-      <div className="flex gap-1.5 overflow-x-auto pb-1">
+      <div className="grid grid-cols-7 gap-1">
         {weekDays.map((d, i) => {
           const ds = ymd(d);
           const sel = isSelectable(d);
@@ -586,31 +586,31 @@ function DateTimeStep({ slug, serviceId, providerId, openDays, bookingWindowMont
           const slots = slotsByDate[ds];
 
           return (
-            <div key={i} className="flex w-[108px] shrink-0 flex-col">
-              <div className={`mb-2 flex flex-col items-center gap-0.5 rounded-xl border py-2 ${
+            <div key={i} className="flex min-w-0 flex-col">
+              <div className={`mb-1.5 flex flex-col items-center gap-0.5 rounded-lg border py-1.5 ${
                 sel ? "border-line bg-surface text-ink" : "border-transparent text-ink-soft/30"}`}>
-                <span className="text-[10.5px] font-semibold uppercase">{dict.weekdaysShort[i]}</span>
-                <span className="text-[15px] font-semibold leading-none">{d.getDate()}</span>
+                <span className="text-[9px] font-semibold uppercase">{dict.weekdaysShort[i]}</span>
+                <span className="text-[13px] font-semibold leading-none">{d.getDate()}</span>
               </div>
 
-              <div className="flex max-h-[360px] flex-col gap-1.5 overflow-y-auto pr-0.5">
+              <div className="flex max-h-[360px] flex-col gap-1 overflow-y-auto pr-0.5">
                 {!sel && (
-                  <p className="pt-2 text-center text-[12px] text-ink-soft/60">{w.closed}</p>
+                  <p className="pt-2 text-center text-[10px] leading-tight text-ink-soft/60">{w.closed}</p>
                 )}
                 {sel && loading && (
-                  <p className="pt-2 text-center text-[12px] text-ink-soft">{w.searchingSlots}</p>
+                  <p className="pt-2 text-center text-[10px] leading-tight text-ink-soft">{w.searchingSlots}</p>
                 )}
                 {sel && !loading && slots?.length === 0 && (
-                  <p className="pt-2 text-center text-[12px] text-ink-soft">{w.noSlotsThisDay}</p>
+                  <p className="pt-2 text-center text-[10px] leading-tight text-ink-soft">{w.noSlotsThisDay}</p>
                 )}
                 {sel && !loading && slots && slots.length > 0 && (
                   isTeamAny ? (
                     groupByProvider(slots).map((group) => (
-                      <div key={group.providerId ?? "any"} className="flex flex-col gap-1.5">
-                        <span className="truncate text-[10px] font-bold uppercase tracking-[.04em] text-ink-soft">{group.providerName}</span>
+                      <div key={group.providerId ?? "any"} className="flex flex-col gap-1">
+                        <span className="truncate text-[8.5px] font-bold uppercase tracking-[.02em] text-ink-soft">{group.providerName}</span>
                         {group.slots.map((s) => (
                           <button key={`${s.startIso}-${s.providerId ?? ""}`} onClick={() => onPick(ds, s)}
-                            className="rounded-lg border border-line py-1.5 text-[12.5px] font-semibold text-ink transition-all hover:border-brand hover:bg-brand hover:text-white">
+                            className="rounded-md border border-line px-0.5 py-1 text-[10.5px] font-semibold text-ink transition-all hover:border-brand hover:bg-brand hover:text-white">
                             {s.label}
                           </button>
                         ))}
@@ -619,7 +619,7 @@ function DateTimeStep({ slug, serviceId, providerId, openDays, bookingWindowMont
                   ) : (
                     slots.map((s) => (
                       <button key={`${s.startIso}-${s.providerId ?? ""}`} onClick={() => onPick(ds, s)}
-                        className="rounded-lg border border-line py-1.5 text-[12.5px] font-semibold text-ink transition-all hover:border-brand hover:bg-brand hover:text-white">
+                        className="rounded-md border border-line px-0.5 py-1 text-[10.5px] font-semibold text-ink transition-all hover:border-brand hover:bg-brand hover:text-white">
                         {s.label}
                       </button>
                     ))
