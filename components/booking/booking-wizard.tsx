@@ -62,7 +62,7 @@ export function BookingWizard({
   patient: PatientInfo | null;
   onPatientChange: (p: PatientInfo | null) => void;
 }) {
-  type Step = "service" | "provider" | "date" | "details" | "done";
+  type Step = "service" | "provider" | "date" | "done";
   const [step, setStep] = useState<Step>("service");
 
   const dict = getBookingPageDictionary(locale);
@@ -70,7 +70,6 @@ export function BookingWizard({
 
   const [service, setService] = useState<Service | null>(null);
   const [providerId, setProviderId] = useState<string | null>(null);
-  const [date, setDate] = useState<string | null>(null);
   const [slot, setSlot] = useState<SlotDTO | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [doneAsGuest, setDoneAsGuest] = useState(false);
@@ -78,7 +77,7 @@ export function BookingWizard({
 
   function reset() {
     setStep("service"); setService(null); setProviderId(null);
-    setDate(null); setSlot(null); setError(null); setConfirmOpen(false);
+    setSlot(null); setError(null); setConfirmOpen(false);
   }
 
   function chooseService(s: Service) {
@@ -94,7 +93,6 @@ export function BookingWizard({
     setError(null);
     if (step === "provider") setStep("service");
     else if (step === "date") setStep(isTeam ? "provider" : "service");
-    else if (step === "details") setStep("date");
   }
 
   const showBack = step !== "service" && step !== "done";
@@ -146,14 +144,7 @@ export function BookingWizard({
         <DateTimeStep slug={slug} serviceId={service.id} providerId={providerId}
           openDays={openDays} bookingWindowMonths={bookingWindowMonths} dict={dict}
           onError={setError}
-          onPick={(d, s) => { setDate(d); setSlot(s); setError(null); setConfirmOpen(true); }}
-        />
-      )}
-
-      {step === "details" && service && slot && date && (
-        <DetailsStep slug={slug} serviceId={service.id} providerId={slot.providerId}
-          slot={slot} serviceName={service.name} dict={dict} locale={locale}
-          onError={setError} onDone={() => { setDoneAsGuest(true); setStep("done"); }}
+          onPick={(_d, s) => { setSlot(s); setError(null); setConfirmOpen(true); }}
         />
       )}
 
@@ -181,7 +172,6 @@ export function BookingWizard({
           onPatientChange={onPatientChange}
           onError={setError}
           onClose={() => setConfirmOpen(false)}
-          onContinueAsGuest={() => { setConfirmOpen(false); setError(null); setStep("details"); }}
           onDone={(asGuest) => { setConfirmOpen(false); setDoneAsGuest(asGuest); setStep("done"); }}
         />
       )}
@@ -195,7 +185,7 @@ export function BookingWizard({
 // "Join Kalendar or sign in" vs "Continue as guest".
 function ConfirmAuthModal({
   slug, serviceId, slot, serviceName, locale, dict, patient,
-  onPatientChange, onError, onClose, onContinueAsGuest, onDone,
+  onPatientChange, onError, onClose, onDone,
 }: {
   slug: string; serviceId: string; slot: SlotDTO; serviceName: string;
   locale: Locale; dict: BookingPageDictionary;
@@ -203,17 +193,18 @@ function ConfirmAuthModal({
   onPatientChange: (p: PatientInfo | null) => void;
   onError: (e: string | null) => void;
   onClose: () => void;
-  onContinueAsGuest: () => void;
   onDone: (asGuest: boolean) => void;
 }) {
   const am = dict.authModal;
   const af = dict.authForm;
-  type AuthView = "start" | "login" | "register";
+  const w = dict.wizard;
+  type AuthView = "start" | "login" | "register" | "guest";
   const [view, setView] = useState<AuthView>("start");
   const [email, setEmail]               = useState("");
   const [password, setPassword]         = useState("");
   const [name, setName]                 = useState("");
   const [confirmPassword, setConfirm]   = useState("");
+  const [guestPhone, setGuestPhone]     = useState("");
   const [busy, setBusy]                 = useState(false);
   const [localError, setLocalError]     = useState<string | null>(null);
 
@@ -292,6 +283,23 @@ function ConfirmAuthModal({
     } catch (e) { setLocalError(e instanceof Error ? e.message : "Error inesperado."); setBusy(false); }
   }
 
+  async function submitGuest() {
+    setLocalError(null);
+    onError(null);
+    if (name.trim().length < 2) { setLocalError(w.errNameRequired); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { setLocalError(w.errEmailInvalid); return; }
+    setBusy(true);
+    const res = await submitBooking({
+      slug, serviceId, providerId: slot.providerId, startIso: slot.startIso,
+      clientName: name, clientEmail: email, clientPhone: guestPhone,
+      guestLocale: locale,
+      // No patientId — this is the guest path.
+    });
+    setBusy(false);
+    if (!res.ok) { setLocalError(res.error); return; }
+    onDone(true);
+  }
+
   function handleClose() {
     if (busy) return;
     onClose();
@@ -358,7 +366,7 @@ function ConfirmAuthModal({
               <div className="h-px flex-1 bg-line" />
             </div>
 
-            <button type="button" onClick={onContinueAsGuest} disabled={busy}
+            <button type="button" onClick={() => { setLocalError(null); setView("guest"); }} disabled={busy}
               className="w-full rounded-xl border border-line px-4 py-3.5 text-[14.5px] font-semibold text-ink transition-all hover:border-brand-line hover:bg-brand-weak">
               {am.continueAsGuest}
             </button>
@@ -404,6 +412,30 @@ function ConfirmAuthModal({
                 {af.createFreeLink}
               </button>
             </p>
+          </div>
+        ) : view === "guest" ? (
+          <div>
+            <div className="mb-4 flex items-center gap-2">
+              <Logo showText={false} size={18} />
+              <h2 className="text-[16px] font-semibold text-ink">{w.yourDetails}</h2>
+            </div>
+            <div className="flex flex-col gap-3">
+              <input placeholder={w.namePlaceholder} value={name}
+                onChange={(e) => setName(e.target.value)} disabled={busy} maxLength={80}
+                className={`${inputBase} rounded-full`} />
+              <input placeholder={w.emailPlaceholder} type="email" value={email}
+                onChange={(e) => setEmail(e.target.value)} disabled={busy} maxLength={120}
+                className={`${inputBase} rounded-full`} />
+              <input placeholder={w.phonePlaceholder} value={guestPhone}
+                onChange={(e) => setGuestPhone(e.target.value)} disabled={busy} maxLength={30}
+                className={`${inputBase} rounded-full`} />
+            </div>
+            <p className="mt-3 text-center text-[12px] text-ink-soft">{am.guestNote}</p>
+            <button type="button" onClick={submitGuest} disabled={busy}
+              className="mt-3 w-full rounded-full bg-brand px-4 py-3.5 text-[14.5px] font-semibold text-white transition-all hover:opacity-90 disabled:opacity-60">
+              {busy ? w.booking : w.bookButton}
+            </button>
+            {localError && <p className="mt-3 text-[13px] text-error">{localError}</p>}
           </div>
         ) : (
           <div>
@@ -578,54 +610,6 @@ function DateTimeStep({ slug, serviceId, providerId, openDays, bookingWindowMont
           )}
         </div>
       )}
-    </Section>
-  );
-}
-
-function DetailsStep({ slug, serviceId, providerId, slot, serviceName, dict, locale, onError, onDone }: {
-  slug: string; serviceId: string; providerId: string | null; slot: SlotDTO;
-  serviceName: string; dict: BookingPageDictionary; locale: Locale;
-  onError: (e: string | null) => void; onDone: () => void;
-}) {
-  const w = dict.wizard;
-  const [name, setName]   = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
-  const [busy, setBusy]   = useState(false);
-
-  const fieldBase = "rounded-[10px] border border-line bg-surface px-[13px] py-3 text-[15px] text-ink outline-none transition-all focus:border-brand focus:shadow-[0_0_0_3px_var(--color-brand-weak)]";
-
-  async function submit() {
-    onError(null);
-    if (name.trim().length < 2) return onError(w.errNameRequired);
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return onError(w.errEmailInvalid);
-    setBusy(true);
-    const res = await submitBooking({
-      slug, serviceId, providerId, startIso: slot.startIso,
-      clientName: name, clientEmail: email, clientPhone: phone,
-      guestLocale: locale,
-      // No patientId — this is the guest path.
-    });
-    setBusy(false);
-    if (!res.ok) return onError(res.error);
-    onDone();
-  }
-
-  return (
-    <Section title={w.yourDetails}>
-      <div className="mb-4 rounded-xl bg-surface-2 px-4 py-3 text-[13.5px] text-ink">
-        <span className="font-semibold">{serviceName}</span> · {slot.label}
-      </div>
-      <div className="flex flex-col gap-3">
-        <input className={fieldBase} placeholder={w.namePlaceholder} value={name} onChange={(e) => setName(e.target.value)} maxLength={80} />
-        <input className={fieldBase} placeholder={w.emailPlaceholder} type="email" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={120} />
-        <input className={fieldBase} placeholder={w.phonePlaceholder} value={phone} onChange={(e) => setPhone(e.target.value)} maxLength={30} />
-      </div>
-      <div className="mt-5">
-        <Btn onClick={submit} disabled={busy} size="lg" full>
-          {busy ? w.booking : w.bookButton}
-        </Btn>
-      </div>
     </Section>
   );
 }
