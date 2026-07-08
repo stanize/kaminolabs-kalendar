@@ -61,7 +61,7 @@ export function BookingWizard({
   patient: PatientInfo | null;
   onPatientChange: (p: PatientInfo | null) => void;
 }) {
-  type Step = "service" | "provider" | "date" | "auth" | "details" | "done";
+  type Step = "service" | "provider" | "date" | "details" | "done";
   const [step, setStep] = useState<Step>("service");
 
   const dict = getBookingPageDictionary(locale);
@@ -73,10 +73,11 @@ export function BookingWizard({
   const [slot, setSlot] = useState<SlotDTO | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [doneAsGuest, setDoneAsGuest] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   function reset() {
     setStep("service"); setService(null); setProviderId(null);
-    setDate(null); setSlot(null); setError(null);
+    setDate(null); setSlot(null); setError(null); setConfirmOpen(false);
   }
 
   function chooseService(s: Service) {
@@ -92,8 +93,7 @@ export function BookingWizard({
     setError(null);
     if (step === "provider") setStep("service");
     else if (step === "date") setStep(isTeam ? "provider" : "service");
-    else if (step === "auth") setStep("date");
-    else if (step === "details") setStep("auth");
+    else if (step === "details") setStep("date");
   }
 
   const showBack = step !== "service" && step !== "done";
@@ -145,18 +145,7 @@ export function BookingWizard({
         <DateTimeStep slug={slug} serviceId={service.id} providerId={providerId}
           openDays={openDays} bookingWindowMonths={bookingWindowMonths} dict={dict}
           onError={setError}
-          onPick={(d, s) => { setDate(d); setSlot(s); setError(null); setStep("auth"); }}
-        />
-      )}
-
-      {step === "auth" && service && slot && (
-        <AuthGateStep
-          slug={slug} serviceId={service.id} slot={slot} serviceName={service.name}
-          locale={locale} patient={patient}
-          onPatientChange={onPatientChange}
-          onError={setError}
-          onContinueAsGuest={() => { setError(null); setStep("details"); }}
-          onDone={(asGuest) => { setDoneAsGuest(asGuest); setStep("done"); }}
+          onPick={(d, s) => { setDate(d); setSlot(s); setError(null); setConfirmOpen(true); }}
         />
       )}
 
@@ -183,25 +172,42 @@ export function BookingWizard({
           <Btn variant="outline" onClick={reset}>{w.bookAnother}</Btn>
         </div>
       )}
+
+      {confirmOpen && service && slot && (
+        <ConfirmAuthModal
+          slug={slug} serviceId={service.id} slot={slot} serviceName={service.name}
+          locale={locale} dict={dict} patient={patient}
+          onPatientChange={onPatientChange}
+          onError={setError}
+          onClose={() => setConfirmOpen(false)}
+          onContinueAsGuest={() => { setConfirmOpen(false); setError(null); setStep("details"); }}
+          onDone={(asGuest) => { setConfirmOpen(false); setDoneAsGuest(asGuest); setStep("done"); }}
+        />
+      )}
     </div>
   );
 }
 
-// ── Auth gate step ────────────────────────────────────────────────────────────
-function AuthGateStep({
-  slug, serviceId, slot, serviceName, locale, patient,
-  onPatientChange, onError, onContinueAsGuest, onDone,
+// ── Confirm / auth modal ────────────────────────────────────────────────────
+// Shown as an overlay when the guest picks a slot (browsing stays free — this
+// only appears at the point of confirming an appointment, IKEA-checkout style):
+// "Join Kalendar or sign in" vs "Continue as guest".
+function ConfirmAuthModal({
+  slug, serviceId, slot, serviceName, locale, dict, patient,
+  onPatientChange, onError, onClose, onContinueAsGuest, onDone,
 }: {
   slug: string; serviceId: string; slot: SlotDTO; serviceName: string;
-  locale: Locale;
+  locale: Locale; dict: BookingPageDictionary;
   patient: PatientInfo | null;
   onPatientChange: (p: PatientInfo | null) => void;
   onError: (e: string | null) => void;
+  onClose: () => void;
   onContinueAsGuest: () => void;
   onDone: (asGuest: boolean) => void;
 }) {
-  type AuthView = "choice" | "login" | "register";
-  const [view, setView] = useState<AuthView>(patient ? "choice" : "choice");
+  const am = dict.authModal;
+  type AuthView = "start" | "authOptions" | "login" | "register";
+  const [view, setView] = useState<AuthView>("start");
   const [email, setEmail]               = useState("");
   const [password, setPassword]         = useState("");
   const [name, setName]                 = useState("");
@@ -284,128 +290,159 @@ function AuthGateStep({
     } catch (e) { setLocalError(e instanceof Error ? e.message : "Error inesperado."); setBusy(false); }
   }
 
-  // Slot summary shown at the top of the auth gate.
+  function handleClose() {
+    if (busy) return;
+    onClose();
+  }
+
+  // Slot summary shown at the top of the modal.
   const slotSummary = (
     <div className="mb-5 rounded-xl bg-surface-2 px-4 py-3 text-[13.5px] text-ink">
       <span className="font-semibold">{serviceName}</span> · {slot.label}
     </div>
   );
 
-  // Already authenticated — show confirm button.
-  if (patient) {
-    return (
-      <Section title="Confirmar reserva">
-        {slotSummary}
-        <div className="mb-4 flex items-center gap-2 rounded-xl bg-brand-weak px-4 py-3 text-[13.5px] text-brand-ink">
-          <Icon name="user" size={15} className="shrink-0" />
-          <span>{patient.name || patient.email}</span>
-        </div>
-        <Btn onClick={() => submitAuthenticated(patient)} disabled={busy} size="lg" full>
-          {busy ? "Reservando…" : "Confirmar reserva"}
-        </Btn>
-        {localError && <p className="mt-3 text-[13px] text-error">{localError}</p>}
-      </Section>
-    );
-  }
-
-  // Choice: sign in, create account, or continue as guest.
-  if (view === "choice") {
-    return (
-      <Section title="Completa tu reserva">
-        {slotSummary}
-
-        <div className="flex flex-col gap-2">
-          <button type="button" onClick={handleGoogle} disabled={busy}
-            className="flex w-full items-center justify-center gap-2.5 rounded-xl border border-line bg-surface px-4 py-3.5 text-[14.5px] font-semibold text-ink shadow-sm transition-all hover:border-brand-line hover:shadow-md disabled:opacity-60">
-            <GoogleIcon /> Continuar con Google
-          </button>
-          <button type="button" onClick={() => { setLocalError(null); setView("login"); }} disabled={busy}
-            className="flex w-full items-center justify-center gap-2.5 rounded-xl border border-line bg-surface px-4 py-3.5 text-[14.5px] font-semibold text-ink shadow-sm transition-all hover:border-brand-line hover:shadow-md">
-            <Icon name="mail" size={18} className="text-ink-soft" /> Iniciar sesión
-          </button>
-          <button type="button" onClick={() => { setLocalError(null); setView("register"); }} disabled={busy}
-            className="flex w-full items-center justify-center gap-2.5 rounded-xl border border-brand-line bg-brand-weak px-4 py-3.5 text-[14.5px] font-semibold text-brand-ink shadow-sm transition-all hover:bg-brand-weak/70">
-            <Icon name="user" size={18} /> Crear cuenta
-          </button>
-        </div>
-
-        <div className="mt-4 flex items-center gap-3">
-          <div className="h-px flex-1 bg-line" />
-          <span className="text-[12px] text-ink-soft">o</span>
-          <div className="h-px flex-1 bg-line" />
-        </div>
-
-        <button type="button" onClick={onContinueAsGuest} disabled={busy}
-          className="mt-4 w-full text-center text-[13.5px] font-medium text-ink-soft hover:text-ink">
-          Continuar como invitado →
-        </button>
-        <p className="mt-1 text-center text-[12px] text-ink-soft">
-          La clínica revisará tu solicitud en un plazo de 24h.
-        </p>
-
-        {localError && <p className="mt-3 text-[13px] text-error">{localError}</p>}
-      </Section>
-    );
-  }
-
-  // Email login form.
-  if (view === "login") {
-    return (
-      <Section title="Iniciar sesión">
-        {slotSummary}
-        <div className="flex flex-col gap-3">
-          <input type="email" placeholder="Email" value={email}
-            onChange={(e) => setEmail(e.target.value)} disabled={busy} className={inputBase} />
-          <input type="password" placeholder="Contraseña" value={password}
-            onChange={(e) => setPassword(e.target.value)} disabled={busy}
-            onKeyDown={(e) => e.key === "Enter" && handleLogin()} className={inputBase} />
-          <Btn onClick={handleLogin} disabled={busy} full>{busy ? "Accediendo…" : "Iniciar sesión"}</Btn>
-        </div>
-        {localError && <p className="mt-3 text-[13px] text-error">{localError}</p>}
-        <p className="mt-4 text-center text-[13px] text-ink-soft">
-          ¿No tienes cuenta?{" "}
-          <button type="button" onClick={() => { setView("register"); setLocalError(null); }}
-            className="font-medium text-brand hover:underline">
-            Crear una
-          </button>
-        </p>
-        <button type="button" onClick={() => { setView("choice"); setLocalError(null); }}
-          className="mt-2 flex items-center gap-1 text-[13px] text-ink-soft hover:text-ink">
-          <Icon name="chevronLeft" size={14} /> Atrás
-        </button>
-      </Section>
-    );
-  }
-
-  // Register form.
   return (
-    <Section title="Crear cuenta">
-      {slotSummary}
-      <div className="flex flex-col gap-3">
-        <input type="text" placeholder="Nombre y apellido" value={name}
-          onChange={(e) => setName(e.target.value)} disabled={busy} className={inputBase} />
-        <input type="email" placeholder="Email" value={email}
-          onChange={(e) => setEmail(e.target.value)} disabled={busy} className={inputBase} />
-        <input type="password" placeholder="Contraseña" value={password}
-          onChange={(e) => setPassword(e.target.value)} disabled={busy} className={inputBase} />
-        <input type="password" placeholder="Confirmar contraseña" value={confirmPassword}
-          onChange={(e) => setConfirm(e.target.value)} disabled={busy}
-          onKeyDown={(e) => e.key === "Enter" && handleRegister()} className={inputBase} />
-        <Btn onClick={handleRegister} disabled={busy} full>{busy ? "Creando cuenta…" : "Crear cuenta y reservar"}</Btn>
-      </div>
-      {localError && <p className="mt-3 text-[13px] text-error">{localError}</p>}
-      <p className="mt-4 text-center text-[13px] text-ink-soft">
-        ¿Ya tienes cuenta?{" "}
-        <button type="button" onClick={() => { setView("login"); setLocalError(null); }}
-          className="font-medium text-brand hover:underline">
-          Inicia sesión
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4"
+      onClick={handleClose}
+    >
+      <div
+        className="relative w-full max-w-[420px] rounded-2xl bg-surface p-6 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          type="button"
+          onClick={handleClose}
+          aria-label={am.close}
+          className="absolute right-4 top-4 grid h-8 w-8 place-items-center rounded-full text-ink-soft hover:bg-surface-2 hover:text-ink"
+        >
+          <Icon name="x" size={18} />
         </button>
-      </p>
-      <button type="button" onClick={() => { setView("choice"); setLocalError(null); }}
-        className="mt-2 flex items-center gap-1 text-[13px] text-ink-soft hover:text-ink">
-        <Icon name="chevronLeft" size={14} /> Atrás
-      </button>
-    </Section>
+
+        {/* Already authenticated — show confirm button. */}
+        {patient ? (
+          <Section title={am.confirmTitle}>
+            {slotSummary}
+            <div className="mb-4 flex items-center gap-2 rounded-xl bg-brand-weak px-4 py-3 text-[13.5px] text-brand-ink">
+              <Icon name="user" size={15} className="shrink-0" />
+              <span>{patient.name || patient.email}</span>
+            </div>
+            <Btn onClick={() => submitAuthenticated(patient)} disabled={busy} size="lg" full>
+              {busy ? am.confirming : am.confirmButton}
+            </Btn>
+            {localError && <p className="mt-3 text-[13px] text-error">{localError}</p>}
+          </Section>
+        ) : view === "start" ? (
+          <Section title={am.title}>
+            {slotSummary}
+
+            <ul className="mb-5 flex flex-col gap-2">
+              {[am.perk1, am.perk2].map((perk) => (
+                <li key={perk} className="flex items-center gap-2 text-[13.5px] text-ink-soft">
+                  <Icon name="check" size={14} className="shrink-0 text-brand" />
+                  {perk}
+                </li>
+              ))}
+            </ul>
+
+            <button type="button" onClick={() => setView("authOptions")} disabled={busy}
+              className="w-full rounded-xl bg-brand px-4 py-3.5 text-[14.5px] font-semibold text-white shadow-sm transition-all hover:opacity-90 disabled:opacity-60">
+              {am.joinOrLogin}
+            </button>
+
+            <div className="my-4 flex items-center gap-3">
+              <div className="h-px flex-1 bg-line" />
+              <span className="text-[12px] text-ink-soft">{am.or}</span>
+              <div className="h-px flex-1 bg-line" />
+            </div>
+
+            <button type="button" onClick={onContinueAsGuest} disabled={busy}
+              className="w-full rounded-xl border border-line px-4 py-3.5 text-[14.5px] font-semibold text-ink transition-all hover:border-brand-line hover:bg-brand-weak">
+              {am.continueAsGuest}
+            </button>
+            <p className="mt-2 text-center text-[12px] text-ink-soft">{am.guestNote}</p>
+
+            {localError && <p className="mt-3 text-[13px] text-error">{localError}</p>}
+          </Section>
+        ) : view === "authOptions" ? (
+          <Section title={am.title}>
+            {slotSummary}
+            <div className="flex flex-col gap-2">
+              <button type="button" onClick={handleGoogle} disabled={busy}
+                className="flex w-full items-center justify-center gap-2.5 rounded-xl border border-line bg-surface px-4 py-3.5 text-[14.5px] font-semibold text-ink shadow-sm transition-all hover:border-brand-line hover:shadow-md disabled:opacity-60">
+                <GoogleIcon /> Continuar con Google
+              </button>
+              <button type="button" onClick={() => { setLocalError(null); setView("login"); }} disabled={busy}
+                className="flex w-full items-center justify-center gap-2.5 rounded-xl border border-line bg-surface px-4 py-3.5 text-[14.5px] font-semibold text-ink shadow-sm transition-all hover:border-brand-line hover:shadow-md">
+                <Icon name="mail" size={18} className="text-ink-soft" /> Iniciar sesión
+              </button>
+              <button type="button" onClick={() => { setLocalError(null); setView("register"); }} disabled={busy}
+                className="flex w-full items-center justify-center gap-2.5 rounded-xl border border-brand-line bg-brand-weak px-4 py-3.5 text-[14.5px] font-semibold text-brand-ink shadow-sm transition-all hover:bg-brand-weak/70">
+                <Icon name="user" size={18} /> Crear cuenta
+              </button>
+            </div>
+            {localError && <p className="mt-3 text-[13px] text-error">{localError}</p>}
+            <button type="button" onClick={() => { setView("start"); setLocalError(null); }}
+              className="mt-4 flex items-center gap-1 text-[13px] text-ink-soft hover:text-ink">
+              <Icon name="chevronLeft" size={14} /> {dict.wizard.back}
+            </button>
+          </Section>
+        ) : view === "login" ? (
+          <Section title="Iniciar sesión">
+            {slotSummary}
+            <div className="flex flex-col gap-3">
+              <input type="email" placeholder="Email" value={email}
+                onChange={(e) => setEmail(e.target.value)} disabled={busy} className={inputBase} />
+              <input type="password" placeholder="Contraseña" value={password}
+                onChange={(e) => setPassword(e.target.value)} disabled={busy}
+                onKeyDown={(e) => e.key === "Enter" && handleLogin()} className={inputBase} />
+              <Btn onClick={handleLogin} disabled={busy} full>{busy ? "Accediendo…" : "Iniciar sesión"}</Btn>
+            </div>
+            {localError && <p className="mt-3 text-[13px] text-error">{localError}</p>}
+            <p className="mt-4 text-center text-[13px] text-ink-soft">
+              ¿No tienes cuenta?{" "}
+              <button type="button" onClick={() => { setView("register"); setLocalError(null); }}
+                className="font-medium text-brand hover:underline">
+                Crear una
+              </button>
+            </p>
+            <button type="button" onClick={() => { setView("authOptions"); setLocalError(null); }}
+              className="mt-2 flex items-center gap-1 text-[13px] text-ink-soft hover:text-ink">
+              <Icon name="chevronLeft" size={14} /> {dict.wizard.back}
+            </button>
+          </Section>
+        ) : (
+          <Section title="Crear cuenta">
+            {slotSummary}
+            <div className="flex flex-col gap-3">
+              <input type="text" placeholder="Nombre y apellido" value={name}
+                onChange={(e) => setName(e.target.value)} disabled={busy} className={inputBase} />
+              <input type="email" placeholder="Email" value={email}
+                onChange={(e) => setEmail(e.target.value)} disabled={busy} className={inputBase} />
+              <input type="password" placeholder="Contraseña" value={password}
+                onChange={(e) => setPassword(e.target.value)} disabled={busy} className={inputBase} />
+              <input type="password" placeholder="Confirmar contraseña" value={confirmPassword}
+                onChange={(e) => setConfirm(e.target.value)} disabled={busy}
+                onKeyDown={(e) => e.key === "Enter" && handleRegister()} className={inputBase} />
+              <Btn onClick={handleRegister} disabled={busy} full>{busy ? "Creando cuenta…" : "Crear cuenta y reservar"}</Btn>
+            </div>
+            {localError && <p className="mt-3 text-[13px] text-error">{localError}</p>}
+            <p className="mt-4 text-center text-[13px] text-ink-soft">
+              ¿Ya tienes cuenta?{" "}
+              <button type="button" onClick={() => { setView("login"); setLocalError(null); }}
+                className="font-medium text-brand hover:underline">
+                Inicia sesión
+              </button>
+            </p>
+            <button type="button" onClick={() => { setView("authOptions"); setLocalError(null); }}
+              className="mt-2 flex items-center gap-1 text-[13px] text-ink-soft hover:text-ink">
+              <Icon name="chevronLeft" size={14} /> {dict.wizard.back}
+            </button>
+          </Section>
+        )}
+      </div>
+    </div>
   );
 }
 

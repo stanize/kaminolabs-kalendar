@@ -21,6 +21,19 @@ export interface BookingPageDictionary {
     poweredBy: string; // "Reservas con" — footer line before the Kalendar logo
     signOut: string; // link shown next to the signed-in patient's name
   };
+  authModal: {
+    close: string; // aria-label for the X button
+    title: string; // "Completa tu reserva"
+    perk1: string;
+    perk2: string;
+    joinOrLogin: string; // primary button: "Únete a Kalendar o inicia sesión"
+    or: string;
+    continueAsGuest: string;
+    guestNote: string; // "La clínica revisará tu solicitud en un plazo de 24h."
+    confirmTitle: string; // "Confirmar reserva" (already-authenticated view)
+    confirmButton: string;
+    confirming: string;
+  };
   wizard: {
     back: string;
     chooseService: string;
@@ -72,6 +85,19 @@ const es: BookingPageDictionary = {
     poweredBy: "Reservas con",
     signOut: "¿No eres tú? Cerrar sesión",
   },
+  authModal: {
+    close: "Cerrar",
+    title: "Completa tu reserva",
+    perk1: "Consulta el estado de tus citas",
+    perk2: "Recibe recordatorios automáticos",
+    joinOrLogin: "Únete a Kalendar o inicia sesión",
+    or: "o",
+    continueAsGuest: "Continuar como invitado",
+    guestNote: "La clínica revisará tu solicitud en un plazo de 24 horas.",
+    confirmTitle: "Confirmar reserva",
+    confirmButton: "Confirmar reserva",
+    confirming: "Reservando…",
+  },
   wizard: {
     back: "Atrás",
     chooseService: "Elige un servicio",
@@ -122,6 +148,19 @@ const en: BookingPageDictionary = {
   header: {
     poweredBy: "Booking by",
     signOut: "Not you? Sign out",
+  },
+  authModal: {
+    close: "Close",
+    title: "Complete your booking",
+    perk1: "Check the status of your appointments",
+    perk2: "Get automatic reminders",
+    joinOrLogin: "Join Kalendar or sign in",
+    or: "or",
+    continueAsGuest: "Continue as guest",
+    guestNote: "The clinic will review your request within 24 hours.",
+    confirmTitle: "Confirm booking",
+    confirmButton: "Confirm booking",
+    confirming: "Booking…",
   },
   wizard: {
     back: "Back",
