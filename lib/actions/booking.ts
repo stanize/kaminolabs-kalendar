@@ -54,14 +54,20 @@ export interface SlotDTO {
 }
 
 export type SlotsResult =
-  | { ok: true; slots: SlotDTO[] }
+  | { ok: true; slotsByDate: Record<string, SlotDTO[]> }
   | { ok: false; error: string };
 
 /**
- * Computes bookable slots for a given service, optional provider, and calendar
- * day (the day is identified by a "YYYY-MM-DD" string interpreted in the
- * business tz). Public/guest action — no auth. Availability accounts for current
- * pending+confirmed bookings.
+ * Computes bookable slots for a given service, optional provider, and an
+ * inclusive calendar date range [dateFrom, dateTo] (each "YYYY-MM-DD" in the
+ * business tz). Public/guest action — no auth. Availability accounts for
+ * current pending+confirmed bookings.
+ *
+ * Fetches taken intervals ONCE per relevant provider for the whole range
+ * (not once per day) — generateSlotsForDay is cheap in-memory work, so the
+ * per-day loop after that single query is effectively free. This range shape
+ * is also what the future chatbot booking interface will call directly,
+ * whether for a single day or a wider window.
  *
  * Provider semantics (team mode):
  *  - providerId = a member id -> that member's free slots (providerName set).
@@ -73,7 +79,8 @@ export async function getAvailableSlots(input: {
   slug: string;
   serviceId: string;
   providerId: string | null;
-  date: string; // "YYYY-MM-DD" in business tz
+  dateFrom: string; // "YYYY-MM-DD" in business tz
+  dateTo: string; // "YYYY-MM-DD" in business tz, inclusive
   dict?: Partial<BookingWizardErrorDict>;
 }): Promise<SlotsResult> {
   const t = { ...FALLBACK_WIZARD_ERRORS, ...input.dict };
@@ -84,21 +91,32 @@ export async function getAvailableSlots(input: {
   const service = data.services.find((s) => s.id === input.serviceId);
   if (!service) return { ok: false, error: t.errInvalidService };
 
-  const [y, m, d] = input.date.split("-").map(Number);
-  if (!y || !m || !d) return { ok: false, error: t.errInvalidDate };
+  const [fy, fm, fd] = input.dateFrom.split("-").map(Number);
+  const [ty, tm, td] = input.dateTo.split("-").map(Number);
+  if (!fy || !fm || !fd || !ty || !tm || !td) return { ok: false, error: t.errInvalidDate };
 
-  const noonUtcGuess = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
-  const day = dayIdInTz(noonUtcGuess, BUSINESS_TZ);
-  const ranges = data.hoursByDay[day] ?? [];
-  if (ranges.length === 0) return { ok: true, slots: [] };
+  // Enumerate each calendar day in the range as {y, m, d} tuples.
+  const days: { y: number; m: number; d: number; ds: string }[] = [];
+  const cursor = new Date(Date.UTC(fy, fm - 1, fd));
+  const last = new Date(Date.UTC(ty, tm - 1, td));
+  if (last < cursor) return { ok: false, error: t.errInvalidDate };
+  while (cursor <= last) {
+    const y = cursor.getUTCFullYear(), m = cursor.getUTCMonth() + 1, d = cursor.getUTCDate();
+    const ds = `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    days.push({ y, m, d, ds });
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
 
+  // Widen the taken-intervals query to cover the whole range (±1 day guard
+  // for cross-midnight edges), fetched once — not once per day.
   const now = new Date();
-  const from = new Date(Date.UTC(y, m - 1, d - 1, 0, 0, 0));
-  const to = new Date(Date.UTC(y, m - 1, d + 2, 0, 0, 0));
+  const from = new Date(Date.UTC(fy, fm - 1, fd - 1, 0, 0, 0));
+  const to = new Date(Date.UTC(ty, tm - 1, td + 2, 0, 0, 0));
 
   const isTeam = data.business.team_mode === "team";
 
-  // Solo, or a specific provider chosen: a single list, provider fixed.
+  // Solo, or a specific provider chosen: a single taken-intervals fetch,
+  // then one generateSlotsForDay call per day in the range.
   if (!isTeam || input.providerId) {
     const provider = isTeam ? input.providerId : null;
     const providerName = provider
@@ -110,62 +128,59 @@ export async function getAvailableSlots(input: {
       to,
       teamMemberId: provider,
     });
-    const slots = generateSlotsForDay({
-      dateInTz: { year: y, month: m, day: d },
-      ranges,
-      durationMin: service.duration_min,
-      taken,
-      now,
-    });
-    return {
-      ok: true,
-      slots: slots.map((s) => ({
-        startIso: s.start.toISOString(),
-        label: s.label,
-        providerId: provider,
-        providerName,
-      })),
-    };
+    const slotsByDate: Record<string, SlotDTO[]> = {};
+    for (const { y, m, d, ds } of days) {
+      const day = dayIdInTz(new Date(Date.UTC(y, m - 1, d, 12, 0, 0)), BUSINESS_TZ);
+      const ranges = data.hoursByDay[day] ?? [];
+      if (ranges.length === 0) { slotsByDate[ds] = []; continue; }
+      const slots = generateSlotsForDay({
+        dateInTz: { year: y, month: m, day: d },
+        ranges, durationMin: service.duration_min, taken, now,
+      });
+      slotsByDate[ds] = slots.map((s) => ({
+        startIso: s.start.toISOString(), label: s.label,
+        providerId: provider, providerName,
+      }));
+    }
+    return { ok: true, slotsByDate };
   }
 
-  // "Cualquiera": one slot per (time, free member), each labelled with provider.
+  // "Cualquiera": one taken-intervals fetch per member for the whole range,
+  // then one slot per (day, time, free member), labelled with provider.
   const perMember = await Promise.all(
     data.members.map(async (mem) => {
       const taken = await getTakenIntervals({
-        businessId: data.business.id,
-        from,
-        to,
-        teamMemberId: mem.id,
+        businessId: data.business.id, from, to, teamMemberId: mem.id,
       });
-      const slots = generateSlotsForDay({
-        dateInTz: { year: y, month: m, day: d },
-        ranges,
-        durationMin: service.duration_min,
-        taken,
-        now,
-      });
-      return { mem, slots };
+      return { mem, taken };
     })
   );
 
-  const out: SlotDTO[] = [];
-  for (const { mem, slots } of perMember) {
-    for (const s of slots) {
-      out.push({
-        startIso: s.start.toISOString(),
-        label: s.label,
-        providerId: mem.id,
-        providerName: mem.name,
+  const slotsByDate: Record<string, SlotDTO[]> = {};
+  for (const { y, m, d, ds } of days) {
+    const day = dayIdInTz(new Date(Date.UTC(y, m - 1, d, 12, 0, 0)), BUSINESS_TZ);
+    const ranges = data.hoursByDay[day] ?? [];
+    if (ranges.length === 0) { slotsByDate[ds] = []; continue; }
+
+    const out: SlotDTO[] = [];
+    for (const { mem, taken } of perMember) {
+      const slots = generateSlotsForDay({
+        dateInTz: { year: y, month: m, day: d },
+        ranges, durationMin: service.duration_min, taken, now,
       });
+      for (const s of slots) {
+        out.push({ startIso: s.start.toISOString(), label: s.label, providerId: mem.id, providerName: mem.name });
+      }
     }
+    // Sort by time, then provider name, so same-time options group together.
+    out.sort(
+      (a, b) =>
+        a.startIso.localeCompare(b.startIso) ||
+        (a.providerName ?? "").localeCompare(b.providerName ?? "")
+    );
+    slotsByDate[ds] = out;
   }
-  // Sort by time, then provider name, so same-time options group together.
-  out.sort(
-    (a, b) =>
-      a.startIso.localeCompare(b.startIso) ||
-      (a.providerName ?? "").localeCompare(b.providerName ?? "")
-  );
-  return { ok: true, slots: out };
+  return { ok: true, slotsByDate };
 }
 
 // ── Submit a booking ───────────────────────────────────────────────────────

@@ -536,24 +536,23 @@ function DateTimeStep({ slug, serviceId, providerId, openDays, bookingWindowMont
     const selectableDays = weekDays.filter(isSelectable);
     onError(null);
     (async () => {
-      setLoadingDates(new Set(selectableDays.map(ymd)));
-      const results = await Promise.all(
-        selectableDays.map(async (d) => {
-          const ds = ymd(d);
-          const res = await getAvailableSlots({ slug, serviceId, providerId, date: ds, dict: dict.errors });
-          return { ds, res };
-        })
-      );
-      if (cancelled) return;
-      let firstError: string | null = null;
-      const next: Record<string, SlotDTO[]> = {};
-      for (const { ds, res } of results) {
-        if (res.ok) next[ds] = res.slots;
-        else firstError ??= res.error;
+      if (selectableDays.length === 0) {
+        setSlotsByDate({});
+        setLoadingDates(new Set());
+        return;
       }
-      setSlotsByDate(next);
+      setLoadingDates(new Set(selectableDays.map(ymd)));
+      const dateFrom = ymd(selectableDays[0]);
+      const dateTo = ymd(selectableDays[selectableDays.length - 1]);
+      const res = await getAvailableSlots({ slug, serviceId, providerId, dateFrom, dateTo, dict: dict.errors });
+      if (cancelled) return;
+      if (!res.ok) {
+        onError(res.error);
+        setSlotsByDate({});
+      } else {
+        setSlotsByDate(res.slotsByDate);
+      }
       setLoadingDates(new Set());
-      if (firstError) onError(firstError);
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
