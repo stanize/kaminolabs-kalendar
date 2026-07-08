@@ -335,8 +335,6 @@ function ConfirmAuthModal({
           </Section>
         ) : view === "start" ? (
           <Section title={am.title}>
-            {slotSummary}
-
             <p className="mb-3 text-[16px] font-bold text-ink">{am.advantagesHeading}</p>
             <ul className="mb-5 flex flex-col gap-2">
               {[am.perk1, am.perk2, am.perk3].map((perk) => (
