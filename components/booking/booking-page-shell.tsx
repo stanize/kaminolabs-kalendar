@@ -10,6 +10,7 @@ import { getBookingPageDictionary } from "@/lib/i18n/dictionaries/booking-page";
 import { authClient } from "@/lib/auth-client";
 import { LOCALES, type Locale } from "@/lib/i18n/config";
 import type { BusinessType, DayId } from "@/lib/onboarding/types";
+import { bookingPath } from "@/lib/business/booking-url";
 
 interface Service {
   id: string;
@@ -92,7 +93,7 @@ export function BookingPageShell({
             </span>
           ) : (
             <Link
-              href="/patient/login"
+              href={`/patient/login?redirectTo=${encodeURIComponent(bookingPath(slug))}`}
               className="flex items-center gap-1.5 text-[13px] font-medium text-brand hover:underline"
             >
               <Icon name="user" size={14} />

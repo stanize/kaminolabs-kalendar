@@ -6,11 +6,23 @@ import { PatientLoginForm } from "@/components/auth/patient-login-form";
 
 export const metadata = { title: "Accede a tu cuenta — Kalendar" };
 
-export default async function PatientLoginPage() {
-  // Already authenticated — go straight to the patient portal.
+export default async function PatientLoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ redirectTo?: string }>;
+}) {
+  // Only accept a same-site relative path (starts with a single "/", never
+  // "//" which browsers treat as protocol-relative) — anything else falls
+  // back to the default portal home. Guards against open-redirect abuse of
+  // this query param.
+  const params = await searchParams;
+  const raw = params.redirectTo;
+  const redirectTo = raw && raw.startsWith("/") && !raw.startsWith("//") ? raw : "/patient";
+
+  // Already authenticated — go straight to the target (or the portal home).
   try {
     const session = await auth.api.getSession({ headers: await headers() });
-    if (session?.user?.id) redirect("/patient");
+    if (session?.user?.id) redirect(redirectTo);
   } catch {
     // No session — show login form.
   }
@@ -29,7 +41,7 @@ export default async function PatientLoginPage() {
         </div>
 
         <div className="rounded-2xl border border-line bg-surface p-6 shadow-sm">
-          <PatientLoginForm redirectTo="/patient" />
+          <PatientLoginForm redirectTo={redirectTo} />
         </div>
       </div>
     </div>
