@@ -68,6 +68,7 @@ export interface BookingPageDictionary {
     nextWeek: string; // aria-label
     searchingSlots: string;
     noSlotsThisDay: string;
+    closed: string; // shown under a non-open weekday column, e.g. "Cerrado"
     yourDetails: string;
     namePlaceholder: string;
     emailPlaceholder: string;
@@ -154,6 +155,7 @@ const es: BookingPageDictionary = {
     nextWeek: "Semana siguiente",
     searchingSlots: "Buscando horarios…",
     noSlotsThisDay: "No hay horarios disponibles este día.",
+    closed: "Cerrado",
     yourDetails: "Tus datos",
     namePlaceholder: "Nombre y apellido",
     emailPlaceholder: "Email",
@@ -240,6 +242,7 @@ const en: BookingPageDictionary = {
     nextWeek: "Next week",
     searchingSlots: "Looking for times…",
     noSlotsThisDay: "No times available this day.",
+    closed: "Closed",
     yourDetails: "Your details",
     namePlaceholder: "First and last name",
     emailPlaceholder: "Email",

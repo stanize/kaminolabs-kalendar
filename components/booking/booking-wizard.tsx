@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Icon } from "@/components/ui/icon";
 import { Logo } from "@/components/ui/logo";
 import { Btn } from "@/components/ui/button";
@@ -525,20 +525,39 @@ function DateTimeStep({ slug, serviceId, providerId, openDays, bookingWindowMont
   const maxDate = new Date(today); maxDate.setMonth(maxDate.getMonth() + bookingWindowMonths);
   const openSet = new Set(openDays);
   const [weekStart, setWeekStart] = useState<Date>(startOfWeekMon(today));
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [slots, setSlots] = useState<SlotDTO[] | null>(null);
-  const [loadingSlots, setLoadingSlots] = useState(false);
+  const [slotsByDate, setSlotsByDate] = useState<Record<string, SlotDTO[]>>({});
+  const [loadingDates, setLoadingDates] = useState<Set<string>>(new Set());
 
   const weekDays = Array.from({ length: 7 }, (_, i) => { const d = new Date(weekStart); d.setDate(d.getDate() + i); return d; });
   function isSelectable(d: Date) { return d >= today && d <= maxDate && openSet.has(jsDowToDayId(d.getDay())); }
 
-  async function pickDay(d: Date) {
-    const ds = ymd(d); setSelectedDate(ds); setSlots(null); setLoadingSlots(true); onError(null);
-    const res = await getAvailableSlots({ slug, serviceId, providerId, date: ds, dict: dict.errors });
-    setLoadingSlots(false);
-    if (!res.ok) { onError(res.error); return; }
-    setSlots(res.slots);
-  }
+  useEffect(() => {
+    let cancelled = false;
+    const selectableDays = weekDays.filter(isSelectable);
+    onError(null);
+    (async () => {
+      setLoadingDates(new Set(selectableDays.map(ymd)));
+      const results = await Promise.all(
+        selectableDays.map(async (d) => {
+          const ds = ymd(d);
+          const res = await getAvailableSlots({ slug, serviceId, providerId, date: ds, dict: dict.errors });
+          return { ds, res };
+        })
+      );
+      if (cancelled) return;
+      let firstError: string | null = null;
+      const next: Record<string, SlotDTO[]> = {};
+      for (const { ds, res } of results) {
+        if (res.ok) next[ds] = res.slots;
+        else firstError ??= res.error;
+      }
+      setSlotsByDate(next);
+      setLoadingDates(new Set());
+      if (firstError) onError(firstError);
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weekStart.getTime(), slug, serviceId, providerId]);
 
   const thisWeekStart = startOfWeekMon(today);
   const canPrev = weekStart > thisWeekStart;
@@ -560,56 +579,58 @@ function DateTimeStep({ slug, serviceId, providerId, openDays, bookingWindowMont
         </button>
       </div>
 
-      <div className="grid grid-cols-7 gap-1.5">
+      <div className="flex gap-1.5 overflow-x-auto pb-1">
         {weekDays.map((d, i) => {
-          const ds = ymd(d); const sel = isSelectable(d); const selected = ds === selectedDate;
+          const ds = ymd(d);
+          const sel = isSelectable(d);
+          const loading = loadingDates.has(ds);
+          const slots = slotsByDate[ds];
+
           return (
-            <button key={i} disabled={!sel} onClick={() => pickDay(d)}
-              className={`flex flex-col items-center gap-0.5 rounded-xl border py-2 transition-all ${
-                selected ? "border-brand bg-brand text-white"
-                : sel ? "border-line bg-surface text-ink hover:border-brand-line hover:bg-brand-weak"
-                : "cursor-default border-transparent text-ink-soft/30"}`}>
-              <span className="text-[10.5px] font-semibold uppercase">{dict.weekdaysShort[i]}</span>
-              <span className="text-[15px] font-semibold leading-none">{d.getDate()}</span>
-            </button>
+            <div key={i} className="flex w-[108px] shrink-0 flex-col">
+              <div className={`mb-2 flex flex-col items-center gap-0.5 rounded-xl border py-2 ${
+                sel ? "border-line bg-surface text-ink" : "border-transparent text-ink-soft/30"}`}>
+                <span className="text-[10.5px] font-semibold uppercase">{dict.weekdaysShort[i]}</span>
+                <span className="text-[15px] font-semibold leading-none">{d.getDate()}</span>
+              </div>
+
+              <div className="flex max-h-[360px] flex-col gap-1.5 overflow-y-auto pr-0.5">
+                {!sel && (
+                  <p className="pt-2 text-center text-[12px] text-ink-soft/60">{w.closed}</p>
+                )}
+                {sel && loading && (
+                  <p className="pt-2 text-center text-[12px] text-ink-soft">{w.searchingSlots}</p>
+                )}
+                {sel && !loading && slots?.length === 0 && (
+                  <p className="pt-2 text-center text-[12px] text-ink-soft">{w.noSlotsThisDay}</p>
+                )}
+                {sel && !loading && slots && slots.length > 0 && (
+                  isTeamAny ? (
+                    groupByProvider(slots).map((group) => (
+                      <div key={group.providerId ?? "any"} className="flex flex-col gap-1.5">
+                        <span className="truncate text-[10px] font-bold uppercase tracking-[.04em] text-ink-soft">{group.providerName}</span>
+                        {group.slots.map((s) => (
+                          <button key={`${s.startIso}-${s.providerId ?? ""}`} onClick={() => onPick(ds, s)}
+                            className="rounded-lg border border-line py-1.5 text-[12.5px] font-semibold text-ink transition-all hover:border-brand hover:bg-brand hover:text-white">
+                            {s.label}
+                          </button>
+                        ))}
+                      </div>
+                    ))
+                  ) : (
+                    slots.map((s) => (
+                      <button key={`${s.startIso}-${s.providerId ?? ""}`} onClick={() => onPick(ds, s)}
+                        className="rounded-lg border border-line py-1.5 text-[12.5px] font-semibold text-ink transition-all hover:border-brand hover:bg-brand hover:text-white">
+                        {s.label}
+                      </button>
+                    ))
+                  )
+                )}
+              </div>
+            </div>
           );
         })}
       </div>
-
-      {selectedDate && (
-        <div className="mt-5">
-          {loadingSlots && <p className="text-[13.5px] text-ink-soft">{w.searchingSlots}</p>}
-          {!loadingSlots && slots?.length === 0 && <p className="text-[13.5px] text-ink-soft">{w.noSlotsThisDay}</p>}
-          {!loadingSlots && slots && slots.length > 0 && (
-            isTeamAny ? (
-              <div className="flex flex-col gap-5">
-                {groupByProvider(slots).map((group) => (
-                  <div key={group.providerId ?? "any"}>
-                    <h3 className="mb-2 text-[13px] font-bold uppercase tracking-[.04em] text-ink-soft">{group.providerName}</h3>
-                    <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
-                      {group.slots.map((s) => (
-                        <button key={`${s.startIso}-${s.providerId ?? ""}`} onClick={() => onPick(selectedDate, s)}
-                          className="rounded-lg border border-line py-2 text-[13.5px] font-semibold text-ink transition-all hover:border-brand hover:bg-brand hover:text-white">
-                          {s.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
-                {slots.map((s) => (
-                  <button key={`${s.startIso}-${s.providerId ?? ""}`} onClick={() => onPick(selectedDate, s)}
-                    className="rounded-lg border border-line py-2 text-[13.5px] font-semibold text-ink transition-all hover:border-brand hover:bg-brand hover:text-white">
-                    {s.label}
-                  </button>
-                ))}
-              </div>
-            )
-          )}
-        </div>
-      )}
     </Section>
   );
 }
