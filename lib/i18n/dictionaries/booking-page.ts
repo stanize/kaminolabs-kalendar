@@ -123,9 +123,9 @@ const es: BookingPageDictionary = {
     confirming: "Reservando…",
   },
   authForm: {
-    loginTitle: "Bienvenido de nuevo",
+    loginTitle: "Inicia sesión en Kalendar",
     loginSubtitle: "Inicia sesión en tu cuenta de Kalendar.",
-    registerTitle: "Crea tu cuenta gratis",
+    registerTitle: "Únete a Kalendar",
     emailPlaceholder: "Email",
     passwordPlaceholder: "Contraseña (mín. 8 car.)",
     confirmPasswordPlaceholder: "Repite la contraseña",
@@ -209,9 +209,9 @@ const en: BookingPageDictionary = {
     confirming: "Booking…",
   },
   authForm: {
-    loginTitle: "Welcome back",
+    loginTitle: "Sign in to Kalendar",
     loginSubtitle: "Sign in to your Kalendar account.",
-    registerTitle: "Create your free account",
+    registerTitle: "Join Kalendar",
     emailPlaceholder: "Email",
     passwordPlaceholder: "Password (min. 8 char.)",
     confirmPasswordPlaceholder: "Repeat password",

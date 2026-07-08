@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Icon } from "@/components/ui/icon";
+import { Logo } from "@/components/ui/logo";
 import { Btn } from "@/components/ui/button";
 import { getAvailableSlots, submitBooking, type SlotDTO } from "@/lib/actions/booking";
 import { provisionPatient } from "@/lib/actions/patient";
@@ -367,6 +368,10 @@ function ConfirmAuthModal({
           </Section>
         ) : view === "login" ? (
           <div>
+            <div className="mb-4 flex items-center gap-2">
+              <Logo showText={false} size={18} />
+              <h2 className="text-[16px] font-semibold text-ink">{af.loginTitle}</h2>
+            </div>
             <div className="flex flex-col gap-3">
               <input type="email" placeholder={af.emailPlaceholder} value={email}
                 onChange={(e) => setEmail(e.target.value)} disabled={busy} className={`${inputBase} rounded-full`} />
@@ -402,6 +407,10 @@ function ConfirmAuthModal({
           </div>
         ) : (
           <div>
+            <div className="mb-4 flex items-center gap-2">
+              <Logo showText={false} size={18} />
+              <h2 className="text-[16px] font-semibold text-ink">{af.registerTitle}</h2>
+            </div>
             <button type="button" onClick={handleGoogle} disabled={busy}
               className="flex w-full items-center justify-center gap-2.5 rounded-full border border-line bg-surface px-4 py-3.5 text-[14.5px] font-semibold text-ink shadow-sm transition-all hover:border-brand-line hover:shadow-md disabled:opacity-60">
               <GoogleIcon /> {af.continueGoogle}
