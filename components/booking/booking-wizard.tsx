@@ -620,44 +620,43 @@ function DateTimeStep({ slug, serviceId, providerId, openDays, bookingWindowMont
         </button>
       </div>
 
-      <div className="grid grid-cols-7 gap-1">
-        {weekDays.map((d, i) => {
-          const ds = ymd(d);
-          const sel = isSelectable(d);
-          const loading = loadingDates.has(ds);
-          const slots = slotsByDate[ds];
+      {loadingDates.size > 0 ? (
+        <p className="py-6 text-center text-[13.5px] text-ink-soft">{w.searchingSlots}</p>
+      ) : (
+        <div className="grid grid-cols-7 gap-1">
+          {weekDays.map((d, i) => {
+            const ds = ymd(d);
+            const sel = isSelectable(d);
+            const slots = slotsByDate[ds];
 
-          return (
-            <div key={i} className="flex min-w-0 flex-col">
-              <div className={`mb-1.5 flex flex-col items-center gap-0.5 rounded-lg border py-1.5 ${
-                sel ? "border-line bg-surface text-ink" : "border-transparent text-ink-soft/30"}`}>
-                <span className="text-[9px] font-semibold uppercase">{dict.weekdaysShort[i]}</span>
-                <span className="text-[13px] font-semibold leading-none">{d.getDate()}</span>
-              </div>
+            return (
+              <div key={i} className="flex min-w-0 flex-col">
+                <div className={`mb-1.5 flex flex-col items-center gap-0.5 rounded-lg border py-1.5 ${
+                  sel ? "border-line bg-surface text-ink" : "border-transparent text-ink-soft/30"}`}>
+                  <span className="text-[9px] font-semibold uppercase">{dict.weekdaysShort[i]}</span>
+                  <span className="text-[13px] font-semibold leading-none">{d.getDate()}</span>
+                </div>
 
-              <div className="flex max-h-[360px] flex-col gap-1 overflow-y-auto pr-0.5">
-                {!sel && (
-                  <p className="pt-2 text-center text-[10px] leading-tight text-ink-soft/60">{w.closed}</p>
-                )}
-                {sel && loading && (
-                  <p className="pt-2 text-center text-[10px] leading-tight text-ink-soft">{w.searchingSlots}</p>
-                )}
-                {sel && !loading && slots?.length === 0 && (
-                  <p className="pt-2 text-center text-[10px] leading-tight text-ink-soft">{w.noSlotsThisDay}</p>
-                )}
-                {sel && !loading && slots && slots.length > 0 && (
-                  isTeamAny ? (
-                    groupByProvider(slots).map((group) => (
-                      <div key={group.providerId ?? "any"} className="flex flex-col gap-1">
-                        <span className="truncate text-[8.5px] font-bold uppercase tracking-[.02em] text-ink-soft">{group.providerName}</span>
-                        {group.slots.map((s) => (
-                          <button key={`${s.startIso}-${s.providerId ?? ""}`} onClick={() => onPick(ds, s)}
-                            className="rounded-md border border-line px-0.5 py-1 text-[10.5px] font-semibold text-ink transition-all hover:border-brand hover:bg-brand hover:text-white">
-                            {s.label}
-                          </button>
-                        ))}
-                      </div>
-                    ))
+                <div className="flex max-h-[360px] flex-col gap-1 overflow-y-auto pr-0.5">
+                  {!sel && (
+                    <p className="pt-2 text-center text-[10px] leading-tight text-ink-soft/60">{w.closed}</p>
+                  )}
+                  {sel && slots?.length === 0 && (
+                    <p className="pt-2 text-center text-[10px] leading-tight text-ink-soft">{w.noSlotsThisDay}</p>
+                  )}
+                  {sel && slots && slots.length > 0 && (
+                    isTeamAny ? (
+                      groupByProvider(slots).map((group) => (
+                        <div key={group.providerId ?? "any"} className="flex flex-col gap-1">
+                          <span className="truncate text-[8.5px] font-bold uppercase tracking-[.02em] text-ink-soft">{group.providerName}</span>
+                          {group.slots.map((s) => (
+                            <button key={`${s.startIso}-${s.providerId ?? ""}`} onClick={() => onPick(ds, s)}
+                              className="rounded-md border border-line px-0.5 py-1 text-[10.5px] font-semibold text-ink transition-all hover:border-brand hover:bg-brand hover:text-white">
+                              {s.label}
+                            </button>
+                          ))}
+                        </div>
+                      ))
                   ) : (
                     slots.map((s) => (
                       <button key={`${s.startIso}-${s.providerId ?? ""}`} onClick={() => onPick(ds, s)}
@@ -666,12 +665,13 @@ function DateTimeStep({ slug, serviceId, providerId, openDays, bookingWindowMont
                       </button>
                     ))
                   )
-                )}
+                  )}
+                </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </Section>
   );
 }
