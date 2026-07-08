@@ -19,6 +19,7 @@ import type { Locale } from "../config";
 export interface BookingPageDictionary {
   header: {
     poweredBy: string; // "Reservas con" — footer line before the Kalendar logo
+    signOut: string; // link shown next to the signed-in patient's name
   };
   wizard: {
     back: string;
@@ -69,6 +70,7 @@ export interface BookingPageDictionary {
 const es: BookingPageDictionary = {
   header: {
     poweredBy: "Reservas con",
+    signOut: "¿No eres tú? Cerrar sesión",
   },
   wizard: {
     back: "Atrás",
@@ -119,6 +121,7 @@ const es: BookingPageDictionary = {
 const en: BookingPageDictionary = {
   header: {
     poweredBy: "Booking by",
+    signOut: "Not you? Sign out",
   },
   wizard: {
     back: "Back",

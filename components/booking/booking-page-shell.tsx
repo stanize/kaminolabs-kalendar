@@ -7,6 +7,7 @@ import { Icon } from "@/components/ui/icon";
 import { BookingWizard } from "@/components/booking/booking-wizard";
 import { businessTypeLabelFor } from "@/lib/i18n/dictionaries/business-types";
 import { getBookingPageDictionary } from "@/lib/i18n/dictionaries/booking-page";
+import { authClient } from "@/lib/auth-client";
 import { LOCALES, type Locale } from "@/lib/i18n/config";
 import type { BusinessType, DayId } from "@/lib/onboarding/types";
 
@@ -65,15 +66,29 @@ export function BookingPageShell({
   const [patient, setPatient] = useState<PatientInfo | null>(initialPatient);
   const dict = getBookingPageDictionary(locale);
 
+  async function handleSignOut() {
+    await authClient.signOut();
+    setPatient(null);
+  }
+
   return (
     <div className="min-h-screen bg-surface-2 px-5 py-10">
       <div className="mx-auto w-full max-w-[560px]">
         {/* Top bar: language switcher + returning patient link */}
         <div className="mb-4 flex items-center justify-between">
           {patient ? (
-            <span className="flex items-center gap-1.5 text-[13px] text-ink-soft">
-              <Icon name="user" size={14} />
-              {patient.name || patient.email}
+            <span className="flex items-center gap-2 text-[13px] text-ink-soft">
+              <span className="flex items-center gap-1.5">
+                <Icon name="user" size={14} />
+                {patient.name || patient.email}
+              </span>
+              <button
+                type="button"
+                onClick={handleSignOut}
+                className="text-brand hover:underline"
+              >
+                {dict.header.signOut}
+              </button>
             </span>
           ) : (
             <Link
