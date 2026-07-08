@@ -36,6 +36,26 @@ export interface BookingPageDictionary {
     confirmButton: string;
     confirming: string;
   };
+  authForm: {
+    loginTitle: string; // "Bienvenido de nuevo"
+    loginSubtitle: string; // "Inicia sesión en tu cuenta de Kalendar."
+    registerTitle: string; // "Crea tu cuenta gratis"
+    emailPlaceholder: string;
+    passwordPlaceholder: string; // "Contraseña (mín. 8 car.)"
+    confirmPasswordPlaceholder: string; // "Repite la contraseña"
+    namePlaceholder: string;
+    continueGoogle: string;
+    or: string;
+    signIn: string;
+    signingIn: string;
+    createAccount: string;
+    creatingAccount: string;
+    noAccount: string; // "¿No tienes cuenta?"
+    createFreeLink: string; // "Crear una gratis"
+    haveAccount: string; // "¿Ya tienes cuenta?"
+    signInLink: string; // "Inicia sesión"
+    termsNote: string; // "Al continuar aceptas los términos y la política de privacidad de Kalendar."
+  };
   wizard: {
     back: string;
     chooseService: string;
@@ -102,6 +122,26 @@ const es: BookingPageDictionary = {
     confirmButton: "Confirmar reserva",
     confirming: "Reservando…",
   },
+  authForm: {
+    loginTitle: "Bienvenido de nuevo",
+    loginSubtitle: "Inicia sesión en tu cuenta de Kalendar.",
+    registerTitle: "Crea tu cuenta gratis",
+    emailPlaceholder: "Email",
+    passwordPlaceholder: "Contraseña (mín. 8 car.)",
+    confirmPasswordPlaceholder: "Repite la contraseña",
+    namePlaceholder: "Nombre y apellido",
+    continueGoogle: "Continuar con Google",
+    or: "o",
+    signIn: "Iniciar sesión",
+    signingIn: "Accediendo…",
+    createAccount: "Crear cuenta",
+    creatingAccount: "Creando cuenta…",
+    noAccount: "¿No tienes cuenta?",
+    createFreeLink: "Crear una gratis",
+    haveAccount: "¿Ya tienes cuenta?",
+    signInLink: "Inicia sesión",
+    termsNote: "Al continuar aceptas los términos y la política de privacidad de Kalendar.",
+  },
   wizard: {
     back: "Atrás",
     chooseService: "Elige un servicio",
@@ -167,6 +207,26 @@ const en: BookingPageDictionary = {
     confirmTitle: "Confirm booking",
     confirmButton: "Confirm booking",
     confirming: "Booking…",
+  },
+  authForm: {
+    loginTitle: "Welcome back",
+    loginSubtitle: "Sign in to your Kalendar account.",
+    registerTitle: "Create your free account",
+    emailPlaceholder: "Email",
+    passwordPlaceholder: "Password (min. 8 char.)",
+    confirmPasswordPlaceholder: "Repeat password",
+    namePlaceholder: "First and last name",
+    continueGoogle: "Continue with Google",
+    or: "or",
+    signIn: "Sign in",
+    signingIn: "Signing in…",
+    createAccount: "Create account",
+    creatingAccount: "Creating account…",
+    noAccount: "Don't have an account?",
+    createFreeLink: "Create one for free",
+    haveAccount: "Already have an account?",
+    signInLink: "Sign in",
+    termsNote: "By continuing you accept Kalendar's terms and privacy policy.",
   },
   wizard: {
     back: "Back",
