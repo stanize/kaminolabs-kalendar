@@ -73,6 +73,7 @@ Kalendar is a SaaS online booking platform targeting Spanish-market professional
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service-role key — used by `lib/supabase/server.ts` for all server-side DB access (bypasses RLS). Server-only, never exposed to the browser |
 | `RESEND_API_KEY` | Resend API key for verification emails (without it, emails are skipped/logged, not sent) |
 | `EMAIL_FROM` | Sender, e.g. `Kalendar <no-reply@kaminolabs.dev>` (domain must be verified in Resend) |
+| `CRON_SECRET` | Bearer token Vercel sets automatically; used to authorize `app/api/cron/sweep-expired-bookings/route.ts` |
 
 ---
 

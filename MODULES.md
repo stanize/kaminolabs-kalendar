@@ -44,7 +44,7 @@ The public-facing booking wizard clients use to book an appointment.
 ## Module: patient-portal
 Patient-facing account area (separate from the clinic panel).
 
-- Routes: `app/patient/page.tsx`, `app/patient/layout.tsx`, `app/patient/login/page.tsx`, `app/patient/bookings/page.tsx`
+- Routes: `app/patient/(protected)/page.tsx`, `app/patient/(protected)/layout.tsx`, `app/patient/(protected)/bookings/page.tsx`, `app/patient/login/page.tsx`
 - Lib: `lib/booking/patient-data.ts`
 - Actions: `lib/actions/patient.ts`
 - DB tables: `kalendar_patients`, reads `kalendar_bookings`
@@ -115,7 +115,7 @@ because they're tightly coupled (availability can be per-member in the future).
 - Actions: `lib/actions/booking-owner.ts`
 - DB tables: `kalendar_bookings` (read + status updates), reads `kalendar_patients`
 - i18n: `lib/i18n/dictionaries/calendar.ts`
-- Gotchas: "Pendientes" tab is the guest-booking review queue with expiry countdown (in progress — see cron module for the sweep that expires these).
+- Gotchas: "Pendientes" tab is the guest-booking review queue — flat list (no day grouping), sorted soonest-expiry-first via `pendingExpiryAt`, with a live `CountdownBadge` (re-renders every 60s). `confirmBookingAsOwner` (in `lib/actions/booking-owner.ts`) transitions `pending_confirmation` → `confirmed`, clears the expiry window, and emails the guest a confirmation receipt in their locale — see cron module for the separate sweep that expires (rather than confirms) stale pending bookings.
 
 ---
 
@@ -126,7 +126,7 @@ because they're tightly coupled (availability can be per-member in the future).
 - **Cron**: `app/api/cron/sweep-expired-bookings/route.ts` (Vercel Cron). Touches `kalendar_bookings` — relevant to public-booking and panel-calendar.
 - **Supabase client**: `lib/supabase/*` — service-role key, used by every module for DB writes.
 - **Schema**: `supabase/schema_001.sql` (all `kalendar_*` tables + `user_roles`), `supabase/schema_better_auth_001.sql` (Better Auth tables). Any module adding/changing a table edits `schema_001.sql` directly (destructive, re-run convention).
-- **Onboarding leftovers**: `lib/onboarding/{data,types,slug}.ts` — kept only because `app/page.tsx`, `app/bookings/[slug]/page.tsx`, and `lib/landing/ejemplos.ts` still import from them. Not a live module; don't add to it.
+- **Onboarding leftovers**: `lib/onboarding/{data,types,slug}.ts` — larger dependency surface than the name suggests. `lib/onboarding/types.ts` exports `DayId` and `BusinessType`, which have become de facto shared types: imported by `lib/availability/{constants,data}.ts`, `lib/booking/data.ts`, `lib/booking/slots.ts`, `lib/business/data.ts`, `lib/actions/{business,availability}.ts`, and the `availability.ts`/`business-types.ts` i18n dictionaries. `lib/onboarding/data.ts` exports `SERVICE_TEMPLATES` and `BUSINESS_TYPES`, used by `app/panel/services/page.tsx`, `lib/actions/business.ts`, and `app/page.tsx`. `lib/landing/ejemplos.ts` imports `OnboardingData`. (`app/bookings/[slug]/page.tsx` does not import onboarding directly — only transitively via `lib/booking/slots.ts`.) Not a live module; don't add to it — but `DayId`/`BusinessType` are good candidates for promotion to a real shared-types location in a future cleanup pass, since half the app now depends on a folder named for a feature that no longer exists as such.
 
 ---
 
@@ -140,4 +140,4 @@ module section above.
 
 ---
 
-_Last resynced: 2026-07-05_
+_Last resynced: 2026-07-10_
