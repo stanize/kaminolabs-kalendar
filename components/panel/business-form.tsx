@@ -11,6 +11,7 @@ import type { BusinessType } from "@/lib/onboarding/types";
 import {
   saveBusinessSettings,
   checkSlugAvailability,
+  lookupPostalCode,
   type SlugCheckResult,
 } from "@/lib/actions/business";
 import {
@@ -32,6 +33,7 @@ interface InitialBusiness {
   addressAdditional: string;
   addressPostalCode: string;
   addressProvince: string;
+  addressCountry: string;
   phone: string;
   contactEmail: string;
   slug: string;
@@ -64,6 +66,7 @@ export function BusinessForm({
   const [addressAdditional, setAddressAdditional] = useState(initial?.addressAdditional ?? "");
   const [addressPostalCode, setAddressPostalCode] = useState(initial?.addressPostalCode ?? "");
   const [addressProvince, setAddressProvince] = useState(initial?.addressProvince ?? "");
+  const [addressCountry, setAddressCountry] = useState(initial?.addressCountry ?? "España");
   const [phone, setPhone] = useState(initial?.phone ?? "");
   // Defaults to the owner's account email on creation, but stays editable —
   // the business's contact email is intentionally distinct from the account.
@@ -78,8 +81,10 @@ export function BusinessForm({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [postalAutofilled, setPostalAutofilled] = useState(false);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const postalDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Schedule a debounced availability check for a given slug (creation only).
   function scheduleSlugCheck(value: string) {
@@ -115,6 +120,7 @@ export function BusinessForm({
   useEffect(() => {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
+      if (postalDebounceRef.current) clearTimeout(postalDebounceRef.current);
     };
   }, []);
 
@@ -134,6 +140,32 @@ export function BusinessForm({
     setSlugTouched(true);
     setSlug(next);
     scheduleSlugCheck(next);
+  }
+
+  // Postal-code autofill (free, static dataset — see lib/business/postal-codes.ts).
+  // Only fills city/province when BOTH are still empty, so it never clobbers
+  // something the user already typed (e.g. if they filled City before reaching
+  // the postal code fields, which is the field order in this form).
+  function handlePostalCodeChange(raw: string) {
+    const next = raw.replace(/\D/g, "").slice(0, 5);
+    setAddressPostalCode(next);
+    setPostalAutofilled(false);
+
+    if (postalDebounceRef.current) clearTimeout(postalDebounceRef.current);
+    if (next.length !== 5) return;
+
+    postalDebounceRef.current = setTimeout(async () => {
+      try {
+        const result = await lookupPostalCode(next);
+        if (result && !city.trim() && !addressProvince.trim()) {
+          setCity(result.city);
+          setAddressProvince(result.province);
+          setPostalAutofilled(true);
+        }
+      } catch {
+        // Silent miss — autofill is a convenience, not a required step.
+      }
+    }, 400);
   }
 
   async function handleSave() {
@@ -168,6 +200,10 @@ export function BusinessForm({
       setError(f.errAddressProvince);
       return;
     }
+    if (addressCountry.trim().length < 2) {
+      setError(f.errAddressCountry);
+      return;
+    }
     if (phone.trim().length < 5) {
       setError(f.errPhone);
       return;
@@ -195,6 +231,7 @@ export function BusinessForm({
     fd.set("addressAdditional", addressAdditional.trim());
     fd.set("addressPostalCode", addressPostalCode.trim());
     fd.set("addressProvince", addressProvince.trim());
+    fd.set("addressCountry", addressCountry.trim());
     fd.set("phone", phone.trim());
     fd.set("contactEmail", contactEmail.trim());
     if (isNew) fd.set("slug", slug);
@@ -209,6 +246,7 @@ export function BusinessForm({
         errAddressNumber: f.errAddressNumber,
         errAddressPostalCode: f.errAddressPostalCode,
         errAddressProvince: f.errAddressProvince,
+        errAddressCountry: f.errAddressCountry,
         errPhone: f.errPhone,
         errContactEmail: f.errContactEmail,
         errSlugTaken: dict.errors.errSlugTaken,
@@ -318,20 +356,13 @@ export function BusinessForm({
           onChange={(e) => setAddressAdditional(e.target.value)}
           maxLength={40}
         />
-        <Field
-          label={f.cityLabel}
-          placeholder={f.cityPlaceholder}
-          value={city}
-          onChange={(e) => setCity(e.target.value)}
-          maxLength={80}
-        />
         <div className="grid grid-cols-2 gap-3">
           <Field
             label={f.addressPostalCodeLabel}
             placeholder={f.addressPostalCodePlaceholder}
             value={addressPostalCode}
-            onChange={(e) => setAddressPostalCode(e.target.value)}
-            maxLength={10}
+            onChange={(e) => handlePostalCodeChange(e.target.value)}
+            maxLength={5}
           />
           <Field
             label={f.addressProvinceLabel}
@@ -341,6 +372,25 @@ export function BusinessForm({
             maxLength={60}
           />
         </div>
+        <Field
+          label={f.cityLabel}
+          placeholder={f.cityPlaceholder}
+          value={city}
+          onChange={(e) => setCity(e.target.value)}
+          maxLength={80}
+        />
+        {postalAutofilled && (
+          <p className="-mt-2 flex items-center gap-1.5 text-[12px] font-medium text-brand-ink">
+            <Icon name="check" size={12} strokeWidth={2.5} /> {f.postalAutofilledHint}
+          </p>
+        )}
+        <Field
+          label={f.addressCountryLabel}
+          placeholder={f.addressCountryPlaceholder}
+          value={addressCountry}
+          onChange={(e) => setAddressCountry(e.target.value)}
+          maxLength={60}
+        />
       </div>
 
       {/* Contact */}

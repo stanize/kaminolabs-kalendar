@@ -10,6 +10,7 @@ import {
   validateSlugFormat,
   screenSlug,
 } from "@/lib/business/slug-screen";
+import { lookupPostalCode as lookupPostalCodeData } from "@/lib/business/postal-codes";
 
 const VALID_TYPES = new Set<string>(BUSINESS_TYPES.map((t) => t.id));
 
@@ -82,6 +83,18 @@ export const checkSlugAvailability = authedAction(
   }
 );
 
+// ── Postal-code autofill (city + province) ─────────────────────────────────
+// Free, static-dataset lookup — no external API call. Purely a UX suggestion:
+// the form fields it fills remain fully editable, and a miss (unknown code,
+// still-typing) is a normal, silent outcome, not an error.
+export type PostalCodeLookupResult = { city: string; province: string } | null;
+
+export const lookupPostalCode = authedAction(
+  async (_session, cp: string): Promise<PostalCodeLookupResult> => {
+    return lookupPostalCodeData(cp);
+  }
+);
+
 // ── Save business settings (create or update) ──────────────────────────────
 export type SaveBusinessResult =
   | { ok: true; slug: string; pendingReview: boolean }
@@ -99,6 +112,7 @@ export const saveBusinessSettings = authedAction(
       errAddressNumber: string;
       errAddressPostalCode: string;
       errAddressProvince: string;
+      errAddressCountry: string;
       errPhone: string;
       errContactEmail: string;
       errSlugTaken: string;
@@ -118,6 +132,7 @@ export const saveBusinessSettings = authedAction(
     const addressAdditional = (formData.get("addressAdditional") as string | null)?.trim() ?? "";
     const addressPostalCode = (formData.get("addressPostalCode") as string | null)?.trim() ?? "";
     const addressProvince = (formData.get("addressProvince") as string | null)?.trim() ?? "";
+    const addressCountry = (formData.get("addressCountry") as string | null)?.trim() ?? "";
     const phone = (formData.get("phone") as string | null)?.trim() ?? "";
     const contactEmail = (formData.get("contactEmail") as string | null)?.trim() ?? "";
 
@@ -141,6 +156,9 @@ export const saveBusinessSettings = authedAction(
     }
     if (addressProvince.length < 2) {
       return { ok: false, error: dict?.errAddressProvince ?? "La provincia es obligatoria." };
+    }
+    if (addressCountry.length < 2) {
+      return { ok: false, error: dict?.errAddressCountry ?? "El país es obligatorio." };
     }
     if (phone.length < 5) {
       return { ok: false, error: dict?.errPhone ?? "El teléfono es obligatorio." };
@@ -176,6 +194,7 @@ export const saveBusinessSettings = authedAction(
           city,
           address_postal_code: addressPostalCode,
           address_province: addressProvince,
+          address_country: addressCountry,
           phone,
           contact_email: contactEmail,
         })
@@ -238,6 +257,7 @@ export const saveBusinessSettings = authedAction(
       city,
       address_postal_code: addressPostalCode,
       address_province: addressProvince,
+      address_country: addressCountry,
       phone,
       contact_email: contactEmail,
       slug,

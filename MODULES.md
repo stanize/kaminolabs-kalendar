@@ -68,15 +68,15 @@ feature — this is the "frame" all panel-* modules render inside.
 ---
 
 ## Module: panel-business
-"Negocio" — the business record (name, type, city, slug).
+"Negocio" — the business record (name, type, legal ID, address, contact, slug).
 
 - Routes: `app/panel/business/page.tsx`
 - Components: `components/panel/business-form.tsx`
-- Lib: `lib/business/data.ts`, `lib/business/reserved-slugs.ts`, `lib/business/slug-screen.ts`, `lib/business/booking-url.ts` (shared — see public-booking)
-- Actions: `lib/actions/business.ts`
+- Lib: `lib/business/data.ts`, `lib/business/reserved-slugs.ts`, `lib/business/slug-screen.ts`, `lib/business/booking-url.ts` (shared — see public-booking), `lib/business/postal-codes.ts` + `postal-codes-es.json` (static ~11k-entry Spanish postal-code → city/province dataset, free, no external API)
+- Actions: `lib/actions/business.ts` (includes `lookupPostalCode`, a thin authed wrapper around the static dataset)
 - DB tables: `kalendar_businesses`
 - i18n: `lib/i18n/dictionaries/business.ts`, `business-types.ts`
-- Gotchas: slug is PERMANENT after creation — form shows read-only on edit, `saveBusinessSettings` ignores slug on update. Slug moderation: clean slugs go `active` instantly but sit in a review queue (`slug_reviewed_at IS NULL`); flagged ones go `pending_review`.
+- Gotchas: slug is PERMANENT after creation — form shows read-only on edit, `saveBusinessSettings` ignores slug on update. Slug moderation: clean slugs go `active` instantly but sit in a review queue (`slug_reviewed_at IS NULL`); flagged ones go `pending_review`. Postal-code autofill only fills city/province when BOTH are still empty (never overwrites something the user already typed); the dataset sometimes uses bilingual province names (e.g. "Araba/Álava") since the source is bilingual for some autonomous communities — fields stay fully editable. `address_country` is free text, defaults to "España" client-side for new businesses only.
 
 ---
 

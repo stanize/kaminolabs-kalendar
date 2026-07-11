@@ -35,6 +35,9 @@ export interface BusinessDictionary {
     addressPostalCodePlaceholder: string;
     addressProvinceLabel: string;
     addressProvincePlaceholder: string;
+    addressCountryLabel: string;
+    addressCountryPlaceholder: string;
+    postalAutofilledHint: string;
     contactSectionLabel: string;
     phoneLabel: string;
     phonePlaceholder: string;
@@ -62,6 +65,7 @@ export interface BusinessDictionary {
     errAddressNumber: string;
     errAddressPostalCode: string;
     errAddressProvince: string;
+    errAddressCountry: string;
     errPhone: string;
     errContactEmail: string;
     errSlugRequired: string;
@@ -111,6 +115,9 @@ const es: BusinessDictionary = {
     addressPostalCodePlaceholder: "28013",
     addressProvinceLabel: "Provincia",
     addressProvincePlaceholder: "Madrid",
+    addressCountryLabel: "País",
+    addressCountryPlaceholder: "España",
+    postalAutofilledHint: "Ciudad y provincia autocompletadas a partir del código postal.",
     contactSectionLabel: "Contacto",
     phoneLabel: "Teléfono",
     phonePlaceholder: "600 123 456",
@@ -138,6 +145,7 @@ const es: BusinessDictionary = {
     errAddressNumber: "El número es obligatorio.",
     errAddressPostalCode: "El código postal es obligatorio.",
     errAddressProvince: "La provincia es obligatoria.",
+    errAddressCountry: "El país es obligatorio.",
     errPhone: "El teléfono es obligatorio.",
     errContactEmail: "El email de contacto es obligatorio.",
     errSlugRequired: "Elige un enlace para tu página de reservas.",
@@ -184,6 +192,9 @@ const en: BusinessDictionary = {
     addressPostalCodePlaceholder: "28013",
     addressProvinceLabel: "Province",
     addressProvincePlaceholder: "Madrid",
+    addressCountryLabel: "Country",
+    addressCountryPlaceholder: "Spain",
+    postalAutofilledHint: "City and province auto-filled from the postal code.",
     contactSectionLabel: "Contact",
     phoneLabel: "Phone",
     phonePlaceholder: "600 123 456",
@@ -211,6 +222,7 @@ const en: BusinessDictionary = {
     errAddressNumber: "Number is required.",
     errAddressPostalCode: "Postal code is required.",
     errAddressProvince: "Province is required.",
+    errAddressCountry: "Country is required.",
     errPhone: "Phone is required.",
     errContactEmail: "Contact email is required.",
     errSlugRequired: "Choose a link for your booking page.",

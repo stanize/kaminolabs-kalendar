@@ -115,6 +115,9 @@ create table public.kalendar_businesses (
   city                    text        not null,
   address_postal_code     text        not null,
   address_province        text        not null,
+  -- Free text, defaults to "España" client-side for new businesses. Not
+  -- restricted to Spain in the schema — kept flexible for future expansion.
+  address_country         text        not null,
   -- Contact info (mandatory). contact_email is distinct from the owner's
   -- Better Auth account email — this is the client-facing contact address
   -- (defaults to the owner's account email in the UI, but is editable).

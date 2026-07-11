@@ -49,6 +49,7 @@ export default async function BusinessPage({
                 addressAdditional: business.address_additional ?? "",
                 addressPostalCode: business.address_postal_code,
                 addressProvince: business.address_province,
+                addressCountry: business.address_country,
                 phone: business.phone,
                 contactEmail: business.contact_email,
                 slug: business.slug,
