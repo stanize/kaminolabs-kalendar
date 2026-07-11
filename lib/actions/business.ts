@@ -94,6 +94,12 @@ export const saveBusinessSettings = authedAction(
     dict?: {
       errName: string;
       errType: string;
+      errCity: string;
+      errAddressStreet: string;
+      errAddressPostalCode: string;
+      errAddressProvince: string;
+      errPhone: string;
+      errContactEmail: string;
       errSlugTaken: string;
       errSaveFailed: string;
       errCreateFailed: string;
@@ -105,12 +111,36 @@ export const saveBusinessSettings = authedAction(
     const name = (formData.get("name") as string | null)?.trim() ?? "";
     const type = (formData.get("type") as string | null)?.trim() ?? "";
     const city = (formData.get("city") as string | null)?.trim() ?? "";
+    const legalId = (formData.get("legalId") as string | null)?.trim() ?? "";
+    const addressStreet = (formData.get("addressStreet") as string | null)?.trim() ?? "";
+    const addressPostalCode = (formData.get("addressPostalCode") as string | null)?.trim() ?? "";
+    const addressProvince = (formData.get("addressProvince") as string | null)?.trim() ?? "";
+    const phone = (formData.get("phone") as string | null)?.trim() ?? "";
+    const contactEmail = (formData.get("contactEmail") as string | null)?.trim() ?? "";
 
     if (name.length < 2) {
       return { ok: false, error: dict?.errName ?? "El nombre del negocio es obligatorio." };
     }
     if (!isValidType(type)) {
       return { ok: false, error: dict?.errType ?? "Selecciona el tipo de negocio." };
+    }
+    if (city.length < 2) {
+      return { ok: false, error: dict?.errCity ?? "La ciudad es obligatoria." };
+    }
+    if (addressStreet.length < 3) {
+      return { ok: false, error: dict?.errAddressStreet ?? "La dirección es obligatoria." };
+    }
+    if (addressPostalCode.length < 3) {
+      return { ok: false, error: dict?.errAddressPostalCode ?? "El código postal es obligatorio." };
+    }
+    if (addressProvince.length < 2) {
+      return { ok: false, error: dict?.errAddressProvince ?? "La provincia es obligatoria." };
+    }
+    if (phone.length < 5) {
+      return { ok: false, error: dict?.errPhone ?? "El teléfono es obligatorio." };
+    }
+    if (!contactEmail.includes("@")) {
+      return { ok: false, error: dict?.errContactEmail ?? "El email de contacto es obligatorio." };
     }
 
     const supabase = await createClient();
@@ -130,7 +160,17 @@ export const saveBusinessSettings = authedAction(
     if (existing) {
       const { error } = await supabase
         .from("kalendar_businesses")
-        .update({ name, type, city: city || null })
+        .update({
+          name,
+          type,
+          city,
+          legal_id: legalId || null,
+          address_street: addressStreet,
+          address_postal_code: addressPostalCode,
+          address_province: addressProvince,
+          phone,
+          contact_email: contactEmail,
+        })
         .eq("id", existing.id)
         .eq("owner_id", session.user.id); // defence in depth
 
@@ -183,7 +223,13 @@ export const saveBusinessSettings = authedAction(
       owner_id: session.user.id,
       name,
       type,
-      city: city || null,
+      city,
+      legal_id: legalId || null,
+      address_street: addressStreet,
+      address_postal_code: addressPostalCode,
+      address_province: addressProvince,
+      phone,
+      contact_email: contactEmail,
       slug,
       slug_status: slugStatus,
       slug_flag_reason: slugFlagReason,

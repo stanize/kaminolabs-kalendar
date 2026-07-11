@@ -26,6 +26,12 @@ interface InitialBusiness {
   name: string;
   type: BusinessType;
   city: string;
+  legalId: string;
+  addressStreet: string;
+  addressPostalCode: string;
+  addressProvince: string;
+  phone: string;
+  contactEmail: string;
   slug: string;
   slugStatus: SlugStatus;
 }
@@ -48,6 +54,12 @@ export function BusinessForm({
   const [name, setName] = useState(initial?.name ?? "");
   const [type, setType] = useState<BusinessType | "">(initial?.type ?? "");
   const [city, setCity] = useState(initial?.city ?? "");
+  const [legalId, setLegalId] = useState(initial?.legalId ?? "");
+  const [addressStreet, setAddressStreet] = useState(initial?.addressStreet ?? "");
+  const [addressPostalCode, setAddressPostalCode] = useState(initial?.addressPostalCode ?? "");
+  const [addressProvince, setAddressProvince] = useState(initial?.addressProvince ?? "");
+  const [phone, setPhone] = useState(initial?.phone ?? "");
+  const [contactEmail, setContactEmail] = useState(initial?.contactEmail ?? "");
 
   // Slug is only editable at creation. After that it is fixed.
   const [slug, setSlug] = useState(initial?.slug ?? "");
@@ -128,6 +140,30 @@ export function BusinessForm({
       setError(f.errType);
       return;
     }
+    if (city.trim().length < 2) {
+      setError(f.errCity);
+      return;
+    }
+    if (addressStreet.trim().length < 3) {
+      setError(f.errAddressStreet);
+      return;
+    }
+    if (addressPostalCode.trim().length < 3) {
+      setError(f.errAddressPostalCode);
+      return;
+    }
+    if (addressProvince.trim().length < 2) {
+      setError(f.errAddressProvince);
+      return;
+    }
+    if (phone.trim().length < 5) {
+      setError(f.errPhone);
+      return;
+    }
+    if (!contactEmail.trim().includes("@")) {
+      setError(f.errContactEmail);
+      return;
+    }
     if (isNew && (!slug || slug.length < 3)) {
       setError(f.errSlugRequired);
       return;
@@ -141,6 +177,12 @@ export function BusinessForm({
     fd.set("name", name.trim());
     fd.set("type", type);
     fd.set("city", city.trim());
+    fd.set("legalId", legalId.trim());
+    fd.set("addressStreet", addressStreet.trim());
+    fd.set("addressPostalCode", addressPostalCode.trim());
+    fd.set("addressProvince", addressProvince.trim());
+    fd.set("phone", phone.trim());
+    fd.set("contactEmail", contactEmail.trim());
     if (isNew) fd.set("slug", slug);
 
     setSaving(true);
@@ -148,6 +190,12 @@ export function BusinessForm({
       const result = await saveBusinessSettings(fd, {
         errName: f.errName,
         errType: f.errType,
+        errCity: f.errCity,
+        errAddressStreet: f.errAddressStreet,
+        errAddressPostalCode: f.errAddressPostalCode,
+        errAddressProvince: f.errAddressProvince,
+        errPhone: f.errPhone,
+        errContactEmail: f.errContactEmail,
         errSlugTaken: dict.errors.errSlugTaken,
         errSaveFailed: dict.errors.errSaveFailed,
         errCreateFailed: dict.errors.errCreateFailed,
@@ -219,12 +267,68 @@ export function BusinessForm({
       {/* City */}
       <Field
         label={f.cityLabel}
-        hint={f.cityHint}
         placeholder={f.cityPlaceholder}
         value={city}
         onChange={(e) => setCity(e.target.value)}
         maxLength={80}
       />
+
+      {/* Legal ID (optional) */}
+      <Field
+        label={f.legalIdLabel}
+        hint={f.legalIdHint}
+        placeholder={f.legalIdPlaceholder}
+        value={legalId}
+        onChange={(e) => setLegalId(e.target.value)}
+        maxLength={20}
+      />
+
+      {/* Address */}
+      <div className="flex flex-col gap-4">
+        <span className="text-[13px] font-semibold text-ink">{f.addressSectionLabel}</span>
+        <Field
+          label={f.addressStreetLabel}
+          placeholder={f.addressStreetPlaceholder}
+          value={addressStreet}
+          onChange={(e) => setAddressStreet(e.target.value)}
+          maxLength={120}
+        />
+        <div className="grid grid-cols-2 gap-3">
+          <Field
+            label={f.addressPostalCodeLabel}
+            placeholder={f.addressPostalCodePlaceholder}
+            value={addressPostalCode}
+            onChange={(e) => setAddressPostalCode(e.target.value)}
+            maxLength={10}
+          />
+          <Field
+            label={f.addressProvinceLabel}
+            placeholder={f.addressProvincePlaceholder}
+            value={addressProvince}
+            onChange={(e) => setAddressProvince(e.target.value)}
+            maxLength={60}
+          />
+        </div>
+      </div>
+
+      {/* Contact */}
+      <div className="flex flex-col gap-4">
+        <span className="text-[13px] font-semibold text-ink">{f.contactSectionLabel}</span>
+        <Field
+          label={f.phoneLabel}
+          placeholder={f.phonePlaceholder}
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          maxLength={30}
+        />
+        <Field
+          label={f.contactEmailLabel}
+          placeholder={f.contactEmailPlaceholder}
+          value={contactEmail}
+          onChange={(e) => setContactEmail(e.target.value)}
+          maxLength={120}
+        />
+      </div>
 
       {/* Slug */}
       {isNew ? (

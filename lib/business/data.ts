@@ -9,7 +9,13 @@ export interface Business {
   owner_id: string;
   name: string;
   type: BusinessType;
-  city: string | null;
+  city: string;
+  legal_id: string | null;
+  address_street: string;
+  address_postal_code: string;
+  address_province: string;
+  phone: string;
+  contact_email: string;
   slug: string;
   slug_status: SlugStatus;
   slug_flag_reason: string | null;
@@ -23,7 +29,7 @@ export interface Business {
 
 const BUSINESS_TABLE = "kalendar_businesses";
 const BUSINESS_COLUMNS =
-  "id, owner_id, name, type, city, slug, slug_status, slug_flag_reason, slug_reviewed_at, brand_color, team_mode, booking_window_months, onboarding_completed_at, created_at";
+  "id, owner_id, name, type, city, legal_id, address_street, address_postal_code, address_province, phone, contact_email, slug, slug_status, slug_flag_reason, slug_reviewed_at, brand_color, team_mode, booking_window_months, onboarding_completed_at, created_at";
 
 /**
  * The business owned by a given user, or null. Always scoped by the userId

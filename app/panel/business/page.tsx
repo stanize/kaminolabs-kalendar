@@ -41,7 +41,13 @@ export default async function BusinessPage({
             ? {
                 name: business.name,
                 type: business.type,
-                city: business.city ?? "",
+                city: business.city,
+                legalId: business.legal_id ?? "",
+                addressStreet: business.address_street,
+                addressPostalCode: business.address_postal_code,
+                addressProvince: business.address_province,
+                phone: business.phone,
+                contactEmail: business.contact_email,
                 slug: business.slug,
                 slugStatus: business.slug_status,
               }

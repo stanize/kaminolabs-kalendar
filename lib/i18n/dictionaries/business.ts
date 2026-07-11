@@ -19,8 +19,22 @@ export interface BusinessDictionary {
     namePlaceholder: string;
     typeLabel: string;
     cityLabel: string;
-    cityHint: string;
     cityPlaceholder: string;
+    legalIdLabel: string;
+    legalIdHint: string;
+    legalIdPlaceholder: string;
+    addressSectionLabel: string;
+    addressStreetLabel: string;
+    addressStreetPlaceholder: string;
+    addressPostalCodeLabel: string;
+    addressPostalCodePlaceholder: string;
+    addressProvinceLabel: string;
+    addressProvincePlaceholder: string;
+    contactSectionLabel: string;
+    phoneLabel: string;
+    phonePlaceholder: string;
+    contactEmailLabel: string;
+    contactEmailPlaceholder: string;
     slugLabel: string;
     slugPlaceholder: string;
     slugImmutableNew: string;
@@ -38,6 +52,12 @@ export interface BusinessDictionary {
     // client-side validation
     errName: string;
     errType: string;
+    errCity: string;
+    errAddressStreet: string;
+    errAddressPostalCode: string;
+    errAddressProvince: string;
+    errPhone: string;
+    errContactEmail: string;
     errSlugRequired: string;
     errSlugTaken: string;
     errUnexpected: string;
@@ -69,8 +89,22 @@ const es: BusinessDictionary = {
     namePlaceholder: "Centro Bienestar Serena",
     typeLabel: "Tipo de negocio",
     cityLabel: "Ciudad",
-    cityHint: "(opcional)",
     cityPlaceholder: "Valencia",
+    legalIdLabel: "NIF / CIF",
+    legalIdHint: "(opcional)",
+    legalIdPlaceholder: "B12345678",
+    addressSectionLabel: "Dirección",
+    addressStreetLabel: "Calle y número",
+    addressStreetPlaceholder: "Calle Mayor 12, 2ºB",
+    addressPostalCodeLabel: "Código postal",
+    addressPostalCodePlaceholder: "28013",
+    addressProvinceLabel: "Provincia",
+    addressProvincePlaceholder: "Madrid",
+    contactSectionLabel: "Contacto",
+    phoneLabel: "Teléfono",
+    phonePlaceholder: "600 123 456",
+    contactEmailLabel: "Email de contacto",
+    contactEmailPlaceholder: "hola@centrobienestar.es",
     slugLabel: "Enlace de tu página de reservas",
     slugPlaceholder: "centro-bienestar",
     slugImmutableNew:
@@ -88,6 +122,12 @@ const es: BusinessDictionary = {
     statusRejected: "Rechazado",
     errName: "El nombre del negocio es obligatorio.",
     errType: "Selecciona el tipo de negocio.",
+    errCity: "La ciudad es obligatoria.",
+    errAddressStreet: "La dirección es obligatoria.",
+    errAddressPostalCode: "El código postal es obligatorio.",
+    errAddressProvince: "La provincia es obligatoria.",
+    errPhone: "El teléfono es obligatorio.",
+    errContactEmail: "El email de contacto es obligatorio.",
     errSlugRequired: "Elige un enlace para tu página de reservas.",
     errSlugTaken: "Ese enlace ya está en uso. Elige otro.",
     errUnexpected: "Ocurrió un error inesperado. Inténtalo de nuevo.",
@@ -116,8 +156,22 @@ const en: BusinessDictionary = {
     namePlaceholder: "Serena Wellness Center",
     typeLabel: "Business type",
     cityLabel: "City",
-    cityHint: "(optional)",
     cityPlaceholder: "Valencia",
+    legalIdLabel: "Tax ID",
+    legalIdHint: "(optional)",
+    legalIdPlaceholder: "B12345678",
+    addressSectionLabel: "Address",
+    addressStreetLabel: "Street and number",
+    addressStreetPlaceholder: "Calle Mayor 12, 2ºB",
+    addressPostalCodeLabel: "Postal code",
+    addressPostalCodePlaceholder: "28013",
+    addressProvinceLabel: "Province",
+    addressProvincePlaceholder: "Madrid",
+    contactSectionLabel: "Contact",
+    phoneLabel: "Phone",
+    phonePlaceholder: "600 123 456",
+    contactEmailLabel: "Contact email",
+    contactEmailPlaceholder: "hello@wellnesscenter.com",
     slugLabel: "Your booking page link",
     slugPlaceholder: "wellness-center",
     slugImmutableNew:
@@ -135,6 +189,12 @@ const en: BusinessDictionary = {
     statusRejected: "Rejected",
     errName: "The business name is required.",
     errType: "Select a business type.",
+    errCity: "City is required.",
+    errAddressStreet: "Address is required.",
+    errAddressPostalCode: "Postal code is required.",
+    errAddressProvince: "Province is required.",
+    errPhone: "Phone is required.",
+    errContactEmail: "Contact email is required.",
     errSlugRequired: "Choose a link for your booking page.",
     errSlugTaken: "That link is already taken. Choose another.",
     errUnexpected: "An unexpected error occurred. Please try again.",

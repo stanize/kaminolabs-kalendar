@@ -102,7 +102,19 @@ create table public.kalendar_businesses (
       'fitness', 'coaching', 'tutoring', 'other'
     )
   ),
-  city                    text,
+  city                    text        not null,
+  -- Legal/tax identifier (NIF/CIF/NIE, etc). Optional for now — format
+  -- validation is deferred to the future invoicing feature.
+  legal_id                text,
+  -- Address (mandatory). Country is implicit (Spain) for now — no country
+  -- column until multi-country support is needed.
+  address_street          text        not null,
+  address_postal_code     text        not null,
+  address_province        text        not null,
+  -- Contact info (mandatory). contact_email is distinct from the owner's
+  -- Better Auth account email — this is the client-facing contact address.
+  phone                   text        not null,
+  contact_email           text        not null,
   slug                    text        not null unique,
   -- Slug moderation. Every slug is human-reviewed regardless of the automated
   -- screen at creation. 'active' = publicly bookable; 'pending_review' = held
