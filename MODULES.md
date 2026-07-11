@@ -58,11 +58,12 @@ Panel-wide chrome: sidebar, layout, home checklist, support form. Not a single
 feature — this is the "frame" all panel-* modules render inside.
 
 - Routes: `app/panel/layout.tsx`, `app/panel/page.tsx`, `app/panel/support/page.tsx`
-- Components: `components/panel/sidebar.tsx`, `components/panel/email-verification-gate.tsx`, `components/panel/setup-complete-banner.tsx`
-- Actions: `lib/actions/support.ts`
-- DB tables: `kalendar_support_tickets`
+- Components: `components/panel/sidebar.tsx`, `components/panel/email-verification-gate.tsx`, `components/panel/setup-complete-banner.tsx`, `components/panel/editable-greeting-name.tsx`
+- Actions: `lib/actions/support.ts`, `lib/actions/account.ts`
+- Data: `lib/account/data.ts` (getPreferredName)
+- DB tables: `kalendar_support_tickets`, `kalendar_user_preferences`
 - i18n: `lib/i18n/dictionaries/panel-shell.ts`
-- Gotchas: clinic role assignment happens idempotently on every panel visit (in the layout) — self-heals Google OAuth + schema resets. BUT the layout first checks `getUserRoles`: a user holding `patient` and NOT `clinic` is redirected to `/patient` instead of being auto-granted `clinic` — role is sticky from first sign-up, so a patient-only account never gets promoted just by landing on `/panel` (e.g. via the clinic `/login` form or a Google OAuth callback, both of which always target `/panel`). Dual-role accounts (both `patient` and `clinic`) are a future feature, not yet handled — currently they always land in the panel. Support screenshot upload goes to Supabase Storage bucket `support-attachments`.
+- Gotchas: clinic role assignment happens idempotently on every panel visit (in the layout) — self-heals Google OAuth + schema resets. BUT the layout first checks `getUserRoles`: a user holding `patient` and NOT `clinic` is redirected to `/patient` instead of being auto-granted `clinic` — role is sticky from first sign-up, so a patient-only account never gets promoted just by landing on `/panel` (e.g. via the clinic `/login` form or a Google OAuth callback, both of which always target `/panel`). Dual-role accounts (both `patient` and `clinic`) are a future feature, not yet handled — currently they always land in the panel. Support screenshot upload goes to Supabase Storage bucket `support-attachments`. Home greeting shows an editable "preferred name" (`kalendar_user_preferences.preferred_name`), a soft display name distinct from the account's Better Auth `user.name` — falls back to the account name's first word, then to a plain "Inicio"/"Home" fallback with no prefix.
 
 ---
 

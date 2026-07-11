@@ -388,6 +388,30 @@ values (
   array['image/png','image/jpeg','image/webp','image/gif']
 ) on conflict (id) do nothing;
 
+-- ----------------------------------------------------------------------------
+-- kalendar_user_preferences
+-- Per-user app-level preferences that don't belong on Better Auth's own
+-- "user" table (which Better Auth owns the shape of). One row per user,
+-- created on first save. preferred_name is a soft display name shown in
+-- panel greetings — distinct from the account's legal/full name.
+-- ----------------------------------------------------------------------------
+create table public.kalendar_user_preferences (
+  user_id        text        primary key
+                              references public."user" (id) on delete cascade,
+  preferred_name text,
+  created_at     timestamptz not null default now(),
+  updated_at     timestamptz not null default now()
+);
+
+create trigger kalendar_user_preferences_updated_at
+  before update on public.kalendar_user_preferences
+  for each row execute function public.set_updated_at();
+
+alter table public.kalendar_user_preferences enable row level security;
+
+create policy "User preferences: all"
+  on public.kalendar_user_preferences for all using (true) with check (true);
+
 -- ============================================================================
 -- End of schema.
 -- ============================================================================

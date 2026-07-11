@@ -31,6 +31,7 @@ import {
   MessageSquare,
   Paperclip,
   Send,
+  Pencil,
   type LucideIcon,
 } from "lucide-react";
 
@@ -67,6 +68,7 @@ export const ICONS: Record<string, LucideIcon> = {
   messageSquare: MessageSquare,
   paperclip: Paperclip,
   send: Send,
+  pencil: Pencil,
 };
 
 export function Icon({

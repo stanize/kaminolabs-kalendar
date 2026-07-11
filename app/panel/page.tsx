@@ -3,8 +3,10 @@ import { Btn } from "@/components/ui/button";
 import Link from "next/link";
 import { requireSession } from "@/lib/auth-session";
 import { getSetupProgress } from "@/lib/business/data";
+import { getPreferredName } from "@/lib/account/data";
 import { bookingPath, bookingUrlDisplay } from "@/lib/business/booking-url";
 import { SetupCompleteBanner } from "@/components/panel/setup-complete-banner";
+import { EditableGreetingName } from "@/components/panel/editable-greeting-name";
 import { getPanelShellServerDictionary } from "@/lib/i18n/server";
 
 export default async function PanelHomePage() {
@@ -16,7 +18,8 @@ export default async function PanelHomePage() {
   const { dict } = await getPanelShellServerDictionary();
   const h = dict.home;
 
-  const firstName = session.user.name?.split(" ")[0] ?? "";
+  const preferredName = await getPreferredName(session.user.id);
+  const firstName = preferredName || session.user.name?.split(" ")[0] || "";
 
   const setupItems = [
     {
@@ -68,7 +71,15 @@ export default async function PanelHomePage() {
     <div className="mx-auto max-w-[860px] px-4 py-6 sm:px-8 sm:py-8">
       <div className="mb-8">
         <h1 className="mb-1 text-[24px]">
-          {firstName ? `${h.greetingPrefix}${firstName}` : h.greetingFallback}
+          <EditableGreetingName
+            initialName={firstName}
+            prefix={h.greetingPrefix}
+            fallback={h.greetingFallback}
+            editHint={h.greetingEditHint}
+            errRequired={h.greetingErrRequired}
+            errTooLong={h.greetingErrTooLong}
+            errSaveFailed={h.greetingErrSaveFailed}
+          />
         </h1>
         <p className="text-[15px] text-ink-soft">{h.subtitle}</p>
       </div>

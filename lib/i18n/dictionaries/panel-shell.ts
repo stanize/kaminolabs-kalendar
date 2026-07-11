@@ -34,6 +34,10 @@ export interface PanelShellDictionary {
   home: {
     greetingPrefix: string; // "Hola, " / "Hi, " — client appends the name
     greetingFallback: string;
+    greetingEditHint: string;
+    greetingErrRequired: string;
+    greetingErrTooLong: string;
+    greetingErrSaveFailed: string;
     subtitle: string;
     setupCardTitle: string;
     step1Label: string;
@@ -93,6 +97,10 @@ const es: PanelShellDictionary = {
   home: {
     greetingPrefix: "Hola, ",
     greetingFallback: "Inicio",
+    greetingEditHint: "Haz clic para cambiar cómo te llamamos",
+    greetingErrRequired: "Escribe un nombre.",
+    greetingErrTooLong: "El nombre es demasiado largo.",
+    greetingErrSaveFailed: "No se pudo guardar el nombre. Inténtalo de nuevo.",
     subtitle: "Bienvenido a tu panel de Kalendar.",
     setupCardTitle: "Configura tu página de reservas",
     step1Label: "Configura tu negocio",
@@ -152,6 +160,10 @@ const en: PanelShellDictionary = {
   home: {
     greetingPrefix: "Hi, ",
     greetingFallback: "Home",
+    greetingEditHint: "Click to change how we greet you",
+    greetingErrRequired: "Enter a name.",
+    greetingErrTooLong: "That name is too long.",
+    greetingErrSaveFailed: "Couldn't save the name. Please try again.",
     subtitle: "Welcome to your Kalendar dashboard.",
     setupCardTitle: "Set up your booking page",
     step1Label: "Set up your business",
