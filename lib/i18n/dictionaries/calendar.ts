@@ -13,6 +13,7 @@ export interface CalendarDictionary {
     subtitle: string;
   };
   manager: {
+    tabWeek: string;
     tabUpcoming: string;
     tabPending: string;
     pendingLabel: string; // the small badge on a pending booking row
@@ -36,6 +37,49 @@ export interface CalendarDictionary {
     errCannotCancel: string;
     errCancelFailed: string;
   };
+  week: {
+    prevWeek: string; // aria-label for the "previous week" nav button
+    nextWeek: string; // aria-label for the "next week" nav button
+    today: string; // "Hoy" jump-to-today button
+    allProviders: string; // "Todos" filter option
+    noProviders: string; // shown when a solo business has somehow no team member seeded
+    addAppointment: string; // tooltip/aria-label on an empty slot
+    weekRangeTemplate: string; // "{from} – {to}", {from}/{to} pre-formatted date strings
+  };
+  modal: {
+    title: string; // "Nueva cita"
+    serviceLabel: string;
+    servicePlaceholder: string;
+    providerLabel: string;
+    dateTimeLabel: string; // read-only summary of the clicked slot
+    clientNameLabel: string;
+    clientNamePlaceholder: string;
+    clientEmailLabel: string;
+    clientEmailPlaceholder: string;
+    clientPhoneLabel: string;
+    clientPhonePlaceholder: string;
+    sendEmailLabel: string; // checkbox: "Enviar confirmación por email"
+    cancel: string;
+    submit: string;
+    submitting: string;
+    close: string; // aria-label for the X button
+  };
+  manualErrors: {
+    // lib/actions/booking-owner.ts -> createBookingAsOwner
+    errNoBusiness: string;
+    errInvalidService: string;
+    errInvalidProvider: string;
+    errNameRequired: string;
+    errEmailInvalid: string;
+    errInvalidSlot: string;
+    errSlotTaken: string;
+    errCreateFailed: string;
+  };
+  widget: {
+    title: string; // "Hoy"
+    appointmentsLabel: string; // "Citas"
+    freeSlotsLabel: string; // "Huecos libres"
+  };
   // Intl.DateTimeFormat locale tag for day-heading formatting (e.g. "es-ES").
   intlLocale: string;
 }
@@ -46,6 +90,7 @@ const es: CalendarDictionary = {
     subtitle: "Tus próximas reservas.",
   },
   manager: {
+    tabWeek: "Semana",
     tabUpcoming: "Próximas",
     tabPending: "Pendientes",
     pendingLabel: "Pendiente",
@@ -68,6 +113,48 @@ const es: CalendarDictionary = {
     errCannotCancel: "Esta reserva ya no se puede cancelar.",
     errCancelFailed: "No se pudo cancelar la reserva.",
   },
+  week: {
+    prevWeek: "Semana anterior",
+    nextWeek: "Semana siguiente",
+    today: "Hoy",
+    allProviders: "Todos",
+    noProviders: "Añade a tu equipo en Equipo para ver la semana.",
+    addAppointment: "Añadir cita",
+    weekRangeTemplate: "{from} – {to}",
+  },
+  modal: {
+    title: "Nueva cita",
+    serviceLabel: "Servicio",
+    servicePlaceholder: "Elige un servicio",
+    providerLabel: "Profesional",
+    dateTimeLabel: "Fecha y hora",
+    clientNameLabel: "Nombre del cliente",
+    clientNamePlaceholder: "Nombre y apellidos",
+    clientEmailLabel: "Email (opcional)",
+    clientEmailPlaceholder: "cliente@email.com",
+    clientPhoneLabel: "Teléfono (opcional)",
+    clientPhonePlaceholder: "600 000 000",
+    sendEmailLabel: "Enviar confirmación por email",
+    cancel: "Cancelar",
+    submit: "Crear cita",
+    submitting: "Creando…",
+    close: "Cerrar",
+  },
+  manualErrors: {
+    errNoBusiness: "No hay negocio.",
+    errInvalidService: "Servicio no válido.",
+    errInvalidProvider: "Profesional no válido.",
+    errNameRequired: "Indica el nombre del cliente.",
+    errEmailInvalid: "Indica un email válido.",
+    errInvalidSlot: "La hora seleccionada no es válida.",
+    errSlotTaken: "Ese horario ya no está disponible. Elige otro.",
+    errCreateFailed: "No se pudo crear la cita. Inténtalo de nuevo.",
+  },
+  widget: {
+    title: "Hoy",
+    appointmentsLabel: "Citas",
+    freeSlotsLabel: "Huecos libres",
+  },
   intlLocale: "es-ES",
 };
 
@@ -77,6 +164,7 @@ const en: CalendarDictionary = {
     subtitle: "Your upcoming bookings.",
   },
   manager: {
+    tabWeek: "Week",
     tabUpcoming: "Upcoming",
     tabPending: "Pending",
     pendingLabel: "Pending",
@@ -98,6 +186,48 @@ const en: CalendarDictionary = {
     errNotFound: "Booking not found.",
     errCannotCancel: "This booking can no longer be cancelled.",
     errCancelFailed: "Couldn't cancel the booking.",
+  },
+  week: {
+    prevWeek: "Previous week",
+    nextWeek: "Next week",
+    today: "Today",
+    allProviders: "All",
+    noProviders: "Add team members under Team to see the week view.",
+    addAppointment: "Add appointment",
+    weekRangeTemplate: "{from} – {to}",
+  },
+  modal: {
+    title: "New appointment",
+    serviceLabel: "Service",
+    servicePlaceholder: "Choose a service",
+    providerLabel: "Provider",
+    dateTimeLabel: "Date and time",
+    clientNameLabel: "Client name",
+    clientNamePlaceholder: "Full name",
+    clientEmailLabel: "Email (optional)",
+    clientEmailPlaceholder: "client@email.com",
+    clientPhoneLabel: "Phone (optional)",
+    clientPhonePlaceholder: "600 000 000",
+    sendEmailLabel: "Send confirmation email",
+    cancel: "Cancel",
+    submit: "Create appointment",
+    submitting: "Creating…",
+    close: "Close",
+  },
+  manualErrors: {
+    errNoBusiness: "No business found.",
+    errInvalidService: "Invalid service.",
+    errInvalidProvider: "Invalid provider.",
+    errNameRequired: "Enter the client's name.",
+    errEmailInvalid: "Enter a valid email.",
+    errInvalidSlot: "The selected time isn't valid.",
+    errSlotTaken: "That slot is no longer available. Pick another.",
+    errCreateFailed: "Couldn't create the appointment. Please try again.",
+  },
+  widget: {
+    title: "Today",
+    appointmentsLabel: "Appointments",
+    freeSlotsLabel: "Free slots",
   },
   intlLocale: "en-GB",
 };

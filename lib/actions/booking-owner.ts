@@ -1,10 +1,12 @@
 "use server";
 
+import { randomBytes } from "crypto";
 import { revalidatePath } from "next/cache";
 import { authedAction } from "@/lib/auth-action";
 import { createClient } from "@/lib/supabase/server";
 import { getBusinessForUser } from "@/lib/business/data";
 import { notifyCancellation } from "@/lib/actions/booking";
+import { getWeekBookings, type WeekViewBooking } from "@/lib/booking/owner-data";
 import {
   sendEmail,
   formatBookingWhen,
@@ -147,5 +149,156 @@ export const confirmBookingAsOwner = authedAction(
     revalidatePath("/panel/calendar");
     revalidatePath("/panel");
     return { ok: true };
+  }
+);
+
+// ── Manual (owner-created) appointment — week grid slot click ──────────────
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** The translation slice this action needs for its own error/validation messages. */
+export interface ManualBookingActionDict {
+  errNoBusiness: string;
+  errInvalidService: string;
+  errInvalidProvider: string;
+  errNameRequired: string;
+  errEmailInvalid: string;
+  errInvalidSlot: string;
+  errSlotTaken: string;
+  errCreateFailed: string;
+}
+
+const MANUAL_FALLBACK: ManualBookingActionDict = {
+  errNoBusiness: "No hay negocio.",
+  errInvalidService: "Servicio no válido.",
+  errInvalidProvider: "Profesional no válido.",
+  errNameRequired: "Indica el nombre del cliente.",
+  errEmailInvalid: "Indica un email válido.",
+  errInvalidSlot: "La hora seleccionada no es válida.",
+  errSlotTaken: "Ese horario ya no está disponible. Elige otro.",
+  errCreateFailed: "No se pudo crear la cita. Inténtalo de nuevo.",
+};
+
+export type CreateManualBookingResult = { ok: true } | { ok: false; error: string };
+
+/**
+ * Creates an appointment directly from the owner's week-grid (walk-in/phone
+ * booking) — no guest pending-confirmation window, it's confirmed immediately.
+ * Client email is optional: if provided AND sendConfirmationEmail is true, a
+ * confirmation email is sent; otherwise no email step runs at all.
+ */
+export const createBookingAsOwner = authedAction(
+  async (
+    session,
+    input: {
+      serviceId: string;
+      teamMemberId: string;
+      startIso: string;
+      clientName: string;
+      clientEmail?: string;
+      clientPhone?: string;
+      sendConfirmationEmail: boolean;
+    },
+    dict?: Partial<ManualBookingActionDict>
+  ): Promise<CreateManualBookingResult> => {
+    const t = { ...MANUAL_FALLBACK, ...dict };
+
+    const business = await getBusinessForUser(session.user.id);
+    if (!business) return { ok: false, error: t.errNoBusiness };
+
+    const supabase = await createClient();
+
+    const [{ data: service }, { data: member }] = await Promise.all([
+      supabase
+        .from("kalendar_services")
+        .select("id, name, duration_min, price")
+        .eq("id", input.serviceId)
+        .eq("business_id", business.id)
+        .maybeSingle(),
+      supabase
+        .from("kalendar_team_members")
+        .select("id")
+        .eq("id", input.teamMemberId)
+        .eq("business_id", business.id)
+        .maybeSingle(),
+    ]);
+
+    if (!service) return { ok: false, error: t.errInvalidService };
+    if (!member) return { ok: false, error: t.errInvalidProvider };
+
+    const name = input.clientName.trim();
+    if (name.length < 2) return { ok: false, error: t.errNameRequired };
+
+    const email = (input.clientEmail ?? "").trim();
+    const wantsEmail = input.sendConfirmationEmail && email.length > 0;
+    if (input.sendConfirmationEmail && email.length > 0 && !EMAIL_RE.test(email)) {
+      return { ok: false, error: t.errEmailInvalid };
+    }
+
+    const start = new Date(input.startIso);
+    if (Number.isNaN(start.getTime())) return { ok: false, error: t.errInvalidSlot };
+    const end = new Date(start.getTime() + service.duration_min * 60_000);
+
+    const token = randomBytes(24).toString("base64url");
+
+    const { error } = await supabase.from("kalendar_bookings").insert({
+      business_id: business.id,
+      service_id: service.id,
+      team_member_id: member.id,
+      patient_id: null,
+      service_name: service.name,
+      service_duration_min: service.duration_min,
+      service_price: service.price,
+      starts_at: start.toISOString(),
+      ends_at: end.toISOString(),
+      status: "confirmed",
+      pending_expiry_at: null,
+      client_name: name,
+      client_email: email || `sin-email+${token}@kaminolabs.dev`,
+      client_phone: (input.clientPhone ?? "").trim() || null,
+      guest_locale: "es",
+      confirm_token: token,
+    });
+
+    if (error) {
+      if (error.code === "23505") return { ok: false, error: t.errSlotTaken };
+      return { ok: false, error: t.errCreateFailed };
+    }
+
+    if (wantsEmail) {
+      const base = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/+$/, "");
+      const whenLabel = formatBookingWhen(start.toISOString(), "es");
+      await sendEmail({
+        to: email,
+        subject: `Reserva confirmada · ${business.name}`,
+        html: bookingConfirmEmailHtml({
+          clientName: name,
+          businessName: business.name,
+          serviceName: service.name,
+          whenLabel,
+          confirmUrl: `${base}/bookings/confirm/${token}`, // unused in confirmed variant
+          cancelUrl: `${base}/bookings/cancel/${token}`,
+          locale: "es",
+          isConfirmed: true,
+        }),
+      });
+    }
+
+    revalidatePath("/panel/calendar");
+    revalidatePath("/panel");
+    return { ok: true };
+  }
+);
+
+// ── Week navigation refetch ─────────────────────────────────────────────────
+
+/**
+ * Refetches just the bookings for a different week range when the owner
+ * navigates the week grid — members/hours/services are static per session,
+ * so only this needs to hit the DB again.
+ */
+export const fetchWeekBookings = authedAction(
+  async (session, weekStartIso: string, weekEndIso: string): Promise<WeekViewBooking[]> => {
+    return getWeekBookings(session.user.id, weekStartIso, weekEndIso);
   }
 );

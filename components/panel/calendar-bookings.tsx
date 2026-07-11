@@ -4,7 +4,15 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { cancelBookingAsOwner, confirmBookingAsOwner } from "@/lib/actions/booking-owner";
+import {
+  CalendarWeekView,
+  type WeekMemberVM,
+  type WeekBookingVM,
+  type WeekServiceVM,
+  type TimeRangeVM,
+} from "@/components/panel/calendar-week-view";
 import type { CalendarDictionary } from "@/lib/i18n/dictionaries/calendar";
+import type { DayId } from "@/lib/onboarding/types";
 
 type Status = "pending_confirmation" | "confirmed" | "cancelled" | "completed";
 
@@ -23,24 +31,6 @@ interface BookingVM {
 }
 
 const TZ = "Europe/Madrid";
-
-function dayKey(iso: string): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit",
-  }).format(new Date(iso));
-}
-
-function dayHeading(iso: string, m: CalendarDictionary["manager"], intlLocale: string): string {
-  const today    = dayKey(new Date().toISOString());
-  const tomorrow = dayKey(new Date(Date.now() + 86400000).toISOString());
-  const k = dayKey(iso);
-  const label = new Intl.DateTimeFormat(intlLocale, {
-    timeZone: TZ, weekday: "long", day: "numeric", month: "long",
-  }).format(new Date(iso));
-  if (k === today)    return `${m.today} · ${label}`;
-  if (k === tomorrow) return `${m.tomorrow} · ${label}`;
-  return label;
-}
 
 function timeLabel(iso: string): string {
   return new Intl.DateTimeFormat("en-GB", {
@@ -89,46 +79,37 @@ function CountdownBadge({ expiryIso, m }: { expiryIso: string; m: CalendarDictio
 export function CalendarBookings({
   bookings,
   dict,
+  weekMembers,
+  weekHoursByDay,
+  weekServices,
+  weekInitialBookings,
+  weekStartIso,
 }: {
   bookings: BookingVM[];
   dict: CalendarDictionary;
+  weekMembers: WeekMemberVM[];
+  weekHoursByDay: Partial<Record<DayId, TimeRangeVM[]>>;
+  weekServices: WeekServiceVM[];
+  weekInitialBookings: WeekBookingVM[];
+  weekStartIso: string;
 }) {
   const router = useRouter();
   const m = dict.manager;
-  const [tab, setTab] = useState<"upcoming" | "pending">("upcoming");
+  const [tab, setTab] = useState<"week" | "pending">("week");
   const [list, setList] = useState<BookingVM[]>(bookings);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const pendingCount = list.filter((b) => b.status === "pending_confirmation").length;
 
-  // For the Pendientes tab: sort by expiry soonest first.
-  const filtered = tab === "pending"
-    ? [...list]
-        .filter((b) => b.status === "pending_confirmation")
-        .sort((a, b) => {
-          if (!a.pendingExpiryAt) return 1;
-          if (!b.pendingExpiryAt) return -1;
-          return new Date(a.pendingExpiryAt).getTime() - new Date(b.pendingExpiryAt).getTime();
-        })
-    : list;
-
-  // Group by day (upcoming tab only; pending tab is a flat sorted list).
-  const groups: { key: string; heading: string; items: BookingVM[] }[] = [];
-  if (tab === "upcoming") {
-    for (const b of filtered) {
-      const k = dayKey(b.startIso);
-      let g = groups.find((x) => x.key === k);
-      if (!g) {
-        g = { key: k, heading: dayHeading(b.startIso, m, dict.intlLocale), items: [] };
-        groups.push(g);
-      }
-      g.items.push(b);
-    }
-  } else {
-    // Pending tab: show as one flat group with no day heading.
-    groups.push({ key: "pending", heading: "", items: filtered });
-  }
+  // Pendientes tab: flat list, sorted by expiry soonest first.
+  const pending = [...list]
+    .filter((b) => b.status === "pending_confirmation")
+    .sort((a, b) => {
+      if (!a.pendingExpiryAt) return 1;
+      if (!b.pendingExpiryAt) return -1;
+      return new Date(a.pendingExpiryAt).getTime() - new Date(b.pendingExpiryAt).getTime();
+    });
 
   const handleCancel = useCallback(async (id: string) => {
     setError(null);
@@ -167,7 +148,7 @@ export function CalendarBookings({
     <div className="flex flex-col gap-5">
       {/* Tabs */}
       <div className="flex gap-2">
-        <TabBtn active={tab === "upcoming"} onClick={() => setTab("upcoming")} label={m.tabUpcoming} />
+        <TabBtn active={tab === "week"} onClick={() => setTab("week")} label={m.tabWeek} />
         <TabBtn
           active={tab === "pending"}
           onClick={() => setTab("pending")}
@@ -182,78 +163,71 @@ export function CalendarBookings({
         </div>
       )}
 
-      {filtered.length === 0 ? (
-        <div className="rounded-2xl border border-line bg-surface px-6 py-12 text-center">
-          <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-full bg-surface-2 text-ink-soft">
-            <Icon name="calendar" size={22} />
-          </div>
-          <p className="text-[14.5px] font-semibold text-ink">
-            {tab === "pending" ? m.emptyPendingTitle : m.emptyUpcomingTitle}
-          </p>
-          <p className="mt-1 text-[13px] text-ink-soft">{m.emptySubtitle}</p>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-6">
-          {groups.map((g) => (
-            <div key={g.key}>
-              {g.heading && (
-                <h2 className="mb-2 text-[13px] font-bold uppercase tracking-[.04em] capitalize text-ink-soft">
-                  {g.heading}
-                </h2>
-              )}
-              <div className="overflow-hidden rounded-xl border border-line bg-surface">
-                {g.items.map((b, i) => (
-                  <div
-                    key={b.id}
-                    className={`flex items-center gap-3 px-4 py-3.5 ${i > 0 ? "border-t border-line" : ""}`}
-                  >
-                    <div className="w-[52px] shrink-0 text-[15px] font-semibold text-ink">
-                      {timeLabel(b.startIso)}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="flex flex-wrap items-center gap-1.5 text-[14px] font-semibold text-ink">
-                        <span className="truncate">{b.serviceName}</span>
-                        {b.status === "pending_confirmation" && (
-                          <span className="shrink-0 rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-semibold text-ink-soft">
-                            {m.pendingLabel}
-                          </span>
-                        )}
-                        {b.status === "pending_confirmation" && b.pendingExpiryAt && (
-                          <CountdownBadge expiryIso={b.pendingExpiryAt} m={m} />
-                        )}
-                      </p>
-                      <p className="truncate text-[12.5px] text-ink-soft">
-                        {b.clientName}
-                        {b.providerName ? ` · ${b.providerName}` : ""}
-                        {b.durationMin ? ` · ${b.durationMin} ${m.minutesUnit}` : ""}
-                      </p>
-                    </div>
+      {tab === "week" && (
+        <CalendarWeekView
+          members={weekMembers}
+          hoursByDay={weekHoursByDay}
+          services={weekServices}
+          initialBookings={weekInitialBookings}
+          initialWeekStartIso={weekStartIso}
+          dict={dict}
+        />
+      )}
 
-                    {/* Action buttons */}
-                    <div className="flex shrink-0 items-center gap-1">
-                      {b.status === "pending_confirmation" && (
-                        <button
-                          onClick={() => handleConfirm(b.id)}
-                          disabled={busyId === b.id}
-                          className="rounded-lg px-2.5 py-1.5 text-[12.5px] font-semibold text-brand hover:bg-brand-weak disabled:opacity-50"
-                        >
-                          {busyId === b.id ? m.confirming : m.confirm}
-                        </button>
-                      )}
-                      <button
-                        onClick={() => handleCancel(b.id)}
-                        disabled={busyId === b.id}
-                        className="rounded-lg px-2.5 py-1.5 text-[12.5px] font-medium text-ink-soft hover:bg-error-weak hover:text-error disabled:opacity-50"
-                      >
-                        {m.cancel}
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+      {tab === "pending" && (
+        pending.length === 0 ? (
+          <div className="rounded-2xl border border-line bg-surface px-6 py-12 text-center">
+            <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-full bg-surface-2 text-ink-soft">
+              <Icon name="calendar" size={22} />
             </div>
-          ))}
-        </div>
+            <p className="text-[14.5px] font-semibold text-ink">{m.emptyPendingTitle}</p>
+            <p className="mt-1 text-[13px] text-ink-soft">{m.emptySubtitle}</p>
+          </div>
+        ) : (
+          <div className="overflow-hidden rounded-xl border border-line bg-surface">
+            {pending.map((b, i) => (
+              <div
+                key={b.id}
+                className={`flex items-center gap-3 px-4 py-3.5 ${i > 0 ? "border-t border-line" : ""}`}
+              >
+                <div className="w-[52px] shrink-0 text-[15px] font-semibold text-ink">
+                  {timeLabel(b.startIso)}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="flex flex-wrap items-center gap-1.5 text-[14px] font-semibold text-ink">
+                    <span className="truncate">{b.serviceName}</span>
+                    <span className="shrink-0 rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-semibold text-ink-soft">
+                      {m.pendingLabel}
+                    </span>
+                    {b.pendingExpiryAt && <CountdownBadge expiryIso={b.pendingExpiryAt} m={m} />}
+                  </p>
+                  <p className="truncate text-[12.5px] text-ink-soft">
+                    {b.clientName}
+                    {b.providerName ? ` · ${b.providerName}` : ""}
+                    {b.durationMin ? ` · ${b.durationMin} ${m.minutesUnit}` : ""}
+                  </p>
+                </div>
+
+                <div className="flex shrink-0 items-center gap-1">
+                  <button
+                    onClick={() => handleConfirm(b.id)}
+                    disabled={busyId === b.id}
+                    className="rounded-lg px-2.5 py-1.5 text-[12.5px] font-semibold text-brand hover:bg-brand-weak disabled:opacity-50"
+                  >
+                    {busyId === b.id ? m.confirming : m.confirm}
+                  </button>
+                  <button
+                    onClick={() => handleCancel(b.id)}
+                    disabled={busyId === b.id}
+                    className="rounded-lg px-2.5 py-1.5 text-[12.5px] font-medium text-ink-soft hover:bg-error-weak hover:text-error disabled:opacity-50"
+                  >
+                    {m.cancel}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )
       )}
     </div>
   );
