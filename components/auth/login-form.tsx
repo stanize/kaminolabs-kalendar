@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { authClient } from "@/lib/auth-client";
+import { authClient, navigateWithFallback } from "@/lib/auth-client";
 import type { PublicDictionary } from "@/lib/i18n/dictionaries/public";
 
 type AuthDict = PublicDictionary["auth"];
@@ -53,7 +53,7 @@ export function LoginForm({ dict }: { dict: AuthDict }) {
         setLoading(false);
         return;
       }
-      router.push("/panel");
+      navigateWithFallback(router, "/panel");
     } catch (e) {
       setError(e instanceof Error ? e.message : dict.errUnexpected);
       setLoading(false);

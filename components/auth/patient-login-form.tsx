@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { authClient } from "@/lib/auth-client";
+import { authClient, navigateWithFallback } from "@/lib/auth-client";
 import { Icon } from "@/components/ui/icon";
 import { provisionPatient, checkPatientRoleConflict } from "@/lib/actions/patient";
 
@@ -131,7 +131,7 @@ export function PatientLoginForm({ redirectTo = "/patient", labels }: PatientLog
       setLoading(false);
       return;
     }
-    router.push(redirectTo);
+    navigateWithFallback(router, redirectTo);
   }
 
   async function afterAuth() {
