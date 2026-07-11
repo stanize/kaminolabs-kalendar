@@ -36,6 +36,7 @@ export default async function BusinessPage({
         dict={dict}
         locale={locale}
         returnToHome={returnToHome}
+        userEmail={session.user.email}
         initial={
           business
             ? {
@@ -44,6 +45,8 @@ export default async function BusinessPage({
                 city: business.city,
                 legalId: business.legal_id ?? "",
                 addressStreet: business.address_street,
+                addressNumber: business.address_number,
+                addressAdditional: business.address_additional ?? "",
                 addressPostalCode: business.address_postal_code,
                 addressProvince: business.address_province,
                 phone: business.phone,

@@ -96,6 +96,7 @@ export const saveBusinessSettings = authedAction(
       errType: string;
       errCity: string;
       errAddressStreet: string;
+      errAddressNumber: string;
       errAddressPostalCode: string;
       errAddressProvince: string;
       errPhone: string;
@@ -113,6 +114,8 @@ export const saveBusinessSettings = authedAction(
     const city = (formData.get("city") as string | null)?.trim() ?? "";
     const legalId = (formData.get("legalId") as string | null)?.trim() ?? "";
     const addressStreet = (formData.get("addressStreet") as string | null)?.trim() ?? "";
+    const addressNumber = (formData.get("addressNumber") as string | null)?.trim() ?? "";
+    const addressAdditional = (formData.get("addressAdditional") as string | null)?.trim() ?? "";
     const addressPostalCode = (formData.get("addressPostalCode") as string | null)?.trim() ?? "";
     const addressProvince = (formData.get("addressProvince") as string | null)?.trim() ?? "";
     const phone = (formData.get("phone") as string | null)?.trim() ?? "";
@@ -124,11 +127,14 @@ export const saveBusinessSettings = authedAction(
     if (!isValidType(type)) {
       return { ok: false, error: dict?.errType ?? "Selecciona el tipo de negocio." };
     }
-    if (city.length < 2) {
-      return { ok: false, error: dict?.errCity ?? "La ciudad es obligatoria." };
-    }
     if (addressStreet.length < 3) {
       return { ok: false, error: dict?.errAddressStreet ?? "La dirección es obligatoria." };
+    }
+    if (addressNumber.length < 1) {
+      return { ok: false, error: dict?.errAddressNumber ?? "El número es obligatorio." };
+    }
+    if (city.length < 2) {
+      return { ok: false, error: dict?.errCity ?? "La ciudad es obligatoria." };
     }
     if (addressPostalCode.length < 3) {
       return { ok: false, error: dict?.errAddressPostalCode ?? "El código postal es obligatorio." };
@@ -163,9 +169,11 @@ export const saveBusinessSettings = authedAction(
         .update({
           name,
           type,
-          city,
           legal_id: legalId || null,
           address_street: addressStreet,
+          address_number: addressNumber,
+          address_additional: addressAdditional || null,
+          city,
           address_postal_code: addressPostalCode,
           address_province: addressProvince,
           phone,
@@ -223,9 +231,11 @@ export const saveBusinessSettings = authedAction(
       owner_id: session.user.id,
       name,
       type,
-      city,
       legal_id: legalId || null,
       address_street: addressStreet,
+      address_number: addressNumber,
+      address_additional: addressAdditional || null,
+      city,
       address_postal_code: addressPostalCode,
       address_province: addressProvince,
       phone,

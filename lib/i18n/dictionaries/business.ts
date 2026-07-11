@@ -26,6 +26,11 @@ export interface BusinessDictionary {
     addressSectionLabel: string;
     addressStreetLabel: string;
     addressStreetPlaceholder: string;
+    addressNumberLabel: string;
+    addressNumberPlaceholder: string;
+    addressAdditionalLabel: string;
+    addressAdditionalHint: string;
+    addressAdditionalPlaceholder: string;
     addressPostalCodeLabel: string;
     addressPostalCodePlaceholder: string;
     addressProvinceLabel: string;
@@ -54,6 +59,7 @@ export interface BusinessDictionary {
     errType: string;
     errCity: string;
     errAddressStreet: string;
+    errAddressNumber: string;
     errAddressPostalCode: string;
     errAddressProvince: string;
     errPhone: string;
@@ -94,8 +100,13 @@ const es: BusinessDictionary = {
     legalIdHint: "(opcional)",
     legalIdPlaceholder: "B12345678",
     addressSectionLabel: "Dirección",
-    addressStreetLabel: "Calle y número",
-    addressStreetPlaceholder: "Calle Mayor 12, 2ºB",
+    addressStreetLabel: "Calle",
+    addressStreetPlaceholder: "Calle Linneo",
+    addressNumberLabel: "Número",
+    addressNumberPlaceholder: "15",
+    addressAdditionalLabel: "Piso, puerta, etc.",
+    addressAdditionalHint: "(opcional)",
+    addressAdditionalPlaceholder: "5D",
     addressPostalCodeLabel: "Código postal",
     addressPostalCodePlaceholder: "28013",
     addressProvinceLabel: "Provincia",
@@ -124,6 +135,7 @@ const es: BusinessDictionary = {
     errType: "Selecciona el tipo de negocio.",
     errCity: "La ciudad es obligatoria.",
     errAddressStreet: "La dirección es obligatoria.",
+    errAddressNumber: "El número es obligatorio.",
     errAddressPostalCode: "El código postal es obligatorio.",
     errAddressProvince: "La provincia es obligatoria.",
     errPhone: "El teléfono es obligatorio.",
@@ -161,8 +173,13 @@ const en: BusinessDictionary = {
     legalIdHint: "(optional)",
     legalIdPlaceholder: "B12345678",
     addressSectionLabel: "Address",
-    addressStreetLabel: "Street and number",
-    addressStreetPlaceholder: "Calle Mayor 12, 2ºB",
+    addressStreetLabel: "Street",
+    addressStreetPlaceholder: "Calle Linneo",
+    addressNumberLabel: "Number",
+    addressNumberPlaceholder: "15",
+    addressAdditionalLabel: "Floor, door, etc.",
+    addressAdditionalHint: "(optional)",
+    addressAdditionalPlaceholder: "5D",
     addressPostalCodeLabel: "Postal code",
     addressPostalCodePlaceholder: "28013",
     addressProvinceLabel: "Province",
@@ -191,6 +208,7 @@ const en: BusinessDictionary = {
     errType: "Select a business type.",
     errCity: "City is required.",
     errAddressStreet: "Address is required.",
+    errAddressNumber: "Number is required.",
     errAddressPostalCode: "Postal code is required.",
     errAddressProvince: "Province is required.",
     errPhone: "Phone is required.",

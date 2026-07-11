@@ -28,6 +28,8 @@ interface InitialBusiness {
   city: string;
   legalId: string;
   addressStreet: string;
+  addressNumber: string;
+  addressAdditional: string;
   addressPostalCode: string;
   addressProvince: string;
   phone: string;
@@ -41,11 +43,13 @@ export function BusinessForm({
   returnToHome,
   dict,
   locale,
+  userEmail,
 }: {
   initial: InitialBusiness | null;
   returnToHome: boolean;
   dict: BusinessDictionary;
   locale: Locale;
+  userEmail: string;
 }) {
   const router = useRouter();
   const isNew = !initial;
@@ -56,10 +60,14 @@ export function BusinessForm({
   const [city, setCity] = useState(initial?.city ?? "");
   const [legalId, setLegalId] = useState(initial?.legalId ?? "");
   const [addressStreet, setAddressStreet] = useState(initial?.addressStreet ?? "");
+  const [addressNumber, setAddressNumber] = useState(initial?.addressNumber ?? "");
+  const [addressAdditional, setAddressAdditional] = useState(initial?.addressAdditional ?? "");
   const [addressPostalCode, setAddressPostalCode] = useState(initial?.addressPostalCode ?? "");
   const [addressProvince, setAddressProvince] = useState(initial?.addressProvince ?? "");
   const [phone, setPhone] = useState(initial?.phone ?? "");
-  const [contactEmail, setContactEmail] = useState(initial?.contactEmail ?? "");
+  // Defaults to the owner's account email on creation, but stays editable —
+  // the business's contact email is intentionally distinct from the account.
+  const [contactEmail, setContactEmail] = useState(initial?.contactEmail ?? userEmail ?? "");
 
   // Slug is only editable at creation. After that it is fixed.
   const [slug, setSlug] = useState(initial?.slug ?? "");
@@ -140,12 +148,16 @@ export function BusinessForm({
       setError(f.errType);
       return;
     }
-    if (city.trim().length < 2) {
-      setError(f.errCity);
-      return;
-    }
     if (addressStreet.trim().length < 3) {
       setError(f.errAddressStreet);
+      return;
+    }
+    if (addressNumber.trim().length < 1) {
+      setError(f.errAddressNumber);
+      return;
+    }
+    if (city.trim().length < 2) {
+      setError(f.errCity);
       return;
     }
     if (addressPostalCode.trim().length < 3) {
@@ -179,6 +191,8 @@ export function BusinessForm({
     fd.set("city", city.trim());
     fd.set("legalId", legalId.trim());
     fd.set("addressStreet", addressStreet.trim());
+    fd.set("addressNumber", addressNumber.trim());
+    fd.set("addressAdditional", addressAdditional.trim());
     fd.set("addressPostalCode", addressPostalCode.trim());
     fd.set("addressProvince", addressProvince.trim());
     fd.set("phone", phone.trim());
@@ -192,6 +206,7 @@ export function BusinessForm({
         errType: f.errType,
         errCity: f.errCity,
         errAddressStreet: f.errAddressStreet,
+        errAddressNumber: f.errAddressNumber,
         errAddressPostalCode: f.errAddressPostalCode,
         errAddressProvince: f.errAddressProvince,
         errPhone: f.errPhone,
@@ -264,15 +279,6 @@ export function BusinessForm({
         </div>
       </div>
 
-      {/* City */}
-      <Field
-        label={f.cityLabel}
-        placeholder={f.cityPlaceholder}
-        value={city}
-        onChange={(e) => setCity(e.target.value)}
-        maxLength={80}
-      />
-
       {/* Legal ID (optional) */}
       <Field
         label={f.legalIdLabel}
@@ -286,12 +292,38 @@ export function BusinessForm({
       {/* Address */}
       <div className="flex flex-col gap-4">
         <span className="text-[13px] font-semibold text-ink">{f.addressSectionLabel}</span>
+        <div className="grid grid-cols-3 gap-3">
+          <div className="col-span-2">
+            <Field
+              label={f.addressStreetLabel}
+              placeholder={f.addressStreetPlaceholder}
+              value={addressStreet}
+              onChange={(e) => setAddressStreet(e.target.value)}
+              maxLength={120}
+            />
+          </div>
+          <Field
+            label={f.addressNumberLabel}
+            placeholder={f.addressNumberPlaceholder}
+            value={addressNumber}
+            onChange={(e) => setAddressNumber(e.target.value)}
+            maxLength={20}
+          />
+        </div>
         <Field
-          label={f.addressStreetLabel}
-          placeholder={f.addressStreetPlaceholder}
-          value={addressStreet}
-          onChange={(e) => setAddressStreet(e.target.value)}
-          maxLength={120}
+          label={f.addressAdditionalLabel}
+          hint={f.addressAdditionalHint}
+          placeholder={f.addressAdditionalPlaceholder}
+          value={addressAdditional}
+          onChange={(e) => setAddressAdditional(e.target.value)}
+          maxLength={40}
+        />
+        <Field
+          label={f.cityLabel}
+          placeholder={f.cityPlaceholder}
+          value={city}
+          onChange={(e) => setCity(e.target.value)}
+          maxLength={80}
         />
         <div className="grid grid-cols-2 gap-3">
           <Field
