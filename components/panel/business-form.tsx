@@ -59,13 +59,15 @@ export function BusinessForm({
 
   const [name, setName] = useState(initial?.name ?? "");
   const [type, setType] = useState<BusinessType | "">(initial?.type ?? "");
-  const [city, setCity] = useState(initial?.city ?? "");
+  const [city, setCity] = useState(initial?.city ?? "Madrid");
+  const [cityTouched, setCityTouched] = useState(!!initial);
+  const [addressProvince, setAddressProvince] = useState(initial?.addressProvince ?? "Madrid");
+  const [addressProvinceTouched, setAddressProvinceTouched] = useState(!!initial);
   const [legalId, setLegalId] = useState(initial?.legalId ?? "");
   const [addressStreet, setAddressStreet] = useState(initial?.addressStreet ?? "");
   const [addressNumber, setAddressNumber] = useState(initial?.addressNumber ?? "");
   const [addressAdditional, setAddressAdditional] = useState(initial?.addressAdditional ?? "");
   const [addressPostalCode, setAddressPostalCode] = useState(initial?.addressPostalCode ?? "");
-  const [addressProvince, setAddressProvince] = useState(initial?.addressProvince ?? "");
   const [addressCountry, setAddressCountry] = useState(initial?.addressCountry ?? "España");
   const [phone, setPhone] = useState(initial?.phone ?? "");
   // Defaults to the owner's account email on creation, but stays editable —
@@ -157,7 +159,7 @@ export function BusinessForm({
     postalDebounceRef.current = setTimeout(async () => {
       try {
         const result = await lookupPostalCode(next);
-        if (result && !city.trim() && !addressProvince.trim()) {
+        if (result && !cityTouched && !addressProvinceTouched) {
           setCity(result.city);
           setAddressProvince(result.province);
           setPostalAutofilled(true);
@@ -368,7 +370,10 @@ export function BusinessForm({
             label={f.addressProvinceLabel}
             placeholder={f.addressProvincePlaceholder}
             value={addressProvince}
-            onChange={(e) => setAddressProvince(e.target.value)}
+            onChange={(e) => {
+              setAddressProvince(e.target.value);
+              setAddressProvinceTouched(true);
+            }}
             maxLength={60}
           />
         </div>
@@ -376,7 +381,10 @@ export function BusinessForm({
           label={f.cityLabel}
           placeholder={f.cityPlaceholder}
           value={city}
-          onChange={(e) => setCity(e.target.value)}
+          onChange={(e) => {
+            setCity(e.target.value);
+            setCityTouched(true);
+          }}
           maxLength={80}
         />
         {postalAutofilled && (
