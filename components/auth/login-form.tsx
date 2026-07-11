@@ -55,6 +55,7 @@ export function LoginForm({ dict }: { dict: AuthDict }) {
       }
       navigateWithFallback(router, "/panel");
     } catch (e) {
+      console.error("[login-form] email sign-in failed", e);
       setError(e instanceof Error ? e.message : dict.errUnexpected);
       setLoading(false);
     }

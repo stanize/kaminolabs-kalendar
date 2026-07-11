@@ -8,7 +8,14 @@ import { RoleUpgradeGate } from "@/components/panel/role-upgrade-gate";
 import { getPanelShellServerDictionary } from "@/lib/i18n/server";
 
 export default async function PanelLayout({ children }: { children: ReactNode }) {
-  const session = await getSession();
+  const t0 = Date.now();
+  let session;
+  try {
+    session = await getSession();
+  } catch (e) {
+    console.error("[panel-layout] getSession failed", { ms: Date.now() - t0, error: e instanceof Error ? e.message : e });
+    throw e;
+  }
   if (!session?.user) redirect("/signin");
 
   const { locale, dict } = await getPanelShellServerDictionary();
@@ -23,7 +30,17 @@ export default async function PanelLayout({ children }: { children: ReactNode })
   // Dual-role accounts (both patient AND clinic) are allowed once confirmed
   // here. For now, holding 'clinic' (alone or alongside 'patient') keeps the
   // user in the panel with no further prompt.
-  const roles = await getUserRoles(session.user.id);
+  const t1 = Date.now();
+  let roles;
+  try {
+    roles = await getUserRoles(session.user.id);
+  } catch (e) {
+    console.error("[panel-layout] getUserRoles failed", { userId: session.user.id, ms: Date.now() - t1, error: e instanceof Error ? e.message : e });
+    throw e;
+  }
+  if (Date.now() - t1 > 3000) {
+    console.error("[panel-layout] getUserRoles slow", { userId: session.user.id, ms: Date.now() - t1 });
+  }
   if (roles.includes("patient") && !roles.includes("clinic")) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-bg">
@@ -36,7 +53,16 @@ export default async function PanelLayout({ children }: { children: ReactNode })
   // uses upsert and is idempotent. This covers both email/password and Google
   // OAuth sign-ups without needing a hook, and self-heals after schema resets.
   // Only reached here for users who are not patient-only (see check above).
-  await assignRole(session.user.id, "clinic");
+  const t2 = Date.now();
+  try {
+    await assignRole(session.user.id, "clinic");
+  } catch (e) {
+    console.error("[panel-layout] assignRole failed", { userId: session.user.id, ms: Date.now() - t2, error: e instanceof Error ? e.message : e });
+    throw e;
+  }
+  if (Date.now() - t2 > 3000) {
+    console.error("[panel-layout] assignRole slow", { userId: session.user.id, ms: Date.now() - t2 });
+  }
 
   // Email/password sign-ups land here unverified — the panel renders but is
   // blocked by a confirmation overlay until `emailVerified` is true. Google

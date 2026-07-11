@@ -15,9 +15,22 @@ function localeFromRequest(request: Request | undefined): "es" | "en" {
 }
 
 export const auth = betterAuth({
-  database: new Pool({
-    connectionString: process.env.DATABASE_URL!,
-  }),
+  database: (() => {
+    const pool = new Pool({
+      connectionString: process.env.DATABASE_URL!,
+      // Explicit cap: on Vercel serverless, an unbounded pool (default max:10
+      // per instance) combined with many concurrent invocations against the
+      // Supabase transaction pooler can queue/stall connection acquisition
+      // instead of failing fast. Keeping this modest and logging exhaustion
+      // makes that failure mode visible instead of presenting as a silent
+      // client-side freeze.
+      max: 5,
+    });
+    pool.on("error", (err) => {
+      console.error("[auth-pool] idle client error", { error: err.message });
+    });
+    return pool;
+  })(),
   emailAndPassword: {
     enabled: true,
     // Keep this false: we still create a session right after sign-up so the
