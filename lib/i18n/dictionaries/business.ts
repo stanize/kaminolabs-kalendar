@@ -39,6 +39,7 @@ export interface BusinessDictionary {
     addressCountryPlaceholder: string;
     postalAutofilledHint: string;
     contactSectionLabel: string;
+    phoneCountryCodeLabel: string;
     phoneLabel: string;
     phonePlaceholder: string;
     contactEmailLabel: string;
@@ -119,6 +120,7 @@ const es: BusinessDictionary = {
     addressCountryPlaceholder: "España",
     postalAutofilledHint: "Ciudad y provincia autocompletadas a partir del código postal.",
     contactSectionLabel: "Contacto",
+    phoneCountryCodeLabel: "Prefijo",
     phoneLabel: "Teléfono",
     phonePlaceholder: "600 123 456",
     contactEmailLabel: "Email de contacto",
@@ -196,6 +198,7 @@ const en: BusinessDictionary = {
     addressCountryPlaceholder: "Spain",
     postalAutofilledHint: "City and province auto-filled from the postal code.",
     contactSectionLabel: "Contact",
+    phoneCountryCodeLabel: "Code",
     phoneLabel: "Phone",
     phonePlaceholder: "600 123 456",
     contactEmailLabel: "Contact email",

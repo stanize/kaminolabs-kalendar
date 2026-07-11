@@ -72,11 +72,11 @@ feature — this is the "frame" all panel-* modules render inside.
 
 - Routes: `app/panel/business/page.tsx`
 - Components: `components/panel/business-form.tsx`
-- Lib: `lib/business/data.ts`, `lib/business/reserved-slugs.ts`, `lib/business/slug-screen.ts`, `lib/business/booking-url.ts` (shared — see public-booking), `lib/business/postal-codes.ts` + `postal-codes-es.json` (static ~11k-entry Spanish postal-code → city/province dataset, free, no external API)
+- Lib: `lib/business/data.ts`, `lib/business/reserved-slugs.ts`, `lib/business/slug-screen.ts`, `lib/business/booking-url.ts` (shared — see public-booking), `lib/business/postal-codes.ts` + `postal-codes-es.json` (static ~11k-entry Spanish postal-code → city/province dataset, free, no external API), `lib/business/phone-country-codes.ts` (static curated dialing-code list, Spanish labels, defaults to +34)
 - Actions: `lib/actions/business.ts` (includes `lookupPostalCode`, a thin authed wrapper around the static dataset)
 - DB tables: `kalendar_businesses`
 - i18n: `lib/i18n/dictionaries/business.ts`, `business-types.ts`
-- Gotchas: slug is PERMANENT after creation — form shows read-only on edit, `saveBusinessSettings` ignores slug on update. Slug moderation: clean slugs go `active` instantly but sit in a review queue (`slug_reviewed_at IS NULL`); flagged ones go `pending_review`. Postal-code autofill only fills city/province when BOTH are still empty (never overwrites something the user already typed); the dataset sometimes uses bilingual province names (e.g. "Araba/Álava") since the source is bilingual for some autonomous communities — fields stay fully editable. `address_country` is free text, defaults to "España" client-side for new businesses only.
+- Gotchas: slug is PERMANENT after creation — form shows read-only on edit, `saveBusinessSettings` ignores slug on update. Slug moderation: clean slugs go `active` instantly but sit in a review queue (`slug_reviewed_at IS NULL`); flagged ones go `pending_review`. Postal-code autofill only fills city/province when BOTH are still empty (never overwrites something the user already typed); the dataset sometimes uses bilingual province names (e.g. "Araba/Álava") since the source is bilingual for some autonomous communities — fields stay fully editable. `address_country` is free text, defaults to "España" client-side for new businesses only. Phone is stored as two columns, `phone_country_code` (defaults `+34`) and `phone_number` — UI shows a country-code dropdown (`lib/business/phone-country-codes.ts`, static list) beside the number field.
 
 ---
 

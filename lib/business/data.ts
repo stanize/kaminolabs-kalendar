@@ -17,7 +17,8 @@ export interface Business {
   address_postal_code: string;
   address_province: string;
   address_country: string;
-  phone: string;
+  phone_country_code: string;
+  phone_number: string;
   contact_email: string;
   slug: string;
   slug_status: SlugStatus;
@@ -32,7 +33,7 @@ export interface Business {
 
 const BUSINESS_TABLE = "kalendar_businesses";
 const BUSINESS_COLUMNS =
-  "id, owner_id, name, type, legal_id, address_street, address_number, address_additional, city, address_postal_code, address_province, address_country, phone, contact_email, slug, slug_status, slug_flag_reason, slug_reviewed_at, brand_color, team_mode, booking_window_months, onboarding_completed_at, created_at";
+  "id, owner_id, name, type, legal_id, address_street, address_number, address_additional, city, address_postal_code, address_province, address_country, phone_country_code, phone_number, contact_email, slug, slug_status, slug_flag_reason, slug_reviewed_at, brand_color, team_mode, booking_window_months, onboarding_completed_at, created_at";
 
 /**
  * The business owned by a given user, or null. Always scoped by the userId

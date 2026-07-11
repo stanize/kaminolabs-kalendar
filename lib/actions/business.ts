@@ -133,6 +133,7 @@ export const saveBusinessSettings = authedAction(
     const addressPostalCode = (formData.get("addressPostalCode") as string | null)?.trim() ?? "";
     const addressProvince = (formData.get("addressProvince") as string | null)?.trim() ?? "";
     const addressCountry = (formData.get("addressCountry") as string | null)?.trim() ?? "";
+    const phoneCountryCode = (formData.get("phoneCountryCode") as string | null)?.trim() ?? "";
     const phone = (formData.get("phone") as string | null)?.trim() ?? "";
     const contactEmail = (formData.get("contactEmail") as string | null)?.trim() ?? "";
 
@@ -159,6 +160,9 @@ export const saveBusinessSettings = authedAction(
     }
     if (addressCountry.length < 2) {
       return { ok: false, error: dict?.errAddressCountry ?? "El país es obligatorio." };
+    }
+    if (!/^\+\d{1,4}$/.test(phoneCountryCode)) {
+      return { ok: false, error: dict?.errPhone ?? "El teléfono es obligatorio." };
     }
     if (phone.length < 5) {
       return { ok: false, error: dict?.errPhone ?? "El teléfono es obligatorio." };
@@ -195,7 +199,8 @@ export const saveBusinessSettings = authedAction(
           address_postal_code: addressPostalCode,
           address_province: addressProvince,
           address_country: addressCountry,
-          phone,
+          phone_country_code: phoneCountryCode,
+          phone_number: phone,
           contact_email: contactEmail,
         })
         .eq("id", existing.id)
@@ -258,7 +263,8 @@ export const saveBusinessSettings = authedAction(
       address_postal_code: addressPostalCode,
       address_province: addressProvince,
       address_country: addressCountry,
-      phone,
+      phone_country_code: phoneCountryCode,
+      phone_number: phone,
       contact_email: contactEmail,
       slug,
       slug_status: slugStatus,

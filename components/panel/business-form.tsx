@@ -22,6 +22,10 @@ import { bookingUrlDisplay } from "@/lib/business/booking-url";
 import type { SlugStatus } from "@/lib/business/data";
 import type { Locale } from "@/lib/i18n/config";
 import type { BusinessDictionary } from "@/lib/i18n/dictionaries/business";
+import {
+  PHONE_COUNTRY_CODES,
+  DEFAULT_PHONE_COUNTRY_CODE,
+} from "@/lib/business/phone-country-codes";
 
 interface InitialBusiness {
   name: string;
@@ -34,6 +38,7 @@ interface InitialBusiness {
   addressPostalCode: string;
   addressProvince: string;
   addressCountry: string;
+  phoneCountryCode: string;
   phone: string;
   contactEmail: string;
   slug: string;
@@ -69,6 +74,9 @@ export function BusinessForm({
   const [addressAdditional, setAddressAdditional] = useState(initial?.addressAdditional ?? "");
   const [addressPostalCode, setAddressPostalCode] = useState(initial?.addressPostalCode ?? "");
   const [addressCountry, setAddressCountry] = useState(initial?.addressCountry ?? "España");
+  const [phoneCountryCode, setPhoneCountryCode] = useState(
+    initial?.phoneCountryCode ?? DEFAULT_PHONE_COUNTRY_CODE
+  );
   const [phone, setPhone] = useState(initial?.phone ?? "");
   // Defaults to the owner's account email on creation, but stays editable —
   // the business's contact email is intentionally distinct from the account.
@@ -234,6 +242,7 @@ export function BusinessForm({
     fd.set("addressPostalCode", addressPostalCode.trim());
     fd.set("addressProvince", addressProvince.trim());
     fd.set("addressCountry", addressCountry.trim());
+    fd.set("phoneCountryCode", phoneCountryCode);
     fd.set("phone", phone.trim());
     fd.set("contactEmail", contactEmail.trim());
     if (isNew) fd.set("slug", slug);
@@ -404,13 +413,29 @@ export function BusinessForm({
       {/* Contact */}
       <div className="flex flex-col gap-4">
         <span className="text-[13px] font-semibold text-ink">{f.contactSectionLabel}</span>
-        <Field
-          label={f.phoneLabel}
-          placeholder={f.phonePlaceholder}
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          maxLength={30}
-        />
+        <div className="grid grid-cols-[112px_1fr] gap-3">
+          <label className="flex flex-col gap-[7px]">
+            <span className="text-[13px] font-semibold text-ink">{f.phoneCountryCodeLabel}</span>
+            <select
+              value={phoneCountryCode}
+              onChange={(e) => setPhoneCountryCode(e.target.value)}
+              className={inputClasses()}
+            >
+              {PHONE_COUNTRY_CODES.map((c) => (
+                <option key={c.code} value={c.code}>
+                  {c.code}
+                </option>
+              ))}
+            </select>
+          </label>
+          <Field
+            label={f.phoneLabel}
+            placeholder={f.phonePlaceholder}
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            maxLength={30}
+          />
+        </div>
         <Field
           label={f.contactEmailLabel}
           placeholder={f.contactEmailPlaceholder}

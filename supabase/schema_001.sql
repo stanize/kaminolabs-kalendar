@@ -27,7 +27,6 @@ create extension if not exists "pgcrypto";
 -- Children before parents.
 -- ----------------------------------------------------------------------------
 drop table if exists public.kalendar_support_tickets cascade;
-drop table if exists public.kalendar_user_preferences cascade;
 drop table if exists public.kalendar_bookings        cascade;
 drop table if exists public.kalendar_patients        cascade;
 drop table if exists public.user_roles               cascade;
@@ -122,7 +121,11 @@ create table public.kalendar_businesses (
   -- Contact info (mandatory). contact_email is distinct from the owner's
   -- Better Auth account email — this is the client-facing contact address
   -- (defaults to the owner's account email in the UI, but is editable).
-  phone                   text        not null,
+  -- Phone is split so the international code (e.g. "+34") and the national
+  -- number are stored separately — cleaner for display and future validation
+  -- than a single free-text field.
+  phone_country_code     text        not null default '+34',
+  phone_number            text        not null,
   contact_email           text        not null,
   slug                    text        not null unique,
   -- Slug moderation. Every slug is human-reviewed regardless of the automated
