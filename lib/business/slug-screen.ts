@@ -26,17 +26,31 @@ const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
  * non-alphanumerics collapsed to single hyphens, trimmed. Used both to build
  * the suggestion from the business name and to sanitize live keystrokes.
  * May return "" for input with no usable characters.
+ *
+ * `keepTrailingHyphen` matters for live typing: without it, typing "centro-"
+ * gets the trailing hyphen stripped immediately (on every keystroke, since
+ * this runs on each onChange), which makes it impossible to ever type a
+ * character after a hyphen — the hyphen never survives long enough. Pass
+ * `true` while the user is actively typing; the final submitted value should
+ * still go through the default (trimmed) form.
  */
-export function sanitizeSlug(input: string): string {
-  return (input || "")
+export function sanitizeSlug(
+  input: string,
+  opts?: { keepTrailingHyphen?: boolean }
+): string {
+  let result = (input || "")
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "") // strip accents
     .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
+    .replace(/^-+/g, "") // leading hyphens are never valid, always strip
     .replace(/-+/g, "-")
-    .slice(0, SLUG_MAX_LENGTH)
-    .replace(/-+$/g, ""); // a trailing hyphen can survive the slice
+    .slice(0, SLUG_MAX_LENGTH);
+
+  if (!opts?.keepTrailingHyphen) {
+    result = result.replace(/-+$/g, "");
+  }
+  return result;
 }
 
 /** Suggested slug from a business name, e.g. "Centro Bienestar" -> "centro-bienestar". */

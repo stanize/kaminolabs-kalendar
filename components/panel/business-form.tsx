@@ -144,10 +144,12 @@ export function BusinessForm({
   }
 
   function handleSlugChange(raw: string) {
-    const next = sanitizeSlug(raw);
+    const next = sanitizeSlug(raw, { keepTrailingHyphen: true });
     setSlugTouched(true);
     setSlug(next);
-    scheduleSlugCheck(next);
+    // Check availability on the trimmed form — a slug ending in "-" is never
+    // itself the final value, so there's no point checking it as one.
+    scheduleSlugCheck(sanitizeSlug(next));
   }
 
   // Postal-code autofill (free, static dataset — see lib/business/postal-codes.ts).
@@ -219,7 +221,7 @@ export function BusinessForm({
       setError(f.errContactEmail);
       return;
     }
-    if (isNew && (!slug || slug.length < 3)) {
+    if (isNew && (!slug || sanitizeSlug(slug).length < 3)) {
       setError(f.errSlugRequired);
       return;
     }
@@ -242,7 +244,7 @@ export function BusinessForm({
     fd.set("phoneCountryCode", phoneCountryCode);
     fd.set("phone", phone.trim());
     fd.set("contactEmail", contactEmail.trim());
-    if (isNew) fd.set("slug", slug);
+    if (isNew) fd.set("slug", sanitizeSlug(slug));
 
     setSaving(true);
     try {
