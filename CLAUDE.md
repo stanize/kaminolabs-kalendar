@@ -6,6 +6,10 @@
 > team, availability, booking, patient portal, etc.), read `MODULES.md` first
 > and jump to that module's section — don't expect it here.
 >
+> Behaviors reviewed and intentionally left as-is (things that look like bugs
+> but aren't, pending future decisions, etc.) live in `POINTS_TO_CONSIDER.md`
+> — check there before re-litigating something already discussed.
+>
 > Keep this file and `MODULES.md` in sync via `RESYNC.md`.
 
 ## Project Overview
@@ -138,3 +142,5 @@ separately if needed: `delete from storage.objects where bucket_id = 'support-at
 - **Supabase for DB only**: Keeps data ownership and avoids vendor lock-in on auth.
 - **Auth: Google OAuth + email/password**: Email/password requires email confirmation, enforced as a panel-level UI gate (not via `requireEmailVerification`, which would block the user from ever reaching the gate).
 - **sessionStorage for Zustand**: Survives Google OAuth redirect round-trip but clears when tab closes.
+
+See also `POINTS_TO_CONSIDER.md` for reviewed-but-not-fixed behaviors (e.g. Google login auto-creating an account on first use).
