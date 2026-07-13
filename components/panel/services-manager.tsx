@@ -138,9 +138,14 @@ export function ServicesManager({
       }
       flashSuccessThen(() => {
         setAdding(false);
-        setBusy(false);
-        setOverlay(null);
-        redirectAfterFirstAdd();
+        // If we redirected, keep the success overlay covering the page until
+        // the /panel navigation unmounts this component — otherwise the
+        // services page flashes through for a moment before home loads.
+        const redirected = redirectAfterFirstAdd();
+        if (!redirected) {
+          setBusy(false);
+          setOverlay(null);
+        }
       });
     } catch {
       setError(m.errUnexpected);
@@ -168,9 +173,13 @@ export function ServicesManager({
       }
       flashSuccessThen(() => {
         setStaged(null);
-        setBusy(false);
-        setOverlay(null);
-        redirectAfterFirstAdd();
+        // Same as manual create: only drop the overlay when staying on the
+        // page; during a redirect it stays up until this component unmounts.
+        const redirected = redirectAfterFirstAdd();
+        if (!redirected) {
+          setBusy(false);
+          setOverlay(null);
+        }
       });
     } catch {
       setError(m.errUnexpected);
