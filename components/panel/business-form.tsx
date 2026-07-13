@@ -91,8 +91,6 @@ export function BusinessForm({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
-  const [postalAutofilled, setPostalAutofilled] = useState(false);
-
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const postalDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -155,11 +153,11 @@ export function BusinessForm({
   // Postal-code autofill (free, static dataset — see lib/business/postal-codes.ts).
   // Only fills city/province when BOTH are still empty, so it never clobbers
   // something the user already typed (e.g. if they filled City before reaching
-  // the postal code fields, which is the field order in this form).
+  // the postal code fields, which is the field order in this form). Silent —
+  // no visible confirmation message, it's a small convenience, not a step.
   function handlePostalCodeChange(raw: string) {
     const next = raw.replace(/\D/g, "").slice(0, 5);
     setAddressPostalCode(next);
-    setPostalAutofilled(false);
 
     if (postalDebounceRef.current) clearTimeout(postalDebounceRef.current);
     if (next.length !== 5) return;
@@ -170,7 +168,6 @@ export function BusinessForm({
         if (result && !cityTouched && !addressProvinceTouched) {
           setCity(result.city);
           setAddressProvince(result.province);
-          setPostalAutofilled(true);
         }
       } catch {
         // Silent miss — autofill is a convenience, not a required step.
@@ -277,8 +274,11 @@ export function BusinessForm({
 
       // Return-intent: when the user arrived from the home page (?from=home),
       // send them back to Inicio after a successful save so the guided setup
-      // flows step-to-step. When they came directly (sidebar), stay put.
+      // flows step-to-step. Give the success banner a brief moment to actually
+      // be seen before navigating away — otherwise the push fires before the
+      // banner ever paints, and it just looks like the screen froze.
       if (returnToHome) {
+        await new Promise((resolve) => setTimeout(resolve, 600));
         router.push("/panel");
         return;
       }
@@ -396,11 +396,6 @@ export function BusinessForm({
           }}
           maxLength={80}
         />
-        {postalAutofilled && (
-          <p className="-mt-2 flex items-center gap-1.5 text-[12px] font-medium text-brand-ink">
-            <Icon name="check" size={12} strokeWidth={2.5} /> {f.postalAutofilledHint}
-          </p>
-        )}
         <Field
           label={f.addressCountryLabel}
           placeholder={f.addressCountryPlaceholder}
