@@ -35,6 +35,7 @@ export interface ServicesDictionary {
     orDivider: string; // separator between manual add and template picker
     templatesTitle: string;
     templatesSubtitle: string;
+    flashSuccess: string; // success flash shown in the save overlay
     errUnexpected: string;
     errDeleteFailed: string;
   };
@@ -85,6 +86,7 @@ const es: ServicesDictionary = {
     orDivider: "o",
     templatesTitle: "¿No sabes por dónde empezar?",
     templatesSubtitle: "Elige los servicios habituales de tu tipo de negocio y ajústalos a tus necesidades.",
+    flashSuccess: "¡Guardado correctamente!",
     errUnexpected: "Ocurrió un error inesperado. Inténtalo de nuevo.",
     errDeleteFailed: "No se pudo eliminar. Inténtalo de nuevo.",
   },
@@ -133,6 +135,7 @@ const en: ServicesDictionary = {
     orDivider: "or",
     templatesTitle: "Not sure where to start?",
     templatesSubtitle: "Pick the services common for your business type and adjust them to your needs.",
+    flashSuccess: "Saved successfully!",
     errUnexpected: "An unexpected error occurred. Please try again.",
     errDeleteFailed: "Couldn't delete. Please try again.",
   },

@@ -98,6 +98,17 @@ export function ServicesManager({
   // not in the staging flow.
   const [staged, setStaged] = useState<DraftService[] | null>(null);
 
+  // Full-screen save overlay: grays out the page while a save is in flight,
+  // then flashes a success confirmation before redirecting/refreshing.
+  const [overlay, setOverlay] = useState<"saving" | "success" | null>(null);
+  const SUCCESS_FLASH_MS = 900;
+
+  /** Shows the success flash briefly, then runs the follow-up (redirect/refresh). */
+  function flashSuccessThen(after: () => void) {
+    setOverlay("success");
+    window.setTimeout(after, SUCCESS_FLASH_MS);
+  }
+
   const hadNoServices = initialServices.length === 0;
 
   function redirectAfterFirstAdd() {
@@ -113,6 +124,7 @@ export function ServicesManager({
   async function handleCreate(draft: DraftService) {
     setError(null);
     setBusy(true);
+    setOverlay("saving");
     try {
       const result = await createService(toServiceInput(draft), {
         action: dict.errors,
@@ -121,14 +133,19 @@ export function ServicesManager({
       if (!result.ok) {
         setError(result.error);
         setBusy(false);
+        setOverlay(null);
         return;
       }
-      setAdding(false);
-      setBusy(false);
-      redirectAfterFirstAdd();
+      flashSuccessThen(() => {
+        setAdding(false);
+        setBusy(false);
+        setOverlay(null);
+        redirectAfterFirstAdd();
+      });
     } catch {
       setError(m.errUnexpected);
       setBusy(false);
+      setOverlay(null);
     }
   }
 
@@ -137,6 +154,7 @@ export function ServicesManager({
     if (!staged || staged.length === 0) return;
     setError(null);
     setBusy(true);
+    setOverlay("saving");
     try {
       const result = await createServices(staged.map(toServiceInput), {
         action: dict.errors,
@@ -145,14 +163,19 @@ export function ServicesManager({
       if (!result.ok) {
         setError(result.error);
         setBusy(false);
+        setOverlay(null);
         return;
       }
-      setStaged(null);
-      setBusy(false);
-      redirectAfterFirstAdd();
+      flashSuccessThen(() => {
+        setStaged(null);
+        setBusy(false);
+        setOverlay(null);
+        redirectAfterFirstAdd();
+      });
     } catch {
       setError(m.errUnexpected);
       setBusy(false);
+      setOverlay(null);
     }
   }
 
@@ -160,6 +183,7 @@ export function ServicesManager({
   async function handleUpdate(id: string, draft: DraftService) {
     setError(null);
     setBusy(true);
+    setOverlay("saving");
     try {
       const result = await updateService(
         { id, ...toServiceInput(draft) },
@@ -168,14 +192,19 @@ export function ServicesManager({
       if (!result.ok) {
         setError(result.error);
         setBusy(false);
+        setOverlay(null);
         return;
       }
-      setEditingId(null);
-      setBusy(false);
-      router.refresh();
+      flashSuccessThen(() => {
+        setEditingId(null);
+        setBusy(false);
+        setOverlay(null);
+        router.refresh();
+      });
     } catch {
       setError(m.errUnexpected);
       setBusy(false);
+      setOverlay(null);
     }
   }
 
@@ -223,6 +252,35 @@ export function ServicesManager({
 
   return (
     <div className="flex flex-col gap-5">
+      {/* Full-screen save overlay: blocks interaction while saving, then
+          flashes the success confirmation before the redirect/refresh runs. */}
+      {overlay && (
+        <div
+          className="fixed inset-0 z-50 grid place-items-center bg-ink/30 backdrop-blur-[2px]"
+          role="status"
+          aria-live="polite"
+        >
+          <div className="flex items-center gap-3 rounded-2xl border border-line bg-surface px-6 py-5 shadow-lg">
+            {overlay === "saving" ? (
+              <>
+                <span
+                  className="h-5 w-5 animate-spin rounded-full border-2 border-line border-t-brand"
+                  aria-hidden
+                />
+                <span className="text-[14px] font-semibold text-ink">{m.saving}</span>
+              </>
+            ) : (
+              <>
+                <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-brand text-white">
+                  <Icon name="check" size={14} strokeWidth={3} />
+                </span>
+                <span className="text-[14px] font-semibold text-ink">{m.flashSuccess}</span>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {error && (
         <div className="flex items-start gap-2 rounded-xl border border-error bg-error-weak px-4 py-3 text-[13.5px] text-error">
           <Icon name="x" size={16} className="mt-0.5 shrink-0" />
