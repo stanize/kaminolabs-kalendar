@@ -26,7 +26,8 @@ create extension if not exists "pgcrypto";
 -- Drop existing tables (cascade removes dependent objects: policies, indexes).
 -- Children before parents.
 -- ----------------------------------------------------------------------------
-drop table if exists public.kalendar_support_tickets cascade;
+drop table if exists public.kalendar_support_tickets  cascade;
+drop table if exists public.kalendar_user_preferences cascade;
 drop table if exists public.kalendar_bookings        cascade;
 drop table if exists public.kalendar_patients        cascade;
 drop table if exists public.user_roles               cascade;
