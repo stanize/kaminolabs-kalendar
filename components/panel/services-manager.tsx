@@ -308,6 +308,16 @@ export function ServicesManager({
         </div>
       )}
 
+      {/* Divider: separates "create your own" from "use a sample" — only when
+          both paths are on screen (add button above, template picker below). */}
+      {showTemplates && (
+        <div className="flex items-center gap-3" aria-hidden>
+          <span className="h-px flex-1 bg-line" />
+          <span className="text-[13px] font-medium text-ink-soft">{m.orDivider}</span>
+          <span className="h-px flex-1 bg-line" />
+        </div>
+      )}
+
       {/* Template picker (only when no services yet) */}
       {showTemplates && (
         <TemplatePicker
@@ -321,11 +331,8 @@ export function ServicesManager({
       {/* Staged template drafts: customize, then confirm together */}
       {inStaging && staged && (
         <div className="flex flex-col gap-4">
-          <div>
-            <p className="text-[14px] font-semibold text-ink">{m.templatesTitle}</p>
-            <p className="text-[13px] text-ink-soft">{m.templatesSubtitle}</p>
-          </div>
-
+          {/* No heading here: the user already chose "Personalizar {n}" — repeating
+              the template-picker title/subtitle at this stage is redundant. */}
           <div className="flex flex-col gap-3">
             {staged.map((draft, i) => (
               <StagedDraftCard

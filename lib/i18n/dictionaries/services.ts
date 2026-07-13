@@ -32,6 +32,7 @@ export interface ServicesDictionary {
     priceFree: string;
     priceLower: string; // aria-label, contains "{step}"
     priceRaise: string; // aria-label, contains "{step}"
+    orDivider: string; // separator between manual add and template picker
     templatesTitle: string;
     templatesSubtitle: string;
     errUnexpected: string;
@@ -81,6 +82,7 @@ const es: ServicesDictionary = {
     priceFree: "Gratis",
     priceLower: "Bajar {step} €",
     priceRaise: "Subir {step} €",
+    orDivider: "o",
     templatesTitle: "¿No sabes por dónde empezar?",
     templatesSubtitle: "Elige los servicios habituales de tu tipo de negocio y ajústalos a tus necesidades.",
     errUnexpected: "Ocurrió un error inesperado. Inténtalo de nuevo.",
@@ -128,6 +130,7 @@ const en: ServicesDictionary = {
     priceFree: "Free",
     priceLower: "Lower {step} €",
     priceRaise: "Raise {step} €",
+    orDivider: "or",
     templatesTitle: "Not sure where to start?",
     templatesSubtitle: "Pick the services common for your business type and adjust them to your needs.",
     errUnexpected: "An unexpected error occurred. Please try again.",
