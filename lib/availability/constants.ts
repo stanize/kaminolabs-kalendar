@@ -69,3 +69,15 @@ export function validateDayRanges(ranges: TimeRange[], dict: DayRangesValidation
   }
   return { valid: true };
 }
+
+/**
+ * First-time setup wizard defaults (statistically likely Spanish schedule):
+ * Mon–Fri open, jornada partida 09:00–13:00 / 14:00–18:00. The wizard fans
+ * these out to each selected day at the review step — after that every day is
+ * independent (no linked template).
+ */
+export const SETUP_DEFAULT_DAYS: DayId[] = ["mon", "tue", "wed", "thu", "fri"];
+export const SETUP_DEFAULT_RANGES: TimeRange[] = [
+  { start: "09:00", end: "13:00" },
+  { start: "14:00", end: "18:00" },
+];

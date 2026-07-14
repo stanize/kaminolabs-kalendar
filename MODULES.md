@@ -98,12 +98,12 @@ feature — this is the "frame" all panel-* modules render inside.
 because they're tightly coupled (availability can be per-member in the future).
 
 - Routes: `app/panel/team/page.tsx`, `app/panel/availability/page.tsx`
-- Components: `components/panel/team-manager.tsx`, `components/panel/availability-manager.tsx`
+- Components: `components/panel/team-manager.tsx`, `components/panel/availability-manager.tsx`, `components/panel/availability-setup-wizard.tsx` (first-setup steps 1–2), `components/panel/time-select.tsx` (shared HH:MM dropdown)
 - Lib: `lib/team/*`, `lib/availability/*`
 - Actions: `lib/actions/team.ts`, `lib/actions/availability.ts`
 - DB tables: `kalendar_team_members`, `kalendar_business_hours`
 - i18n: `lib/i18n/dictionaries/team.ts`, `availability.ts`
-- Gotchas: `team_mode` (`solo`|`team`) lives on `kalendar_businesses`, not on the team table. `ensureOwnerSeeded` idempotently inserts owner as a team member. Availability save is an atomic whole-week replace. Per-member overrides are deferred/future — don't assume they exist.
+- Gotchas: `team_mode` (`solo`|`team`) lives on `kalendar_businesses`, not on the team table. `ensureOwnerSeeded` idempotently inserts owner as a team member. Availability save is an atomic whole-week replace. Per-member overrides are deferred/future — don't assume they exist. First-time availability setup (`hasSavedHours === false`) runs a 3-step wizard: days → standard hours → review; the review step is the normal editor grid pre-filled by fanning the standard hours out to each selected day (defaults: Mon–Fri, 09:00–13:00/14:00–18:00 in `SETUP_DEFAULT_*`). There is deliberately NO linked-template concept — after fan-out every day is independent; the wizard is only a fast entry path and never shows again once hours are saved.
 
 ---
 

@@ -20,6 +20,7 @@ export interface AvailabilityDictionary {
     closed: string;
     removeRange: string; // aria-label
     addRange: string;
+    rangeJoiner: string; // between start and end times, e.g. "09:00 a 13:00"
     saved: string;
     bookingWindowQuestion: string;
     month: string;
@@ -41,6 +42,23 @@ export interface AvailabilityDictionary {
     errSaveFailed: string; // prefix; server detail appended
   };
   weekdays: Record<DayId, string>;
+  weekdaysShort: Record<DayId, string>; // wizard day pills
+  wizard: {
+    // First-time setup wizard (AvailabilitySetupWizard + review banner in
+    // AvailabilityManager). Steps: days -> hours -> review (review = the grid).
+    stepLabel: string; // contains "{n}" and "{total}"
+    daysTitle: string;
+    daysSubtitle: string;
+    hoursTitle: string;
+    hoursSubtitle: string; // contains "{count}" (2+ selected days)
+    hoursSubtitleOne: string; // singular variant (exactly 1 selected day)
+    reviewTitle: string;
+    reviewSubtitle: string;
+    back: string;
+    next: string;
+    finishButton: string;
+    errNoDays: string;
+  };
 }
 
 const es: AvailabilityDictionary = {
@@ -52,6 +70,7 @@ const es: AvailabilityDictionary = {
     closed: "Cerrado",
     removeRange: "Quitar franja",
     addRange: "Añadir franja",
+    rangeJoiner: "a",
     saved: "¡Guardado correctamente!",
     bookingWindowQuestion: "¿Con cuánta antelación pueden reservar?",
     month: "mes",
@@ -79,6 +98,30 @@ const es: AvailabilityDictionary = {
     sat: "Sábado",
     sun: "Domingo",
   },
+  weekdaysShort: {
+    mon: "Lun",
+    tue: "Mar",
+    wed: "Mié",
+    thu: "Jue",
+    fri: "Vie",
+    sat: "Sáb",
+    sun: "Dom",
+  },
+  wizard: {
+    stepLabel: "Paso {n} de {total}",
+    daysTitle: "¿Qué días abres?",
+    daysSubtitle: "Podrás ajustar cada día por separado al final.",
+    hoursTitle: "Tu horario habitual",
+    hoursSubtitle:
+      "Se aplicará a los {count} días seleccionados. Después podrás editar cada día por separado.",
+    hoursSubtitleOne: "Se aplicará al día seleccionado. Después podrás editarlo cuando quieras.",
+    reviewTitle: "Revisa tu semana",
+    reviewSubtitle: "Ajusta cualquier día antes de confirmar.",
+    back: "Atrás",
+    next: "Siguiente",
+    finishButton: "Confirmar y terminar",
+    errNoDays: "Selecciona al menos un día.",
+  },
 };
 
 const en: AvailabilityDictionary = {
@@ -90,6 +133,7 @@ const en: AvailabilityDictionary = {
     closed: "Closed",
     removeRange: "Remove range",
     addRange: "Add range",
+    rangeJoiner: "to",
     saved: "Saved successfully!",
     bookingWindowQuestion: "How far ahead can clients book?",
     month: "month",
@@ -116,6 +160,30 @@ const en: AvailabilityDictionary = {
     fri: "Friday",
     sat: "Saturday",
     sun: "Sunday",
+  },
+  weekdaysShort: {
+    mon: "Mon",
+    tue: "Tue",
+    wed: "Wed",
+    thu: "Thu",
+    fri: "Fri",
+    sat: "Sat",
+    sun: "Sun",
+  },
+  wizard: {
+    stepLabel: "Step {n} of {total}",
+    daysTitle: "Which days are you open?",
+    daysSubtitle: "You'll be able to adjust each day individually at the end.",
+    hoursSubtitle:
+      "These hours will apply to the {count} selected days. You can edit each day individually afterwards.",
+    hoursSubtitleOne: "These hours will apply to the selected day. You can edit it anytime afterwards.",
+    hoursTitle: "Your usual hours",
+    reviewTitle: "Review your week",
+    reviewSubtitle: "Adjust any day before confirming.",
+    back: "Back",
+    next: "Next",
+    finishButton: "Confirm and finish",
+    errNoDays: "Select at least one day.",
   },
 };
 
