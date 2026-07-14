@@ -63,9 +63,9 @@ const es: TeamDictionary = {
   },
   manager: {
     howDoYouWork: "¿Cómo trabajas?",
-    soloTitle: "En solitario",
+    soloTitle: "Individual",
     soloSub: "Solo tú atiendes las citas",
-    teamTitle: "En equipo",
+    teamTitle: "Equipo",
     teamSub: "Varias personas atienden citas",
     you: "Tú",
     edit: "Editar",
@@ -109,9 +109,9 @@ const en: TeamDictionary = {
   },
   manager: {
     howDoYouWork: "How do you work?",
-    soloTitle: "Solo",
+    soloTitle: "Individual",
     soloSub: "Only you handle appointments",
-    teamTitle: "As a team",
+    teamTitle: "Team",
     teamSub: "Several people handle appointments",
     you: "You",
     edit: "Edit",
