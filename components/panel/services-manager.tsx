@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { Btn } from "@/components/ui/button";
+import { SaveOverlay, useSaveOverlay } from "@/components/panel/save-overlay";
 import {
   createService,
   createServices,
@@ -100,14 +101,7 @@ export function ServicesManager({
 
   // Full-screen save overlay: grays out the page while a save is in flight,
   // then flashes a success confirmation before redirecting/refreshing.
-  const [overlay, setOverlay] = useState<"saving" | "success" | null>(null);
-  const SUCCESS_FLASH_MS = 900;
-
-  /** Shows the success flash briefly, then runs the follow-up (redirect/refresh). */
-  function flashSuccessThen(after: () => void) {
-    setOverlay("success");
-    window.setTimeout(after, SUCCESS_FLASH_MS);
-  }
+  const { overlay, setOverlay, flashSuccessThen } = useSaveOverlay();
 
   const hadNoServices = initialServices.length === 0;
 
@@ -263,32 +257,7 @@ export function ServicesManager({
     <div className="flex flex-col gap-5">
       {/* Full-screen save overlay: blocks interaction while saving, then
           flashes the success confirmation before the redirect/refresh runs. */}
-      {overlay && (
-        <div
-          className="fixed inset-0 z-50 grid place-items-center bg-ink/30 backdrop-blur-[2px]"
-          role="status"
-          aria-live="polite"
-        >
-          <div className="flex items-center gap-3 rounded-2xl border border-line bg-surface px-6 py-5 shadow-lg">
-            {overlay === "saving" ? (
-              <>
-                <span
-                  className="h-5 w-5 animate-spin rounded-full border-2 border-line border-t-brand"
-                  aria-hidden
-                />
-                <span className="text-[14px] font-semibold text-ink">{m.saving}</span>
-              </>
-            ) : (
-              <>
-                <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-brand text-white">
-                  <Icon name="check" size={14} strokeWidth={3} />
-                </span>
-                <span className="text-[14px] font-semibold text-ink">{m.flashSuccess}</span>
-              </>
-            )}
-          </div>
-        </div>
-      )}
+      <SaveOverlay state={overlay} savingLabel={m.saving} successLabel={m.flashSuccess} />
 
       {error && (
         <div className="flex items-start gap-2 rounded-xl border border-error bg-error-weak px-4 py-3 text-[13.5px] text-error">

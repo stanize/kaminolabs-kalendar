@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { Btn } from "@/components/ui/button";
+import { SaveOverlay, useSaveOverlay } from "@/components/panel/save-overlay";
 import {
   setTeamMode,
   createMember,
@@ -46,6 +47,9 @@ export function TeamManager({
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Full-screen save overlay (shared setup-page pattern) for create/update
+  // saves. Quick inline actions (mode switch, delete, reorder) stay as-is.
+  const { overlay, setOverlay, flashSuccessThen } = useSaveOverlay();
 
   // ── Mode switch ─────────────────────────────────────────────────────────────
   async function handleMode(next: TeamMode) {
@@ -72,19 +76,25 @@ export function TeamManager({
   async function handleCreate(draft: Draft) {
     setError(null);
     setBusy(true);
+    setOverlay("saving");
     try {
       const result = await createMember(draft, dict.errors);
       if (!result.ok) {
         setError(result.error);
         setBusy(false);
+        setOverlay(null);
         return;
       }
-      setAdding(false);
-      setBusy(false);
-      router.refresh();
+      flashSuccessThen(() => {
+        setAdding(false);
+        setBusy(false);
+        setOverlay(null);
+        router.refresh();
+      });
     } catch {
       setError(m.errUnexpected);
       setBusy(false);
+      setOverlay(null);
     }
   }
 
@@ -92,19 +102,25 @@ export function TeamManager({
   async function handleUpdate(id: string, draft: Draft) {
     setError(null);
     setBusy(true);
+    setOverlay("saving");
     try {
       const result = await updateMember({ id, ...draft }, dict.errors);
       if (!result.ok) {
         setError(result.error);
         setBusy(false);
+        setOverlay(null);
         return;
       }
-      setEditingId(null);
-      setBusy(false);
-      router.refresh();
+      flashSuccessThen(() => {
+        setEditingId(null);
+        setBusy(false);
+        setOverlay(null);
+        router.refresh();
+      });
     } catch {
       setError(m.errUnexpected);
       setBusy(false);
+      setOverlay(null);
     }
   }
 
@@ -149,6 +165,8 @@ export function TeamManager({
 
   return (
     <div className="flex flex-col gap-6">
+      <SaveOverlay state={overlay} savingLabel={m.saving} successLabel={m.flashSuccess} />
+
       {error && (
         <div className="flex items-start gap-2 rounded-xl border border-error bg-error-weak px-4 py-3 text-[13.5px] text-error">
           <Icon name="x" size={16} className="mt-0.5 shrink-0" />

@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { Btn } from "@/components/ui/button";
+import { SaveOverlay, useSaveOverlay } from "@/components/panel/save-overlay";
 import { saveAvailability, type WeekHours } from "@/lib/actions/availability";
 import {
   WEEKDAY_ORDER,
@@ -59,11 +60,13 @@ export function AvailabilityManager({
   const [windowMonths, setWindowMonths] = useState<number>(bookingWindowMonths || 1);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+  // Full-screen save overlay (shared setup-page pattern): gray out while
+  // saving, flash success, then redirect/refresh. Replaces the old inline
+  // "saved" banner.
+  const { overlay, setOverlay, flashSuccessThen } = useSaveOverlay();
 
   function setDay(day: DayId, ranges: TimeRange[]) {
     setWeek((w) => ({ ...w, [day]: ranges }));
-    setSaved(false);
   }
 
   function toggleDay(day: DayId, open: boolean) {
@@ -97,7 +100,6 @@ export function AvailabilityManager({
 
   async function handleSave() {
     setError(null);
-    setSaved(false);
 
     // Client-side validation for immediate feedback (server re-validates).
     for (const day of WEEKDAY_ORDER) {
@@ -109,6 +111,7 @@ export function AvailabilityManager({
     }
 
     setSaving(true);
+    setOverlay("saving");
     try {
       const result = await saveAvailability({
         week,
@@ -118,24 +121,31 @@ export function AvailabilityManager({
       if (!result.ok) {
         setError(result.error);
         setSaving(false);
+        setOverlay(null);
         return;
       }
-      setSaved(true);
-      setSaving(false);
-      // First-time setup from the home flow -> return to Inicio.
-      if (returnToHome && !hasSavedHours) {
-        router.push("/panel");
-        return;
-      }
-      router.refresh();
+      flashSuccessThen(() => {
+        // First-time setup from the home flow -> return to Inicio. Keep the
+        // overlay up through the redirect so this page never flashes through.
+        if (returnToHome && !hasSavedHours) {
+          router.push("/panel");
+          return;
+        }
+        setSaving(false);
+        setOverlay(null);
+        router.refresh();
+      });
     } catch {
       setError(m.errUnexpected);
       setSaving(false);
+      setOverlay(null);
     }
   }
 
   return (
     <div className="flex flex-col gap-5">
+      <SaveOverlay state={overlay} savingLabel={m.confirming} successLabel={m.saved} />
+
       {error && (
         <div className="flex items-start gap-2 rounded-xl border border-error bg-error-weak px-4 py-3 text-[13.5px] text-error">
           <Icon name="x" size={16} className="mt-0.5 shrink-0" />
@@ -204,12 +214,6 @@ export function AvailabilityManager({
         {/* Blank space after the last day so Sat/Sun dropdowns open cleanly,
             then the booking window + confirm — all in the same container. */}
         <div className="border-t border-line px-4 pb-4 pt-6 mt-4">
-          {saved && !error && (
-            <div className="mb-4 flex items-center gap-2 rounded-xl border border-brand-line bg-brand-weak px-4 py-3 text-[13.5px] text-brand-ink">
-              <Icon name="check" size={16} strokeWidth={2.5} className="shrink-0" />
-              <span>{m.saved}</span>
-            </div>
-          )}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div className="flex flex-col gap-[7px]">
               <span className="text-[13px] font-semibold text-ink">{m.bookingWindowQuestion}</span>
@@ -218,7 +222,7 @@ export function AvailabilityManager({
                   <button
                     key={wm}
                     type="button"
-                    onClick={() => { setWindowMonths(wm); setSaved(false); }}
+                    onClick={() => setWindowMonths(wm)}
                     className={`rounded-lg border px-3.5 py-2 text-[13px] font-semibold transition-all ${
                       windowMonths === wm
                         ? "border-brand bg-brand text-white"

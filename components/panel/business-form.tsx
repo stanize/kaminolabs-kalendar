@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { Btn } from "@/components/ui/button";
 import { Field, inputClasses } from "@/components/ui/field";
+import { SaveOverlay, useSaveOverlay } from "@/components/panel/save-overlay";
 import { BUSINESS_TYPES } from "@/lib/onboarding/data";
 import { businessTypeLabelFor } from "@/lib/i18n/dictionaries/business-types";
 import type { BusinessType } from "@/lib/onboarding/types";
@@ -90,7 +91,10 @@ export function BusinessForm({
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
+  // Full-screen save overlay (shared setup-page pattern): gray out while
+  // saving, flash success, then redirect/refresh. Replaces the old inline
+  // "saved" banner.
+  const { overlay, setOverlay, flashSuccessThen } = useSaveOverlay();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const postalDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -179,7 +183,6 @@ export function BusinessForm({
 
   async function handleSave() {
     setError(null);
-    setSaved(false);
 
     if (name.trim().length < 2) {
       setError(f.errName);
@@ -247,6 +250,7 @@ export function BusinessForm({
     if (isNew) fd.set("slug", sanitizeSlug(slug));
 
     setSaving(true);
+    setOverlay("saving");
     try {
       const result = await saveBusinessSettings(fd, {
         errName: f.errName,
@@ -269,31 +273,35 @@ export function BusinessForm({
       if (!result.ok) {
         setError(result.error);
         setSaving(false);
+        setOverlay(null);
         return;
       }
-      setSaved(true);
-      setSaving(false);
 
       // Return-intent: when the user arrived from the home page (?from=home),
       // send them back to Inicio after a successful save so the guided setup
-      // flows step-to-step. Give the success banner a brief moment to actually
-      // be seen before navigating away — otherwise the push fires before the
-      // banner ever paints, and it just looks like the screen froze.
-      if (returnToHome) {
-        await new Promise((resolve) => setTimeout(resolve, 600));
-        router.push("/panel");
-        return;
-      }
-      // Refresh server components (this page's create/edit mode, home checklist).
-      router.refresh();
+      // flows step-to-step. The success flash covers the wait; during a
+      // redirect the overlay stays up until navigation unmounts this page.
+      flashSuccessThen(() => {
+        if (returnToHome) {
+          router.push("/panel");
+          return;
+        }
+        setSaving(false);
+        setOverlay(null);
+        // Refresh server components (this page's create/edit mode, home checklist).
+        router.refresh();
+      });
     } catch {
       setError(f.errUnexpected);
       setSaving(false);
+      setOverlay(null);
     }
   }
 
   return (
     <div className="flex flex-col gap-7">
+      <SaveOverlay state={overlay} savingLabel={f.saving} successLabel={f.saved} />
+
       {/* Name */}
       <Field
         label={f.nameLabel}
@@ -476,13 +484,6 @@ export function BusinessForm({
         <div className="flex items-start gap-2 rounded-xl border border-error bg-error-weak px-4 py-3 text-[13.5px] text-error">
           <Icon name="x" size={16} className="mt-0.5 shrink-0" />
           <span>{error}</span>
-        </div>
-      )}
-
-      {saved && !error && (
-        <div className="flex items-center gap-2 rounded-xl border border-brand-line bg-brand-weak px-4 py-3 text-[13.5px] text-brand-ink">
-          <Icon name="check" size={16} strokeWidth={2.5} className="shrink-0" />
-          <span>{f.saved}</span>
         </div>
       )}
 

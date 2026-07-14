@@ -31,6 +31,7 @@ export interface TeamDictionary {
     rolePlaceholder: string;
     save: string;
     saving: string;
+    flashSuccess: string; // success flash shown in the save overlay
     cancel: string;
     errUnexpected: string;
     errDeleteFailed: string;
@@ -79,6 +80,7 @@ const es: TeamDictionary = {
     rolePlaceholder: "Fisioterapeuta",
     save: "Guardar",
     saving: "Guardando…",
+    flashSuccess: "¡Guardado correctamente!",
     cancel: "Cancelar",
     errUnexpected: "Ocurrió un error inesperado. Inténtalo de nuevo.",
     errDeleteFailed: "No se pudo eliminar. Inténtalo de nuevo.",
@@ -124,6 +126,7 @@ const en: TeamDictionary = {
     rolePlaceholder: "Physiotherapist",
     save: "Save",
     saving: "Saving…",
+    flashSuccess: "Saved successfully!",
     cancel: "Cancel",
     errUnexpected: "An unexpected error occurred. Please try again.",
     errDeleteFailed: "Couldn't delete. Please try again.",
