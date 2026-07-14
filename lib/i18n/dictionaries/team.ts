@@ -21,8 +21,7 @@ export interface TeamDictionary {
     you: string;
     delete: string;
     addMember: string;
-    continueButton: string;
-    saveTeam: string; // commit label outside the setup flow
+    saveTeam: string; // single commit button label
     nameLabel: string;
     namePlaceholder: string;
     roleLabel: string;
@@ -65,7 +64,6 @@ const es: TeamDictionary = {
     you: "Tú",
     delete: "Eliminar",
     addMember: "Añadir miembro",
-    continueButton: "Continuar",
     saveTeam: "Guardar cambios",
     nameLabel: "Nombre",
     namePlaceholder: "Nombre y apellido",
@@ -106,7 +104,6 @@ const en: TeamDictionary = {
     you: "You",
     delete: "Delete",
     addMember: "Add member",
-    continueButton: "Continue",
     saveTeam: "Save changes",
     nameLabel: "Name",
     namePlaceholder: "First and last name",

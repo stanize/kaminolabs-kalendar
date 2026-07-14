@@ -263,10 +263,11 @@ export function TeamManager({
         </div>
       )}
 
-      {/* Single commit: "Continuar" in the setup flow, "Guardar" otherwise */}
+      {/* Single commit — saves the whole roster; in the setup flow it also
+          returns to Inicio after saving. */}
       <div className="pt-2">
         <Btn onClick={handleSave} disabled={saving} size="lg">
-          {saving ? m.saving : returnToHome ? m.continueButton : m.saveTeam}
+          {saving ? m.saving : m.saveTeam}
         </Btn>
       </div>
     </div>
