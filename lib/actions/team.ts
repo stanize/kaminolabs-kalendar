@@ -5,10 +5,6 @@ import { authedAction } from "@/lib/auth-action";
 import { createClient } from "@/lib/supabase/server";
 import { getBusinessForUser } from "@/lib/business/data";
 
-export type TeamActionResult =
-  | { ok: true; created?: boolean }
-  | { ok: false; error: string };
-
 const NAME_MAX = 80;
 const ROLE_MAX = 60;
 
@@ -43,205 +39,166 @@ const FALLBACK: TeamActionDict = {
   errReorderFailed: "No se pudo reordenar:",
 };
 
-function revalidate() {
-  revalidatePath("/panel");
-  revalidatePath("/panel/team");
+/** One member row as the client edits it. id === null means "new, not yet saved". */
+export interface TeamMemberInput {
+  id: string | null;
+  name: string;
+  role: string;
 }
 
-/** Resolves the caller's business id (or null). Centralizes owner_id scoping. */
-async function resolveBusinessId(userId: string): Promise<string | null> {
-  const business = await getBusinessForUser(userId);
-  return business?.id ?? null;
+export interface SaveTeamInput {
+  mode: "solo" | "team";
+  /** The full roster in display order — the single source of truth on save. */
+  members: TeamMemberInput[];
 }
+
+export interface SavedTeamMember {
+  id: string;
+  name: string;
+  role: string | null;
+  is_owner: boolean;
+}
+
+export type SaveTeamResult =
+  | { ok: true; members: SavedTeamMember[] }
+  | { ok: false; error: string };
 
 /**
- * Switches the business between 'solo' and 'team'. Switching to 'solo' is only
- * allowed when at most one member exists (otherwise members would be orphaned).
+ * Atomic whole-roster save (mirrors Disponibilidad's whole-week save): the
+ * client edits members locally (add / rename / re-role / delete / reorder /
+ * mode switch) and commits everything in one action.
+ *
+ * Semantics:
+ * - `members` is authoritative: existing non-owner rows missing from it are
+ *   deleted (their bookings keep working — bookings.team_member_id is
+ *   ON DELETE SET NULL), rows with id are updated, rows without id inserted.
+ * - sort_order = array index.
+ * - The owner row must be present (rename allowed, never deletable).
+ * - mode "solo" requires the roster to be just the owner.
+ *
+ * Not wrapped in a DB transaction (Supabase REST) — statements run in a safe
+ * order (mode → deletes → upserts) so a mid-way failure never leaves an
+ * invalid roster, only a partially applied edit the user can retry.
  */
-export const setTeamMode = authedAction(
+export const saveTeam = authedAction(
   async (
     session,
-    mode: "solo" | "team",
+    input: SaveTeamInput,
     dict?: Partial<TeamActionDict>
-  ): Promise<TeamActionResult> => {
+  ): Promise<SaveTeamResult> => {
     const t = { ...FALLBACK, ...dict };
 
-    if (mode !== "solo" && mode !== "team") {
+    if (input.mode !== "solo" && input.mode !== "team") {
       return { ok: false, error: t.errInvalidMode };
     }
     const business = await getBusinessForUser(session.user.id);
     if (!business) return { ok: false, error: t.errNoBusiness };
 
-    const supabase = await createClient();
-
-    if (mode === "solo") {
-      const { count } = await supabase
-        .from("kalendar_team_members")
-        .select("id", { count: "exact", head: true })
-        .eq("business_id", business.id);
-      if ((count ?? 0) > 1) {
-        return { ok: false, error: t.errCannotGoSolo };
+    // Normalize + validate every row up front — reject the whole save on the
+    // first invalid row so a partial roster is never written.
+    const rows = (input.members ?? []).map((m) => ({
+      id: m.id,
+      name: (m.name ?? "").trim(),
+      role: (m.role ?? "").trim(),
+    }));
+    for (const r of rows) {
+      if (r.name.length < 2) return { ok: false, error: t.errNameRequired };
+      if (r.name.length > NAME_MAX) {
+        return { ok: false, error: t.errNameTooLong.replace("{max}", String(NAME_MAX)) };
+      }
+      if (r.role.length > ROLE_MAX) {
+        return { ok: false, error: t.errRoleTooLong.replace("{max}", String(ROLE_MAX)) };
       }
     }
 
-    const { error } = await supabase
-      .from("kalendar_businesses")
-      .update({ team_mode: mode })
-      .eq("id", business.id)
-      .eq("owner_id", session.user.id);
-    if (error) return { ok: false, error: `${t.errSaveFailed} ${error.message}` };
-
-    revalidate();
-    return { ok: true };
-  }
-);
-
-/** Adds a member (team mode only). Appends after the current max sort_order. */
-export const createMember = authedAction(
-  async (
-    session,
-    input: { name: string; role: string },
-    dict?: Partial<TeamActionDict>
-  ): Promise<TeamActionResult> => {
-    const t = { ...FALLBACK, ...dict };
-
-    const business = await getBusinessForUser(session.user.id);
-    if (!business) return { ok: false, error: t.errNoBusiness };
-    if (business.team_mode !== "team") {
-      return { ok: false, error: t.errTeamModeRequired };
-    }
-
-    const name = input.name.trim();
-    const role = input.role.trim();
-    if (name.length < 2) return { ok: false, error: t.errNameRequired };
-    if (name.length > NAME_MAX) {
-      return { ok: false, error: t.errNameTooLong.replace("{max}", String(NAME_MAX)) };
-    }
-    if (role.length > ROLE_MAX) {
-      return { ok: false, error: t.errRoleTooLong.replace("{max}", String(ROLE_MAX)) };
-    }
-
-    const supabase = await createClient();
-    const { data: last } = await supabase
-      .from("kalendar_team_members")
-      .select("sort_order")
-      .eq("business_id", business.id)
-      .order("sort_order", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    const nextOrder = (last?.sort_order ?? -1) + 1;
-
-    const { error } = await supabase.from("kalendar_team_members").insert({
-      business_id: business.id,
-      name,
-      role: role || null,
-      is_owner: false,
-      sort_order: nextOrder,
-    });
-    if (error) return { ok: false, error: `${t.errAddFailed} ${error.message}` };
-
-    revalidate();
-    return { ok: true, created: true };
-  }
-);
-
-/** Updates a member's name/role. The owner row can be renamed but stays owner. */
-export const updateMember = authedAction(
-  async (
-    session,
-    input: { id: string; name: string; role: string },
-    dict?: Partial<TeamActionDict>
-  ): Promise<TeamActionResult> => {
-    const t = { ...FALLBACK, ...dict };
-
-    const businessId = await resolveBusinessId(session.user.id);
-    if (!businessId) return { ok: false, error: t.errNoBusiness };
-
-    const name = input.name.trim();
-    const role = input.role.trim();
-    if (name.length < 2) return { ok: false, error: t.errNameRequired };
-    if (name.length > NAME_MAX) {
-      return { ok: false, error: t.errNameTooLong.replace("{max}", String(NAME_MAX)) };
-    }
-    if (role.length > ROLE_MAX) {
-      return { ok: false, error: t.errRoleTooLong.replace("{max}", String(ROLE_MAX)) };
-    }
-
-    const supabase = await createClient();
-    const { error } = await supabase
-      .from("kalendar_team_members")
-      .update({ name, role: role || null })
-      .eq("id", input.id)
-      .eq("business_id", businessId);
-    if (error) return { ok: false, error: `${t.errSaveFailed} ${error.message}` };
-
-    revalidate();
-    return { ok: true };
-  }
-);
-
-/** Deletes a member. The owner cannot be deleted. */
-export const deleteMember = authedAction(
-  async (
-    session,
-    id: string,
-    dict?: Partial<TeamActionDict>
-  ): Promise<TeamActionResult> => {
-    const t = { ...FALLBACK, ...dict };
-
-    const businessId = await resolveBusinessId(session.user.id);
-    if (!businessId) return { ok: false, error: t.errNoBusiness };
-
     const supabase = await createClient();
 
-    const { data: member } = await supabase
+    const { data: existingData, error: readError } = await supabase
       .from("kalendar_team_members")
-      .select("is_owner")
-      .eq("id", id)
-      .eq("business_id", businessId)
-      .maybeSingle();
-    if (member?.is_owner) {
+      .select("id, is_owner")
+      .eq("business_id", business.id);
+    if (readError) {
+      return { ok: false, error: `${t.errSaveFailed} ${readError.message}` };
+    }
+    const existing = existingData ?? [];
+    const existingIds = new Set(existing.map((e) => e.id));
+    const ownerId = existing.find((e) => e.is_owner)?.id ?? null;
+
+    // Every id the client sends must belong to this business.
+    for (const r of rows) {
+      if (r.id && !existingIds.has(r.id)) {
+        return { ok: false, error: `${t.errSaveFailed} unknown member` };
+      }
+    }
+    // The owner row can be renamed but never removed.
+    if (ownerId && !rows.some((r) => r.id === ownerId)) {
       return { ok: false, error: t.errCannotDeleteOwner };
     }
+    // Solo mode = just the owner.
+    if (input.mode === "solo" && rows.length > 1) {
+      return { ok: false, error: t.errCannotGoSolo };
+    }
 
-    const { error } = await supabase
-      .from("kalendar_team_members")
-      .delete()
-      .eq("id", id)
-      .eq("business_id", businessId);
-    if (error) return { ok: false, error: `${t.errDeleteFailed} ${error.message}` };
+    // 1) Mode.
+    if (input.mode !== business.team_mode) {
+      const { error } = await supabase
+        .from("kalendar_businesses")
+        .update({ team_mode: input.mode })
+        .eq("id", business.id)
+        .eq("owner_id", session.user.id);
+      if (error) return { ok: false, error: `${t.errSaveFailed} ${error.message}` };
+    }
 
-    revalidate();
-    return { ok: true };
-  }
-);
+    // 2) Deletes: existing non-owner members no longer in the roster.
+    const keptIds = new Set(rows.filter((r) => r.id).map((r) => r.id as string));
+    const toDelete = existing
+      .filter((e) => !e.is_owner && !keptIds.has(e.id))
+      .map((e) => e.id);
+    if (toDelete.length > 0) {
+      const { error } = await supabase
+        .from("kalendar_team_members")
+        .delete()
+        .in("id", toDelete)
+        .eq("business_id", business.id);
+      if (error) return { ok: false, error: `${t.errDeleteFailed} ${error.message}` };
+    }
 
-/** Persists a new ordering. Owner is kept first by sort_order regardless. */
-export const reorderMembers = authedAction(
-  async (
-    session,
-    orderedIds: string[],
-    dict?: Partial<TeamActionDict>
-  ): Promise<TeamActionResult> => {
-    const t = { ...FALLBACK, ...dict };
-
-    const businessId = await resolveBusinessId(session.user.id);
-    if (!businessId) return { ok: false, error: t.errNoBusiness };
-
-    const supabase = await createClient();
-    const results = await Promise.all(
-      orderedIds.map((id, index) =>
-        supabase
+    // 3) Updates + inserts, sort_order = display index.
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i];
+      if (r.id) {
+        const { error } = await supabase
           .from("kalendar_team_members")
-          .update({ sort_order: index })
-          .eq("id", id)
-          .eq("business_id", businessId)
-      )
-    );
-    const failed = results.find((r) => r.error);
-    if (failed?.error) return { ok: false, error: `${t.errReorderFailed} ${failed.error.message}` };
+          .update({ name: r.name, role: r.role || null, sort_order: i })
+          .eq("id", r.id)
+          .eq("business_id", business.id);
+        if (error) return { ok: false, error: `${t.errSaveFailed} ${error.message}` };
+      } else {
+        const { error } = await supabase.from("kalendar_team_members").insert({
+          business_id: business.id,
+          name: r.name,
+          role: r.role || null,
+          is_owner: false,
+          sort_order: i,
+        });
+        if (error) return { ok: false, error: `${t.errAddFailed} ${error.message}` };
+      }
+    }
 
-    revalidate();
-    return { ok: true };
+    // Return the saved roster so the client can remap local rows (new rows get
+    // their real ids — prevents duplicate inserts on a second save).
+    const { data: savedData, error: refetchError } = await supabase
+      .from("kalendar_team_members")
+      .select("id, name, role, is_owner")
+      .eq("business_id", business.id)
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: true });
+    if (refetchError) {
+      return { ok: false, error: `${t.errSaveFailed} ${refetchError.message}` };
+    }
+
+    revalidatePath("/panel");
+    revalidatePath("/panel/team");
+    return { ok: true, members: (savedData ?? []) as SavedTeamMember[] };
   }
 );
