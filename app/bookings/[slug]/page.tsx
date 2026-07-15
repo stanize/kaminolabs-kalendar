@@ -54,13 +54,21 @@ export default async function BusinessPublicPage({
     // No session or error — treat as unauthenticated guest.
   }
 
+  // Single-line display address for the booking page header — replaces the
+  // business-type/city line, which isn't very useful to a patient deciding
+  // whether to book. Kept as plain formatting here rather than a DB column
+  // since it's just a presentation concern over existing address_* fields.
+  const addressLine = [
+    `${business.address_street} ${business.address_number}${business.address_additional ? `, ${business.address_additional}` : ""}`,
+    business.city,
+  ].join(" · ");
+
   return (
     <BookingPageShell
       slug={slug}
       business={{
         name: business.name,
-        type: business.type,
-        city: business.city,
+        address: addressLine,
         brand_color: business.brand_color,
       }}
       services={services}

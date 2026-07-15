@@ -5,11 +5,10 @@ import Link from "next/link";
 import { Logo } from "@/components/ui/logo";
 import { Icon } from "@/components/ui/icon";
 import { BookingWizard } from "@/components/booking/booking-wizard";
-import { businessTypeLabelFor } from "@/lib/i18n/dictionaries/business-types";
 import { getBookingPageDictionary } from "@/lib/i18n/dictionaries/booking-page";
 import { authClient } from "@/lib/auth-client";
 import { LOCALES, type Locale } from "@/lib/i18n/config";
-import type { BusinessType, DayId } from "@/lib/onboarding/types";
+import type { DayId } from "@/lib/onboarding/types";
 import { bookingPath } from "@/lib/business/booking-url";
 
 interface Service {
@@ -49,8 +48,7 @@ export function BookingPageShell({
   slug: string;
   business: {
     name: string;
-    type: BusinessType;
-    city: string | null;
+    address: string;
     brand_color: string;
   };
   services: Service[];
@@ -112,10 +110,7 @@ export function BookingPageShell({
             <Icon name="calendar" size={28} />
           </div>
           <h1 className="mb-1 text-[24px]">{business.name}</h1>
-          <p className="text-[14.5px] text-ink-soft">
-            {businessTypeLabelFor(business.type, locale)}
-            {business.city ? ` · ${business.city}` : ""}
-          </p>
+          <p className="text-[14.5px] text-ink-soft">{business.address}</p>
         </div>
 
         <BookingWizard
