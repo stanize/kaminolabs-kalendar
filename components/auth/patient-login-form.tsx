@@ -95,7 +95,7 @@ const DEFAULT_LABELS: PatientLabels = {
   connecting: "Conectando…",
   noAccount: "¿No tienes cuenta?",
   haveAccount: "¿Ya tienes cuenta?",
-  switchToRegister: "Crear una",
+  switchToRegister: "Crear una gratis",
   switchToLogin: "Inicia sesión",
   errName: "Indica tu nombre.",
   errEmail: "Indica un email válido.",
