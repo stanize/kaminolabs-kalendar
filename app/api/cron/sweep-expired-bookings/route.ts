@@ -114,14 +114,15 @@ export async function GET(request: Request) {
     try {
       const { data: owner } = await supabase
         .from("user")
-        .select("email")
+        .select("email, emailVerified")
         .eq("id", biz.owner_id)
         .maybeSingle();
 
       if (owner?.email) {
+        const prefix = owner.emailVerified ? "[Kalendar] " : "";
         await sendEmail({
           to: owner.email,
-          subject: `[Kalendar] Reserva caducada: ${booking.service_name}`,
+          subject: `${prefix}Reserva caducada: ${booking.service_name}`,
           html: bookingCancelledOwnerHtml({
             serviceName: booking.service_name,
             whenLabel: ownerWhenLabel,

@@ -416,7 +416,7 @@ async function notifyOwnerOfBooking(booking: {
 
   const { data: owner } = await supabase
     .from("user")
-    .select("email")
+    .select("email, emailVerified")
     .eq("id", biz.owner_id)
     .maybeSingle();
   if (!owner?.email) return;
@@ -432,9 +432,12 @@ async function notifyOwnerOfBooking(booking: {
   }
 
   const base = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/+$/, "");
+  // The [Kalendar] subject prefix is only added for owners with a verified
+  // account email — unverified accounts haven't completed onboarding yet.
+  const prefix = owner.emailVerified ? "[Kalendar] " : "";
   await sendEmail({
     to: owner.email,
-    subject: `[Kalendar] Nueva reserva: ${booking.service_name}`,
+    subject: `${prefix}Nueva reserva: ${booking.service_name}`,
     html: ownerBookingNotificationHtml({
       businessName: biz.name,
       serviceName: booking.service_name,
@@ -605,13 +608,14 @@ export async function notifyCancellation(
   if (!byOwner) {
     const { data: owner } = await supabase
       .from("user")
-      .select("email")
+      .select("email, emailVerified")
       .eq("id", biz.owner_id)
       .maybeSingle();
     if (owner?.email) {
+      const prefix = owner.emailVerified ? "[Kalendar] " : "";
       await sendEmail({
         to: owner.email,
-        subject: `[Kalendar] Reserva cancelada: ${booking.service_name}`,
+        subject: `${prefix}Reserva cancelada: ${booking.service_name}`,
         html: bookingCancelledOwnerHtml({
           serviceName: booking.service_name,
           whenLabel: ownerWhenLabel,
