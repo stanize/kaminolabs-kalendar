@@ -94,7 +94,14 @@ function overlaps(aStart: Date, aEnd: Date, bStart: Date, bEnd: Date): boolean {
  *
  * @param dateInTz  a {year, month (1-12), day} identifying the calendar day in tz
  * @param ranges    the business's working intervals for that weekday
- * @param durationMin  the selected service duration (slot length AND step)
+ * @param durationMin  the selected service duration — controls the actual
+ *   appointment length (and therefore what counts as "taken"/blocked)
+ * @param stepMin   the interval between offered start times, e.g. 09:00,
+ *   10:00, 11:00... Deliberately independent from durationMin: a 45-minute
+ *   service still only offers slots on the hour by default, so a following
+ *   60-minute service booked right after it doesn't get squeezed into a
+ *   45-minute gap. Defaults to 60. Not yet clinic-configurable — flagged as
+ *   a likely future per-business setting.
  * @param taken     existing taken intervals (active bookings) as UTC instants
  * @param now       current instant (slots starting in the past are excluded)
  */
@@ -102,13 +109,16 @@ export function generateSlotsForDay(params: {
   dateInTz: { year: number; month: number; day: number };
   ranges: TimeRange[];
   durationMin: number;
+  stepMin?: number;
   taken: TakenInterval[];
   now: Date;
   tz?: string;
 }): Slot[] {
   const { dateInTz, ranges, durationMin, taken, now, tz = BUSINESS_TZ } = params;
+  const stepMin = params.stepMin ?? 60;
   const slots: Slot[] = [];
-  const stepMs = durationMin * 60_000;
+  const stepMs = stepMin * 60_000;
+  const durationMs = durationMin * 60_000;
 
   for (const range of ranges) {
     const [sh, sm] = hm(range.start);
@@ -116,9 +126,9 @@ export function generateSlotsForDay(params: {
     const rangeStart = zonedTimeToUtc(dateInTz.year, dateInTz.month, dateInTz.day, sh, sm, tz);
     const rangeEnd = zonedTimeToUtc(dateInTz.year, dateInTz.month, dateInTz.day, eh, em, tz);
 
-    for (let t = rangeStart.getTime(); t + stepMs <= rangeEnd.getTime() + 1; t += stepMs) {
+    for (let t = rangeStart.getTime(); t + durationMs <= rangeEnd.getTime() + 1; t += stepMs) {
       const slotStart = new Date(t);
-      const slotEnd = new Date(t + stepMs);
+      const slotEnd = new Date(t + durationMs);
       if (slotStart < now) continue; // no past slots
       const isTaken = taken.some((iv) => overlaps(slotStart, slotEnd, iv.start, iv.end));
       if (isTaken) continue;
