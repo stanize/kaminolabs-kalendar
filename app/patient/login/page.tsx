@@ -37,16 +37,6 @@ export default async function PatientLoginPage({
   return (
     <div className="grid min-h-screen items-start justify-items-center bg-surface-2 px-5 pb-12 pt-16 sm:pt-20">
       <div className="w-full max-w-[420px]">
-        {backToBooking && (
-          <Link
-            href={backToBooking}
-            className="mb-4 flex items-center gap-1.5 text-[13.5px] font-medium text-ink-soft hover:text-ink"
-          >
-            <Icon name="chevronLeft" size={15} />
-            Volver a la página de reservas
-          </Link>
-        )}
-
         <div className="mb-8 flex flex-col items-center gap-3 text-center">
           <Logo size={22} />
           <div>
@@ -60,6 +50,16 @@ export default async function PatientLoginPage({
         <div className="rounded-2xl border border-line bg-surface p-6 shadow-sm">
           <PatientLoginForm redirectTo={redirectTo} />
         </div>
+
+        {backToBooking && (
+          <Link
+            href={backToBooking}
+            className="mt-5 flex items-center justify-center gap-1.5 text-[13.5px] font-medium text-ink-soft hover:text-ink"
+          >
+            <Icon name="chevronLeft" size={15} />
+            Volver a la página de reservas
+          </Link>
+        )}
       </div>
     </div>
   );
