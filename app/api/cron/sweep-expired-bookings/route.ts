@@ -122,7 +122,7 @@ export async function GET(request: Request) {
         const prefix = owner.emailVerified ? "[Kalendar] " : "";
         await sendEmail({
           to: owner.email,
-          subject: `${prefix}Reserva caducada: ${booking.service_name}`,
+          subject: `${prefix}Cita caducada: ${booking.service_name}`,
           html: bookingCancelledOwnerHtml({
             serviceName: booking.service_name,
             whenLabel: ownerWhenLabel,

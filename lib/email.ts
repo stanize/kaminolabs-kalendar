@@ -148,9 +148,9 @@ export function ownerBookingNotificationHtml(input: {
     ...(clientPhone ? [{ label: "Teléfono", value: clientPhone }] : []),
   ];
   const body = `
-    <h1 style="font-size:19px;margin:0 0 12px;">Nueva reserva</h1>
-    ${emailBadge("Reserva confirmada", "success")}
-    <p style="font-size:15px;line-height:1.6;margin:0 0 18px;">Tienes una nueva reserva confirmada.</p>
+    <h1 style="font-size:19px;margin:0 0 12px;">Nueva cita</h1>
+    ${emailBadge("Cita confirmada", "success")}
+    <p style="font-size:15px;line-height:1.6;margin:0 0 18px;">Tienes una nueva cita confirmada.</p>
     ${emailInfoBox(rows)}
     ${emailButton("Ver en mi calendario", panelUrl)}`;
   return emailShell(body, "Kalendar · Reservas y agenda para tu clínica");
@@ -192,10 +192,10 @@ export function bookingUnderReviewEmailHtml(input: {
           footer:       "Kalendar · Online booking for your clinic",
         }
       : {
-          title:        "Solicitud de reserva recibida",
+          title:        "Solicitud de cita recibida",
           badge:        "En revisión",
           greeting:     clientName ? `Hola ${escapeHtml(clientName)},` : "Hola,",
-          intro:        `Hemos recibido tu solicitud de reserva en <strong>${escapeHtml(businessName)}</strong>. La clínica la confirmará en breve.`,
+          intro:        `Hemos recibido tu solicitud de cita en <strong>${escapeHtml(businessName)}</strong>. La clínica la confirmará en breve.`,
           note:         "Recibirás un email de confirmación en cuanto sea aprobada.",
           service:      "Servicio",
           when:         "Cuándo",
@@ -244,11 +244,11 @@ export function bookingCancelledClientHtml(input: {
           when: "When",
         }
       : {
-          title: "Reserva cancelada",
+          title: "Cita cancelada",
           greeting: clientName ? `Hola ${escapeHtml(clientName)},` : "Hola,",
-          reasonByOwner:  `Tu reserva en <strong>${escapeHtml(businessName)}</strong> ha sido cancelada por el negocio.`,
-          reasonByGuest:  `Tu reserva en <strong>${escapeHtml(businessName)}</strong> ha sido cancelada.`,
-          reasonByExpiry: `Tu solicitud de reserva en <strong>${escapeHtml(businessName)}</strong> no fue confirmada a tiempo y ha sido cancelada automáticamente.`,
+          reasonByOwner:  `Tu cita en <strong>${escapeHtml(businessName)}</strong> ha sido cancelada por el negocio.`,
+          reasonByGuest:  `Tu cita en <strong>${escapeHtml(businessName)}</strong> ha sido cancelada.`,
+          reasonByExpiry: `Tu solicitud de cita en <strong>${escapeHtml(businessName)}</strong> no fue confirmada a tiempo y ha sido cancelada automáticamente.`,
           service: "Servicio",
           when: "Cuándo",
         };
@@ -280,9 +280,9 @@ export function bookingCancelledOwnerHtml(input: {
     { label: "Cliente", value: clientName },
   ];
   const body = `
-    <h1 style="font-size:19px;margin:0 0 12px;">Reserva cancelada</h1>
+    <h1 style="font-size:19px;margin:0 0 12px;">Cita cancelada</h1>
     ${emailBadge("Cancelada por el cliente", "danger")}
-    <p style="font-size:15px;line-height:1.6;margin:0 0 18px;">Un cliente ha cancelado su reserva.</p>
+    <p style="font-size:15px;line-height:1.6;margin:0 0 18px;">Un cliente ha cancelado su cita.</p>
     ${emailInfoBox(rows)}`;
   return emailShell(body, "Kalendar · Reservas y agenda para tu clínica");
 }
@@ -451,25 +451,25 @@ export function bookingConfirmEmailHtml(input: {
           footer:       "Kalendar · Online booking for your clinic",
         }
       : {
-          titlePending:   "Confirma tu reserva",
+          titlePending:   "Confirma tu cita",
           titleConfirmed: "tu cita ya está planificada",
           badgePending:   "Pendiente de confirmación",
           badgeConfirmed: "Cita confirmada",
           greeting: clientName ? `${clientName}` : "Hola,",
           greetingSuffix: ", tu cita ya está planificada.",
-          introPending:   `Casi listo. Confirma tu reserva en <strong>${escapeHtml(businessName)}</strong> haciendo clic en el botón.`,
+          introPending:   `Casi listo. Confirma tu cita en <strong>${escapeHtml(businessName)}</strong> haciendo clic en el botón.`,
           service:      "Tipo de cita",
           when:         "Fecha y hora",
           clinic:       "Clínica",
           professional: "Profesional",
-          button:       "Confirmar mi reserva",
+          button:       "Confirmar mi cita",
           manageHeading: "¿Necesitas hacer algún cambio?",
           manageBody:   "Puedes modificar o cancelar tu cita fácilmente desde aquí:",
           manage:       "Gestionar mi cita",
           fallback:     "Si el botón no funciona, copia y pega este enlace en tu navegador:",
-          ignore:       "Si no has hecho esta reserva, puedes ignorar este mensaje.",
+          ignore:       "Si no has solicitado esta cita, puedes ignorar este mensaje.",
           cancelPrefix: "¿Necesitas cancelar?",
-          cancelLink:   "Cancela tu reserva aquí",
+          cancelLink:   "Cancela tu cita aquí",
           thanks:       "Gracias por confiar en nosotros.",
           icsPrefix:    "Para añadir esta cita a tu calendario, ",
           icsLink:      "descarga el archivo adjunto",

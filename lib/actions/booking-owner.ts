@@ -132,7 +132,7 @@ export const confirmBookingAsOwner = authedAction(
 
     const ics = buildBookingIcsBase64({
       uid: bookingId,
-      summary: `${booking.service_name} · ${business.name}`,
+      summary: `${booking.service_name} - ${business.name}`,
       location: formatBusinessAddress(business),
       startIso: booking.starts_at,
       durationMin: booking.service_duration_min,
@@ -143,7 +143,7 @@ export const confirmBookingAsOwner = authedAction(
       subject:
         guestLocale === "en"
           ? `Booking confirmed · ${business.name}`
-          : `Reserva confirmada · ${business.name}`,
+          : `Cita confirmada · ${business.name}`,
       html: bookingConfirmEmailHtml({
         clientName: booking.client_name,
         businessName: business.name,
@@ -282,14 +282,14 @@ export const createBookingAsOwner = authedAction(
       const whenLabel = formatBookingWhen(start.toISOString(), "es");
       const ics = buildBookingIcsBase64({
         uid: token,
-        summary: `${service.name} · ${business.name}`,
+        summary: `${service.name} - ${business.name}`,
         location: formatBusinessAddress(business),
         startIso: start.toISOString(),
         durationMin: service.duration_min,
       });
       await sendEmail({
         to: email,
-        subject: `Reserva confirmada · ${business.name}`,
+        subject: `Cita confirmada · ${business.name}`,
         html: bookingConfirmEmailHtml({
           clientName: name,
           businessName: business.name,

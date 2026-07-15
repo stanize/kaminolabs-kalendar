@@ -288,7 +288,7 @@ export async function submitBooking(input: {
     // Authenticated patient: booking is already confirmed. Send a receipt email.
     const ics = buildBookingIcsBase64({
       uid: token,
-      summary: `${service.name} · ${data.business.name}`,
+      summary: `${service.name} - ${data.business.name}`,
       location: formatBusinessAddress(data.business),
       startIso: start.toISOString(),
       durationMin: service.duration_min,
@@ -298,7 +298,7 @@ export async function submitBooking(input: {
       subject:
         input.guestLocale === "en"
           ? `Booking confirmed · ${data.business.name}`
-          : `Reserva confirmada · ${data.business.name}`,
+          : `Cita confirmada · ${data.business.name}`,
       html: bookingConfirmEmailHtml({
         clientName: name,
         businessName: data.business.name,
@@ -322,7 +322,7 @@ export async function submitBooking(input: {
       subject:
         input.guestLocale === "en"
           ? `Booking request received · ${data.business.name}`
-          : `Solicitud de reserva recibida · ${data.business.name}`,
+          : `Solicitud de cita recibida · ${data.business.name}`,
       html: bookingUnderReviewEmailHtml({
         clientName: name,
         businessName: data.business.name,
@@ -437,7 +437,7 @@ async function notifyOwnerOfBooking(booking: {
   const prefix = owner.emailVerified ? "[Kalendar] " : "";
   await sendEmail({
     to: owner.email,
-    subject: `${prefix}Nueva reserva: ${booking.service_name}`,
+    subject: `${prefix}Nueva cita: ${booking.service_name}`,
     html: ownerBookingNotificationHtml({
       businessName: biz.name,
       serviceName: booking.service_name,
@@ -593,7 +593,7 @@ export async function notifyCancellation(
     subject:
       guestLocale === "en"
         ? `Booking cancelled · ${biz.name}`
-        : `Reserva cancelada · ${biz.name}`,
+        : `Cita cancelada · ${biz.name}`,
     html: bookingCancelledClientHtml({
       clientName: booking.client_name,
       businessName: biz.name,
@@ -615,7 +615,7 @@ export async function notifyCancellation(
       const prefix = owner.emailVerified ? "[Kalendar] " : "";
       await sendEmail({
         to: owner.email,
-        subject: `${prefix}Reserva cancelada: ${booking.service_name}`,
+        subject: `${prefix}Cita cancelada: ${booking.service_name}`,
         html: bookingCancelledOwnerHtml({
           serviceName: booking.service_name,
           whenLabel: ownerWhenLabel,
