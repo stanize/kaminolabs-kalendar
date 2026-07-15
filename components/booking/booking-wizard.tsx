@@ -26,6 +26,20 @@ function jsDowToDayId(dow: number): DayId {
   return (["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as DayId[])[dow];
 }
 
+// "jueves, 11 de junio · 16:45" style — used on the confirmation screen,
+// where the compact time-only slot.label isn't enough context on its own.
+function formatFullDateTime(iso: string, locale: Locale): string {
+  const d = new Date(iso);
+  const datePart = new Intl.DateTimeFormat(locale === "es" ? "es-ES" : "en-GB", {
+    timeZone: "Europe/Madrid", weekday: "long", day: "numeric", month: "long",
+  }).format(d);
+  const timePart = new Intl.DateTimeFormat(locale === "es" ? "es-ES" : "en-GB", {
+    timeZone: "Europe/Madrid", hour: "2-digit", minute: "2-digit", hour12: false,
+  }).format(d);
+  const capitalized = datePart.charAt(0).toUpperCase() + datePart.slice(1);
+  return `${capitalized} · ${timePart}`;
+}
+
 function groupByProvider(slots: SlotDTO[]): { providerId: string | null; providerName: string | null; slots: SlotDTO[] }[] {
   const groups: { providerId: string | null; providerName: string | null; slots: SlotDTO[] }[] = [];
   for (const s of slots) {
@@ -55,9 +69,9 @@ const GoogleIcon = () => (
 );
 
 export function BookingWizard({
-  slug, services, members, openDays, bookingWindowMonths, isTeam, locale, patient, onPatientChange,
+  slug, businessName, services, members, openDays, bookingWindowMonths, isTeam, locale, patient, onPatientChange,
 }: {
-  slug: string; services: Service[]; members: Member[]; openDays: DayId[];
+  slug: string; businessName: string; services: Service[]; members: Member[]; openDays: DayId[];
   bookingWindowMonths: number; isTeam: boolean; locale: Locale;
   patient: PatientInfo | null;
   onPatientChange: (p: PatientInfo | null) => void;
@@ -158,9 +172,33 @@ export function BookingWizard({
           <h2 className="mb-1.5 text-[20px]">
             {doneAsGuest ? w.doneTitleGuest : w.doneTitle}
           </h2>
-          <p className="mx-auto mb-6 max-w-[360px] text-[14px] text-ink-soft">
+          <p className="mx-auto mb-5 max-w-[360px] text-[14px] text-ink-soft">
             {doneAsGuest ? w.doneBodyGuest : w.doneBody}
           </p>
+
+          {service && slot && (
+            <dl className="mx-auto mb-6 flex max-w-[360px] flex-col gap-2.5 rounded-xl bg-surface-2 px-4 py-4 text-left">
+              <div className="flex items-start justify-between gap-3">
+                <dt className="shrink-0 text-[13px] text-ink-soft">{w.doneFieldDate}</dt>
+                <dd className="text-right text-[13.5px] font-semibold text-ink">{formatFullDateTime(slot.startIso, locale)}</dd>
+              </div>
+              <div className="flex items-start justify-between gap-3">
+                <dt className="shrink-0 text-[13px] text-ink-soft">{w.doneFieldClinic}</dt>
+                <dd className="text-right text-[13.5px] font-semibold text-ink">{businessName}</dd>
+              </div>
+              <div className="flex items-start justify-between gap-3">
+                <dt className="shrink-0 text-[13px] text-ink-soft">{w.doneFieldService}</dt>
+                <dd className="text-right text-[13.5px] font-semibold text-ink">{service.name}</dd>
+              </div>
+              {slot.providerName && (
+                <div className="flex items-start justify-between gap-3">
+                  <dt className="shrink-0 text-[13px] text-ink-soft">{w.doneFieldProfessional}</dt>
+                  <dd className="text-right text-[13.5px] font-semibold text-ink">{slot.providerName}</dd>
+                </div>
+              )}
+            </dl>
+          )}
+
           <Btn variant="outline" onClick={reset}>{w.bookAnother}</Btn>
         </div>
       )}
