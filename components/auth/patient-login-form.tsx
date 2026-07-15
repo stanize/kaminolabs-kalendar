@@ -6,7 +6,7 @@ import { authClient, navigateWithFallback } from "@/lib/auth-client";
 import { Icon } from "@/components/ui/icon";
 import { provisionPatient, checkPatientRoleConflict } from "@/lib/actions/patient";
 
-type View = "picker" | "login" | "register" | "roleConfirm";
+type View = "picker" | "register" | "roleConfirm";
 
 function withTimeout<T>(promise: Promise<T>, ms: number, msg: string): Promise<T> {
   return Promise.race([
@@ -258,41 +258,11 @@ export function PatientLoginForm({ redirectTo = "/patient", labels }: PatientLog
           {loading ? L.connecting : L.continueGoogle}
         </button>
 
-        <button
-          type="button"
-          onClick={() => { setError(null); setView("login"); }}
-          className="flex w-full items-center justify-center gap-3 rounded-xl border border-line bg-surface px-5 py-4 text-[15px] font-semibold text-ink shadow-sm transition-all hover:border-brand-line hover:shadow-md"
-        >
-          <Icon name="mail" size={20} className="shrink-0 text-ink-soft" />
-          {L.continueEmail}
-        </button>
-
-        {error && (
-          <p className="rounded-xl bg-error-weak px-3.5 py-2.5 text-[13px] font-medium text-error">{error}</p>
-        )}
-
-        <p className="text-center text-[13px] text-ink-soft">
-          {L.noAccount}{" "}
-          <button type="button" onClick={() => { setError(null); setView("register"); }}
-            className="font-medium text-brand hover:underline">
-            {L.switchToRegister}
-          </button>
-        </p>
-      </div>
-    );
-  }
-
-  if (view === "login") {
-    return (
-      <div className="flex flex-col gap-4">
-        <button
-          type="button"
-          onClick={() => { setView("picker"); setError(null); }}
-          disabled={loading}
-          className="flex items-center gap-1.5 self-start text-[13.5px] font-medium text-ink-soft transition-colors hover:text-ink disabled:opacity-40"
-        >
-          <Icon name="chevronLeft" size={16} /> {L.back}
-        </button>
+        <div className="my-1 flex items-center gap-3">
+          <div className="h-px flex-1 bg-line" />
+          <span className="text-[12px] text-ink-soft">o</span>
+          <div className="h-px flex-1 bg-line" />
+        </div>
 
         <div className="flex flex-col gap-3">
           <input type="email" placeholder={L.emailPlaceholder} value={email}
@@ -312,7 +282,7 @@ export function PatientLoginForm({ redirectTo = "/patient", labels }: PatientLog
 
         <p className="text-center text-[13px] text-ink-soft">
           {L.noAccount}{" "}
-          <button type="button" onClick={() => { setView("register"); setError(null); }}
+          <button type="button" onClick={() => { setError(null); setView("register"); }}
             className="font-medium text-brand hover:underline">
             {L.switchToRegister}
           </button>
@@ -355,7 +325,7 @@ export function PatientLoginForm({ redirectTo = "/patient", labels }: PatientLog
 
       <p className="text-center text-[13px] text-ink-soft">
         {L.haveAccount}{" "}
-        <button type="button" onClick={() => { setView("login"); setError(null); }}
+        <button type="button" onClick={() => { setView("picker"); setError(null); }}
           className="font-medium text-brand hover:underline">
           {L.switchToLogin}
         </button>
