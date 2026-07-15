@@ -138,7 +138,7 @@ export function ownerBookingNotificationHtml(input: {
   providerName?: string | null;
   panelUrl: string;
 }): string {
-  const { serviceName, whenLabel, clientName, clientEmail, clientPhone, providerName, panelUrl } = input;
+  const { businessName, serviceName, whenLabel, clientName, clientEmail, clientPhone, providerName, panelUrl } = input;
   const rows = [
     { label: "Servicio", value: serviceName },
     { label: "Cuándo", value: whenLabel },
@@ -148,9 +148,7 @@ export function ownerBookingNotificationHtml(input: {
     ...(clientPhone ? [{ label: "Teléfono", value: clientPhone }] : []),
   ];
   const body = `
-    <h1 style="font-size:19px;margin:0 0 12px;">Nueva cita</h1>
-    ${emailBadge("Cita confirmada", "success")}
-    <p style="font-size:15px;line-height:1.6;margin:0 0 18px;">Tienes una nueva cita confirmada.</p>
+    <p style="font-size:15px;line-height:1.6;margin:0 0 18px;"><strong>${escapeHtml(businessName)}</strong> tiene una nueva cita.</p>
     ${emailInfoBox(rows)}
     ${emailButton("Ver en mi calendario", panelUrl)}`;
   return emailShell(body, "Kalendar · Reservas y agenda para tu clínica");
