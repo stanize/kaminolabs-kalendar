@@ -87,8 +87,10 @@ export interface BookingPageDictionary {
     doneBodyGuest: string;  // guest: "La clínica revisará tu solicitud..."
     doneFieldDate: string;
     doneFieldClinic: string;
+    doneFieldAddress: string;
     doneFieldService: string;
     doneFieldProfessional: string;
+    doneFieldPatient: string;
     bookAnother: string;
     freeLabel: string;
     minutesUnit: string;
@@ -184,8 +186,10 @@ const es: BookingPageDictionary = {
     doneBodyGuest: "La clínica revisará tu solicitud en las próximas 24 horas. Te enviaremos un email cuando sea confirmada.",
     doneFieldDate: "Fecha y hora",
     doneFieldClinic: "Clínica",
+    doneFieldAddress: "Dirección",
     doneFieldService: "Tipo de cita",
     doneFieldProfessional: "Profesional",
+    doneFieldPatient: "Paciente",
     bookAnother: "Hacer otra reserva",
     freeLabel: "Gratis",
     minutesUnit: "min",
@@ -281,8 +285,10 @@ const en: BookingPageDictionary = {
     doneBodyGuest: "The clinic will review your request within 24 hours. We'll send you an email once it's confirmed.",
     doneFieldDate: "Date and time",
     doneFieldClinic: "Clinic",
+    doneFieldAddress: "Address",
     doneFieldService: "Appointment type",
     doneFieldProfessional: "Professional",
+    doneFieldPatient: "Patient",
     bookAnother: "Make another booking",
     freeLabel: "Free",
     minutesUnit: "min",

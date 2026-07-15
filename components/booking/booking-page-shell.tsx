@@ -116,6 +116,7 @@ export function BookingPageShell({
         <BookingWizard
           slug={slug}
           businessName={business.name}
+          businessAddress={business.address}
           services={services}
           members={members}
           openDays={openDays}

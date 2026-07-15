@@ -69,9 +69,9 @@ const GoogleIcon = () => (
 );
 
 export function BookingWizard({
-  slug, businessName, services, members, openDays, bookingWindowMonths, isTeam, locale, patient, onPatientChange,
+  slug, businessName, businessAddress, services, members, openDays, bookingWindowMonths, isTeam, locale, patient, onPatientChange,
 }: {
-  slug: string; businessName: string; services: Service[]; members: Member[]; openDays: DayId[];
+  slug: string; businessName: string; businessAddress: string; services: Service[]; members: Member[]; openDays: DayId[];
   bookingWindowMonths: number; isTeam: boolean; locale: Locale;
   patient: PatientInfo | null;
   onPatientChange: (p: PatientInfo | null) => void;
@@ -187,6 +187,10 @@ export function BookingWizard({
                 <dd className="text-right text-[13.5px] font-semibold text-ink">{businessName}</dd>
               </div>
               <div className="flex items-start justify-between gap-3">
+                <dt className="shrink-0 text-[13px] text-ink-soft">{w.doneFieldAddress}</dt>
+                <dd className="text-right text-[13.5px] font-semibold text-ink">{businessAddress}</dd>
+              </div>
+              <div className="flex items-start justify-between gap-3">
                 <dt className="shrink-0 text-[13px] text-ink-soft">{w.doneFieldService}</dt>
                 <dd className="text-right text-[13.5px] font-semibold text-ink">{service.name}</dd>
               </div>
@@ -206,6 +210,7 @@ export function BookingWizard({
       {confirmOpen && service && slot && (
         <ConfirmAuthModal
           slug={slug} serviceId={service.id} slot={slot} serviceName={service.name}
+          businessName={businessName} businessAddress={businessAddress}
           locale={locale} dict={dict} patient={patient}
           onPatientChange={onPatientChange}
           onError={setError}
@@ -222,10 +227,11 @@ export function BookingWizard({
 // only appears at the point of confirming an appointment, IKEA-checkout style):
 // "Join Kalendar or sign in" vs "Continue as guest".
 function ConfirmAuthModal({
-  slug, serviceId, slot, serviceName, locale, dict, patient,
+  slug, serviceId, slot, serviceName, businessName, businessAddress, locale, dict, patient,
   onPatientChange, onError, onClose, onDone,
 }: {
   slug: string; serviceId: string; slot: SlotDTO; serviceName: string;
+  businessName: string; businessAddress: string;
   locale: Locale; dict: BookingPageDictionary;
   patient: PatientInfo | null;
   onPatientChange: (p: PatientInfo | null) => void;
@@ -366,13 +372,6 @@ function ConfirmAuthModal({
     onClose();
   }
 
-  // Slot summary shown at the top of the modal.
-  const slotSummary = (
-    <div className="mb-5 rounded-xl bg-surface-2 px-4 py-3 text-[13.5px] text-ink">
-      <span className="font-semibold">{serviceName}</span> · {slot.label}
-    </div>
-  );
-
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4"
@@ -394,11 +393,34 @@ function ConfirmAuthModal({
         {/* Already authenticated — show confirm button. */}
         {patient ? (
           <Section title={am.confirmTitle}>
-            {slotSummary}
-            <div className="mb-4 flex items-center gap-2 rounded-xl bg-brand-weak px-4 py-3 text-[13.5px] text-brand-ink">
-              <Icon name="user" size={15} className="shrink-0" />
-              <span>{patient.name || patient.email}</span>
-            </div>
+            <dl className="mb-5 flex flex-col gap-2.5 rounded-xl bg-surface-2 px-4 py-4 text-left">
+              <div className="flex items-start justify-between gap-3">
+                <dt className="shrink-0 text-[13px] text-ink-soft">{w.doneFieldClinic}</dt>
+                <dd className="text-right text-[13.5px] font-semibold text-ink">{businessName}</dd>
+              </div>
+              <div className="flex items-start justify-between gap-3">
+                <dt className="shrink-0 text-[13px] text-ink-soft">{w.doneFieldAddress}</dt>
+                <dd className="text-right text-[13.5px] font-semibold text-ink">{businessAddress}</dd>
+              </div>
+              <div className="flex items-start justify-between gap-3">
+                <dt className="shrink-0 text-[13px] text-ink-soft">{w.doneFieldDate}</dt>
+                <dd className="text-right text-[13.5px] font-semibold text-ink">{formatFullDateTime(slot.startIso, locale)}</dd>
+              </div>
+              <div className="flex items-start justify-between gap-3">
+                <dt className="shrink-0 text-[13px] text-ink-soft">{w.doneFieldService}</dt>
+                <dd className="text-right text-[13.5px] font-semibold text-ink">{serviceName}</dd>
+              </div>
+              {slot.providerName && (
+                <div className="flex items-start justify-between gap-3">
+                  <dt className="shrink-0 text-[13px] text-ink-soft">{w.doneFieldProfessional}</dt>
+                  <dd className="text-right text-[13.5px] font-semibold text-ink">{slot.providerName}</dd>
+                </div>
+              )}
+              <div className="flex items-start justify-between gap-3">
+                <dt className="shrink-0 text-[13px] text-ink-soft">{w.doneFieldPatient}</dt>
+                <dd className="text-right text-[13.5px] font-semibold text-ink">{patient.name || patient.email}</dd>
+              </div>
+            </dl>
             <Btn onClick={() => submitAuthenticated(patient)} disabled={busy} size="lg" full>
               {busy ? am.confirming : am.confirmButton}
             </Btn>
