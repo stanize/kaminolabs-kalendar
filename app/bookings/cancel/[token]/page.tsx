@@ -1,9 +1,7 @@
 import { Logo } from "@/components/ui/logo";
 import { Icon } from "@/components/ui/icon";
 import { getBookingByToken } from "@/lib/actions/booking";
-import { CancelBookingButton } from "@/components/booking/cancel-booking-button";
 import { getBookingResultDictionary } from "@/lib/i18n/dictionaries/booking-result";
-import { bookingPath } from "@/lib/business/booking-url";
 
 export default async function CancelBookingPage({
   params,
@@ -72,11 +70,9 @@ export default async function CancelBookingPage({
                 <p className="text-ink-soft">{result.booking.providerName}</p>
               )}
             </div>
-            <CancelBookingButton
-              token={token}
-              dict={dict}
-              rescheduleUrl={result.ok ? bookingPath(result.booking.businessSlug) : undefined}
-            />
+            {/* TODO: once the patient portal's guest-profile flow exists, replace
+                this placeholder with real self-serve cancel/modify actions. */}
+            <p className="m-0 text-[14px] leading-relaxed text-ink-soft">{dict.contactClinicBody}</p>
           </>
         )}
       </div>

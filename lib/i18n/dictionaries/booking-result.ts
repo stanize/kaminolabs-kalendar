@@ -22,6 +22,7 @@ export interface BookingResultDictionary {
     tooLateTitle: string;
     tooLateBody: string;
     confirmTitle: string;
+    contactClinicBody: string; // placeholder shown instead of cancel/modify actions until the guest profile flow exists
     confirmButton: string;
     modifyButton: string; // "Modificar fecha" — cancels this slot and returns to the booking page to pick a new one
     cancelling: string;
@@ -45,7 +46,8 @@ const es: BookingResultDictionary = {
     alreadyBody: "Esta reserva ya estaba cancelada.",
     tooLateTitle: "No se puede cancelar",
     tooLateBody: "Esta reserva ya no se puede cancelar.",
-    confirmTitle: "¿Cancelar tu reserva?",
+    confirmTitle: "Tu cita",
+    contactClinicBody: "Para cancelar o modificar tu cita, ponte en contacto directamente con la clínica.",
     confirmButton: "Sí, cancelar reserva",
     modifyButton: "Modificar fecha",
     cancelling: "Cancelando…",
@@ -69,7 +71,8 @@ const en: BookingResultDictionary = {
     alreadyBody: "This booking was already cancelled.",
     tooLateTitle: "Can't be cancelled",
     tooLateBody: "This booking can no longer be cancelled.",
-    confirmTitle: "Cancel your booking?",
+    confirmTitle: "Your appointment",
+    contactClinicBody: "To cancel or change your appointment, please contact the clinic directly.",
     confirmButton: "Yes, cancel booking",
     modifyButton: "Change date",
     cancelling: "Cancelling…",
