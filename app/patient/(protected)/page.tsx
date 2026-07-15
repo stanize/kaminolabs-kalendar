@@ -51,7 +51,7 @@ export default async function PatientDashboardPage() {
     (b) => new Date(b.startsAt) < now || b.status === "cancelled"
   );
 
-  const firstName = session.user.name?.split(" ")[0] ?? "Paciente";
+  const firstName = session.user.name?.split(" ")[0] ?? "Cliente";
 
   return (
     <div className="min-h-screen bg-surface-2">

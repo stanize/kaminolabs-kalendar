@@ -133,9 +133,9 @@ const es: PanelShellDictionary = {
   },
   roleUpgrade: {
     title: "Un momento",
-    body: "Esta cuenta ya existe como cuenta de paciente. Continuar añadirá el rol de clínica a tu cuenta. ¿Quieres continuar?",
+    body: "Esta cuenta ya existe como cuenta de cliente. Continuar añadirá el rol de clínica a tu cuenta. ¿Quieres continuar?",
     yes: "Sí, continuar",
-    no: "No, volver a mi cuenta de paciente",
+    no: "No, volver a mi cuenta de cliente",
   },
 };
 
@@ -196,9 +196,9 @@ const en: PanelShellDictionary = {
   },
   roleUpgrade: {
     title: "One moment",
-    body: "This account already exists as a patient account. Continuing will add the clinic role to your account. Do you want to continue?",
+    body: "This account already exists as a client account. Continuing will add the clinic role to your account. Do you want to continue?",
     yes: "Yes, continue",
-    no: "No, go back to my patient account",
+    no: "No, go back to my client account",
   },
 };
 

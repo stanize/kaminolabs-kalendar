@@ -8,7 +8,7 @@ import { provisionPatient } from "@/lib/actions/patient";
 
 const LABELS = {
   title: "Un momento",
-  body: "Esta cuenta ya existe con otro tipo de acceso. Continuar añadirá el rol de paciente a tu cuenta. ¿Quieres continuar?",
+  body: "Esta cuenta ya existe con otro tipo de acceso. Continuar añadirá el rol de cliente a tu cuenta. ¿Quieres continuar?",
   yes: "Sí, continuar",
   no: "No, cerrar sesión",
 };

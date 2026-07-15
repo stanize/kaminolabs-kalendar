@@ -109,7 +109,7 @@ const DEFAULT_LABELS: PatientLabels = {
   errEmailExists: "Ya existe una cuenta con ese email.",
   errUnexpected: "Error inesperado. Inténtalo de nuevo.",
   roleConfirmTitle: "Un momento",
-  roleConfirmBody: "Esta cuenta ya existe con otro tipo de acceso. Continuar añadirá el rol de paciente a tu cuenta. ¿Quieres continuar?",
+  roleConfirmBody: "Esta cuenta ya existe con otro tipo de acceso. Continuar añadirá el rol de cliente a tu cuenta. ¿Quieres continuar?",
   roleConfirmYes: "Sí, continuar",
   roleConfirmNo: "No, cancelar",
   termsPrefix: "Al continuar aceptas los",

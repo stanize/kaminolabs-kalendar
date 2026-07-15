@@ -71,7 +71,7 @@ export async function provisionPatient(phone?: string): Promise<ProvisionResult>
 
   if (!data) {
     console.error("[provisionPatient] no row found for userId:", userId);
-    return { ok: false, error: "No se pudo crear el perfil de paciente." };
+    return { ok: false, error: "No se pudo crear el perfil de cliente." };
   }
 
   return { ok: true, patientId: data.id };

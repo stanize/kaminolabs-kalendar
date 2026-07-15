@@ -39,7 +39,7 @@ export interface BookingPageDictionary {
     confirmButton: string;
     confirming: string;
     roleConfirmTitle: string;
-    roleConfirmBody: string; // "Iniciar sesión añadirá el rol de paciente a tu cuenta. ¿Continuar?"
+    roleConfirmBody: string; // "Iniciar sesión añadirá el rol de cliente a tu cuenta. ¿Continuar?"
     roleConfirmYes: string;
     roleConfirmNo: string;
   };
@@ -138,7 +138,7 @@ const es: BookingPageDictionary = {
     confirmButton: "Confirmar reserva",
     confirming: "Reservando…",
     roleConfirmTitle: "Un momento",
-    roleConfirmBody: "Esta cuenta ya existe con otro tipo de acceso. Continuar añadirá el rol de paciente a tu cuenta. ¿Quieres continuar?",
+    roleConfirmBody: "Esta cuenta ya existe con otro tipo de acceso. Continuar añadirá el rol de cliente a tu cuenta. ¿Quieres continuar?",
     roleConfirmYes: "Sí, continuar",
     roleConfirmNo: "No, cancelar",
   },
@@ -237,7 +237,7 @@ const en: BookingPageDictionary = {
     confirmButton: "Confirm booking",
     confirming: "Booking…",
     roleConfirmTitle: "One moment",
-    roleConfirmBody: "This account already exists with a different type of access. Continuing will add the patient role to your account. Do you want to continue?",
+    roleConfirmBody: "This account already exists with a different type of access. Continuing will add the client role to your account. Do you want to continue?",
     roleConfirmYes: "Yes, continue",
     roleConfirmNo: "No, cancel",
   },
