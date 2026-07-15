@@ -29,6 +29,8 @@ export interface BookingPageDictionary {
     perk2: string;
     perk3: string;
     joinOrLogin: string; // primary button: "Únete a Kalendar o inicia sesión"
+    registerButton: string; // "Registrarse"
+    signInButton: string; // "Iniciar sesión"
     or: string;
     continueAsGuest: string;
     guestNote: string; // "Si continúas como invitado, la clínica revisará tu solicitud en un plazo de 24 horas."
@@ -120,6 +122,8 @@ const es: BookingPageDictionary = {
     perk2: "Recibe recordatorios automáticos",
     perk3: "Modifica o cancela tus citas fácilmente",
     joinOrLogin: "Únete a Kalendar o inicia sesión",
+    registerButton: "Registrarse",
+    signInButton: "Iniciar sesión",
     or: "o",
     continueAsGuest: "Continuar como invitado",
     guestNote: "Si continúas como invitado, la clínica revisará tu solicitud en un plazo de 24 horas.",
@@ -211,6 +215,8 @@ const en: BookingPageDictionary = {
     perk2: "Get automatic reminders",
     perk3: "Reschedule or cancel your appointments easily",
     joinOrLogin: "Join Kalendar or sign in",
+    registerButton: "Sign up",
+    signInButton: "Sign in",
     or: "or",
     continueAsGuest: "Continue as guest",
     guestNote: "If you continue as a guest, the clinic will review your request within 24 hours.",

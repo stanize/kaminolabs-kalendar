@@ -378,10 +378,16 @@ function ConfirmAuthModal({
               ))}
             </ul>
 
-            <button type="button" onClick={() => setView("login")} disabled={busy}
-              className="w-full rounded-xl bg-brand px-4 py-3.5 text-[14.5px] font-semibold text-white shadow-sm transition-all hover:opacity-90 disabled:opacity-60">
-              {am.joinOrLogin}
-            </button>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => setView("register")} disabled={busy}
+                className="flex-1 rounded-xl bg-brand px-4 py-3.5 text-[14.5px] font-semibold text-white shadow-sm transition-all hover:opacity-90 disabled:opacity-60">
+                {am.registerButton}
+              </button>
+              <button type="button" onClick={() => setView("login")} disabled={busy}
+                className="flex-1 rounded-xl border border-line px-4 py-3.5 text-[14.5px] font-semibold text-ink transition-all hover:border-brand-line hover:bg-brand-weak">
+                {am.signInButton}
+              </button>
+            </div>
 
             <div className="my-4 flex items-center gap-3">
               <div className="h-px flex-1 bg-line" />
