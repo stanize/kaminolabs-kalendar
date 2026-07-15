@@ -332,7 +332,7 @@ function emailBadge(text: string, tone: "success" | "info" | "danger" = "success
 }
 
 function emailInfoBox(
-  rows: { label: string; value: string; icon?: string }[],
+  rows: { label: string; value: string }[],
   tone: "neutral" | "info" = "neutral"
 ): string {
   const colors = tone === "info" ? { bg: "#eff6ff", label: "#1e40af" } : { bg: "#f8fafc", label: "#64748b" };
@@ -340,7 +340,7 @@ function emailInfoBox(
     .map(
       (r, i) => `
       <tr>
-        <td style="padding:${i === 0 ? "0 0 10px" : "10px 0 0"};color:${colors.label};font-size:13.5px;vertical-align:top;white-space:nowrap;">${r.icon ? `${r.icon} ` : ""}${escapeHtml(r.label)}</td>
+        <td style="padding:${i === 0 ? "0 0 10px" : "10px 0 0"};color:${colors.label};font-size:13.5px;font-weight:600;vertical-align:top;white-space:nowrap;">${escapeHtml(r.label)}</td>
         <td style="padding:${i === 0 ? "0 0 10px" : "10px 0 0"};font-size:13.5px;font-weight:600;text-align:right;vertical-align:top;">${escapeHtml(r.value)}</td>
       </tr>`
     )
@@ -409,6 +409,11 @@ export function bookingConfirmEmailHtml(input: {
   providerName?: string | null;
   confirmUrl: string;
   cancelUrl: string;
+  // Destination for the "Gestionar mi cita" button on a CONFIRMED booking.
+  // Authenticated-patient bookings should point at the client portal login
+  // (they have an account); guest bookings without one fall back to cancelUrl
+  // (the tokenized cancel/modify page — no login required).
+  manageUrl?: string;
   locale?: "es" | "en";
   // When true, the booking is already confirmed (authenticated patient).
   // Renders a receipt rather than a "please click to confirm" email.
@@ -418,6 +423,7 @@ export function bookingConfirmEmailHtml(input: {
   hasIcsAttachment?: boolean;
 }): string {
   const { clientName, businessName, serviceName, whenLabel, providerName, confirmUrl, cancelUrl } = input;
+  const manageUrl = input.manageUrl ?? cancelUrl;
   const isConfirmed = input.isConfirmed ?? false;
   const hasIcs = input.hasIcsAttachment ?? false;
   const locale = input.locale ?? "es";
@@ -475,10 +481,10 @@ export function bookingConfirmEmailHtml(input: {
         };
 
   const rows = [
-    { icon: "🕐", label: t.when, value: whenLabel },
-    { icon: "🏥", label: t.clinic, value: businessName },
-    { icon: "🗂️", label: t.service, value: serviceName },
-    ...(providerName ? [{ icon: "👤", label: t.professional, value: providerName }] : []),
+    { label: t.when, value: whenLabel },
+    { label: t.clinic, value: businessName },
+    { label: t.service, value: serviceName },
+    ...(providerName ? [{ label: t.professional, value: providerName }] : []),
   ];
 
   const title = isConfirmed ? t.titleConfirmed : t.titlePending;
@@ -492,7 +498,7 @@ export function bookingConfirmEmailHtml(input: {
     ${emailInfoBox(rows, "info")}
     <p style="font-size:14.5px;line-height:1.6;margin:0 0 2px;font-weight:600;">${t.manageHeading}</p>
     <p style="font-size:14px;line-height:1.6;margin:0 0 14px;color:#475569;">${t.manageBody}</p>
-    ${emailButton(t.manage, cancelUrl)}
+    ${emailButton(t.manage, manageUrl)}
     <p style="font-size:14.5px;line-height:1.6;margin:20px 0 0;">${t.thanks}</p>
     ${hasIcs ? `<p style="font-size:13px;line-height:1.6;color:#64748b;margin:14px 0 0;">${t.icsPrefix}<strong>${t.icsLink}</strong>.</p>` : ""}`;
 

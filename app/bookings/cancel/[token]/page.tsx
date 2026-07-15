@@ -3,6 +3,7 @@ import { Icon } from "@/components/ui/icon";
 import { getBookingByToken } from "@/lib/actions/booking";
 import { CancelBookingButton } from "@/components/booking/cancel-booking-button";
 import { getBookingResultDictionary } from "@/lib/i18n/dictionaries/booking-result";
+import { bookingPath } from "@/lib/business/booking-url";
 
 export default async function CancelBookingPage({
   params,
@@ -71,7 +72,11 @@ export default async function CancelBookingPage({
                 <p className="text-ink-soft">{result.booking.providerName}</p>
               )}
             </div>
-            <CancelBookingButton token={token} dict={dict} />
+            <CancelBookingButton
+              token={token}
+              dict={dict}
+              rescheduleUrl={result.ok ? bookingPath(result.booking.businessSlug) : undefined}
+            />
           </>
         )}
       </div>

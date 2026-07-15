@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { Btn } from "@/components/ui/button";
 import { cancelBookingByToken } from "@/lib/actions/booking";
@@ -9,15 +10,22 @@ import type { BookingResultDictionary } from "@/lib/i18n/dictionaries/booking-re
 export function CancelBookingButton({
   token,
   dict,
+  rescheduleUrl,
 }: {
   token: string;
   dict: BookingResultDictionary["cancel"];
+  // When provided, shows a "Modificar fecha" option above the cancel button —
+  // frees this slot, then sends the guest back to the booking page to pick a
+  // new time. There's no move-booking backend yet, so this is cancel+rebook
+  // done in one click rather than a true reschedule.
+  rescheduleUrl?: string;
 }) {
+  const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function cancel() {
+  async function handleCancel(andReschedule: boolean) {
     setError(null);
     setBusy(true);
     try {
@@ -26,6 +34,10 @@ export function CancelBookingButton({
         setError(res.error);
         setBusy(false);
         return;
+      }
+      if (andReschedule && rescheduleUrl) {
+        router.push(rescheduleUrl);
+        return; // keep the busy state through the navigation
       }
       setDone(true);
     } catch {
@@ -54,7 +66,12 @@ export function CancelBookingButton({
           <span>{error}</span>
         </div>
       )}
-      <Btn onClick={cancel} disabled={busy} full>
+      {rescheduleUrl && (
+        <Btn onClick={() => handleCancel(true)} disabled={busy} full>
+          {busy ? dict.cancelling : dict.modifyButton}
+        </Btn>
+      )}
+      <Btn onClick={() => handleCancel(false)} disabled={busy} full variant={rescheduleUrl ? "outline" : undefined}>
         {busy ? dict.cancelling : dict.confirmButton}
       </Btn>
     </div>

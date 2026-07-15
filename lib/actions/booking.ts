@@ -309,6 +309,9 @@ export async function submitBooking(input: {
         // We pass the cancel URL only so the template can show it.
         confirmUrl: cancelUrl, // unused in the authenticated template variant
         cancelUrl,
+        // "Gestionar mi cita" sends an authenticated patient to their portal
+        // (they have an account), not straight to the guest cancel page.
+        manageUrl: `${base}/patient/login?redirectTo=${encodeURIComponent("/patient/bookings")}`,
         locale: input.guestLocale,
         isConfirmed: true,
         hasIcsAttachment: true,
@@ -457,6 +460,7 @@ export interface BookingSummary {
   whenLabel: string;
   status: BookingStatusLite;
   businessName: string;
+  businessSlug: string;
   providerName: string | null;
   guestLocale: "es" | "en";
 }
@@ -479,7 +483,7 @@ export async function getBookingByToken(token: string): Promise<BookingLookupRes
 
   const { data: biz } = await supabase
     .from("kalendar_businesses")
-    .select("name")
+    .select("name, slug")
     .eq("id", b.business_id)
     .maybeSingle();
 
@@ -500,6 +504,7 @@ export async function getBookingByToken(token: string): Promise<BookingLookupRes
       whenLabel: formatBookingWhen(b.starts_at, b.guest_locale),
       status: b.status as BookingStatusLite,
       businessName: biz?.name ?? "",
+      businessSlug: biz?.slug ?? "",
       providerName,
       guestLocale: b.guest_locale,
     },

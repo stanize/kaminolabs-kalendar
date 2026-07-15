@@ -23,6 +23,7 @@ export interface BookingResultDictionary {
     tooLateBody: string;
     confirmTitle: string;
     confirmButton: string;
+    modifyButton: string; // "Modificar fecha" — cancels this slot and returns to the booking page to pick a new one
     cancelling: string;
     doneTitle: string;
     doneBody: string;
@@ -46,6 +47,7 @@ const es: BookingResultDictionary = {
     tooLateBody: "Esta reserva ya no se puede cancelar.",
     confirmTitle: "¿Cancelar tu reserva?",
     confirmButton: "Sí, cancelar reserva",
+    modifyButton: "Modificar fecha",
     cancelling: "Cancelando…",
     doneTitle: "Reserva cancelada",
     doneBody: "Hemos cancelado tu reserva.",
@@ -69,6 +71,7 @@ const en: BookingResultDictionary = {
     tooLateBody: "This booking can no longer be cancelled.",
     confirmTitle: "Cancel your booking?",
     confirmButton: "Yes, cancel booking",
+    modifyButton: "Change date",
     cancelling: "Cancelling…",
     doneTitle: "Booking cancelled",
     doneBody: "We've cancelled your booking.",
