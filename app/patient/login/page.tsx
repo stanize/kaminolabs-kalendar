@@ -2,9 +2,8 @@ import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import Link from "next/link";
 import { auth } from "@/lib/auth";
-import { Logo } from "@/components/ui/logo";
 import { Icon } from "@/components/ui/icon";
-import { PatientLoginForm } from "@/components/auth/patient-login-form";
+import { PatientAuthCard } from "@/components/auth/patient-auth-card";
 
 export const metadata = { title: "Accede a tu cuenta — Kalendar" };
 
@@ -37,19 +36,7 @@ export default async function PatientLoginPage({
   return (
     <div className="grid min-h-screen items-start justify-items-center bg-surface-2 px-5 pb-12 pt-16 sm:pt-20">
       <div className="w-full max-w-[420px]">
-        <div className="mb-8 flex flex-col items-center gap-3 text-center">
-          <Logo size={22} />
-          <div>
-            <h1 className="text-[24px]">Accede a tu cuenta</h1>
-            <p className="mt-1 text-[15px] text-ink-soft">
-              Gestiona tus reservas y citas
-            </p>
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-line bg-surface p-6 shadow-sm">
-          <PatientLoginForm redirectTo={redirectTo} />
-        </div>
+        <PatientAuthCard redirectTo={redirectTo} />
 
         {backToBooking && (
           <Link

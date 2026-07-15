@@ -119,11 +119,31 @@ const DEFAULT_LABELS: PatientLabels = {
   termsSuffix: "de Kalendar.",
 };
 
-export function PatientLoginForm({ redirectTo = "/patient", labels }: PatientLoginFormProps) {
+export type PatientAuthView = "picker" | "register" | "roleConfirm";
+
+export function patientAuthHeading(view: PatientAuthView): { title: string; subtitle: string } {
+  if (view === "register") {
+    return { title: "Crea tu cuenta gratis", subtitle: "Gestiona tus reservas y citas" };
+  }
+  if (view === "roleConfirm") {
+    return { title: "Un momento", subtitle: "Confirma antes de continuar" };
+  }
+  return { title: "Accede a tu cuenta", subtitle: "Gestiona tus reservas y citas" };
+}
+
+export function PatientLoginForm({
+  redirectTo = "/patient",
+  labels,
+  onViewChange,
+}: PatientLoginFormProps & { onViewChange?: (view: PatientAuthView) => void }) {
   const router = useRouter();
   const L = { ...DEFAULT_LABELS, ...labels };
 
-  const [view, setView] = useState<View>("picker");
+  const [view, setViewRaw] = useState<View>("picker");
+  function setView(v: View) {
+    setViewRaw(v);
+    onViewChange?.(v);
+  }
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
