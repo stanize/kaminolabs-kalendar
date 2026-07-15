@@ -90,7 +90,6 @@ export interface BookingPageDictionary {
     doneFieldAddress: string;
     doneFieldService: string;
     doneFieldProfessional: string;
-    doneFieldPatient: string;
     bookAnother: string;
     freeLabel: string;
     minutesUnit: string;
@@ -189,7 +188,6 @@ const es: BookingPageDictionary = {
     doneFieldAddress: "Dirección",
     doneFieldService: "Tipo de cita",
     doneFieldProfessional: "Profesional",
-    doneFieldPatient: "Paciente",
     bookAnother: "Hacer otra reserva",
     freeLabel: "Gratis",
     minutesUnit: "min",
@@ -288,7 +286,6 @@ const en: BookingPageDictionary = {
     doneFieldAddress: "Address",
     doneFieldService: "Appointment type",
     doneFieldProfessional: "Professional",
-    doneFieldPatient: "Patient",
     bookAnother: "Make another booking",
     freeLabel: "Free",
     minutesUnit: "min",

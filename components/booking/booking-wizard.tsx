@@ -416,10 +416,6 @@ function ConfirmAuthModal({
                   <dd className="text-right text-[13.5px] font-semibold text-ink">{slot.providerName}</dd>
                 </div>
               )}
-              <div className="flex items-start justify-between gap-3">
-                <dt className="shrink-0 text-[13px] text-ink-soft">{w.doneFieldPatient}</dt>
-                <dd className="text-right text-[13.5px] font-semibold text-ink">{patient.name || patient.email}</dd>
-              </div>
             </dl>
             <Btn onClick={() => submitAuthenticated(patient)} disabled={busy} size="lg" full>
               {busy ? am.confirming : am.confirmButton}
