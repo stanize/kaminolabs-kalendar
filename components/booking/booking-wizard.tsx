@@ -378,13 +378,13 @@ function ConfirmAuthModal({
               ))}
             </ul>
 
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2">
               <button type="button" onClick={() => setView("register")} disabled={busy}
-                className="flex-1 rounded-xl bg-brand px-4 py-3.5 text-[14.5px] font-semibold text-white shadow-sm transition-all hover:opacity-90 disabled:opacity-60">
+                className="w-full rounded-xl bg-brand px-4 py-3.5 text-[14.5px] font-semibold text-white shadow-sm transition-all hover:opacity-90 disabled:opacity-60">
                 {am.registerButton}
               </button>
               <button type="button" onClick={() => setView("login")} disabled={busy}
-                className="flex-1 rounded-xl border border-line px-4 py-3.5 text-[14.5px] font-semibold text-ink transition-all hover:border-brand-line hover:bg-brand-weak">
+                className="w-full rounded-xl border border-brand-line px-4 py-3.5 text-[14.5px] font-semibold text-brand transition-all hover:bg-brand-weak">
                 {am.signInButton}
               </button>
             </div>
