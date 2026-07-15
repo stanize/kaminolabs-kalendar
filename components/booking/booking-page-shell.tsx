@@ -73,22 +73,16 @@ export function BookingPageShell({
   return (
     <div className="min-h-screen bg-surface-2 px-5 py-10">
       <div className="mx-auto w-full max-w-[560px]">
-        {/* Top bar: language switcher + returning patient link */}
+        {/* Top bar: language switcher + account/sign-in link */}
         <div className="mb-4 flex items-center justify-between">
           {patient ? (
-            <span className="flex items-center gap-2 text-[13px] text-ink-soft">
-              <span className="flex items-center gap-1.5">
-                <Icon name="user" size={14} />
-                {patient.name || patient.email}
-              </span>
-              <button
-                type="button"
-                onClick={handleSignOut}
-                className="text-brand hover:underline"
-              >
-                {dict.header.signOut}
-              </button>
-            </span>
+            <Link
+              href="/patient"
+              className="flex items-center gap-1.5 text-[13px] font-medium text-brand hover:underline"
+            >
+              <Icon name="user" size={14} />
+              {dict.header.myAccount}
+            </Link>
           ) : (
             <Link
               href={`/patient/login?redirectTo=${encodeURIComponent(bookingPath(slug))}`}
@@ -128,9 +122,24 @@ export function BookingPageShell({
         />
 
         {/* Footer */}
-        <div className="mt-6 flex items-center justify-center gap-1.5 text-[12px] text-ink-soft">
-          <span>{dict.header.poweredBy}</span>
-          <Logo size={14} />
+        <div className="mt-6 flex flex-col items-center gap-2">
+          <div className="flex items-center justify-center gap-1.5 text-[12px] text-ink-soft">
+            <span>{dict.header.poweredBy}</span>
+            <Logo size={14} />
+          </div>
+          {patient && (
+            <p className="flex items-center gap-1.5 text-[12px] text-ink-soft">
+              <span>{patient.name || patient.email}</span>
+              <span aria-hidden="true">·</span>
+              <button
+                type="button"
+                onClick={handleSignOut}
+                className="text-brand hover:underline"
+              >
+                {dict.header.signOut}
+              </button>
+            </p>
+          )}
         </div>
       </div>
     </div>

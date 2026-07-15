@@ -20,6 +20,7 @@ export interface BookingPageDictionary {
   header: {
     poweredBy: string; // "Reservas con" — footer line before the Kalendar logo
     signOut: string; // link shown next to the signed-in patient's name
+    myAccount: string; // top-bar link for a signed-in patient, e.g. "Mi cuenta"
   };
   authModal: {
     close: string; // aria-label for the X button
@@ -118,6 +119,7 @@ const es: BookingPageDictionary = {
   header: {
     poweredBy: "Reservas con",
     signOut: "¿No eres tú? Cerrar sesión",
+    myAccount: "Mi cuenta",
   },
   authModal: {
     close: "Cerrar",
@@ -216,6 +218,7 @@ const en: BookingPageDictionary = {
   header: {
     poweredBy: "Booking by",
     signOut: "Not you? Sign out",
+    myAccount: "My account",
   },
   authModal: {
     close: "Close",
