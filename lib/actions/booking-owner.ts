@@ -7,6 +7,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getBusinessForUser } from "@/lib/business/data";
 import { notifyCancellation } from "@/lib/actions/booking";
 import { getWeekBookings, type WeekViewBooking } from "@/lib/booking/owner-data";
+import { buildBookingIcsBase64 } from "@/lib/booking/ics";
+import { formatBusinessAddress } from "@/lib/business/data";
 import {
   sendEmail,
   formatBookingWhen,
@@ -103,7 +105,7 @@ export const confirmBookingAsOwner = authedAction(
     const { data: booking } = await supabase
       .from("kalendar_bookings")
       .select(
-        "id, status, business_id, team_member_id, service_name, starts_at, client_name, client_email, guest_locale"
+        "id, status, business_id, team_member_id, service_name, service_duration_min, starts_at, client_name, client_email, guest_locale"
       )
       .eq("id", bookingId)
       .eq("business_id", business.id)
@@ -128,6 +130,14 @@ export const confirmBookingAsOwner = authedAction(
     const whenLabel = formatBookingWhen(booking.starts_at, guestLocale);
     const base = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/+$/, "");
 
+    const ics = buildBookingIcsBase64({
+      uid: bookingId,
+      summary: `${booking.service_name} · ${business.name}`,
+      location: formatBusinessAddress(business),
+      startIso: booking.starts_at,
+      durationMin: booking.service_duration_min,
+    });
+
     await sendEmail({
       to: booking.client_email,
       subject:
@@ -143,7 +153,9 @@ export const confirmBookingAsOwner = authedAction(
         cancelUrl: `${base}/bookings/cancel/${bookingId}`,
         locale: guestLocale,
         isConfirmed: true,
+        hasIcsAttachment: true,
       }),
+      attachments: [{ filename: "cita-kalendar.ics", content: ics }],
     });
 
     revalidatePath("/panel/calendar");
@@ -268,6 +280,13 @@ export const createBookingAsOwner = authedAction(
     if (wantsEmail) {
       const base = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/+$/, "");
       const whenLabel = formatBookingWhen(start.toISOString(), "es");
+      const ics = buildBookingIcsBase64({
+        uid: token,
+        summary: `${service.name} · ${business.name}`,
+        location: formatBusinessAddress(business),
+        startIso: start.toISOString(),
+        durationMin: service.duration_min,
+      });
       await sendEmail({
         to: email,
         subject: `Reserva confirmada · ${business.name}`,
@@ -280,7 +299,9 @@ export const createBookingAsOwner = authedAction(
           cancelUrl: `${base}/bookings/cancel/${token}`,
           locale: "es",
           isConfirmed: true,
+          hasIcsAttachment: true,
         }),
+        attachments: [{ filename: "cita-kalendar.ics", content: ics }],
       });
     }
 

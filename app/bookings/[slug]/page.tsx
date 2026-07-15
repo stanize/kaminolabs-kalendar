@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { headers } from "next/headers";
 import { getPublicBookingData } from "@/lib/booking/data";
+import { formatBusinessAddress } from "@/lib/business/data";
 import { WEEKDAY_ORDER } from "@/lib/availability/constants";
 import { BookingPageShell } from "@/components/booking/booking-page-shell";
 import { auth } from "@/lib/auth";
@@ -56,12 +57,8 @@ export default async function BusinessPublicPage({
 
   // Single-line display address for the booking page header — replaces the
   // business-type/city line, which isn't very useful to a patient deciding
-  // whether to book. Kept as plain formatting here rather than a DB column
-  // since it's just a presentation concern over existing address_* fields.
-  const addressLine = [
-    `${business.address_street} ${business.address_number}${business.address_additional ? `, ${business.address_additional}` : ""}`,
-    business.city,
-  ].join(" · ");
+  // whether to book.
+  const addressLine = formatBusinessAddress(business);
 
   return (
     <BookingPageShell

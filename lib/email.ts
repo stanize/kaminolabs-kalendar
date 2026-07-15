@@ -17,6 +17,8 @@ type SendEmailInput = {
   to: string;
   subject: string;
   html: string;
+  /** Base64-encoded file content, e.g. from buildBookingIcsBase64(). */
+  attachments?: { filename: string; content: string }[];
 };
 
 export type SendEmailResult =
@@ -25,7 +27,7 @@ export type SendEmailResult =
 
 const DEFAULT_FROM = "Kalendar <onboarding@resend.dev>";
 
-export async function sendEmail({ to, subject, html }: SendEmailInput): Promise<SendEmailResult> {
+export async function sendEmail({ to, subject, html, attachments }: SendEmailInput): Promise<SendEmailResult> {
   const apiKey = process.env.RESEND_API_KEY;
   const from   = process.env.EMAIL_FROM ?? DEFAULT_FROM;
 
@@ -44,7 +46,10 @@ export async function sendEmail({ to, subject, html }: SendEmailInput): Promise<
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ from, to: [to], subject, html }),
+      body: JSON.stringify({
+        from, to: [to], subject, html,
+        ...(attachments && attachments.length > 0 ? { attachments } : {}),
+      }),
     });
 
     const payload = await res.json().catch(() => null);
@@ -328,18 +333,22 @@ function emailBadge(text: string, tone: "success" | "info" | "danger" = "success
     </div>`;
 }
 
-function emailInfoBox(rows: { label: string; value: string }[]): string {
+function emailInfoBox(
+  rows: { label: string; value: string; icon?: string }[],
+  tone: "neutral" | "info" = "neutral"
+): string {
+  const colors = tone === "info" ? { bg: "#eff6ff", label: "#1e40af" } : { bg: "#f8fafc", label: "#64748b" };
   const cells = rows
     .map(
       (r, i) => `
       <tr>
-        <td style="padding:${i === 0 ? "0 0 10px" : "10px 0 0"};color:#64748b;font-size:13.5px;vertical-align:top;">${escapeHtml(r.label)}</td>
+        <td style="padding:${i === 0 ? "0 0 10px" : "10px 0 0"};color:${colors.label};font-size:13.5px;vertical-align:top;white-space:nowrap;">${r.icon ? `${r.icon} ` : ""}${escapeHtml(r.label)}</td>
         <td style="padding:${i === 0 ? "0 0 10px" : "10px 0 0"};font-size:13.5px;font-weight:600;text-align:right;vertical-align:top;">${escapeHtml(r.value)}</td>
       </tr>`
     )
     .join("");
   return `
-    <table style="width:100%;border-collapse:collapse;background:#f8fafc;border-radius:14px;margin:0 0 24px;">
+    <table style="width:100%;border-collapse:collapse;background:${colors.bg};border-radius:14px;margin:0 0 24px;">
       <tr><td style="padding:18px 20px;">
         <table style="width:100%;border-collapse:collapse;"><tbody>${cells}</tbody></table>
       </td></tr>
@@ -406,78 +415,99 @@ export function bookingConfirmEmailHtml(input: {
   // When true, the booking is already confirmed (authenticated patient).
   // Renders a receipt rather than a "please click to confirm" email.
   isConfirmed?: boolean;
+  // Whether an .ics calendar file is attached to this email — shows a note
+  // pointing the client at the attachment when true.
+  hasIcsAttachment?: boolean;
 }): string {
   const { clientName, businessName, serviceName, whenLabel, providerName, confirmUrl, cancelUrl } = input;
   const isConfirmed = input.isConfirmed ?? false;
+  const hasIcs = input.hasIcsAttachment ?? false;
   const locale = input.locale ?? "es";
   const t =
     locale === "en"
       ? {
           titlePending:   "Confirm your booking",
-          titleConfirmed: "Booking confirmed!",
+          titleConfirmed: "your appointment is booked",
           badgePending:   "Awaiting confirmation",
           badgeConfirmed: "Booking confirmed",
-          greeting: clientName ? `Hi ${escapeHtml(clientName)},` : "Hi,",
+          greeting: clientName ? `${clientName}` : "Hi,",
+          greetingSuffix: ", your appointment is booked.",
           introPending:   `Almost there. Confirm your booking at <strong>${escapeHtml(businessName)}</strong> by clicking the button below.`,
-          introConfirmed: `Your booking at <strong>${escapeHtml(businessName)}</strong> is confirmed. See you soon!`,
-          service:      "Service",
-          when:         "When",
+          service:      "Appointment type",
+          when:         "Date and time",
           clinic:       "Clinic",
           professional: "Professional",
           button:       "Confirm my booking",
+          manageHeading: "Need to make a change?",
+          manageBody:   "You can modify or cancel your appointment easily from here:",
           manage:       "Manage my booking",
           fallback:     "If the button doesn't work, copy and paste this link into your browser:",
           ignore:       "If you didn't make this booking, you can ignore this message.",
           cancelPrefix: "Need to cancel or reschedule?",
           cancelLink:   "Manage your booking here",
+          thanks:       "Thank you for trusting us.",
+          icsPrefix:    "To add this appointment to your calendar, ",
+          icsLink:      "download the attached file",
           footer:       "Kalendar · Online booking for your clinic",
         }
       : {
           titlePending:   "Confirma tu reserva",
-          titleConfirmed: "¡Tu cita ya está confirmada!",
+          titleConfirmed: "tu cita ya está planificada",
           badgePending:   "Pendiente de confirmación",
           badgeConfirmed: "Cita confirmada",
-          greeting: clientName ? `Hola ${escapeHtml(clientName)},` : "Hola,",
+          greeting: clientName ? `${clientName}` : "Hola,",
+          greetingSuffix: ", tu cita ya está planificada.",
           introPending:   `Casi listo. Confirma tu reserva en <strong>${escapeHtml(businessName)}</strong> haciendo clic en el botón.`,
-          introConfirmed: `Tu cita en <strong>${escapeHtml(businessName)}</strong> está confirmada. ¡Te esperamos!`,
-          service:      "Servicio",
+          service:      "Tipo de cita",
           when:         "Fecha y hora",
           clinic:       "Clínica",
           professional: "Profesional",
           button:       "Confirmar mi reserva",
+          manageHeading: "¿Necesitas hacer algún cambio?",
+          manageBody:   "Puedes modificar o cancelar tu cita fácilmente desde aquí:",
           manage:       "Gestionar mi cita",
           fallback:     "Si el botón no funciona, copia y pega este enlace en tu navegador:",
           ignore:       "Si no has hecho esta reserva, puedes ignorar este mensaje.",
-          cancelPrefix: "¿Necesitas hacer algún cambio?",
-          cancelLink:   "Gestiona tu cita aquí",
+          cancelPrefix: "¿Necesitas cancelar?",
+          cancelLink:   "Cancela tu reserva aquí",
+          thanks:       "Gracias por confiar en nosotros.",
+          icsPrefix:    "Para añadir esta cita a tu calendario, ",
+          icsLink:      "descarga el archivo adjunto",
           footer:       "Kalendar · Reservas online para tu clínica",
         };
 
   const rows = [
-    { label: t.when, value: whenLabel },
-    { label: t.clinic, value: businessName },
-    { label: t.service, value: serviceName },
-    ...(providerName ? [{ label: t.professional, value: providerName }] : []),
+    { icon: "🕐", label: t.when, value: whenLabel },
+    { icon: "🏥", label: t.clinic, value: businessName },
+    { icon: "🗂️", label: t.service, value: serviceName },
+    ...(providerName ? [{ icon: "👤", label: t.professional, value: providerName }] : []),
   ];
 
   const title = isConfirmed ? t.titleConfirmed : t.titlePending;
-  const intro = isConfirmed ? t.introConfirmed : t.introPending;
   const badge = isConfirmed
     ? emailBadge(t.badgeConfirmed, "success")
     : emailBadge(t.badgePending, "info");
 
-  const body = `
+  const confirmedBody = `
+    <p style="font-size:15px;line-height:1.6;margin:0 0 18px;"><strong>${escapeHtml(t.greeting)}</strong>${t.greetingSuffix}</p>
+    ${badge}
+    ${emailInfoBox(rows, "info")}
+    <p style="font-size:14.5px;line-height:1.6;margin:0 0 2px;font-weight:600;">${t.manageHeading}</p>
+    <p style="font-size:14px;line-height:1.6;margin:0 0 14px;color:#475569;">${t.manageBody}</p>
+    ${emailButton(t.manage, cancelUrl)}
+    <p style="font-size:14.5px;line-height:1.6;margin:20px 0 0;">${t.thanks}</p>
+    ${hasIcs ? `<p style="font-size:13px;line-height:1.6;color:#64748b;margin:14px 0 0;">${t.icsPrefix}<strong>${t.icsLink}</strong>.</p>` : ""}`;
+
+  const pendingBody = `
     <h1 style="font-size:19px;margin:0 0 12px;">${title}</h1>
     ${badge}
-    <p style="font-size:15px;line-height:1.6;margin:0 0 6px;">${t.greeting}</p>
-    <p style="font-size:15px;line-height:1.6;margin:0 0 20px;">${intro}</p>
+    <p style="font-size:15px;line-height:1.6;margin:0 0 6px;">${clientName ? `Hola ${escapeHtml(clientName)},` : "Hola,"}</p>
+    <p style="font-size:15px;line-height:1.6;margin:0 0 20px;">${t.introPending}</p>
     ${emailInfoBox(rows)}
-    ${!isConfirmed ? `
-      ${emailButton(t.button, confirmUrl)}
-      ${emailFallbackLink(t.fallback, confirmUrl)}
-      <p style="font-size:12.5px;line-height:1.6;color:#94a3b8;margin:0 0 18px;">${t.ignore}</p>
-    ` : emailButton(t.manage, cancelUrl)}
-    ${isConfirmed ? "" : emailSecondaryLine(t.cancelPrefix, t.cancelLink, cancelUrl)}`;
+    ${emailButton(t.button, confirmUrl)}
+    ${emailFallbackLink(t.fallback, confirmUrl)}
+    <p style="font-size:12.5px;line-height:1.6;color:#94a3b8;margin:0 0 18px;">${t.ignore}</p>
+    ${emailSecondaryLine(t.cancelPrefix, t.cancelLink, cancelUrl)}`;
 
-  return emailShell(body, t.footer);
+  return emailShell(isConfirmed ? confirmedBody : pendingBody, t.footer);
 }

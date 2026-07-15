@@ -3,6 +3,8 @@
 import { randomBytes } from "crypto";
 import { createClient } from "@/lib/supabase/server";
 import { getPublicBookingData, getTakenIntervals } from "@/lib/booking/data";
+import { buildBookingIcsBase64 } from "@/lib/booking/ics";
+import { formatBusinessAddress } from "@/lib/business/data";
 import {
   sendEmail,
   bookingConfirmEmailHtml,
@@ -284,6 +286,13 @@ export async function submitBooking(input: {
 
   if (isAuthenticated) {
     // Authenticated patient: booking is already confirmed. Send a receipt email.
+    const ics = buildBookingIcsBase64({
+      uid: token,
+      summary: `${service.name} · ${data.business.name}`,
+      location: formatBusinessAddress(data.business),
+      startIso: start.toISOString(),
+      durationMin: service.duration_min,
+    });
     await sendEmail({
       to: email,
       subject:
@@ -302,7 +311,9 @@ export async function submitBooking(input: {
         cancelUrl,
         locale: input.guestLocale,
         isConfirmed: true,
+        hasIcsAttachment: true,
       }),
+      attachments: [{ filename: "cita-kalendar.ics", content: ics }],
     });
   } else {
     // Guest booking: send "under review" email — clinic has 24h to confirm.

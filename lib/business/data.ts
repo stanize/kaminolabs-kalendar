@@ -31,6 +31,20 @@ export interface Business {
   created_at: string;
 }
 
+/**
+ * Single-line display address, e.g. "Calle Mayor 5, 2D · Madrid". Used on the
+ * public booking page header and in booking confirmation emails/ICS files —
+ * kept as one shared formatter so both stay in sync.
+ */
+export function formatBusinessAddress(
+  business: Pick<Business, "address_street" | "address_number" | "address_additional" | "city">
+): string {
+  return [
+    `${business.address_street} ${business.address_number}${business.address_additional ? `, ${business.address_additional}` : ""}`,
+    business.city,
+  ].join(" · ");
+}
+
 const BUSINESS_TABLE = "kalendar_businesses";
 const BUSINESS_COLUMNS =
   "id, owner_id, name, type, legal_id, address_street, address_number, address_additional, city, address_postal_code, address_province, address_country, phone_country_code, phone_number, contact_email, slug, slug_status, slug_flag_reason, slug_reviewed_at, brand_color, team_mode, booking_window_months, onboarding_completed_at, created_at";
