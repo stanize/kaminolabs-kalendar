@@ -71,6 +71,11 @@ interface PatientLabels {
   roleConfirmBody: string;
   roleConfirmYes: string;
   roleConfirmNo: string;
+  termsPrefix: string;
+  terms: string;
+  termsAnd: string;
+  privacy: string;
+  termsSuffix: string;
 }
 
 const DEFAULT_LABELS: PatientLabels = {
@@ -107,6 +112,11 @@ const DEFAULT_LABELS: PatientLabels = {
   roleConfirmBody: "Esta cuenta ya existe con otro tipo de acceso. Continuar añadirá el rol de paciente a tu cuenta. ¿Quieres continuar?",
   roleConfirmYes: "Sí, continuar",
   roleConfirmNo: "No, cancelar",
+  termsPrefix: "Al continuar aceptas los",
+  terms: "términos",
+  termsAnd: "y la",
+  privacy: "política de privacidad",
+  termsSuffix: "de Kalendar.",
 };
 
 export function PatientLoginForm({ redirectTo = "/patient", labels }: PatientLoginFormProps) {
@@ -303,6 +313,22 @@ export function PatientLoginForm({ redirectTo = "/patient", labels }: PatientLog
         <Icon name="chevronLeft" size={16} /> {L.back}
       </button>
 
+      <button
+        type="button"
+        onClick={handleGoogle}
+        disabled={loading}
+        className="flex w-full items-center justify-center gap-3 rounded-xl border border-line bg-surface px-5 py-4 text-[15px] font-semibold text-ink shadow-sm transition-all hover:border-brand-line hover:shadow-md disabled:cursor-wait disabled:opacity-60"
+      >
+        <GoogleIcon />
+        {loading ? L.connecting : L.continueGoogle}
+      </button>
+
+      <div className="flex items-center gap-3">
+        <div className="h-px flex-1 bg-line" />
+        <span className="text-[12px] text-ink-soft">o</span>
+        <div className="h-px flex-1 bg-line" />
+      </div>
+
       <div className="flex flex-col gap-3">
         <input type="text" placeholder={L.namePlaceholder} value={name}
           onChange={(e) => setName(e.target.value)} disabled={loading} className={inputClass} />
@@ -322,6 +348,14 @@ export function PatientLoginForm({ redirectTo = "/patient", labels }: PatientLog
       {error && (
         <p className="rounded-xl bg-error-weak px-3.5 py-2.5 text-[13px] font-medium text-error">{error}</p>
       )}
+
+      <p className="text-center text-[12px] leading-[1.5] text-ink-soft">
+        {L.termsPrefix}{" "}
+        <a href="#" className="underline hover:text-ink">{L.terms}</a>{" "}
+        {L.termsAnd}{" "}
+        <a href="#" className="underline hover:text-ink">{L.privacy}</a>{" "}
+        {L.termsSuffix}
+      </p>
 
       <p className="text-center text-[13px] text-ink-soft">
         {L.haveAccount}{" "}
