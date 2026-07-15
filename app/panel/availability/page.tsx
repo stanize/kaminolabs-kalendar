@@ -34,7 +34,12 @@ export default async function AvailabilityPage({
         <p className="text-[15px] text-ink-soft">{dict.page.subtitle}</p>
       </div>
 
+      {/* key=hasSavedHours forces a full remount when the user saves zero
+          franjas and router.refresh() flips hasSavedHours true→false.
+          Without this, useState never reinitializes on re-render and the
+          wizard stays at "review" until the user navigates away and back. */}
       <AvailabilityManager
+        key={String(hasSavedHours)}
         dict={dict}
         initialWeek={week}
         hasSavedHours={hasSavedHours}
