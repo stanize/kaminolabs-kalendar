@@ -121,7 +121,7 @@ export async function GET(request: Request) {
       if (owner?.email) {
         await sendEmail({
           to: owner.email,
-          subject: `Reserva caducada: ${booking.service_name}`,
+          subject: `[Kalendar] Reserva caducada: ${booking.service_name}`,
           html: bookingCancelledOwnerHtml({
             serviceName: booking.service_name,
             whenLabel: ownerWhenLabel,

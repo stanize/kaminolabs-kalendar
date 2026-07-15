@@ -434,7 +434,7 @@ async function notifyOwnerOfBooking(booking: {
   const base = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/+$/, "");
   await sendEmail({
     to: owner.email,
-    subject: `Nueva reserva: ${booking.service_name}`,
+    subject: `[Kalendar] Nueva reserva: ${booking.service_name}`,
     html: ownerBookingNotificationHtml({
       businessName: biz.name,
       serviceName: booking.service_name,
@@ -611,7 +611,7 @@ export async function notifyCancellation(
     if (owner?.email) {
       await sendEmail({
         to: owner.email,
-        subject: `Reserva cancelada: ${booking.service_name}`,
+        subject: `[Kalendar] Reserva cancelada: ${booking.service_name}`,
         html: bookingCancelledOwnerHtml({
           serviceName: booking.service_name,
           whenLabel: ownerWhenLabel,
