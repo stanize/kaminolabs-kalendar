@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { Btn } from "@/components/ui/button";
@@ -75,6 +75,15 @@ export function AvailabilityManager({
   const [saving, setSaving] = useState(false);
   const [checking, setChecking] = useState(false);
   const [conflicts, setConflicts] = useState<ConflictingBooking[] | null>(null);
+
+  // Snapshot of what's actually saved, so the confirm button stays disabled
+  // until the owner changes something relative to it.
+  const savedWeekRef = useRef(normalize(initialWeek));
+  const savedWindowRef = useRef(bookingWindowMonths || 1);
+  const isDirty = useMemo(
+    () => JSON.stringify(week) !== JSON.stringify(savedWeekRef.current) || windowMonths !== savedWindowRef.current,
+    [week, windowMonths]
+  );
   // Full-screen save overlay (shared setup-page pattern): gray out while
   // saving, flash success, then redirect/refresh. Replaces the old inline
   // "saved" banner.
@@ -211,6 +220,8 @@ export function AvailabilityManager({
         setOverlay(null);
         return;
       }
+      savedWeekRef.current = week;
+      savedWindowRef.current = windowMonths;
       flashSuccessThen(() => {
         // First-time setup from the home flow -> return to Inicio. Keep the
         // overlay up through the redirect so this page never flashes through.
@@ -357,7 +368,7 @@ export function AvailabilityManager({
                       {wz.back}
                     </Btn>
                   )}
-                  <Btn onClick={handleSave} disabled={saving || checking} size="lg">
+                  <Btn onClick={handleSave} disabled={saving || checking || (!isFirstSetup && !isDirty)} size="lg">
                     {saving ? m.confirming : checking ? m.checkingConflicts : isFirstSetup ? wz.finishButton : m.confirmButton}
                   </Btn>
                 </div>
