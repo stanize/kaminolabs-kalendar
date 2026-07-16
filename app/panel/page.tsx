@@ -148,6 +148,8 @@ export default async function PanelHomePage() {
             title={h.bookingPageTitle}
             viewPageLabel={h.viewPage}
             downloadQrLabel={h.downloadQr}
+            qrModalTitle={h.qrModalTitle}
+            closeLabel={h.close}
           />
         )}
 

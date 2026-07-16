@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import QRCode from "qrcode";
 import { Icon } from "@/components/ui/icon";
@@ -13,6 +13,8 @@ export function BookingPageCard({
   title,
   viewPageLabel,
   downloadQrLabel,
+  qrModalTitle,
+  closeLabel,
 }: {
   slug: string;
   bookingPath: string;
@@ -20,26 +22,30 @@ export function BookingPageCard({
   title: string;
   viewPageLabel: string;
   downloadQrLabel: string;
+  qrModalTitle: string;
+  closeLabel: string;
 }) {
-  const [generating, setGenerating] = useState(false);
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+  const [showModal, setShowModal] = useState(false);
 
-  const handleDownloadQr = async () => {
-    setGenerating(true);
-    try {
-      const dataUrl = await QRCode.toDataURL(bookingUrl, {
-        width: 800,
-        margin: 2,
-        color: { dark: "#0f172a", light: "#ffffff" },
-      });
-      const a = document.createElement("a");
-      a.href = dataUrl;
-      a.download = `qr-${slug}.png`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-    } finally {
-      setGenerating(false);
-    }
+  useEffect(() => {
+    let cancelled = false;
+    QRCode.toDataURL(bookingUrl, {
+      width: 640,
+      margin: 2,
+      color: { dark: "#0f172a", light: "#ffffff" },
+    }).then((url) => { if (!cancelled) setQrDataUrl(url); });
+    return () => { cancelled = true; };
+  }, [bookingUrl]);
+
+  const handleDownload = () => {
+    if (!qrDataUrl) return;
+    const a = document.createElement("a");
+    a.href = qrDataUrl;
+    a.download = `qr-${slug}.png`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
   };
 
   return (
@@ -56,12 +62,55 @@ export function BookingPageCard({
         <Icon name="externalLink" size={14} />
       </Link>
 
-      <div className="mt-3">
-        <Btn variant="outline" size="sm" full onClick={handleDownloadQr} disabled={generating}>
-          <Icon name="qrCode" size={14} />
+      <div className="mt-3 flex items-center gap-3">
+        <button
+          onClick={() => qrDataUrl && setShowModal(true)}
+          aria-label={downloadQrLabel}
+          className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-lg border border-line bg-white hover:border-brand-line"
+        >
+          {qrDataUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element -- small client-generated data: URL, no benefit from next/image
+            <img src={qrDataUrl} alt={qrModalTitle} className="h-full w-full" />
+          ) : (
+            <div className="h-full w-full animate-pulse bg-surface-2" />
+          )}
+        </button>
+        <button
+          onClick={() => qrDataUrl && setShowModal(true)}
+          className="text-[13px] font-medium text-ink-soft hover:text-ink"
+        >
           {downloadQrLabel}
-        </Btn>
+        </button>
       </div>
+
+      {showModal && qrDataUrl && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
+          onClick={() => setShowModal(false)}
+        >
+          <div
+            className="w-full max-w-[360px] rounded-2xl bg-surface p-5 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-[16px] font-bold text-ink">{qrModalTitle}</h2>
+              <button
+                onClick={() => setShowModal(false)}
+                aria-label={closeLabel}
+                className="grid h-8 w-8 place-items-center rounded-lg text-ink-soft hover:bg-surface-2"
+              >
+                <Icon name="x" size={16} />
+              </button>
+            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element -- small client-generated data: URL, no benefit from next/image */}
+            <img src={qrDataUrl} alt={qrModalTitle} className="mx-auto h-64 w-64 rounded-lg border border-line" />
+            <p className="mt-3 truncate text-center text-[12.5px] text-ink-soft">{bookingUrl}</p>
+            <Btn variant="outline" size="sm" full className="mt-4" onClick={handleDownload}>
+              <Icon name="qrCode" size={14} /> {downloadQrLabel}
+            </Btn>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

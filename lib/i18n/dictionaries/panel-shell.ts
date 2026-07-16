@@ -53,6 +53,8 @@ export interface PanelShellDictionary {
     bookingPageTitle: string;
     viewPage: string;
     downloadQr: string; // "Descargar código QR" button on the booking-page tile
+    qrModalTitle: string; // title of the QR-preview modal
+    close: string; // generic close-modal aria-label
     quickAccess: string;
   };
   verification: {
@@ -117,6 +119,8 @@ const es: PanelShellDictionary = {
     bookingPageTitle: "Tu página de reservas",
     viewPage: "Ver página",
     downloadQr: "Descargar código QR",
+    qrModalTitle: "Código QR de tu página de reservas",
+    close: "Cerrar",
     quickAccess: "Accesos rápidos",
   },
   verification: {
@@ -181,6 +185,8 @@ const en: PanelShellDictionary = {
     bookingPageTitle: "Your booking page",
     viewPage: "View page",
     downloadQr: "Download QR code",
+    qrModalTitle: "QR code for your booking page",
+    close: "Close",
     quickAccess: "Quick access",
   },
   verification: {

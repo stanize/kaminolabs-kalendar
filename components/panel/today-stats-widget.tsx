@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Icon } from "@/components/ui/icon";
 import type { CalendarDictionary } from "@/lib/i18n/dictionaries/calendar";
 
@@ -9,7 +10,10 @@ export function TodayStatsWidget({
   dict: CalendarDictionary["widget"];
 }) {
   return (
-    <div className="flex items-center gap-4 rounded-2xl border border-line bg-surface px-5 py-4">
+    <Link
+      href="/panel/calendar"
+      className="flex items-center gap-4 rounded-2xl border border-line bg-surface px-5 py-4 transition-colors hover:border-brand-line"
+    >
       <div className="flex items-center gap-2">
         <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-brand-weak text-brand">
           <Icon name="calendar" size={17} />
@@ -20,7 +24,7 @@ export function TodayStatsWidget({
       </div>
       <div className="h-8 w-px bg-line" />
       <Stat value={totalToday} label={dict.appointmentsLabel} />
-    </div>
+    </Link>
   );
 }
 
