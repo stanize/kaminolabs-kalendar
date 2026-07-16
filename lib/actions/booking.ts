@@ -228,18 +228,31 @@ export async function submitBooking(input: {
 
   const isTeam = data.business.team_mode === "team";
 
+  const supabase = await createClient();
+
   // The client now picks an explicit (provider, time) — even on the "Cualquiera"
   // path each slot is a concrete provider. So a team booking must carry a valid
-  // member id; solo bookings carry none.
+  // member id. Solo businesses still have exactly one kalendar_team_members row
+  // (the owner, seeded via ensureOwnerSeeded) — attribute the booking to it
+  // rather than leaving team_member_id null, since the panel's week-grid view
+  // only renders a booking under a provider column when it matches a real
+  // member id (see panel-calendar module / calendar-week-view.tsx).
   let teamMemberId: string | null = null;
   if (isTeam) {
     if (!input.providerId || !data.members.some((m) => m.id === input.providerId)) {
       return { ok: false, error: t.errInvalidProvider };
     }
     teamMemberId = input.providerId;
+  } else {
+    const { data: soloMember } = await supabase
+      .from("kalendar_team_members")
+      .select("id")
+      .eq("business_id", data.business.id)
+      .eq("is_owner", true)
+      .maybeSingle();
+    teamMemberId = soloMember?.id ?? null;
   }
 
-  const supabase = await createClient();
   const token = randomBytes(24).toString("base64url");
   const isAuthenticated = !!input.patientId;
 
