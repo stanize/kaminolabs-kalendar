@@ -37,7 +37,7 @@ The public-facing booking wizard clients use to book an appointment.
 - DB tables: `kalendar_bookings` (write path), reads `kalendar_businesses`, `kalendar_services`, `kalendar_team_members`, `kalendar_business_hours`
 - i18n: `lib/i18n/dictionaries/booking-page.ts`, `booking-result.ts`
 - Depends on shared infra: email (`lib/email.ts` — confirm/cancel/owner-notify emails), auth (patient login step inside wizard)
-- Gotchas: `lib/business/booking-url.ts` is SHARED with panel-business (booking link display) — changes here affect both. Timezone hardcoded `Europe/Madrid` in `lib/booking/slots.ts`.
+- Gotchas: `lib/business/booking-url.ts` is SHARED with panel-business (booking link display) — changes here affect both. Timezone hardcoded `Europe/Madrid` in `lib/booking/slots.ts`. `ConfirmAuthModal` inside `booking-wizard.tsx` is a SEPARATE, self-contained login/register implementation — it does NOT use `components/auth/patient-login-form.tsx`, so any change to the shared patient login (e.g. forgot-password link, error copy) must be mirrored here by hand. Its forgot-password link does a hard `window.location.href` nav (not a soft `<Link>`) to `/forgot-password?from=patient&redirectTo=<current booking page path>` — computed inside the click handler, not render body, since this is SSR'd and `window` isn't available server-side.
 
 ---
 

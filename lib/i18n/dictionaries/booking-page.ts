@@ -55,6 +55,7 @@ export interface BookingPageDictionary {
     or: string;
     signIn: string;
     signingIn: string;
+    forgotPasswordLink: string;
     createAccount: string;
     creatingAccount: string;
     noAccount: string; // "¿No tienes cuenta?"
@@ -154,6 +155,7 @@ const es: BookingPageDictionary = {
     or: "o",
     signIn: "Iniciar sesión",
     signingIn: "Accediendo…",
+    forgotPasswordLink: "¿Olvidaste tu contraseña?",
     createAccount: "Crear cuenta",
     creatingAccount: "Creando cuenta…",
     noAccount: "¿No tienes cuenta?",
@@ -253,6 +255,7 @@ const en: BookingPageDictionary = {
     or: "or",
     signIn: "Sign in",
     signingIn: "Signing in…",
+    forgotPasswordLink: "Forgot your password?",
     createAccount: "Create account",
     creatingAccount: "Creating account…",
     noAccount: "Don't have an account?",
