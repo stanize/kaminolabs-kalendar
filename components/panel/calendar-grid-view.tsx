@@ -275,12 +275,14 @@ function DayProviderColumn({
         {day.isToday && <span className="mt-0.5 h-1 w-1 rounded-full bg-brand" />}
       </div>
       <div
-        className="relative cursor-pointer bg-surface hover:bg-surface-2/40"
+        className="relative cursor-pointer bg-surface-2/50 hover:bg-surface-2/70"
         style={{ height: gridHeight }}
         onClick={handleClick}
         title={dict.week.addAppointment}
       >
-        {/* Working-hours shading */}
+        {/* Working-hours = bookable free time: lighter surface on top of the
+            muted outside-hours base, so the whole schedule (not just booked
+            slots) is visible and free time reads as clearly clickable. */}
         {ranges.map((r, i) => {
           const [sh, sm] = r.start.split(":").map(Number);
           const [eh, em] = r.end.split(":").map(Number);
@@ -289,7 +291,7 @@ function DayProviderColumn({
           return (
             <div
               key={i}
-              className="pointer-events-none absolute left-0 right-0 bg-brand-weak/25"
+              className="pointer-events-none absolute left-0 right-0 bg-surface"
               style={{ top, height }}
             />
           );
