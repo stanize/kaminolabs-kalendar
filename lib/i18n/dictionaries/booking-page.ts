@@ -118,7 +118,7 @@ export interface BookingPageDictionary {
 const es: BookingPageDictionary = {
   header: {
     poweredBy: "Reservas con",
-    signOut: "¿No eres tú? Cerrar sesión",
+    signOut: "Cerrar sesión",
     myAccount: "Mi cuenta",
   },
   authModal: {
@@ -217,7 +217,7 @@ const es: BookingPageDictionary = {
 const en: BookingPageDictionary = {
   header: {
     poweredBy: "Booking by",
-    signOut: "Not you? Sign out",
+    signOut: "Sign out",
     myAccount: "My account",
   },
   authModal: {
