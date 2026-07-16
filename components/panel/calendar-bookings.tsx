@@ -186,7 +186,15 @@ export function CalendarBookings({
     else navigateTo("month", addMonthsInTz(focusDate, 1));
   };
   const handleToday = () => navigateTo(view, new Date());
-  const handleViewChange = (v: CalendarViewMode) => navigateTo(v, focusDate);
+  const handleViewChange = (v: CalendarViewMode) => {
+    if (v === "day" && view === "week") {
+      const now = new Date();
+      const isTodayInRange = now >= range.start && now < range.end;
+      navigateTo("day", isTodayInRange ? now : focusDate);
+      return;
+    }
+    navigateTo(v, focusDate);
+  };
 
   const handleSelectDay = (year: number, month: number, day: number) => {
     navigateTo("day", zonedTimeToUtc(year, month, day, 12, 0));
