@@ -40,7 +40,6 @@ export default async function CalendarPage() {
         </div>
         <TodayStatsWidget
           totalToday={todayStats.totalToday}
-          freeSlotsToday={todayStats.freeSlotsToday}
           dict={dict.widget}
         />
       </div>

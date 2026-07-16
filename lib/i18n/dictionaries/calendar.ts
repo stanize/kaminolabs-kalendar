@@ -38,13 +38,17 @@ export interface CalendarDictionary {
     errCancelFailed: string;
   };
   week: {
-    prevWeek: string; // aria-label for the "previous week" nav button
-    nextWeek: string; // aria-label for the "next week" nav button
+    prevLabel: string; // aria-label for the "previous" nav button — same button for day/week/month
+    nextLabel: string; // aria-label for the "next" nav button
     today: string; // "Hoy" jump-to-today button
     allProviders: string; // "Todos" filter option
     noProviders: string; // shown when a solo business has somehow no team member seeded
     addAppointment: string; // tooltip/aria-label on an empty slot
     weekRangeTemplate: string; // "{from} – {to}", {from}/{to} pre-formatted date strings
+    viewDay: string; // Day/Week/Month dropdown option
+    viewWeek: string;
+    viewMonth: string;
+    moreTemplate: string; // "+{n} más" overflow chip on a month-grid day cell, {n} replaced client-side
   };
   modal: {
     title: string; // "Nueva cita"
@@ -78,7 +82,6 @@ export interface CalendarDictionary {
   widget: {
     title: string; // "Hoy"
     appointmentsLabel: string; // "Citas"
-    freeSlotsLabel: string; // "Huecos libres"
   };
   // Intl.DateTimeFormat locale tag for day-heading formatting (e.g. "es-ES").
   intlLocale: string;
@@ -114,13 +117,17 @@ const es: CalendarDictionary = {
     errCancelFailed: "No se pudo cancelar la reserva.",
   },
   week: {
-    prevWeek: "Semana anterior",
-    nextWeek: "Semana siguiente",
+    prevLabel: "Anterior",
+    nextLabel: "Siguiente",
     today: "Hoy",
     allProviders: "Todos",
     noProviders: "Añade a tu equipo en Equipo para ver la semana.",
     addAppointment: "Añadir cita",
     weekRangeTemplate: "{from} – {to}",
+    viewDay: "Día",
+    viewWeek: "Semana",
+    viewMonth: "Mes",
+    moreTemplate: "+{n} más",
   },
   modal: {
     title: "Nueva cita",
@@ -153,7 +160,6 @@ const es: CalendarDictionary = {
   widget: {
     title: "Hoy",
     appointmentsLabel: "Citas",
-    freeSlotsLabel: "Huecos libres",
   },
   intlLocale: "es-ES",
 };
@@ -188,13 +194,17 @@ const en: CalendarDictionary = {
     errCancelFailed: "Couldn't cancel the booking.",
   },
   week: {
-    prevWeek: "Previous week",
-    nextWeek: "Next week",
+    prevLabel: "Previous",
+    nextLabel: "Next",
     today: "Today",
     allProviders: "All",
     noProviders: "Add team members under Team to see the week view.",
     addAppointment: "Add appointment",
     weekRangeTemplate: "{from} – {to}",
+    viewDay: "Day",
+    viewWeek: "Week",
+    viewMonth: "Month",
+    moreTemplate: "+{n} more",
   },
   modal: {
     title: "New appointment",
@@ -227,7 +237,6 @@ const en: CalendarDictionary = {
   widget: {
     title: "Today",
     appointmentsLabel: "Appointments",
-    freeSlotsLabel: "Free slots",
   },
   intlLocale: "en-GB",
 };

@@ -236,7 +236,7 @@ export async function submitBooking(input: {
   // (the owner, seeded via ensureOwnerSeeded) — attribute the booking to it
   // rather than leaving team_member_id null, since the panel's week-grid view
   // only renders a booking under a provider column when it matches a real
-  // member id (see panel-calendar module / calendar-week-view.tsx).
+  // member id (see panel-calendar module / calendar-grid-view.tsx).
   let teamMemberId: string | null = null;
   if (isTeam) {
     if (!input.providerId || !data.members.some((m) => m.id === input.providerId)) {

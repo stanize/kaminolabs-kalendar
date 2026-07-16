@@ -1,15 +1,18 @@
 "use client";
 
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Icon } from "@/components/ui/icon";
-import { fetchWeekBookings } from "@/lib/actions/booking-owner";
-import { AppointmentModal, type SlotSelection } from "@/components/panel/appointment-modal";
 import type { CalendarDictionary } from "@/lib/i18n/dictionaries/calendar";
 import type { DayId } from "@/lib/onboarding/types";
+import { AppointmentModal, type SlotSelection } from "@/components/panel/appointment-modal";
+import {
+  TZ,
+  tzDateParts,
+  dayIdInTz,
+  zonedTimeToUtc,
+  minutesInTz,
+} from "@/lib/calendar/client-date";
 
-const TZ = "Europe/Madrid";
-const DAY_ORDER: DayId[] = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 const PX_PER_MIN = 1.1; // grid vertical scale
 const DEFAULT_START_MIN = 8 * 60; // 08:00 fallback when no hours are set
 const DEFAULT_END_MIN = 20 * 60; // 20:00 fallback
@@ -47,60 +50,7 @@ export interface WeekServiceVM {
   price: number;
 }
 
-// ── Madrid-tz date helpers (duplicated from lib/booking/slots.ts on purpose:
-// that file is server-only and can't be imported into a client component) ──
-
-function tzDateParts(date: Date): { year: number; month: number; day: number } {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit",
-  }).formatToParts(date);
-  const get = (t: string) => Number(parts.find((p) => p.type === t)?.value);
-  return { year: get("year"), month: get("month"), day: get("day") };
-}
-
-function dayIdInTz(date: Date): DayId {
-  const wd = new Intl.DateTimeFormat("en-US", { timeZone: TZ, weekday: "short" }).format(date);
-  const map: Record<string, DayId> = {
-    Sun: "sun", Mon: "mon", Tue: "tue", Wed: "wed", Thu: "thu", Fri: "fri", Sat: "sat",
-  };
-  return map[wd] ?? "mon";
-}
-
-function zonedTimeToUtc(year: number, month: number, day: number, hh: number, mm: number): Date {
-  const utcGuess = Date.UTC(year, month - 1, day, hh, mm, 0);
-  const asUtc = new Date(utcGuess);
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit",
-    hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
-  }).formatToParts(asUtc);
-  const get = (t: string) => Number(parts.find((p) => p.type === t)?.value);
-  const shownUtc = Date.UTC(get("year"), get("month") - 1, get("day"), get("hour"), get("minute"), get("second"));
-  const offset = shownUtc - utcGuess;
-  return new Date(utcGuess - offset);
-}
-
-function minutesInTz(date: Date): number {
-  const parts = new Intl.DateTimeFormat("en-GB", {
-    timeZone: TZ, hour: "2-digit", minute: "2-digit", hour12: false,
-  }).formatToParts(date);
-  const h = Number(parts.find((p) => p.type === "hour")?.value ?? 0);
-  const m = Number(parts.find((p) => p.type === "minute")?.value ?? 0);
-  return h * 60 + m;
-}
-
-/** UTC instant for the Monday 00:00 (Madrid) of the week containing `date`. */
-function mondayStart(date: Date): Date {
-  const dId = dayIdInTz(date);
-  const idx = DAY_ORDER.indexOf(dId);
-  const { year, month, day } = tzDateParts(date);
-  // Anchor at UTC noon of the calendar day — stable across DST, safe to shift by whole days.
-  const anchor = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
-  anchor.setUTCDate(anchor.getUTCDate() - idx);
-  const mp = tzDateParts(anchor);
-  return zonedTimeToUtc(mp.year, mp.month, mp.day, 0, 0);
-}
-
-interface WeekDay {
+export interface GridDay {
   year: number;
   month: number;
   day: number;
@@ -109,20 +59,27 @@ interface WeekDay {
   isToday: boolean;
 }
 
-function buildWeekDays(mondayUtc: Date, intlLocale: string): WeekDay[] {
-  const days: WeekDay[] = [];
+function timeLabel(iso: string): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: TZ, hour: "2-digit", minute: "2-digit", hour12: false,
+  }).format(new Date(iso));
+}
+
+export function buildGridDays(startUtc: Date, count: number, intlLocale: string): GridDay[] {
+  const days: GridDay[] = [];
   const todayKey = tzDateParts(new Date());
-  for (let i = 0; i < 7; i++) {
-    const anchor = new Date(mondayUtc);
+  for (let i = 0; i < count; i++) {
+    const anchor = new Date(startUtc);
     anchor.setUTCHours(anchor.getUTCHours() + 12); // move to local noon-ish for stable date math
     anchor.setUTCDate(anchor.getUTCDate() + i);
     const { year, month, day } = tzDateParts(anchor);
-    const dayId = DAY_ORDER[i];
+    const noonUtc = zonedTimeToUtc(year, month, day, 12, 0);
     const label = new Intl.DateTimeFormat(intlLocale, {
       timeZone: TZ, weekday: "short", day: "numeric",
-    }).format(zonedTimeToUtc(year, month, day, 12, 0));
+    }).format(noonUtc);
     days.push({
-      year, month, day, dayId,
+      year, month, day,
+      dayId: dayIdInTz(noonUtc),
       dateLabel: label,
       isToday: year === todayKey.year && month === todayKey.month && day === todayKey.day,
     });
@@ -130,48 +87,38 @@ function buildWeekDays(mondayUtc: Date, intlLocale: string): WeekDay[] {
   return days;
 }
 
-function timeLabel(iso: string): string {
-  return new Intl.DateTimeFormat("en-GB", {
-    timeZone: TZ, hour: "2-digit", minute: "2-digit", hour12: false,
-  }).format(new Date(iso));
-}
-
-export function CalendarWeekView({
+export function CalendarGridView({
+  view,
+  days,
   members,
   hoursByDay,
   services,
-  initialBookings,
-  initialWeekStartIso,
+  bookings,
   dict,
+  onBookingCreated,
 }: {
+  view: "day" | "week";
+  days: GridDay[];
   members: WeekMemberVM[];
   hoursByDay: Partial<Record<DayId, TimeRangeVM[]>>;
   services: WeekServiceVM[];
-  initialBookings: WeekBookingVM[];
-  initialWeekStartIso: string;
+  bookings: WeekBookingVM[];
   dict: CalendarDictionary;
+  onBookingCreated: () => void;
 }) {
   const router = useRouter();
   const w = dict.week;
-  const [weekStartIso, setWeekStartIso] = useState(initialWeekStartIso);
-  const [bookings, setBookings] = useState(initialBookings);
-  const [loading, setLoading] = useState(false);
   const [modalSlot, setModalSlot] = useState<SlotSelection | null>(null);
 
-  const weekStartDate = useMemo(() => new Date(weekStartIso), [weekStartIso]);
-  const weekDays = useMemo(
-    () => buildWeekDays(weekStartDate, dict.intlLocale),
-    [weekStartDate, dict.intlLocale]
-  );
-
-  // Grid vertical span: widest working-hours window across the week, with a
-  // sane fallback so an empty schedule still renders a usable grid.
+  // Grid vertical span: widest working-hours window across the displayed
+  // days, with a sane fallback so an empty schedule still renders a usable grid.
   const { gridStartMin, gridEndMin } = useMemo(() => {
     let min = DEFAULT_START_MIN;
     let max = DEFAULT_END_MIN;
     let found = false;
-    for (const ranges of Object.values(hoursByDay)) {
-      for (const r of ranges ?? []) {
+    const relevantDays = view === "day" ? [days[0]?.dayId].filter(Boolean) : Object.keys(hoursByDay);
+    for (const dayId of relevantDays as DayId[]) {
+      for (const r of hoursByDay[dayId] ?? []) {
         const [sh, sm] = r.start.split(":").map(Number);
         const [eh, em] = r.end.split(":").map(Number);
         const s = sh * 60 + sm, e = eh * 60 + em;
@@ -180,7 +127,7 @@ export function CalendarWeekView({
       }
     }
     return { gridStartMin: min, gridEndMin: Math.max(max, min + 60) };
-  }, [hoursByDay]);
+  }, [hoursByDay, days, view]);
 
   const gridHeight = (gridEndMin - gridStartMin) * PX_PER_MIN;
   const hourMarks = useMemo(() => {
@@ -191,33 +138,7 @@ export function CalendarWeekView({
     return marks;
   }, [gridStartMin, gridEndMin]);
 
-  const goToWeek = useCallback(async (newMondayUtc: Date) => {
-    setLoading(true);
-    const newStartIso = newMondayUtc.toISOString();
-    const newEnd = new Date(newMondayUtc);
-    newEnd.setUTCDate(newEnd.getUTCDate() + 7);
-    try {
-      const fresh = await fetchWeekBookings(newStartIso, newEnd.toISOString());
-      setWeekStartIso(newStartIso);
-      setBookings(fresh);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const handlePrevWeek = () => {
-    const prev = new Date(weekStartDate);
-    prev.setUTCDate(prev.getUTCDate() - 7);
-    goToWeek(prev);
-  };
-  const handleNextWeek = () => {
-    const next = new Date(weekStartDate);
-    next.setUTCDate(next.getUTCDate() + 7);
-    goToWeek(next);
-  };
-  const handleToday = () => goToWeek(mondayStart(new Date()));
-
-  const handleSlotClick = (day: WeekDay, member: WeekMemberVM, clickMinute: number) => {
+  const handleSlotClick = (day: GridDay, member: WeekMemberVM, clickMinute: number) => {
     const rounded = Math.round(clickMinute / 15) * 15;
     const hh = Math.floor(rounded / 60);
     const mm = rounded % 60;
@@ -235,13 +156,9 @@ export function CalendarWeekView({
 
   const handleCreated = () => {
     setModalSlot(null);
-    goToWeek(weekStartDate);
+    onBookingCreated();
     router.refresh();
   };
-
-  const rangeLabel = w.weekRangeTemplate
-    .replace("{from}", weekDays[0]?.dateLabel ?? "")
-    .replace("{to}", weekDays[6]?.dateLabel ?? "");
 
   if (members.length === 0) {
     return (
@@ -253,35 +170,8 @@ export function CalendarWeekView({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1">
-          <button
-            onClick={handlePrevWeek}
-            aria-label={w.prevWeek}
-            className="grid h-8 w-8 place-items-center rounded-lg text-ink-soft hover:bg-surface-2"
-          >
-            <Icon name="chevronLeft" size={16} />
-          </button>
-          <button
-            onClick={handleNextWeek}
-            aria-label={w.nextWeek}
-            className="grid h-8 w-8 place-items-center rounded-lg text-ink-soft hover:bg-surface-2"
-          >
-            <Icon name="chevronRight" size={16} />
-          </button>
-          <button
-            onClick={handleToday}
-            className="ml-1 rounded-lg px-2.5 py-1.5 text-[12.5px] font-semibold text-ink-soft hover:bg-surface-2"
-          >
-            {w.today}
-          </button>
-          <span className="ml-2 text-[13.5px] font-semibold capitalize text-ink">{rangeLabel}</span>
-        </div>
-        {loading && <span className="text-[12px] text-ink-soft">…</span>}
-      </div>
-
       <div className="overflow-x-auto rounded-2xl border border-line bg-surface">
-        <div className="flex min-w-[900px]">
+        <div className={`flex ${view === "week" ? "min-w-[900px]" : "min-w-[420px]"}`}>
           {/* Time gutter */}
           <div className="w-14 shrink-0 border-r border-line">
             <div className="h-12 border-b border-line" />
@@ -299,7 +189,7 @@ export function CalendarWeekView({
           </div>
 
           {/* Day columns */}
-          {weekDays.map((day) => {
+          {days.map((day) => {
             const ranges = hoursByDay[day.dayId] ?? [];
             return (
               <div key={`${day.year}-${day.month}-${day.day}`} className="flex flex-1 border-r border-line last:border-r-0">
@@ -351,7 +241,7 @@ function DayProviderColumn({
   dict,
   onSlotClick,
 }: {
-  day: WeekDay;
+  day: GridDay;
   member: WeekMemberVM;
   members: WeekMemberVM[];
   ranges: TimeRangeVM[];
@@ -360,7 +250,7 @@ function DayProviderColumn({
   gridEndMin: number;
   gridHeight: number;
   dict: CalendarDictionary;
-  onSlotClick: (day: WeekDay, member: WeekMemberVM, clickMinute: number) => void;
+  onSlotClick: (day: GridDay, member: WeekMemberVM, clickMinute: number) => void;
 }) {
   const dayBookings = bookings.filter((b) => {
     if (b.teamMemberId !== member.id) return false;
