@@ -170,7 +170,7 @@ export function CalendarGridView({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="overflow-x-auto rounded-2xl border border-line bg-surface">
+      <div className="overflow-x-auto overflow-y-visible rounded-2xl border border-line bg-surface">
         <div className={`flex ${view === "week" ? "min-w-[900px]" : "min-w-[420px]"}`}>
           {/* Time gutter */}
           <div className="w-14 shrink-0 border-r border-line">
