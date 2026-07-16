@@ -303,7 +303,7 @@ export function PatientLoginForm({
           <input type="password" placeholder={L.passwordPlaceholder} value={password}
             onChange={(e) => setPassword(e.target.value)} disabled={loading}
             onKeyDown={(e) => e.key === "Enter" && handleLogin()} className={inputClass} />
-          <div className="flex justify-end">
+          <div className="flex justify-start">
             <Link
               href={`/forgot-password?from=patient${redirectTo ? `&redirectTo=${encodeURIComponent(redirectTo)}` : ""}`}
               className="text-[12.5px] font-medium text-brand hover:underline"

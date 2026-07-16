@@ -70,8 +70,8 @@ export function ResetPasswordForm({
   if (success) {
     return (
       <div className="flex flex-col items-center gap-3 text-center">
-        <p className="text-[14px] font-medium text-ink">{dict.successTitle}</p>
-        <p className="text-[12.5px] leading-[1.5] text-ink-soft">{dict.successBody}</p>
+        <h1 className="text-[17px] font-medium text-ink">{dict.successTitle}</h1>
+        <p className="text-[12.5px] text-ink-soft">{dict.successBody}</p>
         <button
           type="button"
           onClick={() => navigateWithFallback(router, successHref)}
@@ -85,6 +85,11 @@ export function ResetPasswordForm({
 
   return (
     <div className="flex flex-col gap-3">
+      <div className="mb-2 flex flex-col items-center gap-1 text-center">
+        <h1 className="text-[17px] font-medium">{dict.title}</h1>
+        <p className="text-[12.5px] text-ink-soft">{dict.subtitle}</p>
+      </div>
+
       <div className="flex flex-col gap-2">
         <input
           type="password"

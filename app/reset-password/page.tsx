@@ -45,15 +45,10 @@ export default async function ResetPasswordPage({
           <Link href="/" aria-label="Kalendar — volver al inicio" className="mb-1.5">
             <Logo size={18} showText={false} />
           </Link>
-          {invalid ? (
+          {invalid && (
             <>
               <h1 className="text-[17px] font-medium">{dict.resetPassword.invalidTokenTitle}</h1>
               <p className="text-[12.5px] text-ink-soft">{dict.resetPassword.invalidTokenBody}</p>
-            </>
-          ) : (
-            <>
-              <h1 className="text-[17px] font-medium">{dict.resetPassword.title}</h1>
-              <p className="text-[12.5px] text-ink-soft">{dict.resetPassword.subtitle}</p>
             </>
           )}
         </div>

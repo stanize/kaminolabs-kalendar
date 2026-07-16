@@ -93,7 +93,7 @@ export function LoginForm({ dict }: { dict: AuthDict }) {
           onKeyDown={(e) => e.key === "Enter" && handleEmailLogin()}
           className={inputClass}
         />
-        <div className="flex justify-end">
+        <div className="flex justify-start">
           <Link href="/forgot-password" className="text-[11.5px] font-medium text-brand hover:underline">
             {dict.forgotPasswordLink}
           </Link>
