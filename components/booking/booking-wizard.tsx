@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Icon } from "@/components/ui/icon";
 import { Logo } from "@/components/ui/logo";
 import { Btn } from "@/components/ui/button";
@@ -93,6 +93,17 @@ export function BookingWizard({
     setStep("service"); setService(null); setProviderId(null);
     setSlot(null); setError(null); setConfirmOpen(false);
   }
+
+  // If the patient signs out (e.g. via the footer "Cerrar sesión" link) while
+  // sitting on a stale screen — most notably the "done" confirmation — reset
+  // the wizard back to the start. Only fires on a true -> null transition, so
+  // it never interferes with the confirm modal's own sign-in flow (null ->
+  // truthy happens there while a booking submission is still in flight).
+  const wasPatientRef = useRef(false);
+  useEffect(() => {
+    if (wasPatientRef.current && !patient) reset();
+    wasPatientRef.current = !!patient;
+  }, [patient]);
 
   function chooseService(s: Service) {
     setService(s); setError(null);
