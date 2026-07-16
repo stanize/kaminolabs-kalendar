@@ -32,6 +32,7 @@ import {
   Paperclip,
   Send,
   Pencil,
+  QrCode,
   type LucideIcon,
 } from "lucide-react";
 
@@ -69,6 +70,7 @@ export const ICONS: Record<string, LucideIcon> = {
   paperclip: Paperclip,
   send: Send,
   pencil: Pencil,
+  qrCode: QrCode,
 };
 
 export function Icon({

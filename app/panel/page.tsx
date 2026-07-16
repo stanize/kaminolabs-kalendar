@@ -1,16 +1,16 @@
 import { Icon } from "@/components/ui/icon";
-import { Btn } from "@/components/ui/button";
 import Link from "next/link";
 import { requireSession } from "@/lib/auth-session";
 import { getSetupProgress } from "@/lib/business/data";
 import { getPreferredName } from "@/lib/account/data";
-import { bookingPath, bookingUrlDisplay } from "@/lib/business/booking-url";
+import { bookingPath, bookingUrl } from "@/lib/business/booking-url";
 import { SetupCompleteBanner } from "@/components/panel/setup-complete-banner";
 import { EditableGreetingName } from "@/components/panel/editable-greeting-name";
 import { getPanelShellServerDictionary, getLocale } from "@/lib/i18n/server";
 import { getTodayStats } from "@/lib/booking/owner-data";
 import { getCalendarDictionary } from "@/lib/i18n/dictionaries/calendar";
 import { TodayStatsWidget } from "@/components/panel/today-stats-widget";
+import { BookingPageCard } from "@/components/panel/booking-page-card";
 
 export default async function PanelHomePage() {
   const session = await requireSession();
@@ -137,23 +137,18 @@ export default async function PanelHomePage() {
 
       {/* Widget tile grid — Hoy/Citas comes first (top-left); more widgets
           get added here later, each as its own tile alongside it. */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <TodayStatsWidget totalToday={totalToday} dict={calendarDict.widget} />
 
         {business?.slug && (
-          <div className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
-            <p className="mb-1 text-[12px] font-bold uppercase tracking-[.05em] text-ink-soft">
-              {h.bookingPageTitle}
-            </p>
-            <p className="mb-3 truncate text-[14px] font-semibold text-ink">
-              {bookingUrlDisplay(business.slug)}
-            </p>
-            <Link href={bookingPath(business.slug)} target="_blank">
-              <Btn variant="outline" size="sm" full>
-                <Icon name="externalLink" size={14} /> {h.viewPage}
-              </Btn>
-            </Link>
-          </div>
+          <BookingPageCard
+            slug={business.slug}
+            bookingPath={bookingPath(business.slug)}
+            bookingUrl={bookingUrl(business.slug)}
+            title={h.bookingPageTitle}
+            viewPageLabel={h.viewPage}
+            downloadQrLabel={h.downloadQr}
+          />
         )}
 
         <div className="rounded-2xl border border-line bg-surface p-5 shadow-sm">

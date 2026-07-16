@@ -52,6 +52,7 @@ export interface PanelShellDictionary {
     setupCompleteSub: string;
     bookingPageTitle: string;
     viewPage: string;
+    downloadQr: string; // "Descargar código QR" button on the booking-page tile
     quickAccess: string;
   };
   verification: {
@@ -115,6 +116,7 @@ const es: PanelShellDictionary = {
     setupCompleteSub: "Tu página de reservas está lista para recibir clientes.",
     bookingPageTitle: "Tu página de reservas",
     viewPage: "Ver página",
+    downloadQr: "Descargar código QR",
     quickAccess: "Accesos rápidos",
   },
   verification: {
@@ -178,6 +180,7 @@ const en: PanelShellDictionary = {
     setupCompleteSub: "Your booking page is ready to receive clients.",
     bookingPageTitle: "Your booking page",
     viewPage: "View page",
+    downloadQr: "Download QR code",
     quickAccess: "Quick access",
   },
   verification: {
