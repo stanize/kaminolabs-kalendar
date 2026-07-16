@@ -276,13 +276,24 @@ function DayProviderColumn({
       </div>
       <div
         className="relative cursor-pointer bg-surface-2/50 hover:bg-surface-2/70"
-        style={{ height: gridHeight }}
+        style={{
+          height: gridHeight,
+          ...(ranges.length === 0
+            ? {
+                backgroundImage:
+                  "repeating-linear-gradient(135deg, rgba(15,23,42,0.08) 0px, rgba(15,23,42,0.08) 6px, transparent 6px, transparent 14px)",
+              }
+            : {}),
+        }}
         onClick={handleClick}
         title={dict.week.addAppointment}
       >
         {/* Working-hours = bookable free time: lighter surface on top of the
             muted outside-hours base, so the whole schedule (not just booked
-            slots) is visible and free time reads as clearly clickable. */}
+            slots) is visible and free time reads as clearly clickable. Days
+            with zero ranges (clinic closed all day) get a diagonal-stripe
+            base above instead, so a closed day reads differently from a
+            working day's off-hours time. */}
         {ranges.map((r, i) => {
           const [sh, sm] = r.start.split(":").map(Number);
           const [eh, em] = r.end.split(":").map(Number);

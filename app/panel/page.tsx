@@ -7,7 +7,10 @@ import { getPreferredName } from "@/lib/account/data";
 import { bookingPath, bookingUrlDisplay } from "@/lib/business/booking-url";
 import { SetupCompleteBanner } from "@/components/panel/setup-complete-banner";
 import { EditableGreetingName } from "@/components/panel/editable-greeting-name";
-import { getPanelShellServerDictionary } from "@/lib/i18n/server";
+import { getPanelShellServerDictionary, getLocale } from "@/lib/i18n/server";
+import { getTodayStats } from "@/lib/booking/owner-data";
+import { getCalendarDictionary } from "@/lib/i18n/dictionaries/calendar";
+import { TodayStatsWidget } from "@/components/panel/today-stats-widget";
 
 export default async function PanelHomePage() {
   const session = await requireSession();
@@ -17,6 +20,10 @@ export default async function PanelHomePage() {
 
   const { dict } = await getPanelShellServerDictionary();
   const h = dict.home;
+
+  const locale = await getLocale();
+  const { totalToday } = await getTodayStats(session.user.id);
+  const calendarDict = getCalendarDictionary(locale);
 
   const preferredName = await getPreferredName(session.user.id);
   const firstName = preferredName || session.user.name?.split(" ")[0] || "";
@@ -130,6 +137,8 @@ export default async function PanelHomePage() {
         </div>
 
         <div className="flex flex-col gap-4">
+          <TodayStatsWidget totalToday={totalToday} dict={calendarDict.widget} />
+
           {business?.slug && (
             <div className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
               <p className="mb-1 text-[12px] font-bold uppercase tracking-[.05em] text-ink-soft">
