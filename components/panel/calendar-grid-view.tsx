@@ -111,7 +111,10 @@ export function CalendarGridView({
   const [modalSlot, setModalSlot] = useState<SlotSelection | null>(null);
 
   // Grid vertical span: widest working-hours window across the displayed
-  // days, with a sane fallback so an empty schedule still renders a usable grid.
+  // days, with a sane fallback so an empty schedule still renders a usable
+  // grid — additionally widened to cover any booking that falls outside the
+  // currently-configured hours (e.g. hours were edited after the booking was
+  // made), so it renders fully instead of clipping/overlapping the header.
   const { gridStartMin, gridEndMin } = useMemo(() => {
     let min = DEFAULT_START_MIN;
     let max = DEFAULT_END_MIN;
@@ -126,8 +129,19 @@ export function CalendarGridView({
         else { min = Math.min(min, s); max = Math.max(max, e); }
       }
     }
+    for (const b of bookings) {
+      const parts = tzDateParts(new Date(b.startIso));
+      const onDisplayedDay = days.some(
+        (d) => d.year === parts.year && d.month === parts.month && d.day === parts.day
+      );
+      if (!onDisplayedDay) continue;
+      const s = minutesInTz(new Date(b.startIso));
+      const e = s + b.durationMin;
+      if (!found) { min = s; max = e; found = true; }
+      else { min = Math.min(min, s); max = Math.max(max, e); }
+    }
     return { gridStartMin: min, gridEndMin: Math.max(max, min + 60) };
-  }, [hoursByDay, days, view]);
+  }, [hoursByDay, days, view, bookings]);
 
   const gridHeight = (gridEndMin - gridStartMin) * PX_PER_MIN;
   const hourMarks = useMemo(() => {
@@ -275,7 +289,7 @@ function DayProviderColumn({
         {day.isToday && <span className="mt-0.5 h-1 w-1 rounded-full bg-brand" />}
       </div>
       <div
-        className="relative cursor-pointer bg-surface-2/50 hover:bg-surface-2/70"
+        className="relative overflow-hidden cursor-pointer bg-surface-2/50 hover:bg-surface-2/70"
         style={{
           height: gridHeight,
           ...(ranges.length === 0
