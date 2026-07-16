@@ -16,12 +16,27 @@ export default async function ResetPasswordPage({
   // the browser here with either `?token=<verificationToken>` (valid) or
   // `?error=INVALID_TOKEN` (expired/already used) — see the
   // `sendResetPassword` comment in lib/auth.ts for the full round-trip.
-  searchParams: Promise<{ token?: string; error?: string }>;
+  // `from`/`redirectTo` are our own params, carried through from
+  // /forgot-password (which embedded them in the `redirectTo` sent to
+  // Better Auth) — Better Auth preserves unknown query params on that URL
+  // untouched, only adding `token`/`error` on top.
+  searchParams: Promise<{ token?: string; error?: string; from?: string; redirectTo?: string }>;
 }) {
   const { dict } = await getPublicServerDictionary();
   const params = await searchParams;
-  const token = params.token;
+  const token = params.token ?? "";
   const invalid = !token || !!params.error;
+
+  const isPatient = params.from === "patient";
+  const safeRedirectTo =
+    params.redirectTo && params.redirectTo.startsWith("/") && !params.redirectTo.startsWith("//")
+      ? params.redirectTo
+      : undefined;
+  const patientQS = `${safeRedirectTo ? `?redirectTo=${encodeURIComponent(safeRedirectTo)}` : ""}`;
+  const signinHref = isPatient ? `/patient/login${patientQS}` : "/signin";
+  const forgotPasswordHref = isPatient
+    ? `/forgot-password?from=patient${safeRedirectTo ? `&redirectTo=${encodeURIComponent(safeRedirectTo)}` : ""}`
+    : "/forgot-password";
 
   return (
     <div className="grid min-h-screen items-start justify-items-center bg-surface-2 px-5 pb-12 pt-16 sm:pt-20">
@@ -45,13 +60,19 @@ export default async function ResetPasswordPage({
 
         {invalid ? (
           <Link
-            href="/forgot-password"
+            href={forgotPasswordHref}
             className="block w-full rounded-lg bg-brand px-4 py-2 text-center text-[13.5px] font-semibold text-white transition-all hover:bg-brand/90"
           >
             {dict.resetPassword.requestNewLink}
           </Link>
         ) : (
-          <ResetPasswordForm token={token} dict={dict.resetPassword} authDict={dict.auth} />
+          <ResetPasswordForm
+            token={token}
+            dict={dict.resetPassword}
+            authDict={dict.auth}
+            successHref={signinHref}
+            backHref={signinHref}
+          />
         )}
       </div>
     </div>

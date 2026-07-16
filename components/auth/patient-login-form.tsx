@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { authClient, navigateWithFallback } from "@/lib/auth-client";
 import { Icon } from "@/components/ui/icon";
 import { provisionPatient, checkPatientRoleConflict } from "@/lib/actions/patient";
@@ -49,6 +50,7 @@ interface PatientLabels {
   confirmPasswordPlaceholder: string;
   signIn: string;
   loggingIn: string;
+  forgotPasswordLink: string;
   createAccount: string;
   creating: string;
   connecting: string;
@@ -90,6 +92,7 @@ const DEFAULT_LABELS: PatientLabels = {
   confirmPasswordPlaceholder: "Confirmar contraseña",
   signIn: "Iniciar sesión",
   loggingIn: "Accediendo…",
+  forgotPasswordLink: "¿Olvidaste tu contraseña?",
   createAccount: "Crear cuenta",
   creating: "Creando cuenta…",
   connecting: "Conectando…",
@@ -300,6 +303,14 @@ export function PatientLoginForm({
           <input type="password" placeholder={L.passwordPlaceholder} value={password}
             onChange={(e) => setPassword(e.target.value)} disabled={loading}
             onKeyDown={(e) => e.key === "Enter" && handleLogin()} className={inputClass} />
+          <div className="flex justify-end">
+            <Link
+              href={`/forgot-password?from=patient${redirectTo ? `&redirectTo=${encodeURIComponent(redirectTo)}` : ""}`}
+              className="text-[12.5px] font-medium text-brand hover:underline"
+            >
+              {L.forgotPasswordLink}
+            </Link>
+          </div>
           <button type="button" onClick={handleLogin} disabled={loading}
             className="w-full rounded-xl bg-brand px-5 py-3.5 text-[15px] font-semibold text-white transition-all hover:bg-brand/90 disabled:cursor-wait disabled:opacity-60">
             {loading ? L.loggingIn : L.signIn}

@@ -18,7 +18,22 @@ function withTimeout<T>(promise: Promise<T>, ms: number, timeoutMsg: string): Pr
 const inputClass =
   "w-full rounded-lg border border-line bg-surface px-3 py-2 text-[13px] text-ink placeholder:text-ink-soft focus:border-brand focus:outline-none disabled:opacity-50";
 
-export function ForgotPasswordForm({ dict, authDict }: { dict: ForgotPasswordDict; authDict: AuthDict }) {
+export function ForgotPasswordForm({
+  dict,
+  authDict,
+  redirectPath = "/reset-password",
+  backHref = "/signin",
+}: {
+  dict: ForgotPasswordDict;
+  authDict: AuthDict;
+  // Appended to origin and sent as Better Auth's `redirectTo` — lets callers
+  // (e.g. the patient login flow) carry their own `from`/`redirectTo`
+  // context through the token round-trip so /reset-password knows where to
+  // send the user back to afterward. See app/forgot-password/page.tsx and
+  // app/reset-password/page.tsx for how this is threaded end to end.
+  redirectPath?: string;
+  backHref?: string;
+}) {
   const [email, setEmail]     = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState<string | null>(null);
@@ -39,7 +54,7 @@ export function ForgotPasswordForm({ dict, authDict }: { dict: ForgotPasswordDic
       await withTimeout(
         authClient.requestPasswordReset({
           email: email.trim(),
-          redirectTo: `${window.location.origin}/reset-password`,
+          redirectTo: `${window.location.origin}${redirectPath}`,
         }),
         12000,
         authDict.errTimeout
@@ -58,7 +73,7 @@ export function ForgotPasswordForm({ dict, authDict }: { dict: ForgotPasswordDic
       <div className="flex flex-col items-center gap-3 text-center">
         <p className="text-[14px] font-medium text-ink">{dict.checkEmailTitle}</p>
         <p className="text-[12.5px] leading-[1.5] text-ink-soft">{dict.checkEmailBody}</p>
-        <Link href="/signin" className="mt-1 text-[12.5px] font-medium text-brand hover:underline">
+        <Link href={backHref} className="mt-1 text-[12.5px] font-medium text-brand hover:underline">
           {dict.backToSignin}
         </Link>
       </div>
@@ -91,7 +106,7 @@ export function ForgotPasswordForm({ dict, authDict }: { dict: ForgotPasswordDic
         <p className="rounded-lg bg-error-weak px-3 py-2 text-[12px] font-medium text-error">{error}</p>
       )}
 
-      <Link href="/signin" className="text-center text-[11.5px] font-medium text-brand hover:underline">
+      <Link href={backHref} className="text-center text-[11.5px] font-medium text-brand hover:underline">
         {dict.backToSignin}
       </Link>
     </div>

@@ -23,7 +23,7 @@ Login, sign-up, password reset, session handling, role assignment.
 - Proxy/middleware: `proxy.ts`
 - DB tables: `user`, `session`, `account`, `verification` (Better Auth, in `schema_better_auth_001.sql`), `user_roles` (in `schema_001.sql`)
 - Depends on shared infra: i18n (`public.ts` dictionary), email (`lib/email.ts` — verification + reset-password emails)
-- Gotchas: `lib/auth-action.ts` must stay free of `"use server"`. `schema_better_auth_001.sql` must run before `schema_001.sql` (no longer via `npx @better-auth/cli migrate`). `requireEmailVerification: false` — verification gate is UI-side (see panel-shell). Password reset: `authClient.requestPasswordReset({ email, redirectTo })` → Better Auth emails a link to its own `/api/auth/reset-password/:token` route, which 302s the browser to `redirectTo` (`/reset-password`) with `?token=...` (or `?error=INVALID_TOKEN`) — the app never builds that link itself, only renders whatever Better Auth hands `sendResetPassword` in `lib/auth.ts`. Token expires in 1h (`resetPasswordTokenExpiresIn`); resetting revokes all other sessions (`revokeSessionsOnPasswordReset: true`). Patients don't have password reset yet — email/password patient accounts would need this extended (see `patient-portal`).
+- Gotchas: `lib/auth-action.ts` must stay free of `"use server"`. `schema_better_auth_001.sql` must run before `schema_001.sql` (no longer via `npx @better-auth/cli migrate`). `requireEmailVerification: false` — verification gate is UI-side (see panel-shell). Password reset: `authClient.requestPasswordReset({ email, redirectTo })` → Better Auth emails a link to its own `/api/auth/reset-password/:token` route, which 302s the browser to `redirectTo` (`/reset-password`) with `?token=...` (or `?error=INVALID_TOKEN`) — the app never builds that link itself, only renders whatever Better Auth hands `sendResetPassword` in `lib/auth.ts`. Token expires in 1h (`resetPasswordTokenExpiresIn`); resetting revokes all other sessions (`revokeSessionsOnPasswordReset: true`). Shared by clinic (`/signin`) and patient (`/patient/login`) accounts — same `emailAndPassword` config, patient flow just carries `?from=patient&redirectTo=...` through so `/reset-password` sends the user back to the right place (see `patient-portal`).
 
 ---
 
@@ -48,7 +48,7 @@ Patient-facing account area (separate from the clinic panel).
 - Lib: `lib/booking/patient-data.ts`
 - Actions: `lib/actions/patient.ts`
 - DB tables: `kalendar_patients`, reads `kalendar_bookings`
-- Depends on shared infra: auth (Google OAuth self-heal in `app/patient/layout.tsx`), i18n
+- Depends on shared infra: auth (Google OAuth self-heal in `app/patient/layout.tsx`; password reset reuses `auth`'s `/forgot-password` and `/reset-password` pages with `?from=patient&redirectTo=...` — same account/table, just carries context back to `/patient/login` instead of `/signin`), i18n
 - Gotchas: `provisionPatient` assigns patient role AND upserts `kalendar_patients` — don't split these without checking both call sites.
 
 ---

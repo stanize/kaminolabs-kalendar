@@ -23,10 +23,14 @@ export function ResetPasswordForm({
   token,
   dict,
   authDict,
+  successHref = "/signin",
+  backHref = "/signin",
 }: {
   token: string;
   dict: ResetPasswordDict;
   authDict: AuthDict;
+  successHref?: string;
+  backHref?: string;
 }) {
   const router = useRouter();
   const [password, setPassword]               = useState("");
@@ -70,7 +74,7 @@ export function ResetPasswordForm({
         <p className="text-[12.5px] leading-[1.5] text-ink-soft">{dict.successBody}</p>
         <button
           type="button"
-          onClick={() => navigateWithFallback(router, "/signin")}
+          onClick={() => navigateWithFallback(router, successHref)}
           className="mt-1 w-full rounded-lg bg-brand px-4 py-2 text-[13.5px] font-semibold text-white transition-all hover:bg-brand/90"
         >
           {dict.goToSignin}
@@ -113,7 +117,7 @@ export function ResetPasswordForm({
         <p className="rounded-lg bg-error-weak px-3 py-2 text-[12px] font-medium text-error">{error}</p>
       )}
 
-      <Link href="/signin" className="text-center text-[11.5px] font-medium text-brand hover:underline">
+      <Link href={backHref} className="text-center text-[11.5px] font-medium text-brand hover:underline">
         {authDict.back}
       </Link>
     </div>
