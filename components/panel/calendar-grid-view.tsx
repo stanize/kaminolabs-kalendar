@@ -308,19 +308,19 @@ function DayProviderColumn({
         {dayBookings.map((b) => {
           const startMin = minutesInTz(new Date(b.startIso));
           const top = (startMin - gridStartMin) * PX_PER_MIN;
-          const height = Math.max(b.durationMin * PX_PER_MIN, 18);
+          const height = Math.max(b.durationMin * PX_PER_MIN, 30);
           const isPending = b.status === "pending_confirmation";
           return (
             <div
               key={b.id}
               onClick={(e) => e.stopPropagation()}
-              className={`absolute left-0.5 right-0.5 overflow-hidden rounded-md px-1.5 py-0.5 text-[10.5px] leading-tight ${
+              className={`absolute left-0.5 right-0.5 overflow-hidden rounded-md px-1.5 py-[3px] text-[10.5px] leading-[1.2] ${
                 isPending ? "bg-orange-100 text-orange-700" : "bg-brand text-white"
               }`}
               style={{ top, height }}
             >
-              <div className="truncate font-semibold">{timeLabel(b.startIso)} · {b.clientName}</div>
-              <div className="truncate opacity-90">{b.serviceName}</div>
+              <div className="truncate font-semibold">{b.serviceName}</div>
+              <div className="truncate opacity-90">{timeLabel(b.startIso)} · {b.clientName}</div>
             </div>
           );
         })}
