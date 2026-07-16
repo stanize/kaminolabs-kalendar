@@ -10,7 +10,7 @@ import {
   AvailabilitySetupWizard,
   type WizardStep,
 } from "@/components/panel/availability-setup-wizard";
-import { saveAvailability, type WeekHours } from "@/lib/actions/availability";
+import { saveAvailability, checkAvailabilityConflicts, type WeekHours, type ConflictingBooking } from "@/lib/actions/availability";
 import {
   WEEKDAY_ORDER,
   DEFAULT_RANGE_START,
@@ -73,6 +73,8 @@ export function AvailabilityManager({
   const [windowMonths, setWindowMonths] = useState<number>(bookingWindowMonths || 1);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [conflicts, setConflicts] = useState<ConflictingBooking[] | null>(null);
   // Full-screen save overlay (shared setup-page pattern): gray out while
   // saving, flash success, then redirect/refresh. Replaces the old inline
   // "saved" banner.
@@ -166,6 +168,35 @@ export function AvailabilityManager({
       }
     }
 
+    // Check whether any existing future booking would fall outside the hours
+    // about to be saved, so the owner can be warned and confirm before
+    // committing — rather than silently orphaning a booking outside hours.
+    setChecking(true);
+    try {
+      const result = await checkAvailabilityConflicts({
+        week,
+        dict: { errNoBusiness: dict.errors.errNoBusiness, errCheckFailed: dict.errors.errCheckFailed },
+      });
+      setChecking(false);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      if (result.conflicts.length > 0) {
+        setConflicts(result.conflicts);
+        return; // wait for the owner to confirm or cancel in the modal
+      }
+    } catch {
+      setChecking(false);
+      setError(m.errUnexpected);
+      return;
+    }
+
+    await doSave();
+  }
+
+  async function doSave() {
+    setConflicts(null);
     setSaving(true);
     setOverlay("saving");
     try {
@@ -326,14 +357,61 @@ export function AvailabilityManager({
                       {wz.back}
                     </Btn>
                   )}
-                  <Btn onClick={handleSave} disabled={saving} size="lg">
-                    {saving ? m.confirming : isFirstSetup ? wz.finishButton : m.confirmButton}
+                  <Btn onClick={handleSave} disabled={saving || checking} size="lg">
+                    {saving ? m.confirming : checking ? m.checkingConflicts : isFirstSetup ? wz.finishButton : m.confirmButton}
                   </Btn>
                 </div>
               </div>
             </div>
           </div>
         </>
+      )}
+
+      {conflicts && conflicts.length > 0 && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
+          onClick={() => setConflicts(null)}
+        >
+          <div
+            className="w-full max-w-[440px] rounded-2xl bg-surface p-5 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 flex items-center gap-2.5">
+              <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-orange-50 text-orange-600">
+                <Icon name="bell" size={17} />
+              </div>
+              <h2 className="text-[16px] font-bold text-ink">{m.conflictTitle}</h2>
+            </div>
+            <p className="mb-3 text-[13.5px] text-ink-soft">
+              {tmpl(m.conflictBodyTemplate, { n: String(conflicts.length) })}
+            </p>
+            <div className="mb-4 max-h-[220px] overflow-y-auto rounded-xl border border-line">
+              {conflicts.map((c, i) => (
+                <div
+                  key={c.id}
+                  className={`px-3.5 py-2.5 text-[13px] text-ink ${i > 0 ? "border-t border-line" : ""}`}
+                >
+                  {tmpl(m.conflictItemTemplate, {
+                    date: new Intl.DateTimeFormat(dict.intlLocale, {
+                      timeZone: "Europe/Madrid", weekday: "short", day: "numeric", month: "short",
+                      hour: "2-digit", minute: "2-digit",
+                    }).format(new Date(c.startIso)),
+                    client: c.clientName,
+                    service: c.serviceName,
+                  })}
+                </div>
+              ))}
+            </div>
+            <div className="flex items-center justify-end gap-2">
+              <Btn variant="ghost" onClick={() => setConflicts(null)} disabled={saving}>
+                {m.conflictCancel}
+              </Btn>
+              <Btn onClick={doSave} disabled={saving}>
+                {saving ? m.confirming : m.conflictSaveAnyway}
+              </Btn>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

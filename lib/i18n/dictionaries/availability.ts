@@ -29,6 +29,12 @@ export interface AvailabilityDictionary {
     confirming: string;
     errUnexpected: string;
     rangeAt: string; // joins day + range error, contains "{day}" and "{error}"
+    conflictTitle: string; // "Hay citas fuera del nuevo horario" warning modal title
+    conflictBodyTemplate: string; // "{n} cita(s) existentes quedarían fuera..." contains "{n}"
+    conflictItemTemplate: string; // one row per conflict, contains "{date}", "{client}", "{service}"
+    conflictSaveAnyway: string; // confirm button
+    conflictCancel: string; // cancel button
+    checkingConflicts: string; // brief loading label while the pre-save check runs
   };
   validation: {
     // validateDayRanges (lib/availability/constants.ts)
@@ -40,6 +46,7 @@ export interface AvailabilityDictionary {
     errNoBusiness: string;
     errInvalidWindow: string;
     errSaveFailed: string; // prefix; server detail appended
+    errCheckFailed: string; // prefix; server detail appended, from checkAvailabilityConflicts
   };
   weekdays: Record<DayId, string>;
   weekdaysShort: Record<DayId, string>; // wizard day pills
@@ -59,6 +66,7 @@ export interface AvailabilityDictionary {
     finishButton: string;
     errNoDays: string;
   };
+  intlLocale: string; // for Intl.DateTimeFormat when listing conflicting bookings
 }
 
 const es: AvailabilityDictionary = {
@@ -79,6 +87,12 @@ const es: AvailabilityDictionary = {
     confirming: "Guardando…",
     errUnexpected: "Ocurrió un error inesperado. Inténtalo de nuevo.",
     rangeAt: "{day}: {error}",
+    conflictTitle: "Hay citas fuera del nuevo horario",
+    conflictBodyTemplate: "{n} cita(s) ya confirmadas quedarían fuera del horario que estás guardando. Si continúas, esas citas seguirán existiendo pero fuera de tu horario de atención:",
+    conflictItemTemplate: "{date} · {client} · {service}",
+    conflictSaveAnyway: "Guardar de todas formas",
+    conflictCancel: "Cancelar",
+    checkingConflicts: "Comprobando citas existentes…",
   },
   validation: {
     errEndBeforeStart: "La hora de fin debe ser posterior a la de inicio.",
@@ -88,6 +102,7 @@ const es: AvailabilityDictionary = {
     errNoBusiness: "Primero configura tu negocio.",
     errInvalidWindow: "Ventana de reservas no válida.",
     errSaveFailed: "No se pudo guardar:",
+    errCheckFailed: "No se pudieron comprobar las citas existentes:",
   },
   weekdays: {
     mon: "Lunes",
@@ -122,6 +137,7 @@ const es: AvailabilityDictionary = {
     finishButton: "Confirmar y terminar",
     errNoDays: "Selecciona al menos un día.",
   },
+  intlLocale: "es-ES",
 };
 
 const en: AvailabilityDictionary = {
@@ -142,6 +158,12 @@ const en: AvailabilityDictionary = {
     confirming: "Saving…",
     errUnexpected: "An unexpected error occurred. Please try again.",
     rangeAt: "{day}: {error}",
+    conflictTitle: "There are appointments outside the new hours",
+    conflictBodyTemplate: "{n} confirmed appointment(s) would fall outside the hours you're about to save. If you continue, those bookings will still exist, just outside your working hours:",
+    conflictItemTemplate: "{date} · {client} · {service}",
+    conflictSaveAnyway: "Save anyway",
+    conflictCancel: "Cancel",
+    checkingConflicts: "Checking existing appointments…",
   },
   validation: {
     errEndBeforeStart: "The end time must be after the start time.",
@@ -151,6 +173,7 @@ const en: AvailabilityDictionary = {
     errNoBusiness: "Set up your business first.",
     errInvalidWindow: "Invalid booking window.",
     errSaveFailed: "Couldn't save:",
+    errCheckFailed: "Couldn't check existing appointments:",
   },
   weekdays: {
     mon: "Monday",
@@ -185,6 +208,7 @@ const en: AvailabilityDictionary = {
     finishButton: "Confirm and finish",
     errNoDays: "Select at least one day.",
   },
+  intlLocale: "en-GB",
 };
 
 const AVAILABILITY_DICTIONARIES: Record<Locale, AvailabilityDictionary> = { es, en };

@@ -5,6 +5,7 @@ import { authedAction } from "@/lib/auth-action";
 import { createClient } from "@/lib/supabase/server";
 import { getBusinessForUser } from "@/lib/business/data";
 import type { DayId } from "@/lib/onboarding/types";
+import { dayIdInTz, BUSINESS_TZ } from "@/lib/booking/slots";
 import {
   WEEKDAY_ORDER,
   validateDayRanges,
@@ -123,5 +124,84 @@ export const saveAvailability = authedAction(
     revalidatePath("/panel");
     revalidatePath("/panel/availability");
     return { ok: true, created: anyInterval };
+  }
+);
+
+export interface ConflictingBooking {
+  id: string;
+  startIso: string;
+  clientName: string;
+  serviceName: string;
+}
+
+/** Minute-of-day (0-1439) for `date`, evaluated in the business tz. */
+function minutesInTz(date: Date): number {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: BUSINESS_TZ, hour: "2-digit", minute: "2-digit", hour12: false,
+  }).formatToParts(date);
+  const h = Number(parts.find((p) => p.type === "hour")?.value ?? 0);
+  const m = Number(parts.find((p) => p.type === "minute")?.value ?? 0);
+  return h * 60 + m;
+}
+
+function toMinutes(hhmm: string): number {
+  const [h, m] = hhmm.split(":").map(Number);
+  return h * 60 + m;
+}
+
+/**
+ * Compares a proposed new week of hours against existing future bookings and
+ * returns any that would fall outside the new hours (fully or partially) —
+ * e.g. hours were edited after the booking was made, or a day was closed
+ * entirely. Read-only: does not save anything. The panel calls this before
+ * saveAvailability so the owner can be warned and confirm before committing.
+ */
+export const checkAvailabilityConflicts = authedAction(
+  async (
+    session,
+    payload: { week: WeekHours; dict?: { errNoBusiness?: string; errCheckFailed?: string } }
+  ): Promise<
+    | { ok: true; conflicts: ConflictingBooking[] }
+    | { ok: false; error: string }
+  > => {
+    const errNoBusiness = payload.dict?.errNoBusiness ?? FALLBACK_ACTION.errNoBusiness;
+    const errCheckFailed = payload.dict?.errCheckFailed ?? "No se pudieron comprobar las citas existentes.";
+
+    const business = await getBusinessForUser(session.user.id);
+    if (!business) return { ok: false, error: errNoBusiness };
+
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("kalendar_bookings")
+      .select("id, starts_at, ends_at, client_name, service_name")
+      .eq("business_id", business.id)
+      .in("status", ["confirmed", "pending_confirmation"])
+      .gte("starts_at", new Date().toISOString())
+      .order("starts_at");
+
+    if (error) return { ok: false, error: `${errCheckFailed} ${error.message}` };
+
+    const conflicts: ConflictingBooking[] = [];
+    for (const row of data ?? []) {
+      const start = new Date(row.starts_at as string);
+      const end = new Date(row.ends_at as string);
+      const dayId: DayId = dayIdInTz(start);
+      const startMin = minutesInTz(start);
+      const endMin = minutesInTz(end);
+
+      const ranges = payload.week[dayId] ?? [];
+      const fits = ranges.some((r) => startMin >= toMinutes(r.start) && endMin <= toMinutes(r.end));
+
+      if (!fits) {
+        conflicts.push({
+          id: row.id as string,
+          startIso: row.starts_at as string,
+          clientName: (row.client_name as string) ?? "",
+          serviceName: (row.service_name as string) ?? "",
+        });
+      }
+    }
+
+    return { ok: true, conflicts };
   }
 );
