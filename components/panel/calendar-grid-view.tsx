@@ -110,17 +110,16 @@ export function CalendarGridView({
   const w = dict.week;
   const [modalSlot, setModalSlot] = useState<SlotSelection | null>(null);
 
-  // Grid vertical span: widest working-hours window across the displayed
-  // days, with a sane fallback so an empty schedule still renders a usable
-  // grid — additionally widened to cover any booking that falls outside the
-  // currently-configured hours (e.g. hours were edited after the booking was
-  // made), so it renders fully instead of clipping/overlapping the header.
+  // Grid vertical span: uniform across Day/Week views and day navigation —
+  // based on the business's full week of hours (not just the day currently
+  // shown), padded by 1h on each side, plus widened further to cover any
+  // booking that falls outside that window (e.g. hours were edited after
+  // the booking was made). A sane fallback keeps an empty schedule usable.
   const { gridStartMin, gridEndMin } = useMemo(() => {
     let min = DEFAULT_START_MIN;
     let max = DEFAULT_END_MIN;
     let found = false;
-    const relevantDays = view === "day" ? [days[0]?.dayId].filter(Boolean) : Object.keys(hoursByDay);
-    for (const dayId of relevantDays as DayId[]) {
+    for (const dayId of Object.keys(hoursByDay) as DayId[]) {
       for (const r of hoursByDay[dayId] ?? []) {
         const [sh, sm] = r.start.split(":").map(Number);
         const [eh, em] = r.end.split(":").map(Number);
@@ -140,8 +139,10 @@ export function CalendarGridView({
       if (!found) { min = s; max = e; found = true; }
       else { min = Math.min(min, s); max = Math.max(max, e); }
     }
-    return { gridStartMin: min, gridEndMin: Math.max(max, min + 60) };
-  }, [hoursByDay, days, view, bookings]);
+    const paddedMin = Math.max(0, min - 60);
+    const paddedMax = Math.min(24 * 60, max + 60);
+    return { gridStartMin: paddedMin, gridEndMin: Math.max(paddedMax, paddedMin + 60) };
+  }, [hoursByDay, days, bookings]);
 
   const gridHeight = (gridEndMin - gridStartMin) * PX_PER_MIN;
   const hourMarks = useMemo(() => {
