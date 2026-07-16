@@ -1,6 +1,6 @@
 import { betterAuth } from "better-auth";
 import { Pool } from "pg";
-import { sendEmail, verificationEmailHtml } from "@/lib/email";
+import { sendEmail, verificationEmailHtml, resetPasswordEmailHtml } from "@/lib/email";
 import { LOCALE_COOKIE, DEFAULT_LOCALE, isLocale } from "@/lib/i18n/config";
 
 // Reads the `kalendar_locale` cookie off the raw sign-up request (Better Auth
@@ -38,6 +38,31 @@ export const auth = betterAuth({
     // confirmation until `emailVerified` flips to true. Setting this to true
     // would block sign-in entirely and the user could never reach the gate.
     requireEmailVerification: false,
+    // Password reset — see app/forgot-password, app/reset-password. Better
+    // Auth builds the callback URL itself as
+    // `${baseURL}/reset-password/:token?callbackURL=<redirectTo>`; it then
+    // 302s the browser from that URL to `<redirectTo>?token=:token` (or
+    // `?error=INVALID_TOKEN` if expired/consumed) — `redirectTo` is the
+    // `/reset-password` page we pass from the client in
+    // authClient.requestPasswordReset(). We only need to email the `url` it
+    // hands us here; we never construct that link ourselves.
+    resetPasswordTokenExpiresIn: 60 * 60, // 1h
+    // Sign the user out of every other device/browser once their password is
+    // reset — the reset itself proves email ownership, and this closes any
+    // session an attacker may have had if the reset was prompted by a
+    // suspected compromise.
+    revokeSessionsOnPasswordReset: true,
+    sendResetPassword: async ({ user, url }, request) => {
+      const locale = localeFromRequest(request);
+      await sendEmail({
+        to: user.email,
+        subject:
+          locale === "en"
+            ? "Reset your Kalendar password"
+            : "Restablece tu contraseña de Kalendar",
+        html: resetPasswordEmailHtml(url, locale),
+      });
+    },
   },
   emailVerification: {
     // Fire the verification email automatically on email/password sign-up.

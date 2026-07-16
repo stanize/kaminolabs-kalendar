@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { authClient, navigateWithFallback } from "@/lib/auth-client";
 import type { PublicDictionary } from "@/lib/i18n/dictionaries/public";
 
@@ -92,6 +93,11 @@ export function LoginForm({ dict }: { dict: AuthDict }) {
           onKeyDown={(e) => e.key === "Enter" && handleEmailLogin()}
           className={inputClass}
         />
+        <div className="flex justify-end">
+          <Link href="/forgot-password" className="text-[11.5px] font-medium text-brand hover:underline">
+            {dict.forgotPasswordLink}
+          </Link>
+        </div>
         <button
           type="button"
           onClick={handleEmailLogin}

@@ -60,6 +60,28 @@ export interface PublicDictionary {
     noAccount: string;
     createFree: string;
   };
+  forgotPassword: {
+    title: string;
+    subtitle: string;
+    sendLink: string;
+    sending: string;
+    checkEmailTitle: string;
+    checkEmailBody: string;
+    backToSignin: string;
+  };
+  resetPassword: {
+    title: string;
+    subtitle: string;
+    newPasswordPlaceholder: string;
+    resetButton: string;
+    resetting: string;
+    successTitle: string;
+    successBody: string;
+    goToSignin: string;
+    invalidTokenTitle: string;
+    invalidTokenBody: string;
+    requestNewLink: string;
+  };
   auth: {
     // Shared by the sign-up and login forms.
     continueGoogle: string;
@@ -80,6 +102,7 @@ export interface PublicDictionary {
     createAccount: string;
     creating: string;
     loggingIn: string;
+    forgotPasswordLink: string;
     // errors
     errGoogle: string;
     errEmail: string;
@@ -141,6 +164,29 @@ const es: PublicDictionary = {
     noAccount: "¿No tienes cuenta?",
     createFree: "Crear una gratis",
   },
+  forgotPassword: {
+    title: "Recupera tu contraseña",
+    subtitle: "Te enviaremos un enlace para restablecerla.",
+    sendLink: "Enviar enlace",
+    sending: "Enviando…",
+    checkEmailTitle: "Revisa tu email",
+    checkEmailBody:
+      "Si existe una cuenta con ese email, te hemos enviado un enlace para restablecer tu contraseña.",
+    backToSignin: "Volver a iniciar sesión",
+  },
+  resetPassword: {
+    title: "Crea una nueva contraseña",
+    subtitle: "Elige una contraseña nueva para tu cuenta.",
+    newPasswordPlaceholder: "Nueva contraseña (mín. 8 car.)",
+    resetButton: "Restablecer contraseña",
+    resetting: "Restableciendo…",
+    successTitle: "Contraseña actualizada",
+    successBody: "Ya puedes iniciar sesión con tu nueva contraseña.",
+    goToSignin: "Ir a iniciar sesión",
+    invalidTokenTitle: "Enlace no válido o caducado",
+    invalidTokenBody: "Solicita un nuevo enlace para restablecer tu contraseña.",
+    requestNewLink: "Solicitar nuevo enlace",
+  },
   auth: {
     continueGoogle: "Continuar con Google",
     connecting: "Conectando…",
@@ -160,6 +206,7 @@ const es: PublicDictionary = {
     createAccount: "Crear cuenta",
     creating: "Un momento…",
     loggingIn: "Un momento…",
+    forgotPasswordLink: "¿Olvidaste tu contraseña?",
     errGoogle: "No se pudo conectar con Google. Inténtalo de nuevo.",
     errEmail: "Introduce tu email.",
     errPasswordLength: "La contraseña debe tener al menos 8 caracteres.",
@@ -219,6 +266,29 @@ const en: PublicDictionary = {
     noAccount: "Don't have an account?",
     createFree: "Create one for free",
   },
+  forgotPassword: {
+    title: "Reset your password",
+    subtitle: "We'll send you a link to reset it.",
+    sendLink: "Send reset link",
+    sending: "Sending…",
+    checkEmailTitle: "Check your email",
+    checkEmailBody:
+      "If an account exists with that email, we've sent a link to reset your password.",
+    backToSignin: "Back to sign in",
+  },
+  resetPassword: {
+    title: "Create a new password",
+    subtitle: "Choose a new password for your account.",
+    newPasswordPlaceholder: "New password (min. 8 chars)",
+    resetButton: "Reset password",
+    resetting: "Resetting…",
+    successTitle: "Password updated",
+    successBody: "You can now sign in with your new password.",
+    goToSignin: "Go to sign in",
+    invalidTokenTitle: "Invalid or expired link",
+    invalidTokenBody: "Request a new link to reset your password.",
+    requestNewLink: "Request new link",
+  },
   auth: {
     continueGoogle: "Continue with Google",
     connecting: "Connecting…",
@@ -238,6 +308,7 @@ const en: PublicDictionary = {
     createAccount: "Create account",
     creating: "One moment…",
     loggingIn: "One moment…",
+    forgotPasswordLink: "Forgot your password?",
     errGoogle: "Couldn't connect to Google. Please try again.",
     errEmail: "Enter your email.",
     errPasswordLength: "Password must be at least 8 characters.",

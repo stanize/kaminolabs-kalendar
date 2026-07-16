@@ -15,15 +15,15 @@ after every feature is shipped and tested, before starting the next one.
 ---
 
 ## Module: auth
-Login, sign-up, session handling, role assignment.
+Login, sign-up, password reset, session handling, role assignment.
 
-- Routes: `app/api/auth/[...all]/route.ts`, `app/signin/page.tsx`, `app/signup/page.tsx`
-- Components: `components/auth/login-form.tsx`, `components/auth/signup-form.tsx`, `components/auth/patient-login-form.tsx`
+- Routes: `app/api/auth/[...all]/route.ts`, `app/signin/page.tsx`, `app/signup/page.tsx`, `app/forgot-password/page.tsx`, `app/reset-password/page.tsx`
+- Components: `components/auth/login-form.tsx`, `components/auth/signup-form.tsx`, `components/auth/patient-login-form.tsx`, `components/auth/forgot-password-form.tsx`, `components/auth/reset-password-form.tsx`
 - Lib: `lib/auth.ts`, `lib/auth-client.ts`, `lib/auth-session.ts`, `lib/auth-action.ts`, `lib/roles/*`
 - Proxy/middleware: `proxy.ts`
 - DB tables: `user`, `session`, `account`, `verification` (Better Auth, in `schema_better_auth_001.sql`), `user_roles` (in `schema_001.sql`)
-- Depends on shared infra: i18n (`public.ts` dictionary), email (verification emails)
-- Gotchas: `lib/auth-action.ts` must stay free of `"use server"`. `schema_better_auth_001.sql` must run before `schema_001.sql` (no longer via `npx @better-auth/cli migrate`). `requireEmailVerification: false` — verification gate is UI-side (see panel-shell).
+- Depends on shared infra: i18n (`public.ts` dictionary), email (`lib/email.ts` — verification + reset-password emails)
+- Gotchas: `lib/auth-action.ts` must stay free of `"use server"`. `schema_better_auth_001.sql` must run before `schema_001.sql` (no longer via `npx @better-auth/cli migrate`). `requireEmailVerification: false` — verification gate is UI-side (see panel-shell). Password reset: `authClient.requestPasswordReset({ email, redirectTo })` → Better Auth emails a link to its own `/api/auth/reset-password/:token` route, which 302s the browser to `redirectTo` (`/reset-password`) with `?token=...` (or `?error=INVALID_TOKEN`) — the app never builds that link itself, only renders whatever Better Auth hands `sendResetPassword` in `lib/auth.ts`. Token expires in 1h (`resetPasswordTokenExpiresIn`); resetting revokes all other sessions (`revokeSessionsOnPasswordReset: true`). Patients don't have password reset yet — email/password patient accounts would need this extended (see `patient-portal`).
 
 ---
 

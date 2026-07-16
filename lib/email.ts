@@ -125,6 +125,55 @@ export function verificationEmailHtml(url: string, locale: "es" | "en" = "es"): 
 }
 
 /**
+ * Password reset email, sent when a user requests a reset link from
+ * /forgot-password. Owner-facing (clinic accounts only — patients don't
+ * currently have password reset, see MODULES.md -> auth). Localized the same
+ * way as the verification email: from the `kalendar_locale` cookie on the
+ * request, since there's no business.language field yet.
+ */
+export function resetPasswordEmailHtml(url: string, locale: "es" | "en" = "es"): string {
+  const t =
+    locale === "en"
+      ? {
+          heading: "Reset your password",
+          greeting: "Hi,",
+          intro:
+            "We received a request to reset the password for your Kalendar account. Click the button below to choose a new one. This link expires in 1 hour.",
+          button: "Reset my password",
+          fallback: "If the button doesn't work, copy and paste this link into your browser:",
+          ignore: "If you didn't request this, you can safely ignore this message — your password won't change.",
+        }
+      : {
+          heading: "Restablece tu contraseña",
+          greeting: "Hola,",
+          intro:
+            "Hemos recibido una solicitud para restablecer la contraseña de tu cuenta de Kalendar. Haz clic en el botón para elegir una nueva. Este enlace caduca en 1 hora.",
+          button: "Restablecer mi contraseña",
+          fallback: "Si el botón no funciona, copia y pega este enlace en tu navegador:",
+          ignore: "Si no has solicitado esto, puedes ignorar este mensaje — tu contraseña no cambiará.",
+        };
+
+  return `
+  <div style="font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px; color: #0f172a;">
+    <h1 style="font-size: 20px; margin: 0 0 16px;">${t.heading}</h1>
+    <p style="font-size: 15px; line-height: 1.6; margin: 0 0 12px;">${t.greeting}</p>
+    <p style="font-size: 15px; line-height: 1.6; margin: 0 0 24px;">
+      ${t.intro}
+    </p>
+    <a href="${url}" style="display: inline-block; background: #0d9488; color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 600; padding: 12px 24px; border-radius: 12px;">
+      ${t.button}
+    </a>
+    <p style="font-size: 13px; line-height: 1.6; color: #64748b; margin: 24px 0 0;">
+      ${t.fallback}<br />
+      <a href="${url}" style="color: #0d9488; word-break: break-all;">${url}</a>
+    </p>
+    <p style="font-size: 13px; line-height: 1.6; color: #64748b; margin: 16px 0 0;">
+      ${t.ignore}
+    </p>
+  </div>`;
+}
+
+/**
  * Email notifying the business owner that a guest just confirmed a booking.
  * Spanish copy.
  */
