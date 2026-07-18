@@ -10,7 +10,8 @@
 -- managed entirely separately and never appear in either drop list.
 --
 -- SCOPE (edit as modules stabilize):
---   Currently covers: user, account, user_roles, kalendar_businesses.
+--   Currently covers: user, account, user_roles, kalendar_businesses,
+--   kalendar_services.
 --   A table is added here only once its column shape is considered settled
 --   — a table mid-iteration (e.g. still-being-built kalendar_services) is
 --   deliberately left OUT, so schema changes there don't require touching
@@ -89,6 +90,16 @@ create table if not exists public.seed_snapshot_kalendar_businesses (
   created_at              timestamptz not null
 );
 
+create table if not exists public.seed_snapshot_kalendar_services (
+  id           uuid        primary key,
+  business_id  uuid        not null,
+  name         text        not null,
+  duration_min integer     not null,
+  price        numeric     not null,
+  sort_order   integer     not null,
+  created_at   timestamptz not null
+);
+
 -- ── Take snapshot ────────────────────────────────────────────────────────
 create or replace function public.seed_snapshot_take()
 returns text
@@ -96,9 +107,11 @@ language plpgsql
 as $$
 declare
   v_business_count int;
+  v_service_count  int;
   v_user_count     int;
 begin
   truncate public.seed_snapshot_kalendar_businesses;
+  truncate public.seed_snapshot_kalendar_services;
   truncate public.seed_snapshot_user;
   truncate public.seed_snapshot_account;
   truncate public.seed_snapshot_user_roles;
@@ -113,6 +126,11 @@ begin
     brand_color, team_mode, booking_window_months, onboarding_completed_at, created_at
   from public.kalendar_businesses;
 
+  insert into public.seed_snapshot_kalendar_services
+  select id, business_id, name, duration_min, price, sort_order, created_at
+  from public.kalendar_services
+  where business_id in (select id from public.kalendar_businesses);
+
   insert into public.seed_snapshot_user
   select * from public."user"
   where id in (select owner_id from public.kalendar_businesses);
@@ -126,9 +144,10 @@ begin
   where user_id in (select owner_id from public.kalendar_businesses);
 
   select count(*) into v_business_count from public.seed_snapshot_kalendar_businesses;
+  select count(*) into v_service_count from public.seed_snapshot_kalendar_services;
   select count(*) into v_user_count from public.seed_snapshot_user;
 
-  return format('Snapshotted %s business(es) and %s owner account(s).', v_business_count, v_user_count);
+  return format('Snapshotted %s business(es), %s service(s), %s owner account(s).', v_business_count, v_service_count, v_user_count);
 end;
 $$;
 
@@ -139,6 +158,7 @@ language plpgsql
 as $$
 declare
   v_business_count int;
+  v_service_count  int;
   v_user_count     int;
 begin
   insert into public."user"
@@ -171,6 +191,11 @@ begin
   from public.seed_snapshot_kalendar_businesses
   on conflict (id) do nothing;
 
+  insert into public.kalendar_services (id, business_id, name, duration_min, price, sort_order, created_at)
+  select id, business_id, name, duration_min, price, sort_order, created_at
+  from public.seed_snapshot_kalendar_services
+  on conflict (id) do nothing;
+
   -- Belt-and-braces: every restored business owner has the 'clinic' role,
   -- even if a snapshot predates that assignment.
   insert into public.user_roles (user_id, role)
@@ -178,8 +203,9 @@ begin
   on conflict (user_id, role) do nothing;
 
   select count(*) into v_business_count from public.kalendar_businesses;
+  select count(*) into v_service_count from public.kalendar_services;
   select count(*) into v_user_count from public."user";
 
-  return format('Restored. kalendar_businesses now has %s row(s); user now has %s row(s).', v_business_count, v_user_count);
+  return format('Restored. kalendar_businesses: %s row(s); kalendar_services: %s row(s); user: %s row(s).', v_business_count, v_service_count, v_user_count);
 end;
 $$;
