@@ -29,6 +29,7 @@ create extension if not exists "pgcrypto";
 drop table if exists public.kalendar_support_tickets  cascade;
 drop table if exists public.kalendar_user_preferences cascade;
 drop table if exists public.kalendar_bookings        cascade;
+drop table if exists public.kalendar_clients         cascade;
 drop table if exists public.kalendar_patients        cascade;
 drop table if exists public.user_roles               cascade;
 drop table if exists public.kalendar_team_members    cascade;
@@ -86,6 +87,50 @@ alter table public.kalendar_patients enable row level security;
 
 create policy "Patients: write"
   on public.kalendar_patients for all using (true) with check (true);
+
+-- ----------------------------------------------------------------------------
+-- kalendar_clients
+-- A clinic's own record of a person they've booked, one row per
+-- (business, client) — NEVER shared across businesses, even if the same
+-- person books with two different clinics on Kalendar. patient_id is an
+-- optional soft link to a portal login (kalendar_patients); it carries no
+-- special behavior today, just a future hook.
+--
+-- Guest bookings (public wizard) always create a new row here — no lookup/
+-- dedupe by email or phone, by design. Manual bookings (owner, via the panel)
+-- search existing rows first via a client picker before falling back to
+-- creating a new one.
+--
+-- total_sessions / completed_count / no_show_count / cancelled_count and
+-- first_visit_at / last_visit_at are denormalized counters, deliberately not
+-- computed on read (history can grow large). They are updated by the same
+-- server action that changes a booking's status/payment (see
+-- updateBookingResult in lib/actions/booking-owner.ts) — never by a trigger
+-- or cron, so the update logic stays in one visible place.
+-- ----------------------------------------------------------------------------
+create table public.kalendar_clients (
+  id              uuid        primary key default gen_random_uuid(),
+  business_id     uuid        not null references public.kalendar_businesses (id) on delete cascade,
+  patient_id      uuid        references public.kalendar_patients (id) on delete set null,
+  name            text        not null,
+  email           text,
+  phone           text,
+  total_sessions  integer     not null default 0,
+  completed_count integer     not null default 0,
+  no_show_count   integer     not null default 0,
+  cancelled_count integer     not null default 0,
+  first_visit_at  timestamptz,
+  last_visit_at   timestamptz,
+  created_at      timestamptz not null default now()
+);
+
+create index kalendar_clients_business_id_idx on public.kalendar_clients (business_id);
+create index kalendar_clients_patient_id_idx  on public.kalendar_clients (patient_id) where patient_id is not null;
+
+alter table public.kalendar_clients enable row level security;
+
+create policy "Clients: write"
+  on public.kalendar_clients for all using (true) with check (true);
 
 -- ----------------------------------------------------------------------------
 -- kalendar_businesses
@@ -265,7 +310,7 @@ create policy "Team: write"
 -- Times are stored as timestamptz (UTC); business timezone is Europe/Madrid.
 -- ----------------------------------------------------------------------------
 create type public.booking_status as enum (
-  'pending_confirmation', 'confirmed', 'cancelled', 'completed'
+  'pending_confirmation', 'confirmed', 'cancelled', 'completed', 'no_show'
 );
 
 create table public.kalendar_bookings (
@@ -276,12 +321,23 @@ create table public.kalendar_bookings (
   -- Patient who booked (null for guest bookings). FK added below via ALTER TABLE
   -- after kalendar_patients is guaranteed to exist in this same script.
   patient_id           uuid,
+  -- The clinic's own client record for whoever this booking is for (see
+  -- kalendar_clients above). Nullable: older bookings predate this column.
+  -- ON DELETE SET NULL rather than the usual CASCADE — deleting a client
+  -- record should not silently wipe their booking history.
+  clinic_client_id     uuid                  references public.kalendar_clients (id) on delete set null,
   service_name         text                  not null,
   service_duration_min integer               not null check (service_duration_min > 0),
   service_price        numeric(10, 2)        not null default 0 check (service_price >= 0),
   starts_at            timestamptz           not null,
   ends_at              timestamptz           not null,
   status               public.booking_status not null default 'pending_confirmation',
+  -- Independent of status: whether the appointment has been paid. Tracked
+  -- manually for now (owner marks it via the past-booking detail modal) —
+  -- no payment-processor integration yet.
+  payment_status       text                  not null default 'unpaid' check (
+    payment_status in ('unpaid', 'paid')
+  ),
   client_name          text                  not null,
   client_email         text                  not null,
   client_phone         text,
@@ -303,6 +359,7 @@ create table public.kalendar_bookings (
 
 create index kalendar_bookings_business_id_idx  on public.kalendar_bookings (business_id);
 create index kalendar_bookings_patient_id_idx   on public.kalendar_bookings (patient_id) where patient_id is not null;
+create index kalendar_bookings_client_id_idx    on public.kalendar_bookings (clinic_client_id) where clinic_client_id is not null;
 create index kalendar_bookings_starts_at_idx    on public.kalendar_bookings (starts_at);
 create index kalendar_bookings_token_idx        on public.kalendar_bookings (confirm_token);
 -- Cron sweep: find expired guest bookings efficiently.
