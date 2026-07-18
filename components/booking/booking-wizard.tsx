@@ -482,18 +482,6 @@ function ConfirmAuthModal({
               <input type="password" placeholder={af.passwordPlaceholder} value={password}
                 onChange={(e) => setPassword(e.target.value)} disabled={busy}
                 onKeyDown={(e) => e.key === "Enter" && handleLogin()} className={`${inputBase} rounded-full`} />
-              <div className="-mt-1 flex justify-start">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const redirectTo = window.location.pathname + window.location.search;
-                    window.location.href = `/forgot-password?from=patient&redirectTo=${encodeURIComponent(redirectTo)}`;
-                  }}
-                  className="pl-4 text-[12px] font-medium text-brand hover:underline"
-                >
-                  {af.forgotPasswordLink}
-                </button>
-              </div>
               <button type="button" onClick={handleLogin} disabled={busy}
                 className="w-full rounded-full bg-brand px-4 py-3.5 text-[14.5px] font-semibold text-white transition-all hover:opacity-90 disabled:opacity-60">
                 {busy ? af.signingIn : af.signIn}
@@ -654,9 +642,44 @@ function DateTimeStep({ slug, serviceId, providerId, openDays, bookingWindowMont
   const [weekStart, setWeekStart] = useState<Date>(startOfWeekMon(today));
   const [slotsByDate, setSlotsByDate] = useState<Record<string, SlotDTO[]>>({});
   const [loadingDates, setLoadingDates] = useState<Set<string>>(new Set());
+  const [findingFirstAvailable, setFindingFirstAvailable] = useState(true);
 
   const weekDays = Array.from({ length: 7 }, (_, i) => { const d = new Date(weekStart); d.setDate(d.getDate() + i); return d; });
   function isSelectable(d: Date) { return d >= today && d <= maxDate && openSet.has(jsDowToDayId(d.getDay())); }
+
+  // On mount (and whenever service/provider changes), scan the whole booking
+  // window once for the first date with any open slot, and jump the picker
+  // to that week — so the client never lands on a week that's fully closed
+  // or fully booked. This only chooses the WEEK; the client still picks the
+  // day and time slot themselves. Falls back to today's week if nothing is
+  // available anywhere in the window. Gated behind findingFirstAvailable so
+  // the grid never flashes the wrong (likely fully-closed) week first.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const res = await getAvailableSlots({
+        slug, serviceId, providerId, dateFrom: ymd(today), dateTo: ymd(maxDate), dict: dict.errors,
+      });
+      if (cancelled) return;
+      if (res.ok) {
+        const firstAvailableDate = Object.keys(res.slotsByDate)
+          .sort()
+          .find((ds) => res.slotsByDate[ds].length > 0);
+        if (firstAvailableDate) {
+          const [y, m, d] = firstAvailableDate.split("-").map(Number);
+          setWeekStart(startOfWeekMon(new Date(y, m - 1, d)));
+        } else {
+          setWeekStart(startOfWeekMon(today)); // nothing available anywhere; stay on today's week
+        }
+      }
+      setFindingFirstAvailable(false);
+    })();
+    // Resets to "finding" for the next run (service/provider changed) without
+    // calling setState synchronously in the body — cleanup fires before the
+    // next effect's body, ahead of its own setFindingFirstAvailable(false).
+    return () => { cancelled = true; setFindingFirstAvailable(true); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slug, serviceId, providerId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -705,7 +728,7 @@ function DateTimeStep({ slug, serviceId, providerId, openDays, bookingWindowMont
         </button>
       </div>
 
-      {loadingDates.size > 0 ? (
+      {findingFirstAvailable || loadingDates.size > 0 ? (
         <p className="py-6 text-center text-[13.5px] text-ink-soft">{w.searchingSlots}</p>
       ) : (
         <div className="grid grid-cols-7 gap-1">
