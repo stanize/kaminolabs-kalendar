@@ -41,10 +41,15 @@ The public-facing booking wizard clients use to book an appointment.
 
 ---
 
-## Module: patient-portal
-Patient-facing account area (separate from the clinic panel).
+## Module: patient-portal ⚠️ WORK IN PROGRESS
+Patient-facing account area (separate from the clinic panel). **Still actively
+changing** — a new component (`components/auth/patient-auth-card.tsx`) has
+appeared since the last resync and hasn't been reviewed/documented yet. Don't
+treat this module's file list as complete; do a proper resync pass on it once
+it stabilizes rather than trying to keep it current turn-by-turn.
 
 - Routes: `app/patient/(protected)/page.tsx`, `app/patient/(protected)/layout.tsx`, `app/patient/(protected)/bookings/page.tsx`, `app/patient/login/page.tsx`
+- Components: `components/auth/patient-login-form.tsx`, `components/auth/patient-auth-card.tsx` (new, role/purpose not yet reviewed)
 - Lib: `lib/booking/patient-data.ts`
 - Actions: `lib/actions/patient.ts`
 - DB tables: `kalendar_patients`, reads `kalendar_bookings`
@@ -58,11 +63,12 @@ Panel-wide chrome: sidebar, layout, home checklist, support form. Not a single
 feature — this is the "frame" all panel-* modules render inside.
 
 - Routes: `app/panel/layout.tsx`, `app/panel/page.tsx`, `app/panel/support/page.tsx`
-- Components: `components/panel/sidebar.tsx`, `components/panel/email-verification-gate.tsx`, `components/panel/setup-complete-banner.tsx`, `components/panel/editable-greeting-name.tsx`
+- Components: `components/panel/sidebar.tsx`, `components/panel/email-verification-gate.tsx`, `components/panel/setup-complete-banner.tsx`, `components/panel/editable-greeting-name.tsx`, `components/panel/booking-page-card.tsx`
 - Actions: `lib/actions/support.ts`, `lib/actions/account.ts`
 - Data: `lib/account/data.ts` (getPreferredName)
 - DB tables: `kalendar_support_tickets`, `kalendar_user_preferences`
 - i18n: `lib/i18n/dictionaries/panel-shell.ts`
+- Cross-module: Inicio (`app/panel/page.tsx`) reuses `panel-calendar`'s `TodayStatsWidget` component and its `calendar.ts` i18n dict slice, plus `booking-page-card.tsx` (below) for the booking-link card — this module isn't fully self-contained for its home page.
 - Gotchas: clinic role assignment happens idempotently on every panel visit (in the layout) — self-heals Google OAuth + schema resets. BUT the layout first checks `getUserRoles`: a user holding `patient` and NOT `clinic` is redirected to `/patient` instead of being auto-granted `clinic` — role is sticky from first sign-up, so a patient-only account never gets promoted just by landing on `/panel` (e.g. via the clinic `/login` form or a Google OAuth callback, both of which always target `/panel`). Dual-role accounts (both `patient` and `clinic`) are a future feature, not yet handled — currently they always land in the panel. Support screenshot upload goes to Supabase Storage bucket `support-attachments`. Home greeting shows an editable "preferred name" (`kalendar_user_preferences.preferred_name`), a soft display name distinct from the account's Better Auth `user.name` — falls back to the account name's first word, then to a plain "Inicio"/"Home" fallback with no prefix.
 
 ---
@@ -111,8 +117,8 @@ because they're tightly coupled (availability can be per-member in the future).
 "Calendario" — owner-facing view of upcoming/pending bookings.
 
 - Routes: `app/panel/calendar/page.tsx`
-- Components: `components/panel/calendar-bookings.tsx`
-- Lib: `lib/booking/owner-data.ts`
+- Components: `components/panel/calendar-bookings.tsx`, `components/panel/calendar-grid-view.tsx` (Outlook-style weekly grid, per-provider columns), `components/panel/calendar-header.tsx`, `components/panel/calendar-month-view.tsx`, `components/panel/appointment-modal.tsx` (manual appointment creation), `components/panel/today-stats-widget.tsx` (also reused by `panel-shell` — see that module's shared infra note)
+- Lib: `lib/booking/owner-data.ts`, `lib/calendar/client-date.ts` (shared by the grid/month/bookings views)
 - Actions: `lib/actions/booking-owner.ts`
 - DB tables: `kalendar_bookings` (read + status updates), reads `kalendar_patients`
 - i18n: `lib/i18n/dictionaries/calendar.ts`
@@ -124,6 +130,8 @@ because they're tightly coupled (availability can be per-member in the future).
 
 - **i18n mechanism**: `lib/i18n/config.ts`, `lib/i18n/server.ts`, `lib/actions/locale.ts`. Cookie: `kalendar_locale`. One dictionary file per module (see each module's "i18n" line above). If a module needs new UI strings, add to its own dictionary file — don't create a new mechanism.
 - **Email**: `lib/email.ts` (Resend REST API, no SDK). Used by: auth (verification), public-booking (confirm/cancel/owner-notify), future reminders/reschedule.
+- **`.ics` calendar attachment**: `lib/booking/ics.ts` — consumed by both `lib/actions/booking.ts` (public-booking) and `lib/actions/booking-owner.ts` (panel-calendar); not owned by either module alone.
+- **Panel save overlay**: `components/panel/save-overlay.tsx` (`SaveOverlayState`, `SUCCESS_FLASH_MS`) — shared "saving → success flash" UI state used by `panel-business`, `panel-services`, and `panel-team-availability` forms (`business-form.tsx`, `services-manager.tsx`, `team-manager.tsx`, `availability-manager.tsx`). Not module-specific; add new consumers here rather than duplicating.
 - **Cron**: `app/api/cron/sweep-expired-bookings/route.ts` (Vercel Cron). Touches `kalendar_bookings` — relevant to public-booking and panel-calendar.
 - **Supabase client**: `lib/supabase/*` — service-role key, used by every module for DB writes.
 - **Schema**: `supabase/schema_001.sql` (all `kalendar_*` tables + `user_roles`), `supabase/schema_better_auth_001.sql` (Better Auth tables). Any module adding/changing a table edits `schema_001.sql` directly (destructive, re-run convention).
@@ -141,4 +149,4 @@ module section above.
 
 ---
 
-_Last resynced: 2026-07-10_
+_Last resynced: 2026-07-18_

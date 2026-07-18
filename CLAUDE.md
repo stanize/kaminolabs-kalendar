@@ -79,6 +79,7 @@ Kalendar is a SaaS online booking platform targeting Spanish-market professional
 | `RESEND_API_KEY` | Resend API key for verification emails (without it, emails are skipped/logged, not sent) |
 | `EMAIL_FROM` | Sender, e.g. `Kalendar <no-reply@kaminolabs.dev>` (domain must be verified in Resend) |
 | `CRON_SECRET` | Bearer token Vercel sets automatically; used to authorize `app/api/cron/sweep-expired-bookings/route.ts` |
+| `INTERNAL_SCHEMA_API_SECRET` | Shared secret gating `app/api/internal/schema/route.ts`, a read-only endpoint that serves the two schema SQL files' text so the admin portal's (temporary, dev-phase-only) schema-reset feature can run whatever's currently deployed. No DB credentials in this route — worst case a leak exposes table/column names, not write access. Remove this route + var once the admin portal's schema-reset feature is retired. |
 
 ---
 
@@ -134,6 +135,7 @@ separately if needed: `delete from storage.objects where bucket_id = 'support-at
   schema changes, edit this file and re-run it.
 - `schema_better_auth_001.sql` — single consolidated schema for Better Auth's `user`/`session`/`account`/`verification` tables.
 - **Migration order matters**: run `schema_better_auth_001.sql` FIRST (creates `user`/`session`/`account`/`verification`), THEN run `schema_001.sql` — the Kalendar tables have cascade FKs to `public."user"(id)` and will fail if `user` does not yet exist.
+- `supabase/seed_snapshot.sql` — separate, non-destructive snapshot/restore mechanism (not part of either reset script by design, so it survives both). Currently covers `user`, `account`, `user_roles`, `kalendar_businesses` — lets a dev-phase full reset be undone for tables considered "settled" without redoing onboarding by hand. A table is added here only once its shape stabilizes; still-iterating tables are deliberately left out.
 
 ---
 
