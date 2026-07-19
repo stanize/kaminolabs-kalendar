@@ -4,7 +4,7 @@ import { getBusinessForUser } from "@/lib/business/data";
 import {
   getUpcomingBookings,
   getWeekCalendarData,
-  getWeekBounds,
+  getDefaultCalendarWeekBounds,
   getHoyWidgetStats,
   getWeekWidgetStats,
 } from "@/lib/booking/owner-data";
@@ -22,7 +22,7 @@ export default async function CalendarPage() {
     redirect("/panel/business?from=home");
   }
 
-  const { weekStartIso, weekEndIso } = getWeekBounds();
+  const { weekStartIso, weekEndIso } = await getDefaultCalendarWeekBounds(session.user.id);
 
   const [bookings, weekData, hoyStats, weekStats] = await Promise.all([
     getUpcomingBookings(session.user.id),

@@ -289,6 +289,22 @@ export async function getHoyWidgetStats(userId: string): Promise<HoyWidgetStats>
   return { isToday: true, dateIso: `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`, count: 0 };
 }
 
+/** True if any day from `weekStartIso` (Monday) through Sunday still has open business hours after `now`. */
+function weekHasTimeLeft(
+  hoursByDay: Partial<Record<DayId, TimeRange[]>>,
+  weekStartIso: string,
+  now: Date
+): boolean {
+  let cursor = tzDateParts(new Date(weekStartIso), BUSINESS_TZ);
+  for (let i = 0; i < 7; i++) {
+    const dayId = dayIdInTz(zonedTimeToUtc(cursor.year, cursor.month, cursor.day, 12, 0, BUSINESS_TZ), BUSINESS_TZ);
+    const ranges = hoursByDay[dayId] ?? [];
+    if (hasTimeLeft(ranges, cursor.year, cursor.month, cursor.day, now)) return true;
+    cursor = addDaysInBusinessTz(cursor.year, cursor.month, cursor.day, 1);
+  }
+  return false;
+}
+
 export interface WeekWidgetStats {
   isThisWeek: boolean; // false once rolled forward to next week
   count: number;
@@ -308,19 +324,7 @@ export async function getWeekWidgetStats(userId: string): Promise<WeekWidgetStat
   const hoursByDay = await getBusinessHoursByDay(business.id);
   const { weekStartIso, weekEndIso } = getWeekBounds(now);
 
-  let cursor = tzDateParts(new Date(weekStartIso), BUSINESS_TZ);
-  let hasTimeLeftThisWeek = false;
-  for (let i = 0; i < 7; i++) {
-    const dayId = dayIdInTz(zonedTimeToUtc(cursor.year, cursor.month, cursor.day, 12, 0, BUSINESS_TZ), BUSINESS_TZ);
-    const ranges = hoursByDay[dayId] ?? [];
-    if (hasTimeLeft(ranges, cursor.year, cursor.month, cursor.day, now)) {
-      hasTimeLeftThisWeek = true;
-      break;
-    }
-    cursor = addDaysInBusinessTz(cursor.year, cursor.month, cursor.day, 1);
-  }
-
-  if (hasTimeLeftThisWeek) {
+  if (weekHasTimeLeft(hoursByDay, weekStartIso, now)) {
     const count = await countActiveBookings(business.id, now, new Date(weekEndIso));
     return { isThisWeek: true, count };
   }
@@ -328,6 +332,29 @@ export async function getWeekWidgetStats(userId: string): Promise<WeekWidgetStat
   const { weekStartIso: nextWeekStartIso, weekEndIso: nextWeekEndIso } = getWeekBounds(new Date(weekEndIso));
   const count = await countActiveBookings(business.id, new Date(nextWeekStartIso), new Date(nextWeekEndIso));
   return { isThisWeek: false, count };
+}
+
+/**
+ * The calendar page's default landing week: this week if it still has any
+ * open business hours left from right now, otherwise next week (e.g. Friday
+ * evening after closing, with the weekend closed, lands on next week
+ * instead of a dead current week). Same rollover rule as the Esta semana
+ * widget, so clicking either widget or just opening Calendario directly all
+ * land in the same place. Prev/next navigation is unaffected — earlier
+ * weeks are always still reachable.
+ */
+export async function getDefaultCalendarWeekBounds(
+  userId: string
+): Promise<{ weekStartIso: string; weekEndIso: string }> {
+  const business = await getBusinessForUser(userId);
+  const now = new Date();
+  const thisWeek = getWeekBounds(now);
+  if (!business) return thisWeek;
+
+  const hoursByDay = await getBusinessHoursByDay(business.id);
+  if (weekHasTimeLeft(hoursByDay, thisWeek.weekStartIso, now)) return thisWeek;
+
+  return getWeekBounds(new Date(thisWeek.weekEndIso));
 }
 
 const DAY_ORDER_MON_FIRST: DayId[] = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
