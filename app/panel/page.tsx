@@ -7,9 +7,10 @@ import { bookingPath, bookingUrl } from "@/lib/business/booking-url";
 import { SetupCompleteBanner } from "@/components/panel/setup-complete-banner";
 import { EditableGreetingName } from "@/components/panel/editable-greeting-name";
 import { getPanelShellServerDictionary, getLocale } from "@/lib/i18n/server";
-import { getTodayStats } from "@/lib/booking/owner-data";
+import { getHoyWidgetStats, getWeekWidgetStats } from "@/lib/booking/owner-data";
 import { getCalendarDictionary } from "@/lib/i18n/dictionaries/calendar";
 import { TodayStatsWidget } from "@/components/panel/today-stats-widget";
+import { WeekStatsWidget } from "@/components/panel/week-stats-widget";
 import { BookingPageCard } from "@/components/panel/booking-page-card";
 
 export default async function PanelHomePage() {
@@ -22,8 +23,14 @@ export default async function PanelHomePage() {
   const h = dict.home;
 
   const locale = await getLocale();
-  const { totalToday } = await getTodayStats(session.user.id);
+  const [hoyStats, weekStats] = await Promise.all([
+    getHoyWidgetStats(session.user.id),
+    getWeekWidgetStats(session.user.id),
+  ]);
   const calendarDict = getCalendarDictionary(locale);
+  const hoyDayLabel = hoyStats.isToday || !hoyStats.dateIso ? undefined : new Intl.DateTimeFormat(calendarDict.intlLocale, {
+    timeZone: "Europe/Madrid", weekday: "long", day: "numeric", month: "long",
+  }).format(new Date(`${hoyStats.dateIso}T12:00:00Z`));
 
   const preferredName = await getPreferredName(session.user.id);
   const firstName = preferredName || session.user.name?.split(" ")[0] || "";
@@ -138,7 +145,17 @@ export default async function PanelHomePage() {
       {/* Widget tile grid — Hoy/Citas comes first (top-left); more widgets
           get added here later, each as its own tile alongside it. */}
       <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <TodayStatsWidget totalToday={totalToday} dict={calendarDict.widget} />
+        <TodayStatsWidget
+          isToday={hoyStats.isToday}
+          count={hoyStats.count}
+          dayLabel={hoyDayLabel}
+          dict={calendarDict.widget}
+        />
+        <WeekStatsWidget
+          isThisWeek={weekStats.isThisWeek}
+          count={weekStats.count}
+          dict={calendarDict.widget}
+        />
 
         {business?.slug && (
           <BookingPageCard

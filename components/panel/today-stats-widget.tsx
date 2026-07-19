@@ -2,11 +2,21 @@ import Link from "next/link";
 import { Icon } from "@/components/ui/icon";
 import type { CalendarDictionary } from "@/lib/i18n/dictionaries/calendar";
 
+/**
+ * Hoy widget: active (pending + confirmed) appointments remaining from right
+ * now through the end of today — counts down over the day, not a fixed
+ * daily total. If today has no time left (closed, or hours already ended),
+ * shows the next open day's full count instead ("Próxima apertura").
+ */
 export function TodayStatsWidget({
-  totalToday,
+  isToday,
+  count,
+  dayLabel,
   dict,
 }: {
-  totalToday: number;
+  isToday: boolean;
+  count: number;
+  dayLabel?: string; // formatted weekday name, only used when !isToday
   dict: CalendarDictionary["widget"];
 }) {
   return (
@@ -19,11 +29,18 @@ export function TodayStatsWidget({
           <Icon name="calendar" size={17} />
         </div>
         <div className="text-[13px] font-semibold uppercase tracking-[.03em] text-ink-soft">
-          {dict.title}
+          {isToday ? dict.title : dict.nextOpenTitle}
         </div>
       </div>
       <div className="h-8 w-px bg-line" />
-      <Stat value={totalToday} label={dict.appointmentsLabel} />
+      {isToday ? (
+        <Stat value={count} label={dict.appointmentsLabel} />
+      ) : (
+        <div className="flex flex-col">
+          <span className="text-[16px] font-bold capitalize leading-tight text-ink">{dayLabel}</span>
+          <span className="text-[12px] text-ink-soft">{count} {dict.appointmentsLabel.toLowerCase()}</span>
+        </div>
+      )}
     </Link>
   );
 }

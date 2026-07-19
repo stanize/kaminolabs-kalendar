@@ -82,6 +82,9 @@ export interface CalendarDictionary {
   widget: {
     title: string; // "Hoy"
     appointmentsLabel: string; // "Citas"
+    nextOpenTitle: string; // "Próxima apertura" — shown instead of "Hoy" once today has no time left
+    weekTitle: string; // "Esta semana"
+    nextWeekTitle: string; // "Próxima semana" — shown once this week has no time left
   };
   // Intl.DateTimeFormat locale tag for day-heading formatting (e.g. "es-ES").
   intlLocale: string;
@@ -160,6 +163,9 @@ const es: CalendarDictionary = {
   widget: {
     title: "Hoy",
     appointmentsLabel: "Citas",
+    nextOpenTitle: "Próxima apertura",
+    weekTitle: "Esta semana",
+    nextWeekTitle: "Próxima semana",
   },
   intlLocale: "es-ES",
 };
@@ -237,6 +243,9 @@ const en: CalendarDictionary = {
   widget: {
     title: "Today",
     appointmentsLabel: "Appointments",
+    nextOpenTitle: "Next opening",
+    weekTitle: "This week",
+    nextWeekTitle: "Next week",
   },
   intlLocale: "en-GB",
 };

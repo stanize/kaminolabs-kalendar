@@ -5,10 +5,12 @@ import {
   getUpcomingBookings,
   getWeekCalendarData,
   getWeekBounds,
-  getTodayStats,
+  getHoyWidgetStats,
+  getWeekWidgetStats,
 } from "@/lib/booking/owner-data";
 import { CalendarBookings } from "@/components/panel/calendar-bookings";
 import { TodayStatsWidget } from "@/components/panel/today-stats-widget";
+import { WeekStatsWidget } from "@/components/panel/week-stats-widget";
 import { getLocale } from "@/lib/i18n/server";
 import { getCalendarDictionary } from "@/lib/i18n/dictionaries/calendar";
 
@@ -22,14 +24,18 @@ export default async function CalendarPage() {
 
   const { weekStartIso, weekEndIso } = getWeekBounds();
 
-  const [bookings, weekData, todayStats] = await Promise.all([
+  const [bookings, weekData, hoyStats, weekStats] = await Promise.all([
     getUpcomingBookings(session.user.id),
     getWeekCalendarData(session.user.id, weekStartIso, weekEndIso),
-    getTodayStats(session.user.id),
+    getHoyWidgetStats(session.user.id),
+    getWeekWidgetStats(session.user.id),
   ]);
 
   const locale = await getLocale();
   const dict = getCalendarDictionary(locale);
+  const hoyDayLabel = hoyStats.isToday || !hoyStats.dateIso ? undefined : new Intl.DateTimeFormat(dict.intlLocale, {
+    timeZone: "Europe/Madrid", weekday: "long", day: "numeric", month: "long",
+  }).format(new Date(`${hoyStats.dateIso}T12:00:00Z`));
 
   return (
     <div className="mx-auto max-w-[1100px] px-4 py-6 sm:px-8 sm:py-8">
@@ -38,10 +44,19 @@ export default async function CalendarPage() {
           <h1 className="mb-1 text-[24px]">{dict.page.title}</h1>
           <p className="text-[15px] text-ink-soft">{dict.page.subtitle}</p>
         </div>
-        <TodayStatsWidget
-          totalToday={todayStats.totalToday}
-          dict={dict.widget}
-        />
+        <div className="flex flex-wrap gap-3">
+          <TodayStatsWidget
+            isToday={hoyStats.isToday}
+            count={hoyStats.count}
+            dayLabel={hoyDayLabel}
+            dict={dict.widget}
+          />
+          <WeekStatsWidget
+            isThisWeek={weekStats.isThisWeek}
+            count={weekStats.count}
+            dict={dict.widget}
+          />
+        </div>
       </div>
 
       <CalendarBookings

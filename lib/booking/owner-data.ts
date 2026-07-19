@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getBusinessForUser } from "@/lib/business/data";
 import { getTeamForUser } from "@/lib/team/data";
 import { getServicesForUser } from "@/lib/services/data";
-import { generateSlotsForDay, dayIdInTz, tzDateParts, zonedTimeToUtc, BUSINESS_TZ } from "@/lib/booking/slots";
+import { dayIdInTz, tzDateParts, zonedTimeToUtc, BUSINESS_TZ } from "@/lib/booking/slots";
 import type { DayId } from "@/lib/onboarding/types";
 import type { TimeRange } from "@/lib/booking/slots";
 
@@ -214,81 +214,121 @@ export async function getWeekBookings(
   return data?.bookings ?? [];
 }
 
-// ── Today widget: appointment count + free-slot estimate ───────────────────
+// ── Inicio/Calendar dashboard widgets: Hoy + Esta semana ────────────────────
+//
+// Both widgets count only active bookings (pending + confirmed), and both
+// count what's still AHEAD from right now — not the day/week's original
+// total — so the number counts down over the course of the day/week as
+// appointments pass. When there's no time left in the current window
+// (today's hours are done, or the whole week's hours are done), each widget
+// rolls forward to the next window instead of showing a stale/zero count.
 
-export interface TodayStats {
-  totalToday: number;
-  freeSlotsToday: number;
+/** Advances a Madrid-tz calendar date by `n` days, DST-safe (noon-anchored). */
+function addDaysInBusinessTz(year: number, month: number, day: number, n: number) {
+  const noon = zonedTimeToUtc(year, month, day, 12, 0, BUSINESS_TZ);
+  noon.setUTCDate(noon.getUTCDate() + n);
+  return tzDateParts(noon, BUSINESS_TZ);
 }
 
-/** Generic slot granularity used only for the "free slots today" estimate —
- * unlike the real booking engine, this widget isn't tied to a specific
- * service duration, so it approximates with a fixed 30-minute grid. */
-const WIDGET_SLOT_MINUTES = 30;
+/** True if `ranges` (a day's business hours) has any time left after `now`. */
+function hasTimeLeft(ranges: TimeRange[], year: number, month: number, day: number, now: Date): boolean {
+  return ranges.some((r) => {
+    const [eh, em] = r.end.split(":").map(Number);
+    return zonedTimeToUtc(year, month, day, eh, em, BUSINESS_TZ) > now;
+  });
+}
+
+async function countActiveBookings(businessId: string, fromUtc: Date, toUtc: Date): Promise<number> {
+  const supabase = await createClient();
+  const { count } = await supabase
+    .from("kalendar_bookings")
+    .select("id", { count: "exact", head: true })
+    .eq("business_id", businessId)
+    .in("status", ["pending_confirmation", "confirmed"])
+    .gte("starts_at", fromUtc.toISOString())
+    .lt("starts_at", toUtc.toISOString());
+  return count ?? 0;
+}
+
+export interface HoyWidgetStats {
+  isToday: boolean; // false once rolled forward to the next open day
+  dateIso: string; // Madrid "YYYY-MM-DD" the count actually covers
+  count: number;
+}
 
 /**
- * Today's appointment count (pending + confirmed) and an estimated count of
- * remaining free slots today, summed across all providers. Free slots use a
- * fixed 30-minute grid (see WIDGET_SLOT_MINUTES) since "a slot" has no fixed
- * duration outside of a specific service — this is a dashboard estimate, not
- * the exact booking-engine availability.
+ * Hoy widget: active bookings remaining from right now through the end of
+ * today. If today is closed, or today's hours have already ended, scans
+ * forward (up to 14 days) for the next day with any open hours and returns
+ * that day's full count instead (isToday: false).
  */
-export async function getTodayStats(userId: string): Promise<TodayStats> {
+export async function getHoyWidgetStats(userId: string): Promise<HoyWidgetStats> {
   const business = await getBusinessForUser(userId);
-  if (!business) return { totalToday: 0, freeSlotsToday: 0 };
+  if (!business) return { isToday: true, dateIso: "", count: 0 };
 
   const now = new Date();
+  const hoursByDay = await getBusinessHoursByDay(business.id);
+  let cursor = tzDateParts(now, BUSINESS_TZ);
+
+  for (let i = 0; i < 14; i++) {
+    const dayId = dayIdInTz(zonedTimeToUtc(cursor.year, cursor.month, cursor.day, 12, 0, BUSINESS_TZ), BUSINESS_TZ);
+    const ranges = hoursByDay[dayId] ?? [];
+    if (hasTimeLeft(ranges, cursor.year, cursor.month, cursor.day, now)) {
+      const windowStart = i === 0 ? now : zonedTimeToUtc(cursor.year, cursor.month, cursor.day, 0, 0, BUSINESS_TZ);
+      const nextDay = addDaysInBusinessTz(cursor.year, cursor.month, cursor.day, 1);
+      const windowEnd = zonedTimeToUtc(nextDay.year, nextDay.month, nextDay.day, 0, 0, BUSINESS_TZ);
+      const count = await countActiveBookings(business.id, windowStart, windowEnd);
+      const dateIso = `${cursor.year}-${String(cursor.month).padStart(2, "0")}-${String(cursor.day).padStart(2, "0")}`;
+      return { isToday: i === 0, dateIso, count };
+    }
+    cursor = addDaysInBusinessTz(cursor.year, cursor.month, cursor.day, 1);
+  }
+
+  // Nothing open in the next 14 days — fall back to today's (empty) window.
   const { year, month, day } = tzDateParts(now, BUSINESS_TZ);
-  const dayId = dayIdInTz(now, BUSINESS_TZ);
-
-  const supabase = await createClient();
-  const [hoursByDay, members, bookingsRes] = await Promise.all([
-    getBusinessHoursByDay(business.id),
-    getTeamForUser(userId),
-    supabase
-      .from("kalendar_bookings")
-      .select("starts_at, ends_at, team_member_id, status")
-      .eq("business_id", business.id)
-      .in("status", ["pending_confirmation", "confirmed"])
-      .gte(
-        "starts_at",
-        new Date(Date.UTC(year, month - 1, day, 0, 0, 0)).toISOString()
-      )
-      .lt(
-        "starts_at",
-        new Date(Date.UTC(year, month - 1, day + 1, 0, 0, 0)).toISOString()
-      ),
-  ]);
-
-  const todaysBookings =
-    (bookingsRes.data as
-      | { starts_at: string; ends_at: string; team_member_id: string | null }[]
-      | null) ?? [];
-
-  const ranges = hoursByDay[dayId] ?? [];
-  if (ranges.length === 0 || members.length === 0) {
-    return { totalToday: todaysBookings.length, freeSlotsToday: 0 };
-  }
-
-  let freeSlotsToday = 0;
-  for (const member of members) {
-    const taken = todaysBookings
-      .filter((b) => b.team_member_id === member.id)
-      .map((b) => ({ start: new Date(b.starts_at), end: new Date(b.ends_at) }));
-    const slots = generateSlotsForDay({
-      dateInTz: { year, month, day },
-      ranges,
-      durationMin: WIDGET_SLOT_MINUTES,
-      taken,
-      now,
-    });
-    freeSlotsToday += slots.length;
-  }
-
-  return { totalToday: todaysBookings.length, freeSlotsToday };
+  return { isToday: true, dateIso: `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`, count: 0 };
 }
 
-// ── Week bounds helper (server-side, mirrors the client's mondayStart) ─────
+export interface WeekWidgetStats {
+  isThisWeek: boolean; // false once rolled forward to next week
+  count: number;
+}
+
+/**
+ * Esta semana widget: active bookings remaining from right now through the
+ * end of the current Madrid-tz calendar week (Monday-Sunday). If the week's
+ * business hours are all done (no open time left in any remaining day, Mon
+ * through Sun), rolls forward to next week's full count instead.
+ */
+export async function getWeekWidgetStats(userId: string): Promise<WeekWidgetStats> {
+  const business = await getBusinessForUser(userId);
+  if (!business) return { isThisWeek: true, count: 0 };
+
+  const now = new Date();
+  const hoursByDay = await getBusinessHoursByDay(business.id);
+  const { weekStartIso, weekEndIso } = getWeekBounds(now);
+
+  let cursor = tzDateParts(new Date(weekStartIso), BUSINESS_TZ);
+  let hasTimeLeftThisWeek = false;
+  for (let i = 0; i < 7; i++) {
+    const dayId = dayIdInTz(zonedTimeToUtc(cursor.year, cursor.month, cursor.day, 12, 0, BUSINESS_TZ), BUSINESS_TZ);
+    const ranges = hoursByDay[dayId] ?? [];
+    if (hasTimeLeft(ranges, cursor.year, cursor.month, cursor.day, now)) {
+      hasTimeLeftThisWeek = true;
+      break;
+    }
+    cursor = addDaysInBusinessTz(cursor.year, cursor.month, cursor.day, 1);
+  }
+
+  if (hasTimeLeftThisWeek) {
+    const count = await countActiveBookings(business.id, now, new Date(weekEndIso));
+    return { isThisWeek: true, count };
+  }
+
+  const { weekStartIso: nextWeekStartIso, weekEndIso: nextWeekEndIso } = getWeekBounds(new Date(weekEndIso));
+  const count = await countActiveBookings(business.id, new Date(nextWeekStartIso), new Date(nextWeekEndIso));
+  return { isThisWeek: false, count };
+}
 
 const DAY_ORDER_MON_FIRST: DayId[] = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 
