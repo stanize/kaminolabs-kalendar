@@ -482,6 +482,18 @@ function ConfirmAuthModal({
               <input type="password" placeholder={af.passwordPlaceholder} value={password}
                 onChange={(e) => setPassword(e.target.value)} disabled={busy}
                 onKeyDown={(e) => e.key === "Enter" && handleLogin()} className={`${inputBase} rounded-full`} />
+              <div className="-mt-1 flex justify-start">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const redirectTo = window.location.pathname + window.location.search;
+                    window.location.href = `/forgot-password?from=patient&redirectTo=${encodeURIComponent(redirectTo)}`;
+                  }}
+                  className="pl-4 text-[12px] font-medium text-brand hover:underline"
+                >
+                  {af.forgotPasswordLink}
+                </button>
+              </div>
               <button type="button" onClick={handleLogin} disabled={busy}
                 className="w-full rounded-full bg-brand px-4 py-3.5 text-[14.5px] font-semibold text-white transition-all hover:opacity-90 disabled:opacity-60">
                 {busy ? af.signingIn : af.signIn}
