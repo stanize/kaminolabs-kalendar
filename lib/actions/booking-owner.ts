@@ -164,6 +164,71 @@ export const confirmBookingAsOwner = authedAction(
   }
 );
 
+export type BookingResultStatus = "completed" | "no_show" | "cancelled";
+export type BookingPaymentStatus = "unpaid" | "paid";
+
+/** The translation slice updateBookingResult needs for its own error messages. */
+export interface UpdateBookingResultDict {
+  errNoBusiness: string;
+  errNotFound: string;
+  errUpdateFailed: string;
+}
+
+const RESULT_FALLBACK: UpdateBookingResultDict = {
+  errNoBusiness: "No hay negocio.",
+  errNotFound: "Reserva no encontrada.",
+  errUpdateFailed: "No se pudo actualizar la cita.",
+};
+
+/**
+ * Sets a past booking's result (completed/no-show/cancelled) and payment
+ * status (paid/unpaid) from the owner's booking-detail modal. Both are
+ * independent of each other — a no-show can still be marked paid (deposit
+ * kept), a completed session can be pending payment, etc.
+ *
+ * NOTE: doesn't yet update kalendar_clients' denormalized session counters
+ * (total_sessions/completed_count/etc.) — clinic_client_id isn't populated
+ * by any write path yet (manual bookings and the guest wizard don't create/
+ * link a client record yet either). Wiring the counters is follow-up work
+ * once those write paths exist, so it can be tested against real linked
+ * bookings instead of guessed at.
+ */
+export const updateBookingResult = authedAction(
+  async (
+    session,
+    input: { bookingId: string; status: BookingResultStatus; paymentStatus: BookingPaymentStatus },
+    dict?: Partial<UpdateBookingResultDict>
+  ): Promise<OwnerBookingResult> => {
+    const t = { ...RESULT_FALLBACK, ...dict };
+
+    const business = await getBusinessForUser(session.user.id);
+    if (!business) return { ok: false, error: t.errNoBusiness };
+
+    const supabase = await createClient();
+
+    const { data: booking } = await supabase
+      .from("kalendar_bookings")
+      .select("id")
+      .eq("id", input.bookingId)
+      .eq("business_id", business.id)
+      .maybeSingle();
+
+    if (!booking) return { ok: false, error: t.errNotFound };
+
+    const { error } = await supabase
+      .from("kalendar_bookings")
+      .update({ status: input.status, payment_status: input.paymentStatus })
+      .eq("id", input.bookingId)
+      .eq("business_id", business.id);
+
+    if (error) return { ok: false, error: t.errUpdateFailed };
+
+    revalidatePath("/panel/calendar");
+    revalidatePath("/panel");
+    return { ok: true };
+  }
+);
+
 // ── Manual (owner-created) appointment — week grid slot click ──────────────
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

@@ -96,6 +96,7 @@ export function CalendarGridView({
   bookings,
   dict,
   onBookingCreated,
+  onBookingClick,
 }: {
   view: "day" | "week";
   days: GridDay[];
@@ -105,6 +106,7 @@ export function CalendarGridView({
   bookings: WeekBookingVM[];
   dict: CalendarDictionary;
   onBookingCreated: () => void;
+  onBookingClick: (booking: WeekBookingVM, providerName: string) => void;
 }) {
   const router = useRouter();
   const w = dict.week;
@@ -153,8 +155,34 @@ export function CalendarGridView({
     return marks;
   }, [gridStartMin, gridEndMin]);
 
-  const handleSlotClick = (day: GridDay, member: WeekMemberVM, clickMinute: number) => {
-    const rounded = Math.round(clickMinute / 15) * 15;
+  /**
+   * Snaps a raw click-position minute to the nearest real bookable slot —
+   * mirrors generateSlotsForDay's default 60-minute step from each working-
+   * hours range's start (see lib/booking/slots.ts), so clicking near 10:00
+   * lands on 10:00 like the patient wizard would offer, not an arbitrary
+   * 15-minute pixel-rounded time. Falls back to a 15-minute mark if the day
+   * has no ranges at all (fully closed) — the owner can still book outside
+   * hours, just without a slot grid to snap to.
+   */
+  const snapToSlotGrid = (clickMinute: number, ranges: TimeRangeVM[]): number => {
+    const STEP = 60;
+    let best: number | null = null;
+    let bestDist = Infinity;
+    for (const r of ranges) {
+      const [sh, sm] = r.start.split(":").map(Number);
+      const [eh, em] = r.end.split(":").map(Number);
+      const rangeStart = sh * 60 + sm;
+      const rangeEnd = eh * 60 + em;
+      for (let t = rangeStart; t < rangeEnd; t += STEP) {
+        const dist = Math.abs(t - clickMinute);
+        if (dist < bestDist) { bestDist = dist; best = t; }
+      }
+    }
+    return best !== null ? best : Math.round(clickMinute / 15) * 15;
+  };
+
+  const handleSlotClick = (day: GridDay, member: WeekMemberVM, clickMinute: number, ranges: TimeRangeVM[]) => {
+    const rounded = snapToSlotGrid(clickMinute, ranges);
     const hh = Math.floor(rounded / 60);
     const mm = rounded % 60;
     const startDate = zonedTimeToUtc(day.year, day.month, day.day, hh, mm);
@@ -221,6 +249,7 @@ export function CalendarGridView({
                     gridHeight={gridHeight}
                     dict={dict}
                     onSlotClick={handleSlotClick}
+                    onBookingClick={onBookingClick}
                   />
                 ))}
               </div>
@@ -255,6 +284,7 @@ function DayProviderColumn({
   gridHeight,
   dict,
   onSlotClick,
+  onBookingClick,
 }: {
   day: GridDay;
   member: WeekMemberVM;
@@ -265,7 +295,8 @@ function DayProviderColumn({
   gridEndMin: number;
   gridHeight: number;
   dict: CalendarDictionary;
-  onSlotClick: (day: GridDay, member: WeekMemberVM, clickMinute: number) => void;
+  onSlotClick: (day: GridDay, member: WeekMemberVM, clickMinute: number, ranges: TimeRangeVM[]) => void;
+  onBookingClick: (booking: WeekBookingVM, providerName: string) => void;
 }) {
   const dayBookings = bookings.filter((b) => {
     if (b.teamMemberId !== member.id) return false;
@@ -277,7 +308,7 @@ function DayProviderColumn({
     const rect = e.currentTarget.getBoundingClientRect();
     const offsetY = e.clientY - rect.top;
     const clickMinute = gridStartMin + offsetY / PX_PER_MIN;
-    onSlotClick(day, member, clickMinute);
+    onSlotClick(day, member, clickMinute, ranges);
   };
 
   return (
@@ -332,7 +363,9 @@ function DayProviderColumn({
           />
         ))}
 
-        {/* Bookings */}
+        {/* Bookings — click opens the detail modal (manage/cancel if
+            upcoming, mark result + payment if in the past) instead of
+            falling through to the empty-slot "new appointment" handler. */}
         {dayBookings.map((b) => {
           const startMin = minutesInTz(new Date(b.startIso));
           const top = (startMin - gridStartMin) * PX_PER_MIN;
@@ -341,7 +374,7 @@ function DayProviderColumn({
           return (
             <div
               key={b.id}
-              onClick={(e) => e.stopPropagation()}
+              onClick={(e) => { e.stopPropagation(); onBookingClick(b, member.name); }}
               className={`absolute left-0.5 right-0.5 overflow-hidden rounded-md px-1.5 py-[3px] text-[10.5px] leading-[1.2] ${
                 isPending ? "bg-orange-100 text-orange-700" : "bg-brand text-white"
               }`}

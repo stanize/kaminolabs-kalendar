@@ -14,6 +14,7 @@ import {
   type TimeRangeVM,
 } from "@/components/panel/calendar-grid-view";
 import { CalendarMonthView } from "@/components/panel/calendar-month-view";
+import { BookingDetailModal } from "@/components/panel/booking-detail-modal";
 import {
   dayStart,
   mondayStart,
@@ -122,6 +123,7 @@ export function CalendarBookings({
   const [focusDate, setFocusDate] = useState<Date>(() => new Date(weekStartIso));
   const [fetchedBookings, setFetchedBookings] = useState<WeekBookingVM[] | null>(null);
   const [gridLoading, setGridLoading] = useState(false);
+  const [selectedBooking, setSelectedBooking] = useState<{ booking: WeekBookingVM; providerName: string } | null>(null);
 
   const computeRange = useCallback((v: CalendarViewMode, date: Date) => {
     if (v === "day") {
@@ -302,9 +304,22 @@ export function CalendarBookings({
               bookings={gridBookings}
               dict={dict}
               onBookingCreated={handleGridBookingCreated}
+              onBookingClick={(booking, providerName) => setSelectedBooking({ booking, providerName })}
             />
           )}
         </div>
+      )}
+
+      {selectedBooking && (
+        <BookingDetailModal
+          booking={selectedBooking.booking}
+          providerName={selectedBooking.providerName}
+          intlLocale={dict.intlLocale}
+          dict={dict.detailModal}
+          errorsDict={dict.errors}
+          onClose={() => setSelectedBooking(null)}
+          onUpdated={handleGridBookingCreated}
+        />
       )}
 
       {tab === "pending" && (

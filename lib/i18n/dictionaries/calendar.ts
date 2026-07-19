@@ -36,6 +36,7 @@ export interface CalendarDictionary {
     errNotFound: string;
     errCannotCancel: string;
     errCancelFailed: string;
+    errUpdateFailed: string; // updateBookingResult
   };
   week: {
     prevLabel: string; // aria-label for the "previous" nav button — same button for day/week/month
@@ -79,6 +80,20 @@ export interface CalendarDictionary {
     errSlotTaken: string;
     errCreateFailed: string;
   };
+  detailModal: {
+    close: string; // aria-label for the X button
+    cancelButton: string;
+    cancelling: string;
+    resultLabel: string; // "Resultado"
+    resultCompleted: string;
+    resultNoShow: string;
+    resultCancelled: string;
+    paymentLabel: string; // "Pago"
+    paymentPaid: string;
+    paymentPending: string;
+    saveButton: string;
+    saving: string;
+  };
   widget: {
     title: string; // "Hoy"
     appointmentsLabel: string; // "Citas"
@@ -118,6 +133,7 @@ const es: CalendarDictionary = {
     errNotFound: "Reserva no encontrada.",
     errCannotCancel: "Esta reserva ya no se puede cancelar.",
     errCancelFailed: "No se pudo cancelar la reserva.",
+    errUpdateFailed: "No se pudo actualizar la cita.",
   },
   week: {
     prevLabel: "Anterior",
@@ -160,6 +176,20 @@ const es: CalendarDictionary = {
     errSlotTaken: "Ese horario ya no está disponible. Elige otro.",
     errCreateFailed: "No se pudo crear la cita. Inténtalo de nuevo.",
   },
+  detailModal: {
+    close: "Cerrar",
+    cancelButton: "Cancelar cita",
+    cancelling: "Cancelando…",
+    resultLabel: "Resultado",
+    resultCompleted: "Completada",
+    resultNoShow: "No-show",
+    resultCancelled: "Cancelada",
+    paymentLabel: "Pago",
+    paymentPaid: "Pagado",
+    paymentPending: "Pendiente",
+    saveButton: "Guardar",
+    saving: "Guardando…",
+  },
   widget: {
     title: "Hoy",
     appointmentsLabel: "Citas",
@@ -198,6 +228,7 @@ const en: CalendarDictionary = {
     errNotFound: "Booking not found.",
     errCannotCancel: "This booking can no longer be cancelled.",
     errCancelFailed: "Couldn't cancel the booking.",
+    errUpdateFailed: "Couldn't update the appointment.",
   },
   week: {
     prevLabel: "Previous",
@@ -239,6 +270,20 @@ const en: CalendarDictionary = {
     errInvalidSlot: "The selected time isn't valid.",
     errSlotTaken: "That slot is no longer available. Pick another.",
     errCreateFailed: "Couldn't create the appointment. Please try again.",
+  },
+  detailModal: {
+    close: "Close",
+    cancelButton: "Cancel appointment",
+    cancelling: "Cancelling…",
+    resultLabel: "Result",
+    resultCompleted: "Completed",
+    resultNoShow: "No-show",
+    resultCancelled: "Cancelled",
+    paymentLabel: "Payment",
+    paymentPaid: "Paid",
+    paymentPending: "Pending",
+    saveButton: "Save",
+    saving: "Saving…",
   },
   widget: {
     title: "Today",
