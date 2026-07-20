@@ -7,7 +7,8 @@ import { dayIdInTz, tzDateParts, zonedTimeToUtc, BUSINESS_TZ } from "@/lib/booki
 import type { DayId } from "@/lib/onboarding/types";
 import type { TimeRange } from "@/lib/booking/slots";
 
-export type BookingStatus = "pending_confirmation" | "confirmed" | "cancelled" | "completed";
+export type BookingStatus = "pending_confirmation" | "confirmed" | "cancelled" | "completed" | "no_show";
+export type PaymentStatus = "unpaid" | "paid";
 
 export interface OwnerBooking {
   id: string;
@@ -84,6 +85,7 @@ export interface WeekViewBooking {
   endIso: string;
   durationMin: number;
   status: BookingStatus;
+  paymentStatus: PaymentStatus;
   clientName: string;
   clientEmail: string;
   clientPhone: string | null;
@@ -151,12 +153,17 @@ export async function getWeekCalendarData(
     supabase
       .from("kalendar_bookings")
       .select(
-        "id, service_name, service_duration_min, starts_at, ends_at, status, client_name, client_email, client_phone, team_member_id, pending_expiry_at, guest_locale"
+        "id, service_name, service_duration_min, starts_at, ends_at, status, payment_status, client_name, client_email, client_phone, team_member_id, pending_expiry_at, guest_locale"
       )
       .eq("business_id", business.id)
-      .in("status", ["pending_confirmation", "confirmed"])
       .gte("starts_at", weekStartIso)
       .lt("starts_at", weekEndIso)
+      // Future bookings: only active ones (pending/confirmed) — a future
+      // booking that's cancelled stays hidden, same as before. Past
+      // bookings: every status — once a booking's time has passed, it
+      // stays visible in the grid (styled differently) whether or not
+      // it's been reviewed yet, instead of disappearing once marked.
+      .or(`status.in.(pending_confirmation,confirmed),starts_at.lt.${new Date().toISOString()}`)
       .order("starts_at", { ascending: true }),
   ]);
 
@@ -169,6 +176,7 @@ export async function getWeekCalendarData(
           starts_at: string;
           ends_at: string;
           status: BookingStatus;
+          payment_status: PaymentStatus;
           client_name: string;
           client_email: string;
           client_phone: string | null;
@@ -184,6 +192,7 @@ export async function getWeekCalendarData(
     endIso: b.ends_at,
     durationMin: b.service_duration_min,
     status: b.status,
+    paymentStatus: b.payment_status,
     clientName: b.client_name,
     clientEmail: b.client_email,
     clientPhone: b.client_phone,

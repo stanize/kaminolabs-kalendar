@@ -28,7 +28,7 @@ import {
 import type { CalendarDictionary } from "@/lib/i18n/dictionaries/calendar";
 import type { DayId } from "@/lib/onboarding/types";
 
-type Status = "pending_confirmation" | "confirmed" | "cancelled" | "completed";
+type Status = "pending_confirmation" | "confirmed" | "cancelled" | "completed" | "no_show";
 
 interface BookingVM {
   id: string;

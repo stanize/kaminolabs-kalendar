@@ -3,6 +3,7 @@
 import type { CalendarDictionary } from "@/lib/i18n/dictionaries/calendar";
 import { TZ, tzDateParts } from "@/lib/calendar/client-date";
 import type { WeekBookingVM } from "@/components/panel/calendar-grid-view";
+import { chipClasses } from "@/components/panel/calendar-grid-view";
 
 const MAX_CHIPS_PER_DAY = 3;
 
@@ -93,9 +94,7 @@ export function CalendarMonthView({
                 {dayBookings.slice(0, MAX_CHIPS_PER_DAY).map((b) => (
                   <div
                     key={b.id}
-                    className={`truncate rounded px-1 py-0.5 text-[10px] leading-tight ${
-                      b.status === "pending_confirmation" ? "bg-orange-100 text-orange-700" : "bg-brand-weak text-brand-ink"
-                    }`}
+                    className={`truncate rounded px-1 py-0.5 text-[10px] leading-tight ${chipClasses(b.status, new Date(b.startIso) < new Date())}`}
                   >
                     {timeLabel(b.startIso)} · {b.clientName}
                   </div>

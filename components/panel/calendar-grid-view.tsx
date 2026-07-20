@@ -34,7 +34,8 @@ export interface WeekBookingVM {
   startIso: string;
   endIso: string;
   durationMin: number;
-  status: "pending_confirmation" | "confirmed" | "cancelled" | "completed";
+  status: "pending_confirmation" | "confirmed" | "cancelled" | "completed" | "no_show";
+  paymentStatus: "unpaid" | "paid";
   clientName: string;
   clientEmail: string;
   clientPhone: string | null;
@@ -273,6 +274,25 @@ export function CalendarGridView({
   );
 }
 
+/**
+ * Chip color for a booking, by state:
+ * - pending_confirmation: unchanged orange (awaiting guest confirmation)
+ * - confirmed, still upcoming: unchanged brand teal
+ * - confirmed, but its time has passed and it hasn't been reviewed yet:
+ *   muted slate — a visual nudge that it needs a Resultado/Pago
+ * - completed / no_show / cancelled: each their own muted color, so a
+ *   glance at the week tells you which past appointments were handled and
+ *   how, without them disappearing from the grid.
+ * Always clickable regardless of state — past appointments can be revised.
+ */
+export function chipClasses(status: WeekBookingVM["status"], isPast: boolean): string {
+  if (status === "pending_confirmation") return "bg-orange-100 text-orange-700";
+  if (status === "confirmed") return isPast ? "bg-slate-200 text-slate-700" : "bg-brand text-white";
+  if (status === "completed") return "bg-emerald-100 text-emerald-700";
+  if (status === "no_show") return "bg-red-100 text-red-700";
+  return "bg-surface-2 text-ink-soft line-through decoration-1"; // cancelled
+}
+
 function DayProviderColumn({
   day,
   member,
@@ -370,14 +390,12 @@ function DayProviderColumn({
           const startMin = minutesInTz(new Date(b.startIso));
           const top = (startMin - gridStartMin) * PX_PER_MIN;
           const height = Math.max(b.durationMin * PX_PER_MIN, 30);
-          const isPending = b.status === "pending_confirmation";
+          const isPast = new Date(b.startIso) < new Date();
           return (
             <div
               key={b.id}
               onClick={(e) => { e.stopPropagation(); onBookingClick(b, member.name); }}
-              className={`absolute left-0.5 right-0.5 overflow-hidden rounded-md px-1.5 py-[3px] text-[10.5px] leading-[1.2] ${
-                isPending ? "bg-orange-100 text-orange-700" : "bg-brand text-white"
-              }`}
+              className={`absolute left-0.5 right-0.5 cursor-pointer overflow-hidden rounded-md px-1.5 py-[3px] text-[10.5px] leading-[1.2] ${chipClasses(b.status, isPast)}`}
               style={{ top, height }}
             >
               <div className="truncate font-semibold">{b.serviceName}</div>

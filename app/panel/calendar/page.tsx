@@ -86,6 +86,7 @@ export default async function CalendarPage() {
           endIso: b.endIso,
           durationMin: b.durationMin,
           status: b.status,
+          paymentStatus: b.paymentStatus,
           clientName: b.clientName,
           clientEmail: b.clientEmail,
           clientPhone: b.clientPhone,

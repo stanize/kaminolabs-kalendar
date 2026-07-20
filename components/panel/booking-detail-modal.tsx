@@ -28,8 +28,12 @@ export function BookingDetailModal({
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<BookingResultStatus | null>(null);
-  const [payment, setPayment] = useState<BookingPaymentStatus>("unpaid");
+  const initialResult: BookingResultStatus | null =
+    booking.status === "completed" || booking.status === "no_show" || booking.status === "cancelled"
+      ? booking.status
+      : null;
+  const [result, setResult] = useState<BookingResultStatus | null>(initialResult);
+  const [payment, setPayment] = useState<BookingPaymentStatus>(booking.paymentStatus);
 
   const isFuture = new Date(booking.startIso) > new Date();
   const hasRealEmail = booking.clientEmail && !booking.clientEmail.startsWith("sin-email+");
