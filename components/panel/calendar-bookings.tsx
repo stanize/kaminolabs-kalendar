@@ -123,7 +123,7 @@ export function CalendarBookings({
   const [focusDate, setFocusDate] = useState<Date>(() => new Date(weekStartIso));
   const [fetchedBookings, setFetchedBookings] = useState<WeekBookingVM[] | null>(null);
   const [gridLoading, setGridLoading] = useState(false);
-  const [selectedBooking, setSelectedBooking] = useState<{ booking: WeekBookingVM; providerName: string } | null>(null);
+  const [selectedBooking, setSelectedBooking] = useState<WeekBookingVM | null>(null);
 
   const computeRange = useCallback((v: CalendarViewMode, date: Date) => {
     if (v === "day") {
@@ -304,7 +304,7 @@ export function CalendarBookings({
               bookings={gridBookings}
               dict={dict}
               onBookingCreated={handleGridBookingCreated}
-              onBookingClick={(booking, providerName) => setSelectedBooking({ booking, providerName })}
+              onBookingClick={(booking) => setSelectedBooking(booking)}
             />
           )}
         </div>
@@ -312,8 +312,7 @@ export function CalendarBookings({
 
       {selectedBooking && (
         <BookingDetailModal
-          booking={selectedBooking.booking}
-          providerName={selectedBooking.providerName}
+          booking={selectedBooking}
           intlLocale={dict.intlLocale}
           dict={dict.detailModal}
           errorsDict={dict.errors}
