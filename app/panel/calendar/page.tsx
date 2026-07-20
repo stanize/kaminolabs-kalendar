@@ -90,6 +90,7 @@ export default async function CalendarPage() {
           clientName: b.clientName,
           clientEmail: b.clientEmail,
           clientPhone: b.clientPhone,
+          notes: b.notes,
           teamMemberId: b.teamMemberId,
           pendingExpiryAt: b.pendingExpiryAt,
           guestLocale: b.guestLocale,

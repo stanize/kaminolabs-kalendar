@@ -39,6 +39,7 @@ export interface WeekBookingVM {
   clientName: string;
   clientEmail: string;
   clientPhone: string | null;
+  notes: string | null;
   teamMemberId: string | null;
   pendingExpiryAt: string | null;
   guestLocale: string | null;
@@ -107,7 +108,7 @@ export function CalendarGridView({
   bookings: WeekBookingVM[];
   dict: CalendarDictionary;
   onBookingCreated: () => void;
-  onBookingClick: (booking: WeekBookingVM) => void;
+  onBookingClick: (booking: WeekBookingVM, providerName: string) => void;
 }) {
   const router = useRouter();
   const w = dict.week;
@@ -316,7 +317,7 @@ function DayProviderColumn({
   gridHeight: number;
   dict: CalendarDictionary;
   onSlotClick: (day: GridDay, member: WeekMemberVM, clickMinute: number, ranges: TimeRangeVM[]) => void;
-  onBookingClick: (booking: WeekBookingVM) => void;
+  onBookingClick: (booking: WeekBookingVM, providerName: string) => void;
 }) {
   const dayBookings = bookings.filter((b) => {
     if (b.teamMemberId !== member.id) return false;
@@ -394,7 +395,7 @@ function DayProviderColumn({
           return (
             <div
               key={b.id}
-              onClick={(e) => { e.stopPropagation(); onBookingClick(b); }}
+              onClick={(e) => { e.stopPropagation(); onBookingClick(b, member.name); }}
               className={`absolute left-0.5 right-0.5 cursor-pointer overflow-hidden rounded-md px-1.5 py-[3px] text-[10.5px] leading-[1.2] ${chipClasses(b.status, isPast)}`}
               style={{ top, height }}
             >

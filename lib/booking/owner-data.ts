@@ -89,6 +89,7 @@ export interface WeekViewBooking {
   clientName: string;
   clientEmail: string;
   clientPhone: string | null;
+  notes: string | null;
   teamMemberId: string | null;
   pendingExpiryAt: string | null;
   guestLocale: string | null;
@@ -153,7 +154,7 @@ export async function getWeekCalendarData(
     supabase
       .from("kalendar_bookings")
       .select(
-        "id, service_name, service_duration_min, starts_at, ends_at, status, payment_status, client_name, client_email, client_phone, team_member_id, pending_expiry_at, guest_locale"
+        "id, service_name, service_duration_min, starts_at, ends_at, status, payment_status, client_name, client_email, client_phone, notes, team_member_id, pending_expiry_at, guest_locale"
       )
       .eq("business_id", business.id)
       .gte("starts_at", weekStartIso)
@@ -180,6 +181,7 @@ export async function getWeekCalendarData(
           client_name: string;
           client_email: string;
           client_phone: string | null;
+          notes: string | null;
           team_member_id: string | null;
           pending_expiry_at: string | null;
           guest_locale: string | null;
@@ -196,6 +198,7 @@ export async function getWeekCalendarData(
     clientName: b.client_name,
     clientEmail: b.client_email,
     clientPhone: b.client_phone,
+    notes: b.notes,
     teamMemberId: b.team_member_id,
     pendingExpiryAt: b.pending_expiry_at,
     guestLocale: b.guest_locale,

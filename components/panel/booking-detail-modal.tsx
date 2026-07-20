@@ -11,6 +11,7 @@ const TZ = "Europe/Madrid";
 
 export function BookingDetailModal({
   booking,
+  providerName,
   intlLocale,
   dict,
   errorsDict,
@@ -18,6 +19,7 @@ export function BookingDetailModal({
   onUpdated,
 }: {
   booking: WeekBookingVM;
+  providerName: string | null;
   intlLocale: string;
   dict: CalendarDictionary["detailModal"];
   errorsDict: CalendarDictionary["errors"];
@@ -32,7 +34,6 @@ export function BookingDetailModal({
       : null;
   const [result, setResult] = useState<BookingResultStatus | null>(initialResult);
   const [payment, setPayment] = useState<BookingPaymentStatus>(booking.paymentStatus);
-  const isDirty = result !== initialResult || payment !== booking.paymentStatus;
 
   const isFuture = new Date(booking.startIso) > new Date();
   const hasRealEmail = booking.clientEmail && !booking.clientEmail.startsWith("sin-email+");
@@ -88,6 +89,12 @@ export function BookingDetailModal({
             <Icon name="user" size={14} className="shrink-0 text-ink-soft" />
             <span>{booking.clientName}</span>
           </div>
+          {providerName && (
+            <div className="flex items-center gap-2 text-ink-soft">
+              <Icon name="users" size={14} className="shrink-0" />
+              <span>{providerName}</span>
+            </div>
+          )}
           {booking.clientPhone && (
             <div className="flex items-center gap-2 text-ink-soft">
               <Icon name="phone" size={14} className="shrink-0" />
@@ -101,6 +108,16 @@ export function BookingDetailModal({
             </div>
           )}
         </div>
+
+        {booking.notes && (
+          <div className="mb-4 rounded-xl border border-line bg-surface px-3.5 py-3 text-[13px]">
+            <p className="mb-1 flex items-center gap-1.5 font-semibold text-ink-soft">
+              <Icon name="fileText" size={13} className="shrink-0" />
+              {dict.notesLabel}
+            </p>
+            <p className="whitespace-pre-wrap text-ink">{booking.notes}</p>
+          </div>
+        )}
 
         {error && (
           <div className="mb-3 rounded-lg border border-error bg-error-weak px-3 py-2 text-[13px] text-error">
@@ -135,11 +152,8 @@ export function BookingDetailModal({
                 <ChoiceBtn active={payment === "unpaid"} onClick={() => setPayment("unpaid")} label={dict.paymentPending} />
               </div>
             </div>
-            <div className="flex justify-end gap-2">
-              <Btn variant="ghost" onClick={onClose} disabled={busy}>
-                {dict.dismissButton}
-              </Btn>
-              <Btn onClick={handleSaveResult} disabled={busy || !result || !isDirty}>
+            <div className="flex justify-end">
+              <Btn onClick={handleSaveResult} disabled={busy || !result}>
                 {busy ? dict.saving : dict.saveButton}
               </Btn>
             </div>

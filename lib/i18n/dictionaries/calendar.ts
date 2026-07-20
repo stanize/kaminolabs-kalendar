@@ -82,7 +82,7 @@ export interface CalendarDictionary {
   };
   detailModal: {
     close: string; // aria-label for the X button
-    dismissButton: string; // "Cancelar" — closes the modal without saving (past bookings)
+    notesLabel: string; // "Comentarios"
     cancelButton: string;
     cancelling: string;
     resultLabel: string; // "Resultado"
@@ -179,7 +179,7 @@ const es: CalendarDictionary = {
   },
   detailModal: {
     close: "Cerrar",
-    dismissButton: "Cancelar",
+    notesLabel: "Comentarios",
     cancelButton: "Cancelar cita",
     cancelling: "Cancelando…",
     resultLabel: "Resultado",
@@ -275,7 +275,7 @@ const en: CalendarDictionary = {
   },
   detailModal: {
     close: "Close",
-    dismissButton: "Cancel",
+    notesLabel: "Comments",
     cancelButton: "Cancel appointment",
     cancelling: "Cancelling…",
     resultLabel: "Result",

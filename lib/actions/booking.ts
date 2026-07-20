@@ -200,6 +200,8 @@ export async function submitBooking(input: {
   clientName: string;
   clientEmail: string;
   clientPhone: string;
+  // Optional free-text comment from whoever's booking, shown to the clinic.
+  notes?: string;
   guestLocale: "es" | "en";
   // When set, the booking is for an authenticated patient: status is 'confirmed'
   // immediately, pending_expiry_at is null, and patient_id is stored.
@@ -217,6 +219,7 @@ export async function submitBooking(input: {
   const name = input.clientName.trim();
   const email = input.clientEmail.trim();
   const phone = input.clientPhone.trim();
+  const notes = (input.notes ?? "").trim();
   if (name.length < 2) return { ok: false, error: t.errNameRequired };
   if (!EMAIL_RE.test(email)) return { ok: false, error: t.errEmailInvalid };
 
@@ -278,6 +281,7 @@ export async function submitBooking(input: {
     client_name: name,
     client_email: email,
     client_phone: phone || null,
+    notes: notes || null,
     guest_locale: input.guestLocale,
     confirm_token: token,
   });
@@ -360,6 +364,7 @@ export async function submitBooking(input: {
     client_name: name,
     client_email: email,
     client_phone: phone || null,
+    notes: notes || null,
   });
 
   return { ok: true, token };
@@ -383,7 +388,7 @@ export async function confirmBooking(token: string): Promise<ConfirmResult> {
   const { data: booking } = await supabase
     .from("kalendar_bookings")
     .select(
-      "id, status, business_id, team_member_id, service_name, starts_at, client_name, client_email, client_phone, guest_locale"
+      "id, status, business_id, team_member_id, service_name, starts_at, client_name, client_email, client_phone, notes, guest_locale"
     )
     .eq("confirm_token", token)
     .maybeSingle();
@@ -419,6 +424,7 @@ async function notifyOwnerOfBooking(booking: {
   client_name: string;
   client_email: string;
   client_phone: string | null;
+  notes: string | null;
 }): Promise<void> {
   const supabase = await createClient();
 
@@ -461,6 +467,7 @@ async function notifyOwnerOfBooking(booking: {
       clientName: booking.client_name,
       clientEmail: booking.client_email,
       clientPhone: booking.client_phone,
+      notes: booking.notes,
       providerName,
       panelUrl: `${base}/panel/calendar`,
     }),

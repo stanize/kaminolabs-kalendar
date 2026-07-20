@@ -341,6 +341,11 @@ create table public.kalendar_bookings (
   client_name          text                  not null,
   client_email         text                  not null,
   client_phone         text,
+  -- Optional free-text comment from whoever booked (guest or authenticated
+  -- patient), e.g. "First time visiting, please advise on parking." Shown to
+  -- the clinic in the calendar/booking detail view and the owner
+  -- notification email; never required.
+  notes                text,
   -- The UI language the guest/patient was using when they booked.
   -- Drives the language of guest-facing emails and the confirm/cancel pages.
   guest_locale         text                  not null default 'es' check (

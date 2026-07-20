@@ -260,6 +260,7 @@ function ConfirmAuthModal({
   const [name, setName]                 = useState("");
   const [confirmPassword, setConfirm]   = useState("");
   const [guestPhone, setGuestPhone]     = useState("");
+  const [notes, setNotes]               = useState("");
   const [busy, setBusy]                 = useState(false);
   const [localError, setLocalError]     = useState<string | null>(null);
 
@@ -271,6 +272,7 @@ function ConfirmAuthModal({
       slug, serviceId, providerId: slot.providerId,
       startIso: slot.startIso,
       clientName: p.name, clientEmail: p.email, clientPhone: "",
+      notes,
       guestLocale: locale, patientId: p.id,
     });
     setBusy(false);
@@ -370,6 +372,7 @@ function ConfirmAuthModal({
     const res = await submitBooking({
       slug, serviceId, providerId: slot.providerId, startIso: slot.startIso,
       clientName: name, clientEmail: email, clientPhone: guestPhone,
+      notes,
       guestLocale: locale,
       // No patientId — this is the guest path.
     });
@@ -428,6 +431,9 @@ function ConfirmAuthModal({
                 </div>
               )}
             </dl>
+            <textarea placeholder={w.notesPlaceholder} value={notes} rows={3}
+              onChange={(e) => setNotes(e.target.value)} disabled={busy} maxLength={500}
+              className={`${inputBase} mb-4 resize-none`} />
             <Btn onClick={() => submitAuthenticated(patient)} disabled={busy} size="lg" full>
               {busy ? am.confirming : am.confirmButton}
             </Btn>
@@ -556,6 +562,9 @@ function ConfirmAuthModal({
               <input placeholder={w.phonePlaceholder} value={guestPhone}
                 onChange={(e) => setGuestPhone(e.target.value)} disabled={busy} maxLength={30}
                 className={`${inputBase} rounded-full`} />
+              <textarea placeholder={w.notesPlaceholder} value={notes} rows={3}
+                onChange={(e) => setNotes(e.target.value)} disabled={busy} maxLength={500}
+                className={`${inputBase} resize-none`} />
             </div>
             <p className="mt-3 text-center text-[12px] text-ink-soft">{am.guestNote}</p>
             <button type="button" onClick={submitGuest} disabled={busy}

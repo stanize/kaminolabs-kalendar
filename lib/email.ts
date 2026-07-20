@@ -185,9 +185,10 @@ export function ownerBookingNotificationHtml(input: {
   clientEmail: string;
   clientPhone?: string | null;
   providerName?: string | null;
+  notes?: string | null;
   panelUrl: string;
 }): string {
-  const { businessName, serviceName, whenLabel, clientName, clientEmail, clientPhone, providerName, panelUrl } = input;
+  const { businessName, serviceName, whenLabel, clientName, clientEmail, clientPhone, providerName, notes, panelUrl } = input;
   const rows = [
     { label: "Servicio", value: serviceName },
     { label: "Cuándo", value: whenLabel },
@@ -195,6 +196,7 @@ export function ownerBookingNotificationHtml(input: {
     { label: "Cliente", value: clientName },
     { label: "Email", value: clientEmail },
     ...(clientPhone ? [{ label: "Teléfono", value: clientPhone }] : []),
+    ...(notes ? [{ label: "Comentarios", value: notes }] : []),
   ];
   const body = `
     <p style="font-size:15px;line-height:1.6;margin:0 0 18px;"><strong>${escapeHtml(businessName)}</strong> tiene una nueva cita.</p>

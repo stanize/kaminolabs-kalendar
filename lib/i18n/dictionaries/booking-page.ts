@@ -81,6 +81,7 @@ export interface BookingPageDictionary {
     namePlaceholder: string;
     emailPlaceholder: string;
     phonePlaceholder: string;
+    notesPlaceholder: string;
     bookButton: string;
     booking: string;
     doneTitle: string;      // authenticated: "Reserva confirmada"
@@ -181,6 +182,7 @@ const es: BookingPageDictionary = {
     namePlaceholder: "Nombre y apellido",
     emailPlaceholder: "Email",
     phonePlaceholder: "Teléfono (opcional)",
+    notesPlaceholder: "Comentarios (opcional)",
     bookButton: "Reservar",
     booking: "Reservando…",
     doneTitle: "¡Reserva confirmada!",
@@ -281,6 +283,7 @@ const en: BookingPageDictionary = {
     namePlaceholder: "First and last name",
     emailPlaceholder: "Email",
     phonePlaceholder: "Phone (optional)",
+    notesPlaceholder: "Comments (optional)",
     bookButton: "Book",
     booking: "Booking…",
     doneTitle: "Booking confirmed!",
