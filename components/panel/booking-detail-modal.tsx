@@ -11,7 +11,6 @@ const TZ = "Europe/Madrid";
 
 export function BookingDetailModal({
   booking,
-  providerName,
   intlLocale,
   dict,
   errorsDict,
@@ -19,7 +18,6 @@ export function BookingDetailModal({
   onUpdated,
 }: {
   booking: WeekBookingVM;
-  providerName: string | null;
   intlLocale: string;
   dict: CalendarDictionary["detailModal"];
   errorsDict: CalendarDictionary["errors"];
@@ -34,6 +32,7 @@ export function BookingDetailModal({
       : null;
   const [result, setResult] = useState<BookingResultStatus | null>(initialResult);
   const [payment, setPayment] = useState<BookingPaymentStatus>(booking.paymentStatus);
+  const isDirty = result !== initialResult || payment !== booking.paymentStatus;
 
   const isFuture = new Date(booking.startIso) > new Date();
   const hasRealEmail = booking.clientEmail && !booking.clientEmail.startsWith("sin-email+");
@@ -89,12 +88,6 @@ export function BookingDetailModal({
             <Icon name="user" size={14} className="shrink-0 text-ink-soft" />
             <span>{booking.clientName}</span>
           </div>
-          {providerName && (
-            <div className="flex items-center gap-2 text-ink-soft">
-              <Icon name="users" size={14} className="shrink-0" />
-              <span>{providerName}</span>
-            </div>
-          )}
           {booking.clientPhone && (
             <div className="flex items-center gap-2 text-ink-soft">
               <Icon name="phone" size={14} className="shrink-0" />
@@ -152,8 +145,11 @@ export function BookingDetailModal({
                 <ChoiceBtn active={payment === "unpaid"} onClick={() => setPayment("unpaid")} label={dict.paymentPending} />
               </div>
             </div>
-            <div className="flex justify-end">
-              <Btn onClick={handleSaveResult} disabled={busy || !result}>
+            <div className="flex justify-end gap-2">
+              <Btn variant="ghost" onClick={onClose} disabled={busy}>
+                {dict.dismissButton}
+              </Btn>
+              <Btn onClick={handleSaveResult} disabled={busy || !result || !isDirty}>
                 {busy ? dict.saving : dict.saveButton}
               </Btn>
             </div>
