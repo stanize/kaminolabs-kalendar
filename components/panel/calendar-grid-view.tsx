@@ -276,22 +276,20 @@ export function CalendarGridView({
 }
 
 /**
- * Chip color for a booking — purely status-driven now, not time-driven:
- * - confirmed: dark green / bold white text.
- * - pending_confirmation: light green / bold red text (awaiting the
- *   guest's confirmation).
- * - completed / no_show / cancelled: once the clinic has actually reviewed
- *   a past appointment via the detail modal, it gets one muted "done, no
- *   further action needed" look — regardless of which of the three it was
- *   set to. Until it's reviewed, a past confirmed/pending booking looks
- *   exactly like any other confirmed/pending booking (no separate "past"
- *   color) — reviewing it is what changes its look, not time passing.
- * Always clickable regardless of state — reviewed appointments can be revised.
+ * Chip color for a booking — time is the primary axis:
+ * - Not past (upcoming or happening now): dark green / bold white text,
+ *   regardless of status (confirmed vs pending_confirmation no longer
+ *   distinguished here).
+ * - Past and not yet reviewed (still pending_confirmation/confirmed):
+ *   dark gray / bold red text — needs attention.
+ * - Past and reviewed (completed/no_show/cancelled via the detail modal):
+ *   light gray / dark gray text — done, nothing pending.
+ * Always clickable regardless of state — past appointments can be revised.
  */
-export function chipClasses(status: WeekBookingVM["status"]): string {
-  if (status === "pending_confirmation") return "bg-green-100 text-red-700 font-bold";
-  if (status === "confirmed") return "bg-green-600 text-white font-bold";
-  return "bg-slate-100 text-slate-500"; // completed / no_show / cancelled — reviewed, done
+export function chipClasses(status: WeekBookingVM["status"], isPast: boolean): string {
+  if (!isPast) return "bg-green-600 text-white font-bold";
+  const isReviewed = status === "completed" || status === "no_show" || status === "cancelled";
+  return isReviewed ? "bg-slate-100 text-slate-600" : "bg-slate-600 text-red-400 font-bold";
 }
 
 function DayProviderColumn({
@@ -391,11 +389,12 @@ function DayProviderColumn({
           const startMin = minutesInTz(new Date(b.startIso));
           const top = (startMin - gridStartMin) * PX_PER_MIN;
           const height = Math.max(b.durationMin * PX_PER_MIN, 30);
+          const isPast = new Date(b.startIso) < new Date();
           return (
             <div
               key={b.id}
               onClick={(e) => { e.stopPropagation(); onBookingClick(b); }}
-              className={`absolute left-0.5 right-0.5 cursor-pointer overflow-hidden rounded-md px-1.5 py-[3px] text-[10.5px] leading-[1.2] ${chipClasses(b.status)}`}
+              className={`absolute left-0.5 right-0.5 cursor-pointer overflow-hidden rounded-md px-1.5 py-[3px] text-[10.5px] leading-[1.2] ${chipClasses(b.status, isPast)}`}
               style={{ top, height }}
             >
               <div className="truncate">{b.serviceName}</div>
