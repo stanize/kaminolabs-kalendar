@@ -188,7 +188,10 @@ export async function getAvailableSlots(input: {
 // ── Submit a booking ───────────────────────────────────────────────────────
 export type SubmitResult =
   | { ok: true; token: string }
-  | { ok: false; error: string };
+  // errorDetail carries the raw Postgres error for diagnostic callers (the
+  // admin appointment-generator tool). The public wizard never reads it —
+  // only `error` (the localized, user-safe message) is shown there.
+  | { ok: false; error: string; errorDetail?: string };
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -296,9 +299,9 @@ export async function submitBooking(input: {
   if (error) {
     // Unique active-slot index violation -> the slot was just taken.
     if (error.code === "23505") {
-      return { ok: false, error: t.errSlotTaken };
+      return { ok: false, error: t.errSlotTaken, errorDetail: error.message };
     }
-    return { ok: false, error: t.errCreateFailed };
+    return { ok: false, error: t.errCreateFailed, errorDetail: `${error.code}: ${error.message}` };
   }
 
   const base = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/+$/, "");
