@@ -94,7 +94,7 @@ export function CalendarMonthView({
                 {dayBookings.slice(0, MAX_CHIPS_PER_DAY).map((b) => (
                   <div
                     key={b.id}
-                    className={`truncate rounded px-1 py-0.5 text-[10px] leading-tight ${chipClasses(b.status, new Date(b.startIso) < new Date())}`}
+                    className={`truncate rounded px-1 py-0.5 text-[10px] leading-tight ${chipClasses(b.status)}`}
                   >
                     {timeLabel(b.startIso)} · {b.clientName}
                   </div>
