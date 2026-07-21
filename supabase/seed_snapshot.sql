@@ -152,6 +152,14 @@ end;
 $$;
 
 -- ── Restore snapshot ─────────────────────────────────────────────────────
+-- Resolves each snapshotted owner to an existing live user with the same
+-- email if one already exists (e.g. re-created via a different login
+-- surface, such as the admin portal, after a reset) instead of crashing on
+-- the user table's email-uniqueness constraint. Businesses/services always
+-- follow the resolved id; account/user_roles rows are only restored for
+-- genuinely newly-inserted users — a pre-existing account is never touched
+-- or reassigned. Like any plpgsql function, an unhandled error here rolls
+-- back everything the call did (no partial restores).
 create or replace function public.seed_snapshot_restore()
 returns text
 language plpgsql
@@ -159,18 +167,38 @@ as $$
 declare
   v_business_count int;
   v_service_count  int;
-  v_user_count     int;
+  v_remapped_count int;
 begin
+  create temporary table tmp_owner_map (
+    old_id text primary key,
+    new_id text not null,
+    remapped boolean not null
+  ) on commit drop;
+
+  insert into tmp_owner_map (old_id, new_id, remapped)
+  select
+    s.id,
+    coalesce(existing.id, s.id),
+    (existing.id is not null and existing.id != s.id)
+  from public.seed_snapshot_user s
+  left join public."user" existing on existing.email = s.email;
+
   insert into public."user"
-  select * from public.seed_snapshot_user
+  select s.*
+  from public.seed_snapshot_user s
+  join tmp_owner_map m on m.old_id = s.id and m.remapped = false
   on conflict (id) do nothing;
 
   insert into public.account
-  select * from public.seed_snapshot_account
+  select a.*
+  from public.seed_snapshot_account a
+  join tmp_owner_map m on m.old_id = a."userId" and m.remapped = false
   on conflict (id) do nothing;
 
   insert into public.user_roles
-  select * from public.seed_snapshot_user_roles
+  select r.*
+  from public.seed_snapshot_user_roles r
+  join tmp_owner_map m on m.old_id = r.user_id and m.remapped = false
   on conflict (user_id, role) do nothing;
 
   insert into public.kalendar_businesses (
@@ -182,13 +210,14 @@ begin
     brand_color, team_mode, booking_window_months, onboarding_completed_at, created_at
   )
   select
-    id, owner_id, name, type, legal_id,
-    address_street, address_number, address_additional,
-    city, address_postal_code, address_province, address_country,
-    phone_country_code, phone_number, contact_email,
-    slug, slug_status, slug_flag_reason, slug_reviewed_at, slug_reviewed_by,
-    brand_color, team_mode, booking_window_months, onboarding_completed_at, created_at
-  from public.seed_snapshot_kalendar_businesses
+    s.id, m.new_id, s.name, s.type, s.legal_id,
+    s.address_street, s.address_number, s.address_additional,
+    s.city, s.address_postal_code, s.address_province, s.address_country,
+    s.phone_country_code, s.phone_number, s.contact_email,
+    s.slug, s.slug_status, s.slug_flag_reason, s.slug_reviewed_at, s.slug_reviewed_by,
+    s.brand_color, s.team_mode, s.booking_window_months, s.onboarding_completed_at, s.created_at
+  from public.seed_snapshot_kalendar_businesses s
+  join tmp_owner_map m on m.old_id = s.owner_id
   on conflict (id) do nothing;
 
   insert into public.kalendar_services (id, business_id, name, duration_min, price, sort_order, created_at)
@@ -197,15 +226,18 @@ begin
   on conflict (id) do nothing;
 
   -- Belt-and-braces: every restored business owner has the 'clinic' role,
-  -- even if a snapshot predates that assignment.
+  -- even if a snapshot predates that assignment, or the owner was remapped.
   insert into public.user_roles (user_id, role)
   select owner_id, 'clinic' from public.kalendar_businesses
   on conflict (user_id, role) do nothing;
 
   select count(*) into v_business_count from public.kalendar_businesses;
   select count(*) into v_service_count from public.kalendar_services;
-  select count(*) into v_user_count from public."user";
+  select count(*) into v_remapped_count from tmp_owner_map where remapped;
 
-  return format('Restored. kalendar_businesses: %s row(s); kalendar_services: %s row(s); user: %s row(s).', v_business_count, v_service_count, v_user_count);
+  return format(
+    'Restored. kalendar_businesses: %s row(s); kalendar_services: %s row(s); user: %s row(s). %s owner(s) remapped to a pre-existing account by email.',
+    v_business_count, v_service_count, (select count(*) from public."user"), v_remapped_count
+  );
 end;
 $$;
