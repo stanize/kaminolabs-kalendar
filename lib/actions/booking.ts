@@ -206,6 +206,10 @@ export async function submitBooking(input: {
   // When set, the booking is for an authenticated patient: status is 'confirmed'
   // immediately, pending_expiry_at is null, and patient_id is stored.
   patientId?: string | null;
+  // Admin-tooling escape hatch only (e.g. the appointment generator): forces
+  // a specific status instead of deriving it from patientId. Never set by
+  // the real public booking wizard.
+  statusOverride?: "confirmed" | "pending_confirmation";
   dict?: Partial<BookingWizardErrorDict>;
 }): Promise<SubmitResult> {
   const t = { ...FALLBACK_WIZARD_ERRORS, ...input.dict };
@@ -261,10 +265,13 @@ export async function submitBooking(input: {
 
   // Authenticated patients: confirmed immediately, no expiry window.
   // Guests: pending_confirmation, clinic has 24h to confirm.
-  const bookingStatus = isAuthenticated ? "confirmed" : "pending_confirmation";
-  const pendingExpiryAt = isAuthenticated
-    ? null
-    : new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+  // statusOverride (admin tooling only) takes precedence over the
+  // patientId-derived default when provided.
+  const bookingStatus = input.statusOverride ?? (isAuthenticated ? "confirmed" : "pending_confirmation");
+  const pendingExpiryAt =
+    bookingStatus === "confirmed"
+      ? null
+      : new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
   const { error } = await supabase.from("kalendar_bookings").insert({
     business_id: data.business.id,
@@ -301,7 +308,7 @@ export async function submitBooking(input: {
     : null;
   const whenLabel = formatBookingWhen(start.toISOString(), input.guestLocale);
 
-  if (isAuthenticated) {
+  if (bookingStatus === "confirmed") {
     // Authenticated patient: booking is already confirmed. Send a receipt email.
     const ics = buildBookingIcsBase64({
       uid: token,
