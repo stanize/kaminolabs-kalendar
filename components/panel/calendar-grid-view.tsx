@@ -276,22 +276,19 @@ export function CalendarGridView({
 }
 
 /**
- * Chip color for a booking, by state:
- * - pending_confirmation: unchanged orange (awaiting guest confirmation)
- * - confirmed, still upcoming: unchanged brand teal
- * - confirmed, but its time has passed and it hasn't been reviewed yet:
- *   muted slate — a visual nudge that it needs a Resultado/Pago
- * - completed / no_show / cancelled: each their own muted color, so a
- *   glance at the week tells you which past appointments were handled and
- *   how, without them disappearing from the grid.
+ * Chip color for a booking:
+ * - Any appointment whose time has already passed: light orange / dark red,
+ *   regardless of status — a single unmistakable "this happened, check it"
+ *   signal instead of one color per status.
+ * - pending_confirmation, still upcoming: light orange / orange text
+ *   (awaiting the guest's confirmation).
+ * - confirmed, still upcoming: light green / dark red text.
  * Always clickable regardless of state — past appointments can be revised.
  */
 export function chipClasses(status: WeekBookingVM["status"], isPast: boolean): string {
+  if (isPast) return "bg-orange-200 text-red-800";
   if (status === "pending_confirmation") return "bg-orange-100 text-orange-700";
-  if (status === "confirmed") return isPast ? "bg-slate-200 text-slate-700" : "bg-brand text-white";
-  if (status === "completed") return "bg-emerald-100 text-emerald-700";
-  if (status === "no_show") return "bg-red-100 text-red-700";
-  return "bg-surface-2 text-ink-soft line-through decoration-1"; // cancelled
+  return "bg-green-100 text-red-800";
 }
 
 function DayProviderColumn({

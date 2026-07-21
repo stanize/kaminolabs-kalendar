@@ -314,8 +314,7 @@ export function CalendarBookings({
         <BookingDetailModal
           booking={selectedBooking}
           intlLocale={dict.intlLocale}
-          dict={dict.detailModal}
-          errorsDict={dict.errors}
+          dict={dict}
           onClose={() => setSelectedBooking(null)}
           onUpdated={handleGridBookingCreated}
         />

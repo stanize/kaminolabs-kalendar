@@ -3,7 +3,13 @@
 import { useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import { Btn } from "@/components/ui/button";
-import { cancelBookingAsOwner, updateBookingResult, type BookingResultStatus, type BookingPaymentStatus } from "@/lib/actions/booking-owner";
+import {
+  cancelBookingAsOwner,
+  confirmBookingAsOwner,
+  updateBookingResult,
+  type BookingResultStatus,
+  type BookingPaymentStatus,
+} from "@/lib/actions/booking-owner";
 import type { CalendarDictionary } from "@/lib/i18n/dictionaries/calendar";
 import type { WeekBookingVM } from "@/components/panel/calendar-grid-view";
 
@@ -13,17 +19,16 @@ export function BookingDetailModal({
   booking,
   intlLocale,
   dict,
-  errorsDict,
   onClose,
   onUpdated,
 }: {
   booking: WeekBookingVM;
   intlLocale: string;
-  dict: CalendarDictionary["detailModal"];
-  errorsDict: CalendarDictionary["errors"];
+  dict: CalendarDictionary;
   onClose: () => void;
   onUpdated: () => void;
 }) {
+  const d = dict.detailModal;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const initialResult: BookingResultStatus | null =
@@ -35,6 +40,7 @@ export function BookingDetailModal({
   const isDirty = result !== initialResult || payment !== booking.paymentStatus;
 
   const isFuture = new Date(booking.startIso) > new Date();
+  const isAwaitingConfirmation = booking.status === "pending_confirmation";
   const hasRealEmail = booking.clientEmail && !booking.clientEmail.startsWith("sin-email+");
 
   const dateTimeLabel = new Intl.DateTimeFormat(intlLocale, {
@@ -44,7 +50,17 @@ export function BookingDetailModal({
   const handleCancel = async () => {
     setBusy(true);
     setError(null);
-    const res = await cancelBookingAsOwner(booking.id, errorsDict);
+    const res = await cancelBookingAsOwner(booking.id, dict.errors);
+    setBusy(false);
+    if (!res.ok) { setError(res.error); return; }
+    onUpdated();
+    onClose();
+  };
+
+  const handleConfirm = async () => {
+    setBusy(true);
+    setError(null);
+    const res = await confirmBookingAsOwner(booking.id, dict.errors);
     setBusy(false);
     if (!res.ok) { setError(res.error); return; }
     onUpdated();
@@ -57,7 +73,7 @@ export function BookingDetailModal({
     setError(null);
     const res = await updateBookingResult(
       { bookingId: booking.id, status: result, paymentStatus: payment },
-      errorsDict
+      dict.errors
     );
     setBusy(false);
     if (!res.ok) { setError(res.error); return; }
@@ -72,7 +88,7 @@ export function BookingDetailModal({
           <h2 className="text-[17px] font-bold text-ink">{booking.serviceName}</h2>
           <button
             onClick={onClose}
-            aria-label={dict.close}
+            aria-label={d.close}
             className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-ink-soft hover:bg-surface-2"
           >
             <Icon name="x" size={16} />
@@ -88,6 +104,12 @@ export function BookingDetailModal({
             <Icon name="user" size={14} className="shrink-0 text-ink-soft" />
             <span>{booking.clientName}</span>
           </div>
+          {isAwaitingConfirmation && (
+            <div className="flex items-center gap-2 text-orange-700">
+              <Icon name="bell" size={14} className="shrink-0" />
+              <span className="font-semibold">{dict.manager.pendingLabel}</span>
+            </div>
+          )}
           {booking.clientPhone && (
             <div className="flex items-center gap-2 text-ink-soft">
               <Icon name="phone" size={14} className="shrink-0" />
@@ -106,7 +128,7 @@ export function BookingDetailModal({
           <div className="mb-4 rounded-xl border border-line bg-surface px-3.5 py-3 text-[13px]">
             <p className="mb-1 flex items-center gap-1.5 font-semibold text-ink-soft">
               <Icon name="fileText" size={13} className="shrink-0" />
-              {dict.notesLabel}
+              {d.notesLabel}
             </p>
             <p className="whitespace-pre-wrap text-ink">{booking.notes}</p>
           </div>
@@ -119,38 +141,43 @@ export function BookingDetailModal({
         )}
 
         {isFuture ? (
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-2">
             <Btn variant="outline" onClick={handleCancel} disabled={busy}>
-              {busy ? dict.cancelling : dict.cancelButton}
+              {busy ? d.cancelling : d.cancelButton}
             </Btn>
+            {isAwaitingConfirmation && (
+              <Btn onClick={handleConfirm} disabled={busy}>
+                {busy ? dict.manager.confirming : dict.manager.confirm}
+              </Btn>
+            )}
           </div>
         ) : (
           <div className="flex flex-col gap-4">
             <div>
               <p className="mb-1.5 text-[12px] font-bold uppercase tracking-[.05em] text-ink-soft">
-                {dict.resultLabel}
+                {d.resultLabel}
               </p>
               <div className="flex gap-1.5">
-                <ChoiceBtn active={result === "completed"} onClick={() => setResult("completed")} label={dict.resultCompleted} />
-                <ChoiceBtn active={result === "no_show"} onClick={() => setResult("no_show")} label={dict.resultNoShow} />
-                <ChoiceBtn active={result === "cancelled"} onClick={() => setResult("cancelled")} label={dict.resultCancelled} />
+                <ChoiceBtn active={result === "completed"} onClick={() => setResult("completed")} label={d.resultCompleted} />
+                <ChoiceBtn active={result === "no_show"} onClick={() => setResult("no_show")} label={d.resultNoShow} />
+                <ChoiceBtn active={result === "cancelled"} onClick={() => setResult("cancelled")} label={d.resultCancelled} />
               </div>
             </div>
             <div>
               <p className="mb-1.5 text-[12px] font-bold uppercase tracking-[.05em] text-ink-soft">
-                {dict.paymentLabel}
+                {d.paymentLabel}
               </p>
               <div className="flex gap-1.5">
-                <ChoiceBtn active={payment === "paid"} onClick={() => setPayment("paid")} label={dict.paymentPaid} />
-                <ChoiceBtn active={payment === "unpaid"} onClick={() => setPayment("unpaid")} label={dict.paymentPending} />
+                <ChoiceBtn active={payment === "paid"} onClick={() => setPayment("paid")} label={d.paymentPaid} />
+                <ChoiceBtn active={payment === "unpaid"} onClick={() => setPayment("unpaid")} label={d.paymentPending} />
               </div>
             </div>
             <div className="flex justify-end gap-2">
               <Btn variant="ghost" onClick={onClose} disabled={busy}>
-                {dict.dismissButton}
+                {d.dismissButton}
               </Btn>
               <Btn onClick={handleSaveResult} disabled={busy || !result || !isDirty}>
-                {busy ? dict.saving : dict.saveButton}
+                {busy ? d.saving : d.saveButton}
               </Btn>
             </div>
           </div>
