@@ -281,7 +281,7 @@ export function CalendarGridView({
  *   regardless of status (confirmed vs pending_confirmation no longer
  *   distinguished here).
  * - Past and not yet reviewed (still pending_confirmation/confirmed):
- *   gray-600 / red-200 text — needs attention.
+ *   stone-600 / red-300 text — needs attention.
  * - Past and reviewed (completed/no_show/cancelled via the detail modal):
  *   teal-400 / teal-900 text — done, nothing pending.
  * Always clickable regardless of state — past appointments can be revised.
@@ -289,7 +289,7 @@ export function CalendarGridView({
 export function chipClasses(status: WeekBookingVM["status"], isPast: boolean): string {
   if (!isPast) return "bg-teal-800 text-teal-50 font-bold";
   const isReviewed = status === "completed" || status === "no_show" || status === "cancelled";
-  return isReviewed ? "bg-teal-400 text-teal-900" : "bg-gray-600 text-red-200 font-bold";
+  return isReviewed ? "bg-teal-400 text-teal-900" : "bg-stone-600 text-red-300 font-bold";
 }
 
 function DayProviderColumn({
