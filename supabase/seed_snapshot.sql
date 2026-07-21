@@ -11,20 +11,19 @@
 --
 -- SCOPE (edit as modules stabilize):
 --   Currently covers: user, account, user_roles, kalendar_businesses,
---   kalendar_services.
---   A table is added here only once its column shape is considered settled
---   — a table mid-iteration (e.g. still-being-built kalendar_services) is
---   deliberately left OUT, so schema changes there don't require touching
---   this file. When a module stabilizes, add its mirror table + extend both
---   functions below (see the pattern already used for kalendar_businesses).
+--   kalendar_services, kalendar_team_members, kalendar_business_hours.
+--   A table is added here only once its column shape is considered settled.
+--   When a module stabilizes, add its mirror table + extend both functions
+--   below (see the pattern already used for the tables above).
 --
 -- Usage:
 --   select public.seed_snapshot_take();     -- capture current state
 --   select public.seed_snapshot_restore();  -- after a reset, bring it back
 --
 -- Scoping logic: snapshots every row in kalendar_businesses (however many
--- test clinics exist at snapshot time — no hardcoded email list), plus
--- whichever user/account/user_roles rows belong to those businesses' owners.
+-- test clinics exist at snapshot time — no hardcoded email list), plus their
+-- services/team/hours, plus whichever user/account/user_roles rows belong
+-- to those businesses' owners.
 -- ============================================================================
 
 -- ── Mirror tables (must track the live schema of the tables they shadow) ───
@@ -100,6 +99,26 @@ create table if not exists public.seed_snapshot_kalendar_services (
   created_at   timestamptz not null
 );
 
+create table if not exists public.seed_snapshot_kalendar_team_members (
+  id          uuid        primary key,
+  business_id uuid        not null,
+  name        text        not null,
+  role        text,
+  is_owner    boolean     not null,
+  sort_order  integer     not null,
+  created_at  timestamptz not null
+);
+
+create table if not exists public.seed_snapshot_kalendar_business_hours (
+  id          uuid        primary key,
+  business_id uuid        not null,
+  day         text        not null,
+  start_time  time        not null,
+  end_time    time        not null,
+  sort_order  integer     not null,
+  created_at  timestamptz not null
+);
+
 -- ── Take snapshot ────────────────────────────────────────────────────────
 create or replace function public.seed_snapshot_take()
 returns text
@@ -108,10 +127,14 @@ as $$
 declare
   v_business_count int;
   v_service_count  int;
+  v_team_count     int;
+  v_hours_count    int;
   v_user_count     int;
 begin
   truncate public.seed_snapshot_kalendar_businesses;
   truncate public.seed_snapshot_kalendar_services;
+  truncate public.seed_snapshot_kalendar_team_members;
+  truncate public.seed_snapshot_kalendar_business_hours;
   truncate public.seed_snapshot_user;
   truncate public.seed_snapshot_account;
   truncate public.seed_snapshot_user_roles;
@@ -131,6 +154,16 @@ begin
   from public.kalendar_services
   where business_id in (select id from public.kalendar_businesses);
 
+  insert into public.seed_snapshot_kalendar_team_members
+  select id, business_id, name, role, is_owner, sort_order, created_at
+  from public.kalendar_team_members
+  where business_id in (select id from public.kalendar_businesses);
+
+  insert into public.seed_snapshot_kalendar_business_hours
+  select id, business_id, day, start_time, end_time, sort_order, created_at
+  from public.kalendar_business_hours
+  where business_id in (select id from public.kalendar_businesses);
+
   insert into public.seed_snapshot_user
   select * from public."user"
   where id in (select owner_id from public.kalendar_businesses);
@@ -145,9 +178,14 @@ begin
 
   select count(*) into v_business_count from public.seed_snapshot_kalendar_businesses;
   select count(*) into v_service_count from public.seed_snapshot_kalendar_services;
+  select count(*) into v_team_count from public.seed_snapshot_kalendar_team_members;
+  select count(*) into v_hours_count from public.seed_snapshot_kalendar_business_hours;
   select count(*) into v_user_count from public.seed_snapshot_user;
 
-  return format('Snapshotted %s business(es), %s service(s), %s owner account(s).', v_business_count, v_service_count, v_user_count);
+  return format(
+    'Snapshotted %s business(es), %s service(s), %s team member(s), %s hours row(s), %s owner account(s).',
+    v_business_count, v_service_count, v_team_count, v_hours_count, v_user_count
+  );
 end;
 $$;
 
@@ -155,11 +193,11 @@ $$;
 -- Resolves each snapshotted owner to an existing live user with the same
 -- email if one already exists (e.g. re-created via a different login
 -- surface, such as the admin portal, after a reset) instead of crashing on
--- the user table's email-uniqueness constraint. Businesses/services always
--- follow the resolved id; account/user_roles rows are only restored for
--- genuinely newly-inserted users — a pre-existing account is never touched
--- or reassigned. Like any plpgsql function, an unhandled error here rolls
--- back everything the call did (no partial restores).
+-- the user table's email-uniqueness constraint. Businesses/services/team/
+-- hours always follow the resolved id; account/user_roles rows are only
+-- restored for genuinely newly-inserted users — a pre-existing account is
+-- never touched or reassigned. Like any plpgsql function, an unhandled
+-- error here rolls back everything the call did (no partial restores).
 create or replace function public.seed_snapshot_restore()
 returns text
 language plpgsql
@@ -167,6 +205,8 @@ as $$
 declare
   v_business_count int;
   v_service_count  int;
+  v_team_count     int;
+  v_hours_count    int;
   v_remapped_count int;
 begin
   create temporary table tmp_owner_map (
@@ -225,6 +265,16 @@ begin
   from public.seed_snapshot_kalendar_services
   on conflict (id) do nothing;
 
+  insert into public.kalendar_team_members (id, business_id, name, role, is_owner, sort_order, created_at)
+  select id, business_id, name, role, is_owner, sort_order, created_at
+  from public.seed_snapshot_kalendar_team_members
+  on conflict (id) do nothing;
+
+  insert into public.kalendar_business_hours (id, business_id, day, start_time, end_time, sort_order, created_at)
+  select id, business_id, day, start_time, end_time, sort_order, created_at
+  from public.seed_snapshot_kalendar_business_hours
+  on conflict (id) do nothing;
+
   -- Belt-and-braces: every restored business owner has the 'clinic' role,
   -- even if a snapshot predates that assignment, or the owner was remapped.
   insert into public.user_roles (user_id, role)
@@ -233,11 +283,13 @@ begin
 
   select count(*) into v_business_count from public.kalendar_businesses;
   select count(*) into v_service_count from public.kalendar_services;
+  select count(*) into v_team_count from public.kalendar_team_members;
+  select count(*) into v_hours_count from public.kalendar_business_hours;
   select count(*) into v_remapped_count from tmp_owner_map where remapped;
 
   return format(
-    'Restored. kalendar_businesses: %s row(s); kalendar_services: %s row(s); user: %s row(s). %s owner(s) remapped to a pre-existing account by email.',
-    v_business_count, v_service_count, (select count(*) from public."user"), v_remapped_count
+    'Restored. kalendar_businesses: %s row(s); kalendar_services: %s row(s); kalendar_team_members: %s row(s); kalendar_business_hours: %s row(s); user: %s row(s). %s owner(s) remapped to a pre-existing account by email.',
+    v_business_count, v_service_count, v_team_count, v_hours_count, (select count(*) from public."user"), v_remapped_count
   );
 end;
 $$;
