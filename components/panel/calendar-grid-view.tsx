@@ -277,7 +277,7 @@ export function CalendarGridView({
 
 /**
  * Chip color for a booking — time is the primary axis:
- * - Not past (upcoming or happening now): dark green / bold white text,
+ * - Not past (upcoming or happening now): dark teal / bold light text,
  *   regardless of status (confirmed vs pending_confirmation no longer
  *   distinguished here).
  * - Past and not yet reviewed (still pending_confirmation/confirmed):
@@ -287,7 +287,7 @@ export function CalendarGridView({
  * Always clickable regardless of state — past appointments can be revised.
  */
 export function chipClasses(status: WeekBookingVM["status"], isPast: boolean): string {
-  if (!isPast) return "bg-green-600 text-white font-bold";
+  if (!isPast) return "bg-teal-800 text-teal-50 font-bold";
   const isReviewed = status === "completed" || status === "no_show" || status === "cancelled";
   return isReviewed ? "bg-slate-100 text-slate-600" : "bg-slate-600 text-red-400 font-bold";
 }
