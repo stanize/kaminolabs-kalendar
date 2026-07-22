@@ -277,19 +277,22 @@ export function CalendarGridView({
 
 /**
  * Chip color for a booking — time is the primary axis:
- * - Not past (upcoming or happening now): dark teal / bold light text,
- *   regardless of status (confirmed vs pending_confirmation no longer
- *   distinguished here).
+ * - Not past (upcoming or happening now): teal-50 bg / teal-900 text /
+ *   teal-600 left border — fresh, active, primary appointment.
  * - Past and not yet reviewed (still pending_confirmation/confirmed):
- *   stone-600 / red-300 text — needs attention.
+ *   rose-50 bg / rose-900 text / rose-500 left border — a clear but not
+ *   "heavy" alert that it needs review.
  * - Past and reviewed (completed/no_show/cancelled via the detail modal):
- *   stone-200 / stone-600 text — done, nothing pending.
+ *   slate-100 bg / slate-500 text / slate-300 left border — receded,
+ *   easy to scan past, done.
  * Always clickable regardless of state — past appointments can be revised.
  */
 export function chipClasses(status: WeekBookingVM["status"], isPast: boolean): string {
-  if (!isPast) return "bg-teal-800 text-teal-50 font-bold";
+  if (!isPast) return "bg-teal-50 text-teal-900 border-l-4 border-teal-600";
   const isReviewed = status === "completed" || status === "no_show" || status === "cancelled";
-  return isReviewed ? "bg-stone-200 text-stone-600" : "bg-stone-600 text-red-300 font-bold";
+  return isReviewed
+    ? "bg-slate-100 text-slate-500 border-l-4 border-slate-300"
+    : "bg-rose-50 text-rose-900 border-l-4 border-rose-500";
 }
 
 function DayProviderColumn({
