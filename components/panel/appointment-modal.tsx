@@ -3,8 +3,9 @@
 import { useMemo, useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import { createBookingAsOwner } from "@/lib/actions/booking-owner";
-import { zonedTimeToUtc, TZ } from "@/lib/calendar/client-date";
+import { zonedTimeToUtc, dayIdInTz, tzDateParts, TZ } from "@/lib/calendar/client-date";
 import type { CalendarDictionary } from "@/lib/i18n/dictionaries/calendar";
+import type { DayId } from "@/lib/onboarding/types";
 import type { WeekBookingVM } from "@/components/panel/calendar-grid-view";
 
 interface ServiceVM {
@@ -33,9 +34,13 @@ export interface SlotSelection {
   providerName: string;
 }
 
-/** Every hourly slot across a day's working-hours ranges — the "framework" of
- * suggested times shown as quick-pick chips. Not a restriction: the time
- * input next to them accepts any value, in or out of business hours. */
+function ymd(year: number, month: number, day: number): string {
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+/** Every hourly slot across a day's working-hours ranges — offered in the
+ * time field's dropdown as a convenience, not a restriction: the field
+ * itself accepts any typed value too, in or out of business hours. */
 function buildSuggestedTimes(ranges: TimeRangeVM[]): string[] {
   const times: string[] = [];
   for (const r of ranges) {
@@ -53,8 +58,8 @@ function buildSuggestedTimes(ranges: TimeRangeVM[]): string[] {
 
 export function AppointmentModal({
   slot,
-  dayRanges,
-  dayBookings,
+  hoursByDay,
+  allBookings,
   intlLocale,
   services,
   members,
@@ -64,8 +69,8 @@ export function AppointmentModal({
   onCreated,
 }: {
   slot: SlotSelection;
-  dayRanges: TimeRangeVM[];
-  dayBookings: WeekBookingVM[];
+  hoursByDay: Partial<Record<DayId, TimeRangeVM[]>>;
+  allBookings: WeekBookingVM[];
   intlLocale: string;
   services: ServiceVM[];
   members: MemberVM[];
@@ -76,6 +81,7 @@ export function AppointmentModal({
 }) {
   const [serviceId, setServiceId] = useState(services[0]?.id ?? "");
   const [teamMemberId, setTeamMemberId] = useState(slot.teamMemberId);
+  const [dateStr, setDateStr] = useState(ymd(slot.dayYear, slot.dayMonth, slot.dayDay));
   const [timeStr, setTimeStr] = useState(slot.initialTime);
   const [clientName, setClientName] = useState("");
   const [clientEmail, setClientEmail] = useState("");
@@ -84,15 +90,40 @@ export function AppointmentModal({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const suggestedTimes = useMemo(() => buildSuggestedTimes(dayRanges), [dayRanges]);
+  const dateValid = /^\d{4}-\d{2}-\d{2}$/.test(dateStr);
   const timeValid = /^\d{2}:\d{2}$/.test(timeStr);
+
+  const selectedDateParts = useMemo(() => {
+    if (!dateValid) return null;
+    const [y, m, d] = dateStr.split("-").map(Number);
+    return { year: y, month: m, day: d };
+  }, [dateValid, dateStr]);
+
+  // Ranges/bookings for whichever date is currently selected — recomputed
+  // reactively so changing the date (not just the time) stays accurate,
+  // instead of being pinned to the originally-clicked day's data.
+  const selectedDayRanges = useMemo(() => {
+    if (!selectedDateParts) return [];
+    const dayId = dayIdInTz(zonedTimeToUtc(selectedDateParts.year, selectedDateParts.month, selectedDateParts.day, 12, 0));
+    return hoursByDay[dayId] ?? [];
+  }, [selectedDateParts, hoursByDay]);
+
+  const selectedDayBookings = useMemo(() => {
+    if (!selectedDateParts) return [];
+    return allBookings.filter((b) => {
+      const p = tzDateParts(new Date(b.startIso));
+      return p.year === selectedDateParts.year && p.month === selectedDateParts.month && p.day === selectedDateParts.day;
+    });
+  }, [selectedDateParts, allBookings]);
+
+  const suggestedTimes = useMemo(() => buildSuggestedTimes(selectedDayRanges), [selectedDayRanges]);
   const isOutsideHours = timeValid && !suggestedTimes.includes(timeStr);
 
   const startDate = useMemo(() => {
-    if (!timeValid) return null;
+    if (!selectedDateParts || !timeValid) return null;
     const [hh, mm] = timeStr.split(":").map(Number);
-    return zonedTimeToUtc(slot.dayYear, slot.dayMonth, slot.dayDay, hh, mm);
-  }, [timeValid, timeStr, slot.dayYear, slot.dayMonth, slot.dayDay]);
+    return zonedTimeToUtc(selectedDateParts.year, selectedDateParts.month, selectedDateParts.day, hh, mm);
+  }, [selectedDateParts, timeValid, timeStr]);
 
   const selectedService = services.find((s) => s.id === serviceId);
   const durationMin = selectedService?.durationMin ?? 30;
@@ -101,21 +132,22 @@ export function AppointmentModal({
     if (!startDate) return false;
     const startMs = startDate.getTime();
     const endMs = startMs + durationMin * 60_000;
-    return dayBookings.some((b) => {
+    return selectedDayBookings.some((b) => {
       if (b.teamMemberId !== teamMemberId) return false;
       if (b.status !== "pending_confirmation" && b.status !== "confirmed") return false;
       const bStart = new Date(b.startIso).getTime();
       const bEnd = new Date(b.endIso).getTime();
       return bStart < endMs && bEnd > startMs;
     });
-  }, [startDate, durationMin, teamMemberId, dayBookings]);
+  }, [startDate, durationMin, teamMemberId, selectedDayBookings]);
 
   const dateLabel = useMemo(() => {
-    const base = startDate ?? zonedTimeToUtc(slot.dayYear, slot.dayMonth, slot.dayDay, 12, 0);
+    const base = startDate ?? (selectedDateParts ? zonedTimeToUtc(selectedDateParts.year, selectedDateParts.month, selectedDateParts.day, 12, 0) : null);
+    if (!base) return "";
     return new Intl.DateTimeFormat(intlLocale, {
       timeZone: TZ, weekday: "long", day: "numeric", month: "long",
     }).format(base);
-  }, [startDate, slot.dayYear, slot.dayMonth, slot.dayDay, intlLocale]);
+  }, [startDate, selectedDateParts, intlLocale]);
 
   const handleSubmit = async () => {
     setError(null);
@@ -160,9 +192,11 @@ export function AppointmentModal({
           </button>
         </div>
 
-        <p className="mb-4 rounded-lg bg-surface-2 px-3 py-2 text-[13px] font-medium capitalize text-ink">
-          {dateLabel}
-        </p>
+        {dateLabel && (
+          <p className="mb-4 rounded-lg bg-surface-2 px-3 py-2 text-[13px] font-medium capitalize text-ink">
+            {dateLabel}
+          </p>
+        )}
 
         {error && (
           <div className="mb-3 rounded-lg border border-error bg-error-weak px-3 py-2 text-[12.5px] text-error">
@@ -208,40 +242,39 @@ export function AppointmentModal({
             </Field>
           )}
 
-          <Field label={dict.timeLabel}>
-            <input
-              type="time"
-              value={timeStr}
-              onChange={(e) => setTimeStr(e.target.value)}
-              className={`w-full rounded-lg border bg-surface px-3 py-2 text-[14px] text-ink ${
-                conflict ? "border-error" : "border-line"
-              }`}
-            />
-            {isOutsideHours && !conflict && (
-              <span className="mt-1 text-[12px] text-ink-soft">{dict.outsideHoursNote}</span>
-            )}
-          </Field>
-
-          {suggestedTimes.length > 0 && (
-            <div>
-              <p className="mb-1.5 text-[12px] font-semibold text-ink-soft">{dict.suggestedSlotsLabel}</p>
-              <div className="flex flex-wrap gap-1.5">
-                {suggestedTimes.map((t) => (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => setTimeStr(t)}
-                    className={`rounded-full border px-2.5 py-1 text-[12px] font-semibold transition-colors ${
-                      t === timeStr
-                        ? "border-brand bg-brand-weak text-brand-ink"
-                        : "border-line text-ink-soft hover:bg-surface-2"
-                    }`}
-                  >
-                    {t}
-                  </button>
-                ))}
-              </div>
+          <div className="flex gap-3">
+            <div className="flex-1">
+              <Field label={dict.dateLabel}>
+                <input
+                  type="date"
+                  value={dateStr}
+                  onChange={(e) => setDateStr(e.target.value)}
+                  className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[14px] text-ink"
+                />
+              </Field>
             </div>
+            <div className="flex-1">
+              <Field label={dict.timeLabel}>
+                <input
+                  type="text"
+                  list="appointment-modal-time-options"
+                  value={timeStr}
+                  onChange={(e) => setTimeStr(e.target.value)}
+                  placeholder="HH:MM"
+                  className={`w-full rounded-lg border bg-surface px-3 py-2 text-[14px] text-ink ${
+                    conflict ? "border-error" : "border-line"
+                  }`}
+                />
+                <datalist id="appointment-modal-time-options">
+                  {suggestedTimes.map((t) => (
+                    <option key={t} value={t} />
+                  ))}
+                </datalist>
+              </Field>
+            </div>
+          </div>
+          {isOutsideHours && !conflict && (
+            <span className="-mt-2 text-[12px] text-ink-soft">{dict.outsideHoursNote}</span>
           )}
 
           <Field label={dict.clientNameLabel}>
@@ -294,7 +327,7 @@ export function AppointmentModal({
           </button>
           <button
             onClick={handleSubmit}
-            disabled={submitting || !clientName.trim() || !serviceId || !timeValid || conflict}
+            disabled={submitting || !clientName.trim() || !serviceId || !dateValid || !timeValid || conflict}
             className="rounded-lg bg-brand px-4 py-2 text-[13.5px] font-semibold text-white hover:opacity-90 disabled:opacity-50"
           >
             {submitting ? dict.submitting : dict.submit}

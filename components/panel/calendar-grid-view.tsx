@@ -211,14 +211,6 @@ export function CalendarGridView({
     );
   }
 
-  const modalDayRanges = modalSlot ? (hoursByDay[dayIdInTz(zonedTimeToUtc(modalSlot.dayYear, modalSlot.dayMonth, modalSlot.dayDay, 12, 0))] ?? []) : [];
-  const modalDayBookings = modalSlot
-    ? bookings.filter((b) => {
-        const p = tzDateParts(new Date(b.startIso));
-        return p.year === modalSlot.dayYear && p.month === modalSlot.dayMonth && p.day === modalSlot.dayDay;
-      })
-    : [];
-
   return (
     <div className="flex flex-col gap-3">
       <div className="overflow-x-auto overflow-y-visible rounded-2xl border border-line bg-surface">
@@ -269,8 +261,8 @@ export function CalendarGridView({
       {modalSlot && (
         <AppointmentModal
           slot={modalSlot}
-          dayRanges={modalDayRanges}
-          dayBookings={modalDayBookings}
+          hoursByDay={hoursByDay}
+          allBookings={bookings}
           intlLocale={dict.intlLocale}
           services={services.map((s) => ({ id: s.id, name: s.name, durationMin: s.durationMin, price: s.price }))}
           members={members.map((m) => ({ id: m.id, name: m.name }))}

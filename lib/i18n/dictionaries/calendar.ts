@@ -56,9 +56,9 @@ export interface CalendarDictionary {
     serviceLabel: string;
     servicePlaceholder: string;
     providerLabel: string;
-    dateTimeLabel: string; // read-only summary of the clicked slot's date (time is now separately editable)
-    timeLabel: string; // "Hora" — editable time input
-    suggestedSlotsLabel: string; // small caption above the suggested-slot chips
+    dateTimeLabel: string; // read-only summary shown above the fields (weekday + full date)
+    dateLabel: string; // "Fecha" — editable date field
+    timeLabel: string; // "Hora" — editable time field (combobox: dropdown + free typing)
     outsideHoursNote: string; // non-blocking note shown when the picked time falls outside business hours
     clientNameLabel: string;
     clientNamePlaceholder: string;
@@ -159,8 +159,8 @@ const es: CalendarDictionary = {
     servicePlaceholder: "Elige un servicio",
     providerLabel: "Profesional",
     dateTimeLabel: "Fecha y hora",
+    dateLabel: "Fecha",
     timeLabel: "Hora",
-    suggestedSlotsLabel: "Horarios sugeridos",
     outsideHoursNote: "Fuera de horario laboral",
     clientNameLabel: "Nombre del cliente",
     clientNamePlaceholder: "Nombre y apellidos",
@@ -259,8 +259,8 @@ const en: CalendarDictionary = {
     servicePlaceholder: "Choose a service",
     providerLabel: "Provider",
     dateTimeLabel: "Date and time",
+    dateLabel: "Date",
     timeLabel: "Time",
-    suggestedSlotsLabel: "Suggested times",
     outsideHoursNote: "Outside business hours",
     clientNameLabel: "Client name",
     clientNamePlaceholder: "Full name",
