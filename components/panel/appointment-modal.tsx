@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import { createBookingAsOwner } from "@/lib/actions/booking-owner";
+import { zonedTimeToUtc, TZ } from "@/lib/calendar/client-date";
 import type { CalendarDictionary } from "@/lib/i18n/dictionaries/calendar";
+import type { WeekBookingVM } from "@/components/panel/calendar-grid-view";
 
 interface ServiceVM {
   id: string;
@@ -17,15 +19,43 @@ interface MemberVM {
   name: string;
 }
 
+interface TimeRangeVM {
+  start: string; // "HH:MM"
+  end: string; // "HH:MM"
+}
+
 export interface SlotSelection {
-  startIso: string;
-  dateTimeLabel: string; // pre-formatted for display, e.g. "lunes, 15 de julio · 10:00"
+  dayYear: number;
+  dayMonth: number;
+  dayDay: number;
+  initialTime: string; // "HH:MM" — the slot that was clicked, editable from here on
   teamMemberId: string;
   providerName: string;
 }
 
+/** Every hourly slot across a day's working-hours ranges — the "framework" of
+ * suggested times shown as quick-pick chips. Not a restriction: the time
+ * input next to them accepts any value, in or out of business hours. */
+function buildSuggestedTimes(ranges: TimeRangeVM[]): string[] {
+  const times: string[] = [];
+  for (const r of ranges) {
+    const [sh, sm] = r.start.split(":").map(Number);
+    const [eh, em] = r.end.split(":").map(Number);
+    let t = sh * 60 + sm;
+    const end = eh * 60 + em;
+    while (t < end) {
+      times.push(`${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`);
+      t += 60;
+    }
+  }
+  return times;
+}
+
 export function AppointmentModal({
   slot,
+  dayRanges,
+  dayBookings,
+  intlLocale,
   services,
   members,
   dict,
@@ -34,6 +64,9 @@ export function AppointmentModal({
   onCreated,
 }: {
   slot: SlotSelection;
+  dayRanges: TimeRangeVM[];
+  dayBookings: WeekBookingVM[];
+  intlLocale: string;
   services: ServiceVM[];
   members: MemberVM[];
   dict: CalendarDictionary["modal"];
@@ -43,6 +76,7 @@ export function AppointmentModal({
 }) {
   const [serviceId, setServiceId] = useState(services[0]?.id ?? "");
   const [teamMemberId, setTeamMemberId] = useState(slot.teamMemberId);
+  const [timeStr, setTimeStr] = useState(slot.initialTime);
   const [clientName, setClientName] = useState("");
   const [clientEmail, setClientEmail] = useState("");
   const [clientPhone, setClientPhone] = useState("");
@@ -50,16 +84,49 @@ export function AppointmentModal({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const suggestedTimes = useMemo(() => buildSuggestedTimes(dayRanges), [dayRanges]);
+  const timeValid = /^\d{2}:\d{2}$/.test(timeStr);
+  const isOutsideHours = timeValid && !suggestedTimes.includes(timeStr);
+
+  const startDate = useMemo(() => {
+    if (!timeValid) return null;
+    const [hh, mm] = timeStr.split(":").map(Number);
+    return zonedTimeToUtc(slot.dayYear, slot.dayMonth, slot.dayDay, hh, mm);
+  }, [timeValid, timeStr, slot.dayYear, slot.dayMonth, slot.dayDay]);
+
+  const selectedService = services.find((s) => s.id === serviceId);
+  const durationMin = selectedService?.durationMin ?? 30;
+
+  const conflict = useMemo(() => {
+    if (!startDate) return false;
+    const startMs = startDate.getTime();
+    const endMs = startMs + durationMin * 60_000;
+    return dayBookings.some((b) => {
+      if (b.teamMemberId !== teamMemberId) return false;
+      if (b.status !== "pending_confirmation" && b.status !== "confirmed") return false;
+      const bStart = new Date(b.startIso).getTime();
+      const bEnd = new Date(b.endIso).getTime();
+      return bStart < endMs && bEnd > startMs;
+    });
+  }, [startDate, durationMin, teamMemberId, dayBookings]);
+
+  const dateLabel = useMemo(() => {
+    const base = startDate ?? zonedTimeToUtc(slot.dayYear, slot.dayMonth, slot.dayDay, 12, 0);
+    return new Intl.DateTimeFormat(intlLocale, {
+      timeZone: TZ, weekday: "long", day: "numeric", month: "long",
+    }).format(base);
+  }, [startDate, slot.dayYear, slot.dayMonth, slot.dayDay, intlLocale]);
+
   const handleSubmit = async () => {
     setError(null);
-    if (!serviceId) return;
+    if (!serviceId || !startDate || conflict) return;
     setSubmitting(true);
     try {
       const res = await createBookingAsOwner(
         {
           serviceId,
           teamMemberId,
-          startIso: slot.startIso,
+          startIso: startDate.toISOString(),
           clientName,
           clientEmail: clientEmail || undefined,
           clientPhone: clientPhone || undefined,
@@ -94,12 +161,18 @@ export function AppointmentModal({
         </div>
 
         <p className="mb-4 rounded-lg bg-surface-2 px-3 py-2 text-[13px] font-medium capitalize text-ink">
-          {slot.dateTimeLabel}
+          {dateLabel}
         </p>
 
         {error && (
           <div className="mb-3 rounded-lg border border-error bg-error-weak px-3 py-2 text-[12.5px] text-error">
             {error}
+          </div>
+        )}
+
+        {!error && conflict && (
+          <div className="mb-3 rounded-lg border border-error bg-error-weak px-3 py-2 text-[12.5px] text-error">
+            {errorsDict.errSlotTaken}
           </div>
         )}
 
@@ -133,6 +206,42 @@ export function AppointmentModal({
                 ))}
               </select>
             </Field>
+          )}
+
+          <Field label={dict.timeLabel}>
+            <input
+              type="time"
+              value={timeStr}
+              onChange={(e) => setTimeStr(e.target.value)}
+              className={`w-full rounded-lg border bg-surface px-3 py-2 text-[14px] text-ink ${
+                conflict ? "border-error" : "border-line"
+              }`}
+            />
+            {isOutsideHours && !conflict && (
+              <span className="mt-1 text-[12px] text-ink-soft">{dict.outsideHoursNote}</span>
+            )}
+          </Field>
+
+          {suggestedTimes.length > 0 && (
+            <div>
+              <p className="mb-1.5 text-[12px] font-semibold text-ink-soft">{dict.suggestedSlotsLabel}</p>
+              <div className="flex flex-wrap gap-1.5">
+                {suggestedTimes.map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setTimeStr(t)}
+                    className={`rounded-full border px-2.5 py-1 text-[12px] font-semibold transition-colors ${
+                      t === timeStr
+                        ? "border-brand bg-brand-weak text-brand-ink"
+                        : "border-line text-ink-soft hover:bg-surface-2"
+                    }`}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
+            </div>
           )}
 
           <Field label={dict.clientNameLabel}>
@@ -185,7 +294,7 @@ export function AppointmentModal({
           </button>
           <button
             onClick={handleSubmit}
-            disabled={submitting || !clientName.trim() || !serviceId}
+            disabled={submitting || !clientName.trim() || !serviceId || !timeValid || conflict}
             className="rounded-lg bg-brand px-4 py-2 text-[13.5px] font-semibold text-white hover:opacity-90 disabled:opacity-50"
           >
             {submitting ? dict.submitting : dict.submit}

@@ -187,13 +187,11 @@ export function CalendarGridView({
     const rounded = snapToSlotGrid(clickMinute, ranges);
     const hh = Math.floor(rounded / 60);
     const mm = rounded % 60;
-    const startDate = zonedTimeToUtc(day.year, day.month, day.day, hh, mm);
-    const dateTimeLabel = new Intl.DateTimeFormat(dict.intlLocale, {
-      timeZone: TZ, weekday: "long", day: "numeric", month: "long",
-    }).format(startDate) + ` · ${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
     setModalSlot({
-      startIso: startDate.toISOString(),
-      dateTimeLabel,
+      dayYear: day.year,
+      dayMonth: day.month,
+      dayDay: day.day,
+      initialTime: `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`,
       teamMemberId: member.id,
       providerName: member.name,
     });
@@ -212,6 +210,14 @@ export function CalendarGridView({
       </div>
     );
   }
+
+  const modalDayRanges = modalSlot ? (hoursByDay[dayIdInTz(zonedTimeToUtc(modalSlot.dayYear, modalSlot.dayMonth, modalSlot.dayDay, 12, 0))] ?? []) : [];
+  const modalDayBookings = modalSlot
+    ? bookings.filter((b) => {
+        const p = tzDateParts(new Date(b.startIso));
+        return p.year === modalSlot.dayYear && p.month === modalSlot.dayMonth && p.day === modalSlot.dayDay;
+      })
+    : [];
 
   return (
     <div className="flex flex-col gap-3">
@@ -263,6 +269,9 @@ export function CalendarGridView({
       {modalSlot && (
         <AppointmentModal
           slot={modalSlot}
+          dayRanges={modalDayRanges}
+          dayBookings={modalDayBookings}
+          intlLocale={dict.intlLocale}
           services={services.map((s) => ({ id: s.id, name: s.name, durationMin: s.durationMin, price: s.price }))}
           members={members.map((m) => ({ id: m.id, name: m.name }))}
           dict={dict.modal}

@@ -316,6 +316,23 @@ export const createBookingAsOwner = authedAction(
     if (Number.isNaN(start.getTime())) return { ok: false, error: t.errInvalidSlot };
     const end = new Date(start.getTime() + service.duration_min * 60_000);
 
+    // Real time-range overlap check for this provider — the DB's partial
+    // unique index (business_id, team_member_id, starts_at) only catches an
+    // exact-start-time collision, not a general overlap (e.g. a 50-min
+    // appointment at 12:00 doesn't share a starts_at with one at 12:30, but
+    // they still overlap). Matters more now that the owner can pick any
+    // free time, not just a fixed hourly grid.
+    const { data: overlapping } = await supabase
+      .from("kalendar_bookings")
+      .select("id")
+      .eq("business_id", business.id)
+      .eq("team_member_id", member.id)
+      .in("status", ["pending_confirmation", "confirmed"])
+      .lt("starts_at", end.toISOString())
+      .gt("ends_at", start.toISOString())
+      .limit(1);
+    if (overlapping && overlapping.length > 0) return { ok: false, error: t.errSlotTaken };
+
     const token = randomBytes(24).toString("base64url");
 
     const { error } = await supabase.from("kalendar_bookings").insert({
