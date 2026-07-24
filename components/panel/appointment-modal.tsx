@@ -329,7 +329,6 @@ export function AppointmentModal({
             <input
               type="checkbox"
               checked={sendEmail}
-              disabled={!clientEmail}
               onChange={(e) => setSendEmail(e.target.checked)}
               className="h-4 w-4 rounded border-line"
             />
