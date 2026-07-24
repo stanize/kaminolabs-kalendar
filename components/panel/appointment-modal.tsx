@@ -178,8 +178,8 @@ export function AppointmentModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-      <div className="w-full max-w-[440px] rounded-2xl bg-surface p-5 shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 px-4 py-6">
+      <div className="max-h-[90vh] w-full max-w-[440px] overflow-y-auto rounded-2xl bg-surface p-5 shadow-xl">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-[17px] font-bold text-ink">{dict.title}</h2>
           <button
@@ -208,7 +208,7 @@ export function AppointmentModal({
             <select
               value={serviceId}
               onChange={(e) => setServiceId(e.target.value)}
-              className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[14px] text-ink"
+              className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[16px] text-ink"
             >
               {services.length === 0 && <option value="">{dict.servicePlaceholder}</option>}
               {services.map((s) => (
@@ -224,7 +224,7 @@ export function AppointmentModal({
               <select
                 value={teamMemberId}
                 onChange={(e) => setTeamMemberId(e.target.value)}
-                className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[14px] text-ink"
+                className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[16px] text-ink"
               >
                 {members.map((m) => (
                   <option key={m.id} value={m.id}>
@@ -235,14 +235,14 @@ export function AppointmentModal({
             </Field>
           )}
 
-          <div className="flex gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row">
             <div className="flex-1">
               <Field label={dict.dateLabel}>
                 <input
                   type="date"
                   value={dateStr}
                   onChange={(e) => setDateStr(e.target.value)}
-                  className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[14px] text-ink"
+                  className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[16px] text-ink"
                 />
               </Field>
             </div>
@@ -256,7 +256,7 @@ export function AppointmentModal({
                   onBlur={() => setTimeMenuOpen(false)}
                   placeholder="HH:MM"
                   autoComplete="off"
-                  className={`w-full rounded-lg border bg-surface px-3 py-2 text-[14px] text-ink ${
+                  className={`w-full rounded-lg border bg-surface px-3 py-2 text-[16px] text-ink ${
                     conflict ? "border-error" : "border-line"
                   }`}
                 />
@@ -292,7 +292,7 @@ export function AppointmentModal({
               value={clientName}
               onChange={(e) => setClientName(e.target.value)}
               placeholder={dict.clientNamePlaceholder}
-              className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[14px] text-ink"
+              className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[16px] text-ink"
             />
           </Field>
 
@@ -302,7 +302,7 @@ export function AppointmentModal({
               onChange={(e) => setClientEmail(e.target.value)}
               placeholder={dict.clientEmailPlaceholder}
               type="email"
-              className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[14px] text-ink"
+              className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[16px] text-ink"
             />
           </Field>
 
@@ -311,7 +311,7 @@ export function AppointmentModal({
               value={clientPhone}
               onChange={(e) => setClientPhone(e.target.value)}
               placeholder={dict.clientPhonePlaceholder}
-              className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[14px] text-ink"
+              className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[16px] text-ink"
             />
           </Field>
 
@@ -321,7 +321,7 @@ export function AppointmentModal({
               onChange={(e) => setNotes(e.target.value)}
               placeholder={dict.notesPlaceholder}
               rows={2}
-              className="w-full resize-none rounded-lg border border-line bg-surface px-3 py-2 text-[14px] text-ink"
+              className="w-full resize-none rounded-lg border border-line bg-surface px-3 py-2 text-[16px] text-ink"
             />
           </Field>
 
