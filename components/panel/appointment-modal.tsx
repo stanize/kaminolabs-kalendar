@@ -88,6 +88,7 @@ export function AppointmentModal({
   const [sendEmail, setSendEmail] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [timeMenuOpen, setTimeMenuOpen] = useState(false);
 
   const dateValid = /^\d{4}-\d{2}-\d{2}$/.test(dateStr);
   const timeValid = /^\d{2}:\d{2}$/.test(timeStr);
@@ -127,18 +128,24 @@ export function AppointmentModal({
   const selectedService = services.find((s) => s.id === serviceId);
   const durationMin = selectedService?.durationMin ?? 30;
 
-  const conflict = useMemo(() => {
-    if (!startDate) return false;
-    const startMs = startDate.getTime();
-    const endMs = startMs + durationMin * 60_000;
-    return selectedDayBookings.some((b) => {
-      if (b.teamMemberId !== teamMemberId) return false;
-      if (b.status !== "pending_confirmation" && b.status !== "confirmed") return false;
-      const bStart = new Date(b.startIso).getTime();
-      const bEnd = new Date(b.endIso).getTime();
-      return bStart < endMs && bEnd > startMs;
-    });
-  }, [startDate, durationMin, teamMemberId, selectedDayBookings]);
+  const isTimeTaken = useMemo(() => {
+    return (candidate: string): boolean => {
+      if (!selectedDateParts) return false;
+      const [hh, mm] = candidate.split(":").map(Number);
+      const start = zonedTimeToUtc(selectedDateParts.year, selectedDateParts.month, selectedDateParts.day, hh, mm);
+      const startMs = start.getTime();
+      const endMs = startMs + durationMin * 60_000;
+      return selectedDayBookings.some((b) => {
+        if (b.teamMemberId !== teamMemberId) return false;
+        if (b.status !== "pending_confirmation" && b.status !== "confirmed") return false;
+        const bStart = new Date(b.startIso).getTime();
+        const bEnd = new Date(b.endIso).getTime();
+        return bStart < endMs && bEnd > startMs;
+      });
+    };
+  }, [selectedDateParts, durationMin, teamMemberId, selectedDayBookings]);
+
+  const conflict = timeValid ? isTimeTaken(timeStr) : false;
 
   const handleSubmit = async () => {
     setError(null);
@@ -239,24 +246,41 @@ export function AppointmentModal({
                 />
               </Field>
             </div>
-            <div className="flex-1">
+            <div className="relative flex-1">
               <Field label={dict.timeLabel}>
                 <input
                   type="text"
-                  list="appointment-modal-time-options"
                   value={timeStr}
                   onChange={(e) => setTimeStr(e.target.value)}
+                  onFocus={() => setTimeMenuOpen(true)}
+                  onBlur={() => setTimeMenuOpen(false)}
                   placeholder="HH:MM"
+                  autoComplete="off"
                   className={`w-full rounded-lg border bg-surface px-3 py-2 text-[14px] text-ink ${
                     conflict ? "border-error" : "border-line"
                   }`}
                 />
-                <datalist id="appointment-modal-time-options">
-                  {suggestedTimes.map((t) => (
-                    <option key={t} value={t} />
-                  ))}
-                </datalist>
               </Field>
+              {timeMenuOpen && suggestedTimes.length > 0 && (
+                <div className="absolute left-0 right-0 top-full z-10 mt-1 max-h-[220px] overflow-y-auto rounded-lg border border-line bg-surface py-1 shadow-lg">
+                  {suggestedTimes.map((t) => {
+                    const taken = isTimeTaken(t);
+                    return (
+                      <button
+                        key={t}
+                        type="button"
+                        // onMouseDown (not onClick) fires before the input's onBlur closes the menu
+                        onMouseDown={() => setTimeStr(t)}
+                        className={`block w-full px-3 py-1.5 text-left text-[13.5px] hover:bg-surface-2 ${
+                          taken ? "text-ink-soft" : "font-bold text-green-600"
+                        }`}
+                      >
+                        {t}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
           {isOutsideHours && !conflict && (
