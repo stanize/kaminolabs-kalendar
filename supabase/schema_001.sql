@@ -358,6 +358,21 @@ create table public.kalendar_bookings (
   -- Generated for every booking; only used by the legacy token-link flow (guest
   -- bookings pre-auth). Kept for schema continuity but no longer emailed.
   confirm_token        text                  not null unique,
+  -- Appointment-reminder tracking (app/api/cron/send-reminders). NULL = not
+  -- yet sent; timestamp = sent. Set AFTER a successful send, never before, so
+  -- a crash mid-batch leaves the row eligible for retry on the next run
+  -- rather than silently skipped. Only 'confirmed' bookings are ever eligible
+  -- (re-checked at send time, not just query time, to catch late cancellations).
+  reminder_24h_sent_at timestamptz,
+  reminder_1h_sent_at  timestamptz,
+  -- Best-effort failure visibility: sendEmail() is silent/best-effort by
+  -- design (see lib/email.ts), which is fine for transactional emails but not
+  -- for the flagship no-show-reduction feature. Set when a reminder send
+  -- throws; surfaced in the panel calendar booking detail
+  -- (components/panel/calendar-bookings.tsx). Not cleared automatically —
+  -- the next successful send for that same window overwrites/clears it.
+  reminder_send_failed boolean               not null default false,
+  last_reminder_error  text,
   created_at           timestamptz           not null default now(),
   updated_at           timestamptz           not null default now()
 );
@@ -370,6 +385,10 @@ create index kalendar_bookings_token_idx        on public.kalendar_bookings (con
 -- Cron sweep: find expired guest bookings efficiently.
 create index kalendar_bookings_expiry_idx       on public.kalendar_bookings (pending_expiry_at)
   where status = 'pending_confirmation' and pending_expiry_at is not null;
+-- Reminder cron: find confirmed bookings still owed a 24h and/or 1h reminder.
+create index kalendar_bookings_reminder_due_idx on public.kalendar_bookings (starts_at)
+  where status = 'confirmed'
+    and (reminder_24h_sent_at is null or reminder_1h_sent_at is null);
 
 -- NOTE: patient_id intentionally has no FK constraint in this file. The
 -- Supabase SQL editor validates all FK references against the live catalog

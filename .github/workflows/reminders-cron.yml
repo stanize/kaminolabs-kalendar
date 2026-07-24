@@ -1,0 +1,26 @@
+name: Send appointment reminders
+
+# Same rationale as sweep-cron.yml: Vercel Hobby plan only allows daily
+# Vercel Cron jobs, so this runs via GitHub Actions instead. 15-minute
+# cadence matches the ±15min send-windows in the reminders route so no
+# booking is missed to cron jitter (see app/api/cron/send-reminders/route.ts).
+on:
+  schedule:
+    - cron: "*/15 * * * *" # every 15 minutes (UTC)
+  workflow_dispatch: {} # allow manual runs from the Actions tab
+
+jobs:
+  send-reminders:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call send-reminders endpoint
+        run: |
+          response=$(curl -s -o /tmp/response.txt -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "https://kalendar.kaminolabs.dev/api/cron/send-reminders")
+          echo "HTTP status: $response"
+          cat /tmp/response.txt
+          if [ "$response" -ge 400 ]; then
+            echo "Reminders endpoint returned an error"
+            exit 1
+          fi

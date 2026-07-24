@@ -566,3 +566,132 @@ export function bookingConfirmEmailHtml(input: {
 
   return emailShell(isConfirmed ? confirmedBody : pendingBody, t.footer);
 }
+
+// ── Appointment reminders (24h / 1h before) ─────────────────────────────────
+// GUEST-facing — localized to booking.guest_locale, same as bookingConfirmEmailHtml.
+// Sent by app/api/cron/send-reminders/route.ts. Only ever sent for 'confirmed'
+// bookings (re-checked at send time, not just query time — see route).
+
+type ReminderEmailInput = {
+  clientName: string;
+  businessName: string;
+  serviceName: string;
+  whenLabel: string;
+  providerName?: string | null;
+  /** Formatted single-line address, e.g. "Calle Mayor 1, 28013 Madrid". Omitted if the business has no address on file. */
+  businessAddress?: string | null;
+  /** Tokenized cancel link — reuses the same confirm_token as every other booking email, no separate token type. */
+  cancelUrl: string;
+  locale?: "es" | "en";
+};
+
+function reminderBody(
+  input: ReminderEmailInput,
+  t: {
+    badge: string;
+    greeting: string;
+    intro: string;
+    service: string;
+    when: string;
+    address: string;
+    professional: string;
+    cancelPrefix: string;
+    cancelLink: string;
+  }
+): string {
+  const { serviceName, whenLabel, providerName, businessAddress, cancelUrl } = input;
+  const rows = [
+    { label: t.service, value: serviceName },
+    { label: t.when, value: whenLabel },
+    ...(providerName ? [{ label: t.professional, value: providerName }] : []),
+    ...(businessAddress ? [{ label: t.address, value: businessAddress }] : []),
+  ];
+  return `
+    ${emailBadge(t.badge, "info")}
+    <p style="font-size:15px;line-height:1.6;margin:0 0 6px;">${t.greeting}</p>
+    <p style="font-size:15px;line-height:1.6;margin:0 0 18px;">${t.intro}</p>
+    ${emailInfoBox(rows, "info")}
+    ${emailSecondaryLine(t.cancelPrefix, t.cancelLink, cancelUrl)}`;
+}
+
+/** Sent ~24h before a confirmed booking's starts_at. */
+export function appointmentReminder24hEmailHtml(input: ReminderEmailInput): string {
+  const { clientName, businessName } = input;
+  const locale = input.locale ?? "es";
+  const t =
+    locale === "en"
+      ? {
+          badge:        "Reminder",
+          greeting:     clientName ? `Hi ${escapeHtml(clientName)},` : "Hi,",
+          intro:        `Just a reminder — your appointment at <strong>${escapeHtml(businessName)}</strong> is tomorrow.`,
+          service:      "Service",
+          when:         "When",
+          address:      "Address",
+          professional: "Professional",
+          cancelPrefix: "Can't make it?",
+          cancelLink:   "Cancel your appointment here",
+          footer:       "Kalendar · Online booking for your clinic",
+        }
+      : {
+          badge:        "Recordatorio",
+          greeting:     clientName ? `Hola ${escapeHtml(clientName)},` : "Hola,",
+          intro:        `Te recordamos que tienes una cita mañana en <strong>${escapeHtml(businessName)}</strong>.`,
+          service:      "Servicio",
+          when:         "Cuándo",
+          address:      "Dirección",
+          professional: "Profesional",
+          cancelPrefix: "¿No puedes asistir?",
+          cancelLink:   "Cancela tu cita aquí",
+          footer:       "Kalendar · Reservas online para tu clínica",
+        };
+  return emailShell(reminderBody(input, t), t.footer);
+}
+
+/** Sent ~1h before a confirmed booking's starts_at. */
+export function appointmentReminder1hEmailHtml(input: ReminderEmailInput): string {
+  const { clientName, businessName } = input;
+  const locale = input.locale ?? "es";
+  const t =
+    locale === "en"
+      ? {
+          badge:        "Starting soon",
+          greeting:     clientName ? `Hi ${escapeHtml(clientName)},` : "Hi,",
+          intro:        `Your appointment at <strong>${escapeHtml(businessName)}</strong> is in about 1 hour.`,
+          service:      "Service",
+          when:         "When",
+          address:      "Address",
+          professional: "Professional",
+          cancelPrefix: "Can't make it?",
+          cancelLink:   "Cancel your appointment here",
+          footer:       "Kalendar · Online booking for your clinic",
+        }
+      : {
+          badge:        "Empieza pronto",
+          greeting:     clientName ? `Hola ${escapeHtml(clientName)},` : "Hola,",
+          intro:        `Tu cita en <strong>${escapeHtml(businessName)}</strong> es dentro de aproximadamente 1 hora.`,
+          service:      "Servicio",
+          when:         "Cuándo",
+          address:      "Dirección",
+          professional: "Profesional",
+          cancelPrefix: "¿No puedes asistir?",
+          cancelLink:   "Cancela tu cita aquí",
+          footer:       "Kalendar · Reservas online para tu clínica",
+        };
+  return emailShell(reminderBody(input, t), t.footer);
+}
+
+/** Locale-aware subject line for the two reminder variants. */
+export function reminderEmailSubject(
+  variant: "24h" | "1h",
+  businessName: string,
+  locale: "es" | "en" = "es"
+): string {
+  if (locale === "en") {
+    return variant === "24h"
+      ? `Reminder: your appointment tomorrow · ${businessName}`
+      : `Reminder: your appointment in 1 hour · ${businessName}`;
+  }
+  return variant === "24h"
+    ? `Recordatorio: tu cita mañana · ${businessName}`
+    : `Recordatorio: tu cita en 1 hora · ${businessName}`;
+}

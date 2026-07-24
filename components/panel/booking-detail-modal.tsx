@@ -124,6 +124,14 @@ export function BookingDetailModal({
               <span className="truncate">{booking.clientEmail}</span>
             </div>
           )}
+          {booking.reminderSendFailed && (
+            <div className="flex items-center gap-2 text-amber-700" title={booking.lastReminderError ?? undefined}>
+              <Icon name="bell" size={14} className="shrink-0" />
+              <span className="font-semibold">
+                Recordatorio no enviado{booking.lastReminderError ? `: ${booking.lastReminderError}` : ""}
+              </span>
+            </div>
+          )}
         </div>
 
         {booking.notes && (

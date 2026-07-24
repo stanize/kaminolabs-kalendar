@@ -44,6 +44,8 @@ export interface WeekBookingVM {
   teamMemberId: string | null;
   pendingExpiryAt: string | null;
   guestLocale: string | null;
+  reminderSendFailed: boolean;
+  lastReminderError: string | null;
 }
 
 export interface WeekServiceVM {
@@ -402,7 +404,12 @@ function DayProviderColumn({
               className={`absolute left-0.5 right-0.5 cursor-pointer overflow-hidden rounded-md px-1.5 py-[3px] text-[10.5px] leading-[1.2] ${chipClasses(b.status, isPast)}`}
               style={{ top, height }}
             >
-              <div className="truncate">{b.serviceName}</div>
+              <div className="truncate">
+                {b.reminderSendFailed && (
+                  <span title="Recordatorio no enviado" className="mr-1 text-amber-600">⚠</span>
+                )}
+                {b.serviceName}
+              </div>
               <div className="truncate opacity-90">{timeLabel(b.startIso)} · {b.clientName}</div>
             </div>
           );

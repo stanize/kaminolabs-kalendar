@@ -95,6 +95,8 @@ export default async function CalendarPage() {
           teamMemberId: b.teamMemberId,
           pendingExpiryAt: b.pendingExpiryAt,
           guestLocale: b.guestLocale,
+          reminderSendFailed: b.reminderSendFailed,
+          lastReminderError: b.lastReminderError,
         }))}
         weekStartIso={weekStartIso}
       />
