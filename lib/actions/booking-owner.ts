@@ -274,6 +274,7 @@ export const createBookingAsOwner = authedAction(
       clientName: string;
       clientEmail?: string;
       clientPhone?: string;
+      notes?: string;
       sendConfirmationEmail: boolean;
     },
     dict?: Partial<ManualBookingActionDict>
@@ -350,6 +351,7 @@ export const createBookingAsOwner = authedAction(
       client_name: name,
       client_email: email || `sin-email+${token}@kaminolabs.dev`,
       client_phone: (input.clientPhone ?? "").trim() || null,
+      notes: (input.notes ?? "").trim() || null,
       guest_locale: "es",
       confirm_token: token,
     });

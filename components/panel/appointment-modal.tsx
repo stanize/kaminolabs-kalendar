@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import { createBookingAsOwner } from "@/lib/actions/booking-owner";
-import { zonedTimeToUtc, dayIdInTz, tzDateParts, TZ } from "@/lib/calendar/client-date";
+import { zonedTimeToUtc, dayIdInTz, tzDateParts } from "@/lib/calendar/client-date";
 import type { CalendarDictionary } from "@/lib/i18n/dictionaries/calendar";
 import type { DayId } from "@/lib/onboarding/types";
 import type { WeekBookingVM } from "@/components/panel/calendar-grid-view";
@@ -60,7 +60,6 @@ export function AppointmentModal({
   slot,
   hoursByDay,
   allBookings,
-  intlLocale,
   services,
   members,
   dict,
@@ -71,7 +70,6 @@ export function AppointmentModal({
   slot: SlotSelection;
   hoursByDay: Partial<Record<DayId, TimeRangeVM[]>>;
   allBookings: WeekBookingVM[];
-  intlLocale: string;
   services: ServiceVM[];
   members: MemberVM[];
   dict: CalendarDictionary["modal"];
@@ -86,6 +84,7 @@ export function AppointmentModal({
   const [clientName, setClientName] = useState("");
   const [clientEmail, setClientEmail] = useState("");
   const [clientPhone, setClientPhone] = useState("");
+  const [notes, setNotes] = useState("");
   const [sendEmail, setSendEmail] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -141,14 +140,6 @@ export function AppointmentModal({
     });
   }, [startDate, durationMin, teamMemberId, selectedDayBookings]);
 
-  const dateLabel = useMemo(() => {
-    const base = startDate ?? (selectedDateParts ? zonedTimeToUtc(selectedDateParts.year, selectedDateParts.month, selectedDateParts.day, 12, 0) : null);
-    if (!base) return "";
-    return new Intl.DateTimeFormat(intlLocale, {
-      timeZone: TZ, weekday: "long", day: "numeric", month: "long",
-    }).format(base);
-  }, [startDate, selectedDateParts, intlLocale]);
-
   const handleSubmit = async () => {
     setError(null);
     if (!serviceId || !startDate || conflict) return;
@@ -162,6 +153,7 @@ export function AppointmentModal({
           clientName,
           clientEmail: clientEmail || undefined,
           clientPhone: clientPhone || undefined,
+          notes: notes || undefined,
           sendConfirmationEmail: sendEmail,
         },
         errorsDict
@@ -191,12 +183,6 @@ export function AppointmentModal({
             <Icon name="x" size={16} />
           </button>
         </div>
-
-        {dateLabel && (
-          <p className="mb-4 rounded-lg bg-surface-2 px-3 py-2 text-[13px] font-medium capitalize text-ink">
-            {dateLabel}
-          </p>
-        )}
 
         {error && (
           <div className="mb-3 rounded-lg border border-error bg-error-weak px-3 py-2 text-[12.5px] text-error">
@@ -302,6 +288,16 @@ export function AppointmentModal({
               onChange={(e) => setClientPhone(e.target.value)}
               placeholder={dict.clientPhonePlaceholder}
               className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[14px] text-ink"
+            />
+          </Field>
+
+          <Field label={dict.notesLabel}>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder={dict.notesPlaceholder}
+              rows={2}
+              className="w-full resize-none rounded-lg border border-line bg-surface px-3 py-2 text-[14px] text-ink"
             />
           </Field>
 

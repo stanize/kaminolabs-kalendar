@@ -263,7 +263,6 @@ export function CalendarGridView({
           slot={modalSlot}
           hoursByDay={hoursByDay}
           allBookings={bookings}
-          intlLocale={dict.intlLocale}
           services={services.map((s) => ({ id: s.id, name: s.name, durationMin: s.durationMin, price: s.price }))}
           members={members.map((m) => ({ id: m.id, name: m.name }))}
           dict={dict.modal}

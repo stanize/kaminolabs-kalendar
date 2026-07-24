@@ -66,6 +66,8 @@ export interface CalendarDictionary {
     clientEmailPlaceholder: string;
     clientPhoneLabel: string;
     clientPhonePlaceholder: string;
+    notesLabel: string; // "Comentarios (opcional)"
+    notesPlaceholder: string;
     sendEmailLabel: string; // checkbox: "Enviar confirmación por email"
     cancel: string;
     submit: string;
@@ -168,6 +170,8 @@ const es: CalendarDictionary = {
     clientEmailPlaceholder: "cliente@email.com",
     clientPhoneLabel: "Teléfono (opcional)",
     clientPhonePlaceholder: "600 000 000",
+    notesLabel: "Comentarios (opcional)",
+    notesPlaceholder: "Notas internas sobre la cita",
     sendEmailLabel: "Enviar confirmación por email",
     cancel: "Cancelar",
     submit: "Crear cita",
@@ -268,6 +272,8 @@ const en: CalendarDictionary = {
     clientEmailPlaceholder: "client@email.com",
     clientPhoneLabel: "Phone (optional)",
     clientPhonePlaceholder: "600 000 000",
+    notesLabel: "Comments (optional)",
+    notesPlaceholder: "Internal notes about the appointment",
     sendEmailLabel: "Send confirmation email",
     cancel: "Cancel",
     submit: "Create appointment",
