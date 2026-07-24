@@ -81,6 +81,7 @@ export default async function CalendarPage() {
         }))}
         weekInitialBookings={(weekData?.bookings ?? []).map((b) => ({
           id: b.id,
+          serviceId: b.serviceId,
           serviceName: b.serviceName,
           startIso: b.startIso,
           endIso: b.endIso,

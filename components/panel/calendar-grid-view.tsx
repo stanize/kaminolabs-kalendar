@@ -30,6 +30,7 @@ export interface WeekMemberVM {
 
 export interface WeekBookingVM {
   id: string;
+  serviceId: string | null;
   serviceName: string;
   startIso: string;
   endIso: string;
@@ -260,6 +261,7 @@ export function CalendarGridView({
 
       {modalSlot && (
         <AppointmentModal
+          mode="create"
           slot={modalSlot}
           hoursByDay={hoursByDay}
           allBookings={bookings}
@@ -268,7 +270,7 @@ export function CalendarGridView({
           dict={dict.modal}
           errorsDict={dict.manualErrors}
           onClose={() => setModalSlot(null)}
-          onCreated={handleCreated}
+          onSaved={handleCreated}
         />
       )}
     </div>

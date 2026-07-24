@@ -243,6 +243,8 @@ export interface ManualBookingActionDict {
   errInvalidSlot: string;
   errSlotTaken: string;
   errCreateFailed: string;
+  errNotFound: string; // updateBookingAsOwner: booking id doesn't belong to this business
+  errUpdateFailed: string; // updateBookingAsOwner: update itself failed
 }
 
 const MANUAL_FALLBACK: ManualBookingActionDict = {
@@ -254,6 +256,8 @@ const MANUAL_FALLBACK: ManualBookingActionDict = {
   errInvalidSlot: "La hora seleccionada no es válida.",
   errSlotTaken: "Ese horario ya no está disponible. Elige otro.",
   errCreateFailed: "No se pudo crear la cita. Inténtalo de nuevo.",
+  errNotFound: "Reserva no encontrada.",
+  errUpdateFailed: "No se pudo actualizar la cita. Inténtalo de nuevo.",
 };
 
 export type CreateManualBookingResult = { ok: true } | { ok: false; error: string };
@@ -381,6 +385,142 @@ export const createBookingAsOwner = authedAction(
           whenLabel,
           confirmUrl: `${base}/bookings/confirm/${token}`, // unused in confirmed variant
           cancelUrl: `${base}/bookings/cancel/${token}`,
+          locale: "es",
+          isConfirmed: true,
+          hasIcsAttachment: true,
+        }),
+        attachments: [{ filename: "cita-kalendar.ics", content: ics }],
+      });
+    }
+
+    revalidatePath("/panel/calendar");
+    revalidatePath("/panel");
+    return { ok: true };
+  }
+);
+
+/**
+ * Updates an existing appointment's service/provider/time/client details —
+ * the "Modificar" flow from the booking detail modal, which reuses the same
+ * form as creating a new one. Overlap check excludes the booking's own row
+ * (otherwise it would always conflict with itself).
+ */
+export const updateBookingAsOwner = authedAction(
+  async (
+    session,
+    input: {
+      bookingId: string;
+      serviceId: string;
+      teamMemberId: string;
+      startIso: string;
+      clientName: string;
+      clientEmail?: string;
+      clientPhone?: string;
+      notes?: string;
+      sendConfirmationEmail: boolean;
+    },
+    dict?: Partial<ManualBookingActionDict>
+  ): Promise<CreateManualBookingResult> => {
+    const t = { ...MANUAL_FALLBACK, ...dict };
+
+    const business = await getBusinessForUser(session.user.id);
+    if (!business) return { ok: false, error: t.errNoBusiness };
+
+    const supabase = await createClient();
+
+    const [{ data: service }, { data: member }, { data: existing }] = await Promise.all([
+      supabase
+        .from("kalendar_services")
+        .select("id, name, duration_min, price")
+        .eq("id", input.serviceId)
+        .eq("business_id", business.id)
+        .maybeSingle(),
+      supabase
+        .from("kalendar_team_members")
+        .select("id")
+        .eq("id", input.teamMemberId)
+        .eq("business_id", business.id)
+        .maybeSingle(),
+      supabase
+        .from("kalendar_bookings")
+        .select("id, confirm_token")
+        .eq("id", input.bookingId)
+        .eq("business_id", business.id)
+        .maybeSingle(),
+    ]);
+
+    if (!service) return { ok: false, error: t.errInvalidService };
+    if (!member) return { ok: false, error: t.errInvalidProvider };
+    if (!existing) return { ok: false, error: t.errNotFound };
+
+    const name = input.clientName.trim();
+    if (name.length < 2) return { ok: false, error: t.errNameRequired };
+
+    const email = (input.clientEmail ?? "").trim();
+    const wantsEmail = input.sendConfirmationEmail && email.length > 0;
+    if (input.sendConfirmationEmail && email.length > 0 && !EMAIL_RE.test(email)) {
+      return { ok: false, error: t.errEmailInvalid };
+    }
+
+    const start = new Date(input.startIso);
+    if (Number.isNaN(start.getTime())) return { ok: false, error: t.errInvalidSlot };
+    const end = new Date(start.getTime() + service.duration_min * 60_000);
+
+    const { data: overlapping } = await supabase
+      .from("kalendar_bookings")
+      .select("id")
+      .eq("business_id", business.id)
+      .eq("team_member_id", member.id)
+      .neq("id", input.bookingId)
+      .in("status", ["pending_confirmation", "confirmed"])
+      .lt("starts_at", end.toISOString())
+      .gt("ends_at", start.toISOString())
+      .limit(1);
+    if (overlapping && overlapping.length > 0) return { ok: false, error: t.errSlotTaken };
+
+    const { error } = await supabase
+      .from("kalendar_bookings")
+      .update({
+        service_id: service.id,
+        team_member_id: member.id,
+        service_name: service.name,
+        service_duration_min: service.duration_min,
+        service_price: service.price,
+        starts_at: start.toISOString(),
+        ends_at: end.toISOString(),
+        client_name: name,
+        client_email: email || `sin-email+${existing.confirm_token}@kaminolabs.dev`,
+        client_phone: (input.clientPhone ?? "").trim() || null,
+        notes: (input.notes ?? "").trim() || null,
+      })
+      .eq("id", input.bookingId)
+      .eq("business_id", business.id);
+
+    if (error) {
+      if (error.code === "23505") return { ok: false, error: t.errSlotTaken };
+      return { ok: false, error: t.errUpdateFailed };
+    }
+
+    if (wantsEmail) {
+      const base = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/+$/, "");
+      const whenLabel = formatBookingWhen(start.toISOString(), "es");
+      const ics = buildBookingIcsBase64({
+        uid: existing.confirm_token,
+        summary: `${service.name} - ${business.name}`,
+        location: formatBusinessAddress(business),
+        startIso: start.toISOString(),
+        durationMin: service.duration_min,
+      });
+      await sendEmail({
+        to: email,
+        subject: `Cita actualizada · ${business.name}`,
+        html: bookingConfirmEmailHtml({
+          clientName: name,
+          businessName: business.name,
+          serviceName: service.name,
+          whenLabel,
+          confirmUrl: `${base}/bookings/confirm/${existing.confirm_token}`, // unused in confirmed variant
+          cancelUrl: `${base}/bookings/cancel/${existing.confirm_token}`,
           locale: "es",
           isConfirmed: true,
           hasIcsAttachment: true,

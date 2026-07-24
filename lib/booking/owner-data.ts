@@ -80,6 +80,7 @@ export interface WeekViewMember {
 
 export interface WeekViewBooking {
   id: string;
+  serviceId: string | null;
   serviceName: string;
   startIso: string;
   endIso: string;
@@ -154,7 +155,7 @@ export async function getWeekCalendarData(
     supabase
       .from("kalendar_bookings")
       .select(
-        "id, service_name, service_duration_min, starts_at, ends_at, status, payment_status, client_name, client_email, client_phone, notes, team_member_id, pending_expiry_at, guest_locale"
+        "id, service_id, service_name, service_duration_min, starts_at, ends_at, status, payment_status, client_name, client_email, client_phone, notes, team_member_id, pending_expiry_at, guest_locale"
       )
       .eq("business_id", business.id)
       .gte("starts_at", weekStartIso)
@@ -172,6 +173,7 @@ export async function getWeekCalendarData(
     (bookingsRes.data as
       | {
           id: string;
+          service_id: string | null;
           service_name: string;
           service_duration_min: number;
           starts_at: string;
@@ -189,6 +191,7 @@ export async function getWeekCalendarData(
       | null) ?? []
   ).map((b) => ({
     id: b.id,
+    serviceId: b.service_id,
     serviceName: b.service_name,
     startIso: b.starts_at,
     endIso: b.ends_at,

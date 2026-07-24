@@ -21,12 +21,14 @@ export function BookingDetailModal({
   dict,
   onClose,
   onUpdated,
+  onModify,
 }: {
   booking: WeekBookingVM;
   intlLocale: string;
   dict: CalendarDictionary;
   onClose: () => void;
   onUpdated: () => void;
+  onModify: (booking: WeekBookingVM) => void;
 }) {
   const d = dict.detailModal;
   const [busy, setBusy] = useState(false);
@@ -141,9 +143,12 @@ export function BookingDetailModal({
         )}
 
         {isFuture ? (
-          <div className="flex justify-end gap-2">
+          <div className="flex flex-wrap justify-end gap-2">
             <Btn variant="outline" onClick={handleCancel} disabled={busy}>
               {busy ? d.cancelling : d.cancelButton}
+            </Btn>
+            <Btn variant="outline" onClick={() => onModify(booking)} disabled={busy}>
+              {d.modifyButton}
             </Btn>
             {isAwaitingConfirmation && (
               <Btn onClick={handleConfirm} disabled={busy}>

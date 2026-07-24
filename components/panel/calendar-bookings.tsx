@@ -15,6 +15,7 @@ import {
 } from "@/components/panel/calendar-grid-view";
 import { CalendarMonthView } from "@/components/panel/calendar-month-view";
 import { BookingDetailModal } from "@/components/panel/booking-detail-modal";
+import { AppointmentModal } from "@/components/panel/appointment-modal";
 import {
   dayStart,
   mondayStart,
@@ -124,6 +125,7 @@ export function CalendarBookings({
   const [fetchedBookings, setFetchedBookings] = useState<WeekBookingVM[] | null>(null);
   const [gridLoading, setGridLoading] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<WeekBookingVM | null>(null);
+  const [editingBooking, setEditingBooking] = useState<WeekBookingVM | null>(null);
 
   const computeRange = useCallback((v: CalendarViewMode, date: Date) => {
     if (v === "day") {
@@ -317,6 +319,28 @@ export function CalendarBookings({
           dict={dict}
           onClose={() => setSelectedBooking(null)}
           onUpdated={handleGridBookingCreated}
+          onModify={(booking) => {
+            setSelectedBooking(null);
+            setEditingBooking(booking);
+          }}
+        />
+      )}
+
+      {editingBooking && (
+        <AppointmentModal
+          mode="edit"
+          booking={editingBooking}
+          hoursByDay={weekHoursByDay}
+          allBookings={gridBookings}
+          services={weekServices}
+          members={weekMembers}
+          dict={dict.modal}
+          errorsDict={dict.manualErrors}
+          onClose={() => setEditingBooking(null)}
+          onSaved={() => {
+            setEditingBooking(null);
+            handleGridBookingCreated();
+          }}
         />
       )}
 

@@ -53,6 +53,7 @@ export interface CalendarDictionary {
   };
   modal: {
     title: string; // "Nueva cita"
+    editTitle: string; // "Modificar cita"
     serviceLabel: string;
     servicePlaceholder: string;
     providerLabel: string;
@@ -72,10 +73,12 @@ export interface CalendarDictionary {
     cancel: string;
     submit: string;
     submitting: string;
+    saveButton: string; // "Guardar cambios" — edit mode's submit label
+    saving: string; // "Guardando…" — edit mode's submitting label
     close: string; // aria-label for the X button
   };
   manualErrors: {
-    // lib/actions/booking-owner.ts -> createBookingAsOwner
+    // lib/actions/booking-owner.ts -> createBookingAsOwner / updateBookingAsOwner
     errNoBusiness: string;
     errInvalidService: string;
     errInvalidProvider: string;
@@ -84,11 +87,14 @@ export interface CalendarDictionary {
     errInvalidSlot: string;
     errSlotTaken: string;
     errCreateFailed: string;
+    errNotFound: string;
+    errUpdateFailed: string;
   };
   detailModal: {
     close: string; // aria-label for the X button
     dismissButton: string; // "Cancelar" — closes the modal without saving (past bookings)
     notesLabel: string; // "Comentarios"
+    modifyButton: string; // "Modificar" — opens the appointment editor (future bookings)
     cancelButton: string;
     cancelling: string;
     resultLabel: string; // "Resultado"
@@ -157,6 +163,7 @@ const es: CalendarDictionary = {
   },
   modal: {
     title: "Nueva cita",
+    editTitle: "Modificar cita",
     serviceLabel: "Servicio",
     servicePlaceholder: "Elige un servicio",
     providerLabel: "Profesional",
@@ -176,6 +183,8 @@ const es: CalendarDictionary = {
     cancel: "Cancelar",
     submit: "Crear cita",
     submitting: "Creando…",
+    saveButton: "Guardar cambios",
+    saving: "Guardando…",
     close: "Cerrar",
   },
   manualErrors: {
@@ -187,11 +196,14 @@ const es: CalendarDictionary = {
     errInvalidSlot: "La hora seleccionada no es válida.",
     errSlotTaken: "Ese horario ya no está disponible. Elige otro.",
     errCreateFailed: "No se pudo crear la cita. Inténtalo de nuevo.",
+    errNotFound: "Reserva no encontrada.",
+    errUpdateFailed: "No se pudo actualizar la cita. Inténtalo de nuevo.",
   },
   detailModal: {
     close: "Cerrar",
     dismissButton: "Cancelar",
     notesLabel: "Comentarios",
+    modifyButton: "Modificar",
     cancelButton: "Cancelar cita",
     cancelling: "Cancelando…",
     resultLabel: "Resultado",
@@ -259,6 +271,7 @@ const en: CalendarDictionary = {
   },
   modal: {
     title: "New appointment",
+    editTitle: "Modify appointment",
     serviceLabel: "Service",
     servicePlaceholder: "Choose a service",
     providerLabel: "Provider",
@@ -278,6 +291,8 @@ const en: CalendarDictionary = {
     cancel: "Cancel",
     submit: "Create appointment",
     submitting: "Creating…",
+    saveButton: "Save changes",
+    saving: "Saving…",
     close: "Close",
   },
   manualErrors: {
@@ -289,11 +304,14 @@ const en: CalendarDictionary = {
     errInvalidSlot: "The selected time isn't valid.",
     errSlotTaken: "That slot is no longer available. Pick another.",
     errCreateFailed: "Couldn't create the appointment. Please try again.",
+    errNotFound: "Booking not found.",
+    errUpdateFailed: "Couldn't update the appointment. Please try again.",
   },
   detailModal: {
     close: "Close",
     dismissButton: "Cancel",
     notesLabel: "Comments",
+    modifyButton: "Modify",
     cancelButton: "Cancel appointment",
     cancelling: "Cancelling…",
     resultLabel: "Result",

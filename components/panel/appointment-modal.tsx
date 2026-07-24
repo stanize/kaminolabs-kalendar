@@ -2,8 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { Icon } from "@/components/ui/icon";
-import { createBookingAsOwner } from "@/lib/actions/booking-owner";
-import { zonedTimeToUtc, dayIdInTz, tzDateParts } from "@/lib/calendar/client-date";
+import { createBookingAsOwner, updateBookingAsOwner } from "@/lib/actions/booking-owner";
+import { zonedTimeToUtc, dayIdInTz, tzDateParts, TZ } from "@/lib/calendar/client-date";
 import type { CalendarDictionary } from "@/lib/i18n/dictionaries/calendar";
 import type { DayId } from "@/lib/onboarding/types";
 import type { WeekBookingVM } from "@/components/panel/calendar-grid-view";
@@ -38,6 +38,12 @@ function ymd(year: number, month: number, day: number): string {
   return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
+function hhmmFromIso(iso: string): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: TZ, hour: "2-digit", minute: "2-digit", hour12: false,
+  }).format(new Date(iso));
+}
+
 /** Every hourly slot across a day's working-hours ranges — offered in the
  * time field's dropdown as a convenience, not a restriction: the field
  * itself accepts any typed value too, in or out of business hours. */
@@ -56,35 +62,55 @@ function buildSuggestedTimes(ranges: TimeRangeVM[]): string[] {
   return times;
 }
 
-export function AppointmentModal({
-  slot,
-  hoursByDay,
-  allBookings,
-  services,
-  members,
-  dict,
-  errorsDict,
-  onClose,
-  onCreated,
-}: {
-  slot: SlotSelection;
-  hoursByDay: Partial<Record<DayId, TimeRangeVM[]>>;
-  allBookings: WeekBookingVM[];
-  services: ServiceVM[];
-  members: MemberVM[];
-  dict: CalendarDictionary["modal"];
-  errorsDict: CalendarDictionary["manualErrors"];
-  onClose: () => void;
-  onCreated: () => void;
-}) {
-  const [serviceId, setServiceId] = useState(services[0]?.id ?? "");
-  const [teamMemberId, setTeamMemberId] = useState(slot.teamMemberId);
-  const [dateStr, setDateStr] = useState(ymd(slot.dayYear, slot.dayMonth, slot.dayDay));
-  const [timeStr, setTimeStr] = useState(slot.initialTime);
-  const [clientName, setClientName] = useState("");
-  const [clientEmail, setClientEmail] = useState("");
-  const [clientPhone, setClientPhone] = useState("");
-  const [notes, setNotes] = useState("");
+type AppointmentModalProps =
+  | {
+      mode: "create";
+      slot: SlotSelection;
+      hoursByDay: Partial<Record<DayId, TimeRangeVM[]>>;
+      allBookings: WeekBookingVM[];
+      services: ServiceVM[];
+      members: MemberVM[];
+      dict: CalendarDictionary["modal"];
+      errorsDict: CalendarDictionary["manualErrors"];
+      onClose: () => void;
+      onSaved: () => void;
+    }
+  | {
+      mode: "edit";
+      booking: WeekBookingVM;
+      hoursByDay: Partial<Record<DayId, TimeRangeVM[]>>;
+      allBookings: WeekBookingVM[];
+      services: ServiceVM[];
+      members: MemberVM[];
+      dict: CalendarDictionary["modal"];
+      errorsDict: CalendarDictionary["manualErrors"];
+      onClose: () => void;
+      onSaved: () => void;
+    };
+
+export function AppointmentModal(props: AppointmentModalProps) {
+  const { hoursByDay, allBookings, services, members, dict, errorsDict, onClose, onSaved } = props;
+  const isEdit = props.mode === "edit";
+  const editBookingId = isEdit ? props.booking.id : null;
+
+  const initialDateParts = isEdit
+    ? tzDateParts(new Date(props.booking.startIso))
+    : { year: props.slot.dayYear, month: props.slot.dayMonth, day: props.slot.dayDay };
+  const initialTeamMemberId = isEdit ? (props.booking.teamMemberId ?? members[0]?.id ?? "") : props.slot.teamMemberId;
+  const initialTimeStr = isEdit ? hhmmFromIso(props.booking.startIso) : props.slot.initialTime;
+  const initialServiceId = isEdit ? (props.booking.serviceId ?? services[0]?.id ?? "") : (services[0]?.id ?? "");
+  const initialClientEmail = isEdit && props.booking.clientEmail && !props.booking.clientEmail.startsWith("sin-email+")
+    ? props.booking.clientEmail
+    : "";
+
+  const [serviceId, setServiceId] = useState(initialServiceId);
+  const [teamMemberId, setTeamMemberId] = useState(initialTeamMemberId);
+  const [dateStr, setDateStr] = useState(ymd(initialDateParts.year, initialDateParts.month, initialDateParts.day));
+  const [timeStr, setTimeStr] = useState(initialTimeStr);
+  const [clientName, setClientName] = useState(isEdit ? props.booking.clientName : "");
+  const [clientEmail, setClientEmail] = useState(initialClientEmail);
+  const [clientPhone, setClientPhone] = useState(isEdit ? props.booking.clientPhone ?? "" : "");
+  const [notes, setNotes] = useState(isEdit ? props.booking.notes ?? "" : "");
   const [sendEmail, setSendEmail] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -111,10 +137,11 @@ export function AppointmentModal({
   const selectedDayBookings = useMemo(() => {
     if (!selectedDateParts) return [];
     return allBookings.filter((b) => {
+      if (editBookingId && b.id === editBookingId) return false; // exclude itself from conflict checks
       const p = tzDateParts(new Date(b.startIso));
       return p.year === selectedDateParts.year && p.month === selectedDateParts.month && p.day === selectedDateParts.day;
     });
-  }, [selectedDateParts, allBookings]);
+  }, [selectedDateParts, allBookings, editBookingId]);
 
   const suggestedTimes = useMemo(() => buildSuggestedTimes(selectedDayRanges), [selectedDayRanges]);
   const isOutsideHours = timeValid && !suggestedTimes.includes(timeStr);
@@ -152,27 +179,27 @@ export function AppointmentModal({
     if (!serviceId || !startDate || conflict) return;
     setSubmitting(true);
     try {
-      const res = await createBookingAsOwner(
-        {
-          serviceId,
-          teamMemberId,
-          startIso: startDate.toISOString(),
-          clientName,
-          clientEmail: clientEmail || undefined,
-          clientPhone: clientPhone || undefined,
-          notes: notes || undefined,
-          sendConfirmationEmail: sendEmail,
-        },
-        errorsDict
-      );
+      const payload = {
+        serviceId,
+        teamMemberId,
+        startIso: startDate.toISOString(),
+        clientName,
+        clientEmail: clientEmail || undefined,
+        clientPhone: clientPhone || undefined,
+        notes: notes || undefined,
+        sendConfirmationEmail: sendEmail,
+      };
+      const res = isEdit
+        ? await updateBookingAsOwner({ bookingId: editBookingId as string, ...payload }, errorsDict)
+        : await createBookingAsOwner(payload, errorsDict);
       if (!res.ok) {
         setError(res.error);
         setSubmitting(false);
         return;
       }
-      onCreated();
+      onSaved();
     } catch {
-      setError(errorsDict.errCreateFailed);
+      setError(isEdit ? errorsDict.errUpdateFailed : errorsDict.errCreateFailed);
       setSubmitting(false);
     }
   };
@@ -181,7 +208,7 @@ export function AppointmentModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 px-4 py-6">
       <div className="max-h-[90vh] w-full max-w-[440px] overflow-y-auto rounded-2xl bg-surface p-5 shadow-xl">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-[17px] font-bold text-ink">{dict.title}</h2>
+          <h2 className="text-[17px] font-bold text-ink">{isEdit ? dict.editTitle : dict.title}</h2>
           <button
             onClick={onClose}
             aria-label={dict.close}
@@ -349,7 +376,7 @@ export function AppointmentModal({
             disabled={submitting || !clientName.trim() || !serviceId || !dateValid || !timeValid || conflict}
             className="rounded-lg bg-brand px-4 py-2 text-[13.5px] font-semibold text-white hover:opacity-90 disabled:opacity-50"
           >
-            {submitting ? dict.submitting : dict.submit}
+            {submitting ? (isEdit ? dict.saving : dict.submitting) : (isEdit ? dict.saveButton : dict.submit)}
           </button>
         </div>
       </div>
