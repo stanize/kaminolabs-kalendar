@@ -1,13 +1,23 @@
-name: Send appointment reminders
+name: Send appointment reminders (fallback)
 
-# Same rationale as sweep-cron.yml: Vercel Hobby plan only allows daily
-# Vercel Cron jobs, so this runs via GitHub Actions instead. 15-minute
-# cadence matches the ±15min send-windows in the reminders route so no
-# booking is missed to cron jitter (see app/api/cron/send-reminders/route.ts).
+# FALLBACK ONLY as of 2026-07-25 — the primary scheduler for this job is now
+# Supabase pg_cron + pg_net (job name "send-appointment-reminders", every 15
+# min, calls the same /api/cron/send-reminders endpoint). That change was
+# made because real GitHub Actions run history showed schedule jitter of
+# 1h50m–3h11m against a nominal 15-minute cron — too loose for reminder
+# windows that are only ±15min wide. pg_cron runs inside Supabase's own
+# Postgres instance instead of a shared Actions scheduler queue, which is
+# significantly more dependable for tight timing. See
+# docs/reminders-build-log.md for the full writeup.
+#
+# This workflow is kept as a manual fallback (run it by hand from the Actions
+# tab, or re-enable the `schedule:` trigger below) in case the Supabase side
+# ever needs to be bypassed. It intentionally has NO `schedule:` trigger —
+# only workflow_dispatch — so it does not double-send alongside pg_cron.
+# Sending is idempotent either way (reminder_24h_sent_at / reminder_1h_sent_at
+# guards), so even a manual run overlapping with pg_cron is harmless.
 on:
-  schedule:
-    - cron: "*/15 * * * *" # every 15 minutes (UTC)
-  workflow_dispatch: {} # allow manual runs from the Actions tab
+  workflow_dispatch: {} # manual runs from the Actions tab only — see note above
 
 jobs:
   send-reminders:
@@ -24,3 +34,4 @@ jobs:
             echo "Reminders endpoint returned an error"
             exit 1
           fi
+

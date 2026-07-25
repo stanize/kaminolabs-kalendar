@@ -118,32 +118,58 @@ Spanish instead, until a deliberate `business.language` field exists.
 - Validated: `tsc --noEmit` and `eslint` both clean across all five touched
   files after this change.
 
-## Cron cadence finding (2026-07-25) — needs a decision, not yet acted on
+## Cron cadence: resolved (2026-07-25) — moved to Supabase pg_cron
 
-Live testing surfaced a real infra gap, not a bug in the reminders code
-itself: `reminders-cron.yml` is scheduled `*/15 * * * *`, but the actual
-GitHub Actions run history showed gaps of **1h50m to 3h11m** between runs
-(cross-checked against `sweep-cron.yml`'s long-running history, which shows
-the same kind of jitter against its own hourly schedule — e.g. one real gap
-of ~1h45m). GitHub does not guarantee scheduled-workflow timing, especially
-under load, and this repo's actual cadence today is far looser than 15
-minutes.
+Decision made: primary scheduling moved from GitHub Actions to **Supabase
+`pg_cron` + `pg_net`**, keeping GitHub Actions as a documented manual
+fallback rather than removing it.
 
-Practical effect: the reminder windows (±15min around the 24h/1h marks) are
-narrow enough that many real reminders could be missed entirely if a cron
-run doesn't land inside the open window — this isn't hypothetical, it's what
-happened to the first two test bookings before the schedule "warmed up."
+**Why this option**: already in the stack (no new vendor), runs inside
+Supabase's own Postgres instance rather than a shared external scheduler
+queue, supports down-to-the-minute scheduling, and ties dependability to
+Supabase's own uptime rather than GitHub Actions' best-effort Actions
+scheduler (which is what produced the 1h50m–3h11m gaps documented above).
 
-**Not decided yet — flagging for a future session:**
-1. Widen the send-windows (trades timing precision for reliability — e.g. a
-   "24h before" reminder that actually goes out 22–26h before is still
-   useful; a "1h before" reminder with a wide window is riskier since it can
-   fire late).
-2. Move off GitHub Actions schedule for this specific job (e.g. an external
-   cron service like cron-job.org hitting the same authenticated endpoint,
-   or a paid Vercel plan's native Cron).
-3. Accept the current jitter for v1 and revisit if it proves to be a real
-   no-show-reduction problem in practice.
+**What was done:**
+- Enabled `pg_cron` and `pg_net` extensions on the Supabase project
+  (`supabase_vault` was already enabled). Migration:
+  `enable_pg_cron_and_pg_net`.
+- Rotated `CRON_SECRET` (old value retired) and stored the new value in
+  Supabase Vault as secret name `cron_secret`, rather than embedding it in
+  plain SQL — referenced via `vault.decrypted_secrets` inside the cron job
+  body.
+- Created a `cron.schedule` job named `send-appointment-reminders`,
+  `*/15 * * * *`, that does a `net.http_get` against
+  `https://kalendar.kaminolabs.dev/api/cron/send-reminders` with the
+  vault-stored secret as the `Authorization: Bearer` header. Migration:
+  `schedule_appointment_reminders_pg_cron`. Confirmed registered via
+  `select * from cron.job` (jobid 1, active).
+- `.github/workflows/reminders-cron.yml` — removed the `schedule:` trigger,
+  kept `workflow_dispatch:` only. Renamed the workflow to "Send appointment
+  reminders (fallback)" with a comment block explaining it's now
+  manual-only, why, and that it's safe to run alongside pg_cron because
+  reminder sending is idempotent (the `_sent_at` column guards).
+- `app/api/cron/sweep-expired-bookings/route.ts` / `sweep-cron.yml` —
+  **left as-is**, out of scope for this change (only the reminders job moved;
+  the sweep job shares the same `CRON_SECRET`, so it's affected by the
+  rotation below but not by the scheduler change itself).
 
-This is a genuine trade-off decision, not something to silently patch —
-noting it here rather than picking an approach unilaterally.
+**Manual steps Claude could not complete (tooling gaps, not skipped):**
+1. **Vercel**: update the `CRON_SECRET` environment variable to the new
+   rotated value, then redeploy so the running app picks it up. No
+   env-var-write tool is available in this session's Vercel MCP tools
+   (only observability + docs + design-import tools were available).
+2. **GitHub**: update the repo secret `CRON_SECRET` (Settings → Secrets and
+   variables → Actions) to the same new value, so the fallback workflow
+   still authenticates correctly if it's ever run manually. The GitHub PAT
+   in use has Contents:write (pushes work) but not Actions:write/secrets
+   permission — same gap hit earlier when trying `workflow_dispatch` via API.
+
+Both of these use **the same new secret value**, supplied to Arun directly
+in chat (not restated here since this file may end up in a public repo).
+
+**Not yet re-verified end-to-end** after this change — the earlier live
+test (24h + 1h reminders, pending-exclusion) was run against the *old*
+GitHub-Actions-scheduled path before this migration. Should re-run the same
+manual test once Vercel + GitHub secrets are updated, to confirm the
+pg_cron path delivers correctly with the new secret.
