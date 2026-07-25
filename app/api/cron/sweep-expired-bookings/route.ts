@@ -5,6 +5,7 @@ import {
   formatBookingWhen,
   bookingCancelledClientHtml,
   bookingCancelledOwnerHtml,
+  EMAIL_LOCALE,
 } from "@/lib/email";
 
 /**
@@ -83,8 +84,7 @@ export async function GET(request: Request) {
 
     if (!biz) continue;
 
-    const guestLocale = (booking.guest_locale ?? "es") as "es" | "en";
-    const whenLabel = formatBookingWhen(booking.starts_at, guestLocale);
+    const whenLabel = formatBookingWhen(booking.starts_at, EMAIL_LOCALE);
     const ownerWhenLabel = formatBookingWhen(booking.starts_at, "es");
 
     // Email the guest: booking was not confirmed in time.
@@ -92,7 +92,7 @@ export async function GET(request: Request) {
       await sendEmail({
         to: booking.client_email,
         subject:
-          guestLocale === "en"
+          EMAIL_LOCALE === "en"
             ? `Booking request not confirmed · ${biz.name}`
             : `Solicitud de reserva no confirmada · ${biz.name}`,
         html: bookingCancelledClientHtml({
@@ -102,7 +102,7 @@ export async function GET(request: Request) {
           whenLabel,
           byOwner: false,
           byExpiry: true,
-          locale: guestLocale,
+          locale: EMAIL_LOCALE,
         }),
       });
       emailsSent++;

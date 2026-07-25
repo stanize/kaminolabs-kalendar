@@ -7,6 +7,7 @@ import {
   appointmentReminder24hEmailHtml,
   appointmentReminder1hEmailHtml,
   reminderEmailSubject,
+  EMAIL_LOCALE,
 } from "@/lib/email";
 
 /**
@@ -161,8 +162,9 @@ async function sendReminder(
     .maybeSingle();
   if (fresh?.status !== "confirmed") return true; // not a failure — just no longer applicable
 
-  const guestLocale = (booking.guest_locale ?? "es") as "es" | "en";
-  const whenLabel = formatBookingWhen(booking.starts_at, guestLocale);
+  // Reminder content is pinned to Spanish for now (EMAIL_LOCALE, see
+  // lib/email.ts) regardless of the booking's stored guest_locale.
+  const whenLabel = formatBookingWhen(booking.starts_at, EMAIL_LOCALE);
   const base = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/+$/, "");
   const cancelUrl = `${base}/bookings/cancel/${booking.confirm_token}`;
 
@@ -184,14 +186,14 @@ async function sendReminder(
     providerName,
     businessAddress: formatBusinessAddress(biz),
     cancelUrl,
-    locale: guestLocale,
+    locale: EMAIL_LOCALE,
   });
 
   const sentAtColumn = variant === "24h" ? "reminder_24h_sent_at" : "reminder_1h_sent_at";
 
   const result = await sendEmail({
     to: booking.client_email,
-    subject: reminderEmailSubject(variant, biz.name, guestLocale),
+    subject: reminderEmailSubject(variant, biz.name, EMAIL_LOCALE),
     html,
   });
 

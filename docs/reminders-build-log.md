@@ -83,4 +83,67 @@ Arun, not committed to the repo — kept here as the reference of record instead
 
 ## Status
 
-**Not started — plan above is the current state.**
+**Core reminders feature: built, deployed, verified working** (24h + 1h
+emails both confirmed via live test sends; pending-confirmation exclusion
+confirmed). See "Cron cadence finding" below for an open infra question.
+
+## Mid-session addition: EMAIL_LOCALE pin (2026-07-25)
+
+After reviewing a live test email, Arun asked to stop deriving guest-facing
+email language from the booking's `guest_locale` and default everything to
+Spanish instead, until a deliberate `business.language` field exists.
+
+- **Scope confirmed**: all guest-facing emails, not just reminders —
+  confirmation, cancellation (client + expiry-sweep), under-review, and both
+  reminder emails.
+- **guest_locale itself**: left untouched in the DB and booking wizard —
+  still detected and stored on every booking as before. Only the *email*
+  call sites stopped reading it.
+- **Implementation**: added `export const EMAIL_LOCALE: "es" | "en" = "es"`
+  to `lib/email.ts` as the single source of truth, with a comment pointing
+  at this log entry and at what to do once `business.language` lands (swap
+  the constant for that per-business value at each call site). Every call
+  site that previously computed a `guestLocale` variable from
+  `booking.guest_locale` *for email purposes* now uses `EMAIL_LOCALE`
+  instead:
+  - `lib/actions/booking.ts`: `bookGuestSlot`'s confirm/under-review send,
+    and `notifyCancellation`'s client receipt.
+  - `lib/actions/booking-owner.ts`: the owner-confirms-pending-booking send.
+  - `app/api/cron/send-reminders/route.ts`: both reminder variants.
+  - `app/api/cron/sweep-expired-bookings/route.ts`: the expiry-cancellation
+    guest email.
+- **Explicitly NOT touched**: `getBookingByToken`'s `guestLocale` return
+  value in `lib/actions/booking.ts` — that drives the guest-facing *cancel
+  page* UI (on-page i18n), not an email, and is out of scope for this ask.
+- Validated: `tsc --noEmit` and `eslint` both clean across all five touched
+  files after this change.
+
+## Cron cadence finding (2026-07-25) — needs a decision, not yet acted on
+
+Live testing surfaced a real infra gap, not a bug in the reminders code
+itself: `reminders-cron.yml` is scheduled `*/15 * * * *`, but the actual
+GitHub Actions run history showed gaps of **1h50m to 3h11m** between runs
+(cross-checked against `sweep-cron.yml`'s long-running history, which shows
+the same kind of jitter against its own hourly schedule — e.g. one real gap
+of ~1h45m). GitHub does not guarantee scheduled-workflow timing, especially
+under load, and this repo's actual cadence today is far looser than 15
+minutes.
+
+Practical effect: the reminder windows (±15min around the 24h/1h marks) are
+narrow enough that many real reminders could be missed entirely if a cron
+run doesn't land inside the open window — this isn't hypothetical, it's what
+happened to the first two test bookings before the schedule "warmed up."
+
+**Not decided yet — flagging for a future session:**
+1. Widen the send-windows (trades timing precision for reliability — e.g. a
+   "24h before" reminder that actually goes out 22–26h before is still
+   useful; a "1h before" reminder with a wide window is riskier since it can
+   fire late).
+2. Move off GitHub Actions schedule for this specific job (e.g. an external
+   cron service like cron-job.org hitting the same authenticated endpoint,
+   or a paid Vercel plan's native Cron).
+3. Accept the current jitter for v1 and revisit if it proves to be a real
+   no-show-reduction problem in practice.
+
+This is a genuine trade-off decision, not something to silently patch —
+noting it here rather than picking an approach unilaterally.

@@ -13,6 +13,7 @@ import {
   sendEmail,
   formatBookingWhen,
   bookingConfirmEmailHtml,
+  EMAIL_LOCALE,
 } from "@/lib/email";
 
 export type OwnerBookingResult = { ok: true } | { ok: false; error: string };
@@ -125,9 +126,9 @@ export const confirmBookingAsOwner = authedAction(
 
     if (error) return { ok: false, error: t.errCancelFailed };
 
-    // Email the guest a confirmation receipt in their language.
-    const guestLocale = (booking.guest_locale ?? "es") as "es" | "en";
-    const whenLabel = formatBookingWhen(booking.starts_at, guestLocale);
+    // Email the guest a confirmation receipt (Spanish — EMAIL_LOCALE pin,
+    // see lib/email.ts; guest_locale is still stored but no longer read here).
+    const whenLabel = formatBookingWhen(booking.starts_at, EMAIL_LOCALE);
     const base = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/+$/, "");
 
     const ics = buildBookingIcsBase64({
@@ -141,7 +142,7 @@ export const confirmBookingAsOwner = authedAction(
     await sendEmail({
       to: booking.client_email,
       subject:
-        guestLocale === "en"
+        EMAIL_LOCALE === "en"
           ? `Booking confirmed · ${business.name}`
           : `Cita confirmada · ${business.name}`,
       html: bookingConfirmEmailHtml({
@@ -151,7 +152,7 @@ export const confirmBookingAsOwner = authedAction(
         whenLabel,
         confirmUrl: `${base}/bookings/confirm/${bookingId}`, // unused in confirmed variant
         cancelUrl: `${base}/bookings/cancel/${bookingId}`,
-        locale: guestLocale,
+        locale: EMAIL_LOCALE,
         isConfirmed: true,
         hasIcsAttachment: true,
       }),

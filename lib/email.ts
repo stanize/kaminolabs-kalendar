@@ -13,6 +13,19 @@
  *                       Resend shared test sender is used, which only delivers
  *                       to the email address of the Resend account owner.
  */
+
+/**
+ * TEMPORARY: guest-facing email content is pinned to Spanish for all guest
+ * emails (confirmation, cancellation, under-review, reminders), regardless
+ * of the booking's stored `guest_locale`. This is a deliberate product call
+ * (2026-07-25, see docs/reminders-build-log.md) — `guest_locale` is still
+ * detected and stored on every booking as before (used for on-page UI, e.g.
+ * the guest cancel page), it's just no longer read when building email
+ * content. Once a `business.language` field exists, replace this constant
+ * with that per-business setting at each of this file's call sites.
+ */
+export const EMAIL_LOCALE: "es" | "en" = "es";
+
 type SendEmailInput = {
   to: string;
   subject: string;

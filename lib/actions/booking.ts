@@ -13,6 +13,7 @@ import {
   bookingCancelledClientHtml,
   bookingCancelledOwnerHtml,
   formatBookingWhen,
+  EMAIL_LOCALE,
 } from "@/lib/email";
 import {
   generateSlotsForDay,
@@ -309,7 +310,7 @@ export async function submitBooking(input: {
   const providerName = teamMemberId
     ? data.members.find((mm) => mm.id === teamMemberId)?.name ?? null
     : null;
-  const whenLabel = formatBookingWhen(start.toISOString(), input.guestLocale);
+  const whenLabel = formatBookingWhen(start.toISOString(), EMAIL_LOCALE);
 
   if (bookingStatus === "confirmed") {
     // Authenticated patient: booking is already confirmed. Send a receipt email.
@@ -323,7 +324,7 @@ export async function submitBooking(input: {
     await sendEmail({
       to: email,
       subject:
-        input.guestLocale === "en"
+        EMAIL_LOCALE === "en"
           ? `Booking confirmed · ${data.business.name}`
           : `Cita confirmada · ${data.business.name}`,
       html: bookingConfirmEmailHtml({
@@ -339,7 +340,7 @@ export async function submitBooking(input: {
         // "Gestionar mi cita" sends an authenticated patient to their portal
         // (they have an account), not straight to the guest cancel page.
         manageUrl: `${base}/patient/login?redirectTo=${encodeURIComponent("/patient/bookings")}`,
-        locale: input.guestLocale,
+        locale: EMAIL_LOCALE,
         isConfirmed: true,
         hasIcsAttachment: true,
       }),
@@ -350,7 +351,7 @@ export async function submitBooking(input: {
     await sendEmail({
       to: email,
       subject:
-        input.guestLocale === "en"
+        EMAIL_LOCALE === "en"
           ? `Booking request received · ${data.business.name}`
           : `Solicitud de cita recibida · ${data.business.name}`,
       html: bookingUnderReviewEmailHtml({
@@ -360,7 +361,7 @@ export async function submitBooking(input: {
         whenLabel,
         providerName,
         cancelUrl,
-        locale: input.guestLocale,
+        locale: EMAIL_LOCALE,
       }),
     });
   }
@@ -583,9 +584,10 @@ export async function cancelBookingByToken(token: string): Promise<CancelResult>
 /**
  * Sends cancellation emails. byOwner=false -> client cancelled (notify owner +
  * client receipt). byOwner=true -> owner cancelled (notify client only).
- * Best-effort; failures are logged, never thrown. The CLIENT receipt is
- * localized to guest_locale; the OWNER notification stays Spanish (no
- * owner-language setting exists yet).
+ * Best-effort; failures are logged, never thrown. Both the CLIENT receipt and
+ * the OWNER notification are Spanish for now (EMAIL_LOCALE pin — see
+ * lib/email.ts) — guest_locale is still stored on the booking but no longer
+ * read here.
  */
 export async function notifyCancellation(
   booking: {
@@ -600,7 +602,6 @@ export async function notifyCancellation(
   byOwner: boolean
 ): Promise<void> {
   const supabase = await createClient();
-  const guestLocale = booking.guest_locale ?? "es";
 
   const { data: biz } = await supabase
     .from("kalendar_businesses")
@@ -619,14 +620,14 @@ export async function notifyCancellation(
     providerName = m?.name ?? null;
   }
 
-  const guestWhenLabel = formatBookingWhen(booking.starts_at, guestLocale);
+  const guestWhenLabel = formatBookingWhen(booking.starts_at, EMAIL_LOCALE);
   const ownerWhenLabel = formatBookingWhen(booking.starts_at); // owner emails stay Spanish
 
-  // Always send the client a cancellation receipt, in their own language.
+  // Always send the client a cancellation receipt.
   await sendEmail({
     to: booking.client_email,
     subject:
-      guestLocale === "en"
+      EMAIL_LOCALE === "en"
         ? `Booking cancelled · ${biz.name}`
         : `Cita cancelada · ${biz.name}`,
     html: bookingCancelledClientHtml({
@@ -635,7 +636,7 @@ export async function notifyCancellation(
       serviceName: booking.service_name,
       whenLabel: guestWhenLabel,
       byOwner,
-      locale: guestLocale,
+      locale: EMAIL_LOCALE,
     }),
   });
 
