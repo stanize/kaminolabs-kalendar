@@ -215,13 +215,8 @@ export function ownerBookingNotificationHtml(input: {
     <p style="font-size:15px;line-height:1.6;margin:0 0 18px;"><strong>${escapeHtml(businessName)}</strong> tiene una nueva cita.</p>
     ${emailInfoBox(rows)}
     ${emailButton("Ver en mi calendario", panelUrl)}`;
-  return emailShell(body, "Kalendar · Reservas y agenda para tu clínica");
+  return emailShell(body, "Kalendar · Reservas y agenda para tu clínica", "Kalendar");
 }
-
-/**
- * Email to the client confirming their booking was cancelled. Localized to the
- * guest's chosen language (booking.guest_locale) — GUEST-facing email.
- */
 /**
  * Email sent to a GUEST (no account) immediately after they submit a booking.
  * Tells them their request was received and is under clinic review (24h window).
@@ -235,8 +230,9 @@ export function bookingUnderReviewEmailHtml(input: {
   providerName?: string | null;
   cancelUrl: string;
   locale?: "es" | "en";
+  brandColor?: string | null;
 }): string {
-  const { clientName, businessName, serviceName, whenLabel, providerName, cancelUrl } = input;
+  const { clientName, businessName, serviceName, whenLabel, providerName, cancelUrl, brandColor } = input;
   const locale = input.locale ?? "es";
   const t =
     locale === "en"
@@ -249,8 +245,7 @@ export function bookingUnderReviewEmailHtml(input: {
           service:      "Service",
           when:         "When",
           professional: "Professional",
-          cancelPrefix: "Changed your mind?",
-          cancelLink:   "Cancel your request here",
+          manage:       "Manage my request",
           footer:       "Kalendar · Online booking for your clinic",
         }
       : {
@@ -262,14 +257,13 @@ export function bookingUnderReviewEmailHtml(input: {
           service:      "Servicio",
           when:         "Cuándo",
           professional: "Profesional",
-          cancelPrefix: "¿Has cambiado de opinión?",
-          cancelLink:   "Cancela tu solicitud aquí",
+          manage:       "Gestionar mi solicitud",
           footer:       "Kalendar · Reservas online para tu clínica",
         };
   const rows = [
-    { label: t.service, value: serviceName },
-    { label: t.when, value: whenLabel },
-    ...(providerName ? [{ label: t.professional, value: providerName }] : []),
+    { icon: ROW_ICON.service, label: t.service, value: serviceName },
+    { icon: ROW_ICON.when, label: t.when, value: whenLabel },
+    ...(providerName ? [{ icon: ROW_ICON.professional, label: t.professional, value: providerName }] : []),
   ];
   const body = `
     <h1 style="font-size:19px;margin:0 0 12px;">${t.title}</h1>
@@ -278,8 +272,8 @@ export function bookingUnderReviewEmailHtml(input: {
     <p style="font-size:15px;line-height:1.6;margin:0 0 18px;">${t.intro}</p>
     ${emailInfoBox(rows)}
     <p style="font-size:13px;line-height:1.6;color:#64748b;margin:0 0 16px;">${t.note}</p>
-    ${emailSecondaryLine(t.cancelPrefix, t.cancelLink, cancelUrl)}`;
-  return emailShell(body, t.footer);
+    ${emailButton(t.manage, cancelUrl, brandColor)}`;
+  return emailShell(body, t.footer, businessName, brandColor);
 }
 
 export function bookingCancelledClientHtml(input: {
@@ -290,8 +284,9 @@ export function bookingCancelledClientHtml(input: {
   byOwner: boolean;
   byExpiry?: boolean;
   locale?: "es" | "en";
+  brandColor?: string | null;
 }): string {
-  const { clientName, businessName, serviceName, whenLabel, byOwner } = input;
+  const { clientName, businessName, serviceName, whenLabel, byOwner, brandColor } = input;
   const byExpiry = input.byExpiry ?? false;
   const locale = input.locale ?? "es";
   const t =
@@ -321,8 +316,11 @@ export function bookingCancelledClientHtml(input: {
     ${emailBadge(t.title, "danger")}
     <p style="font-size:15px;line-height:1.6;margin:0 0 6px;">${t.greeting}</p>
     <p style="font-size:15px;line-height:1.6;margin:0 0 18px;">${reason}</p>
-    ${emailInfoBox([{ label: t.service, value: serviceName }, { label: t.when, value: whenLabel }])}`;
-  return emailShell(body, footer);
+    ${emailInfoBox([
+      { icon: ROW_ICON.service, label: t.service, value: serviceName },
+      { icon: ROW_ICON.when, label: t.when, value: whenLabel },
+    ])}`;
+  return emailShell(body, footer, businessName, brandColor);
 }
 
 /**
@@ -346,7 +344,7 @@ export function bookingCancelledOwnerHtml(input: {
     ${emailBadge("Cancelada por el cliente", "danger")}
     <p style="font-size:15px;line-height:1.6;margin:0 0 18px;">Un cliente ha cancelado su cita.</p>
     ${emailInfoBox(rows)}`;
-  return emailShell(body, "Kalendar · Reservas y agenda para tu clínica");
+  return emailShell(body, "Kalendar · Reservas y agenda para tu clínica", "Kalendar");
 }
 
 function escapeHtml(s: string): string {
@@ -358,20 +356,30 @@ function escapeHtml(s: string): string {
 }
 
 // ── Shared branded email chrome ─────────────────────────────────────────────
-// One visual shell (teal header band with the Kalendar mark, white card body,
-// light footer) used by every template below, so all outgoing mail — owner or
-// guest-facing, any language — looks like it came from the same product.
+// One visual shell (colored header band, white card body, light footer) used
+// by every template below. As of 2026-07-26: CLIENT-facing emails show the
+// business's own name + brand_color in the header (so mail looks like it
+// came from the clinic, not from "Kalendar") — owner-facing emails
+// (ownerBookingNotificationHtml, bookingCancelledOwnerHtml) keep the fixed
+// "Kalendar" header since those are Kalendar's own product notifications to
+// the business owner, not client-facing branding. Every template still
+// mentions "Kalendar" in the small footer print either way.
 
 const BRAND_TEAL = "#0d9488";
 const FONT = "-apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif";
 
-function emailShell(bodyHtml: string, footerNote: string): string {
+/** Only accept a real #rrggbb value from the DB; anything else falls back to the default teal. */
+function safeBrandColor(color?: string | null): string {
+  return color && /^#[0-9a-fA-F]{6}$/.test(color) ? color : BRAND_TEAL;
+}
+
+function emailShell(bodyHtml: string, footerNote: string, headerLabel: string, brandColor?: string | null): string {
+  const color = safeBrandColor(brandColor);
   return `
   <div style="background:#eef2f6;padding:32px 12px;font-family:${FONT};">
     <div style="max-width:480px;margin:0 auto;background:#ffffff;border-radius:18px;overflow:hidden;box-shadow:0 1px 3px rgba(15,23,42,0.08);">
-      <div style="background:${BRAND_TEAL};padding:22px 24px;text-align:center;">
-        <div style="display:inline-block;width:36px;height:36px;background:rgba(255,255,255,0.18);border-radius:10px;line-height:36px;font-size:17px;color:#ffffff;">📅</div>
-        <div style="color:#ffffff;font-weight:700;font-size:15px;margin-top:6px;letter-spacing:.01em;">Kalendar</div>
+      <div style="background:${color};padding:24px 24px;text-align:center;">
+        <div style="color:#ffffff;font-weight:700;font-size:17px;letter-spacing:.01em;">${escapeHtml(headerLabel)}</div>
       </div>
       <div style="padding:30px 26px 8px;color:#0f172a;">
         ${bodyHtml}
@@ -382,6 +390,15 @@ function emailShell(bodyHtml: string, footerNote: string): string {
     </div>
   </div>`;
 }
+
+/** Icons used to prefix emailInfoBox rows, matched by row label meaning across every template. */
+const ROW_ICON = {
+  when: "🕐",
+  service: "⭐",
+  professional: "👤",
+  address: "📍",
+  clinic: "🏥",
+} as const;
 
 function emailBadge(text: string, tone: "success" | "info" | "danger" = "success"): string {
   const colors = {
@@ -396,7 +413,7 @@ function emailBadge(text: string, tone: "success" | "info" | "danger" = "success
 }
 
 function emailInfoBox(
-  rows: { label: string; value: string }[],
+  rows: { label: string; value: string; icon?: string }[],
   tone: "neutral" | "info" = "neutral"
 ): string {
   const colors = tone === "info" ? { bg: "#eff6ff", label: "#1e40af" } : { bg: "#f8fafc", label: "#64748b" };
@@ -404,7 +421,7 @@ function emailInfoBox(
     .map(
       (r, i) => `
       <tr>
-        <td style="padding:${i === 0 ? "0 0 10px" : "10px 0 0"};color:${colors.label};font-size:13.5px;font-weight:600;vertical-align:top;white-space:nowrap;">${escapeHtml(r.label)}</td>
+        <td style="padding:${i === 0 ? "0 0 10px" : "10px 0 0"};color:${colors.label};font-size:13.5px;font-weight:600;vertical-align:top;white-space:nowrap;">${r.icon ? `<span style="margin-right:6px;">${r.icon}</span>` : ""}${escapeHtml(r.label)}</td>
         <td style="padding:${i === 0 ? "0 0 10px" : "10px 0 0"};font-size:13.5px;font-weight:600;text-align:right;vertical-align:top;">${escapeHtml(r.value)}</td>
       </tr>`
     )
@@ -417,9 +434,9 @@ function emailInfoBox(
     </table>`;
 }
 
-function emailButton(label: string, url: string): string {
+function emailButton(label: string, url: string, brandColor?: string | null): string {
   return `
-    <a href="${url}" style="display:block;text-align:center;background:${BRAND_TEAL};color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:14px 24px;border-radius:12px;margin:0 0 18px;">
+    <a href="${url}" style="display:block;text-align:center;background:${safeBrandColor(brandColor)};color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:14px 24px;border-radius:12px;margin:0 0 18px;">
       ${escapeHtml(label)}
     </a>`;
 }
@@ -485,8 +502,9 @@ export function bookingConfirmEmailHtml(input: {
   // Whether an .ics calendar file is attached to this email — shows a note
   // pointing the client at the attachment when true.
   hasIcsAttachment?: boolean;
+  brandColor?: string | null;
 }): string {
-  const { clientName, businessName, serviceName, whenLabel, providerName, confirmUrl, cancelUrl } = input;
+  const { clientName, businessName, serviceName, whenLabel, providerName, confirmUrl, cancelUrl, brandColor } = input;
   const manageUrl = input.manageUrl ?? cancelUrl;
   const isConfirmed = input.isConfirmed ?? false;
   const hasIcs = input.hasIcsAttachment ?? false;
@@ -545,10 +563,10 @@ export function bookingConfirmEmailHtml(input: {
         };
 
   const rows = [
-    { label: t.when, value: whenLabel },
-    { label: t.clinic, value: businessName },
-    { label: t.service, value: serviceName },
-    ...(providerName ? [{ label: t.professional, value: providerName }] : []),
+    { icon: ROW_ICON.when, label: t.when, value: whenLabel },
+    { icon: ROW_ICON.clinic, label: t.clinic, value: businessName },
+    { icon: ROW_ICON.service, label: t.service, value: serviceName },
+    ...(providerName ? [{ icon: ROW_ICON.professional, label: t.professional, value: providerName }] : []),
   ];
 
   const title = isConfirmed ? t.titleConfirmed : t.titlePending;
@@ -562,7 +580,7 @@ export function bookingConfirmEmailHtml(input: {
     ${emailInfoBox(rows, "info")}
     <p style="font-size:14.5px;line-height:1.6;margin:0 0 2px;font-weight:600;">${t.manageHeading}</p>
     <p style="font-size:14px;line-height:1.6;margin:0 0 14px;color:#475569;">${t.manageBody}</p>
-    ${emailButton(t.manage, manageUrl)}
+    ${emailButton(t.manage, manageUrl, brandColor)}
     <p style="font-size:14.5px;line-height:1.6;margin:20px 0 0;">${t.thanks}</p>
     ${hasIcs ? `<p style="font-size:13px;line-height:1.6;color:#64748b;margin:14px 0 0;">${t.icsPrefix}<strong>${t.icsLink}</strong>.</p>` : ""}`;
 
@@ -572,12 +590,12 @@ export function bookingConfirmEmailHtml(input: {
     <p style="font-size:15px;line-height:1.6;margin:0 0 6px;">${clientName ? `Hola ${escapeHtml(clientName)},` : "Hola,"}</p>
     <p style="font-size:15px;line-height:1.6;margin:0 0 20px;">${t.introPending}</p>
     ${emailInfoBox(rows)}
-    ${emailButton(t.button, confirmUrl)}
+    ${emailButton(t.button, confirmUrl, brandColor)}
     ${emailFallbackLink(t.fallback, confirmUrl)}
     <p style="font-size:12.5px;line-height:1.6;color:#94a3b8;margin:0 0 18px;">${t.ignore}</p>
     ${emailSecondaryLine(t.cancelPrefix, t.cancelLink, cancelUrl)}`;
 
-  return emailShell(isConfirmed ? confirmedBody : pendingBody, t.footer);
+  return emailShell(isConfirmed ? confirmedBody : pendingBody, t.footer, businessName, brandColor);
 }
 
 // ── Appointment reminders (24h / 1h before) ─────────────────────────────────
@@ -593,9 +611,10 @@ type ReminderEmailInput = {
   providerName?: string | null;
   /** Formatted single-line address, e.g. "Calle Mayor 1, 28013 Madrid". Omitted if the business has no address on file. */
   businessAddress?: string | null;
-  /** Tokenized cancel link — reuses the same confirm_token as every other booking email, no separate token type. */
+  /** Tokenized cancel link — reuses the same confirm_token as every other booking email, no separate token type. Also used as the "Gestionar mi cita" button destination for now, since a dedicated reschedule/manage page doesn't exist yet. */
   cancelUrl: string;
   locale?: "es" | "en";
+  brandColor?: string | null;
 };
 
 function reminderBody(
@@ -608,28 +627,27 @@ function reminderBody(
     when: string;
     address: string;
     professional: string;
-    cancelPrefix: string;
-    cancelLink: string;
+    manage: string;
   }
 ): string {
-  const { serviceName, whenLabel, providerName, businessAddress, cancelUrl } = input;
+  const { serviceName, whenLabel, providerName, businessAddress, cancelUrl, brandColor } = input;
   const rows = [
-    { label: t.service, value: serviceName },
-    { label: t.when, value: whenLabel },
-    ...(providerName ? [{ label: t.professional, value: providerName }] : []),
-    ...(businessAddress ? [{ label: t.address, value: businessAddress }] : []),
+    { icon: ROW_ICON.service, label: t.service, value: serviceName },
+    { icon: ROW_ICON.when, label: t.when, value: whenLabel },
+    ...(providerName ? [{ icon: ROW_ICON.professional, label: t.professional, value: providerName }] : []),
+    ...(businessAddress ? [{ icon: ROW_ICON.address, label: t.address, value: businessAddress }] : []),
   ];
   return `
     ${emailBadge(t.badge, "info")}
     <p style="font-size:15px;line-height:1.6;margin:0 0 6px;">${t.greeting}</p>
     <p style="font-size:15px;line-height:1.6;margin:0 0 18px;">${t.intro}</p>
     ${emailInfoBox(rows, "info")}
-    ${emailSecondaryLine(t.cancelPrefix, t.cancelLink, cancelUrl)}`;
+    ${emailButton(t.manage, cancelUrl, brandColor)}`;
 }
 
 /** Sent ~24h before a confirmed booking's starts_at. */
 export function appointmentReminder24hEmailHtml(input: ReminderEmailInput): string {
-  const { clientName, businessName } = input;
+  const { clientName, businessName, brandColor } = input;
   const locale = input.locale ?? "es";
   const t =
     locale === "en"
@@ -641,8 +659,7 @@ export function appointmentReminder24hEmailHtml(input: ReminderEmailInput): stri
           when:         "When",
           address:      "Address",
           professional: "Professional",
-          cancelPrefix: "Can't make it?",
-          cancelLink:   "Cancel your appointment here",
+          manage:       "Manage my appointment",
           footer:       "Kalendar · Online booking for your clinic",
         }
       : {
@@ -653,16 +670,15 @@ export function appointmentReminder24hEmailHtml(input: ReminderEmailInput): stri
           when:         "Cuándo",
           address:      "Dirección",
           professional: "Profesional",
-          cancelPrefix: "¿No puedes asistir?",
-          cancelLink:   "Cancela tu cita aquí",
+          manage:       "Gestionar mi cita",
           footer:       "Kalendar · Reservas online para tu clínica",
         };
-  return emailShell(reminderBody(input, t), t.footer);
+  return emailShell(reminderBody(input, t), t.footer, businessName, brandColor);
 }
 
 /** Sent ~1h before a confirmed booking's starts_at. */
 export function appointmentReminder1hEmailHtml(input: ReminderEmailInput): string {
-  const { clientName, businessName } = input;
+  const { clientName, businessName, brandColor } = input;
   const locale = input.locale ?? "es";
   const t =
     locale === "en"
@@ -674,8 +690,7 @@ export function appointmentReminder1hEmailHtml(input: ReminderEmailInput): strin
           when:         "When",
           address:      "Address",
           professional: "Professional",
-          cancelPrefix: "Can't make it?",
-          cancelLink:   "Cancel your appointment here",
+          manage:       "Manage my appointment",
           footer:       "Kalendar · Online booking for your clinic",
         }
       : {
@@ -686,11 +701,10 @@ export function appointmentReminder1hEmailHtml(input: ReminderEmailInput): strin
           when:         "Cuándo",
           address:      "Dirección",
           professional: "Profesional",
-          cancelPrefix: "¿No puedes asistir?",
-          cancelLink:   "Cancela tu cita aquí",
+          manage:       "Gestionar mi cita",
           footer:       "Kalendar · Reservas online para tu clínica",
         };
-  return emailShell(reminderBody(input, t), t.footer);
+  return emailShell(reminderBody(input, t), t.footer, businessName, brandColor);
 }
 
 /** Locale-aware subject line for the two reminder variants. */

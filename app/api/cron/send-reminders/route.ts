@@ -63,7 +63,8 @@ export async function GET(request: Request) {
       address_street,
       address_number,
       address_additional,
-      city
+      city,
+      brand_color
     )
   `;
 
@@ -127,6 +128,7 @@ type CandidateBooking = {
         address_number: string;
         address_additional: string | null;
         city: string;
+        brand_color: string;
       }
     | {
         name: string;
@@ -134,6 +136,7 @@ type CandidateBooking = {
         address_number: string;
         address_additional: string | null;
         city: string;
+        brand_color: string;
       }[];
 };
 
@@ -187,6 +190,7 @@ async function sendReminder(
     businessAddress: formatBusinessAddress(biz),
     cancelUrl,
     locale: EMAIL_LOCALE,
+    brandColor: biz.brand_color,
   });
 
   const sentAtColumn = variant === "24h" ? "reminder_24h_sent_at" : "reminder_1h_sent_at";

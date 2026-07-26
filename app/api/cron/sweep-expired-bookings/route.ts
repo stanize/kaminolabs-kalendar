@@ -44,7 +44,8 @@ export async function GET(request: Request) {
       guest_locale,
       kalendar_businesses!inner (
         name,
-        owner_id
+        owner_id,
+        brand_color
       )
     `)
     .eq("status", "pending_confirmation")
@@ -103,6 +104,7 @@ export async function GET(request: Request) {
           byOwner: false,
           byExpiry: true,
           locale: EMAIL_LOCALE,
+          brandColor: biz.brand_color,
         }),
       });
       emailsSent++;

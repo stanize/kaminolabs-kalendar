@@ -155,6 +155,7 @@ export const confirmBookingAsOwner = authedAction(
         locale: EMAIL_LOCALE,
         isConfirmed: true,
         hasIcsAttachment: true,
+        brandColor: business.brand_color,
       }),
       attachments: [{ filename: "cita-kalendar.ics", content: ics }],
     });
@@ -389,6 +390,7 @@ export const createBookingAsOwner = authedAction(
           locale: "es",
           isConfirmed: true,
           hasIcsAttachment: true,
+          brandColor: business.brand_color,
         }),
         attachments: [{ filename: "cita-kalendar.ics", content: ics }],
       });
@@ -525,6 +527,7 @@ export const updateBookingAsOwner = authedAction(
           locale: "es",
           isConfirmed: true,
           hasIcsAttachment: true,
+          brandColor: business.brand_color,
         }),
         attachments: [{ filename: "cita-kalendar.ics", content: ics }],
       });

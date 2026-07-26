@@ -343,6 +343,7 @@ export async function submitBooking(input: {
         locale: EMAIL_LOCALE,
         isConfirmed: true,
         hasIcsAttachment: true,
+        brandColor: data.business.brand_color,
       }),
       attachments: [{ filename: "cita-kalendar.ics", content: ics }],
     });
@@ -362,6 +363,7 @@ export async function submitBooking(input: {
         providerName,
         cancelUrl,
         locale: EMAIL_LOCALE,
+        brandColor: data.business.brand_color,
       }),
     });
   }
@@ -605,7 +607,7 @@ export async function notifyCancellation(
 
   const { data: biz } = await supabase
     .from("kalendar_businesses")
-    .select("name, owner_id")
+    .select("name, owner_id, brand_color")
     .eq("id", booking.business_id)
     .maybeSingle();
   if (!biz) return;
@@ -637,6 +639,7 @@ export async function notifyCancellation(
       whenLabel: guestWhenLabel,
       byOwner,
       locale: EMAIL_LOCALE,
+      brandColor: biz.brand_color,
     }),
   });
 
