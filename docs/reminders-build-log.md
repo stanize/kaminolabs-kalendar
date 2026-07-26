@@ -168,8 +168,35 @@ scheduler (which is what produced the 1h50m–3h11m gaps documented above).
 Both of these use **the same new secret value**, supplied to Arun directly
 in chat (not restated here since this file may end up in a public repo).
 
-**Not yet re-verified end-to-end** after this change — the earlier live
-test (24h + 1h reminders, pending-exclusion) was run against the *old*
-GitHub-Actions-scheduled path before this migration. Should re-run the same
-manual test once Vercel + GitHub secrets are updated, to confirm the
-pg_cron path delivers correctly with the new secret.
+## Final verification (2026-07-26) — Supabase pg_cron path confirmed working
+
+After Arun updated both the Vercel `CRON_SECRET` env var and the GitHub
+Actions repo secret to the rotated value, and Vercel redeployed commit
+`0a6b447` (confirmed `READY` via `Vercel:list_deployments`), re-ran the full
+test:
+
+- `cron.job_run_details` for `send-appointment-reminders` shows runs landing
+  exactly on `:00/:15/:30/:45` — **zero jitter**, a direct contrast to the
+  1h50m–3h11m gaps observed on GitHub Actions. This is the reliability
+  improvement the migration was for.
+- Fresh 24h + 1h test bookings (`stanize@gmail.com`) both got
+  `reminder_24h_sent_at` / `reminder_1h_sent_at` set on the same `12:15:03`
+  run, and Arun confirmed both emails arrived (in Spanish, per the
+  `EMAIL_LOCALE` pin).
+- The `pending_confirmation` exclusion test booking had independently
+  transitioned to `cancelled` (via the existing expiry sweep) by the time of
+  this run — still validates the intended behavior: a non-`confirmed`
+  booking gets no reminder, both `_sent_at` columns stayed `null`.
+- `reminder_send_failed` stayed `false` / `last_reminder_error` stayed
+  `null` across all rows — no failures.
+- Test bookings deleted after verification.
+
+## Status: feature complete
+
+Appointment reminders (backlog #1) are live in production:
+- 24h + 1h emails, Spanish by default (`EMAIL_LOCALE` pin, all guest emails)
+- Scheduled via Supabase `pg_cron` + `pg_net` (primary), GitHub Actions
+  `reminders-cron.yml` kept as a manual-only fallback
+- Failure visibility surfaced on the panel calendar
+- All decisions, deviations, and the cron-reliability finding/fix are
+  recorded above for future reference.
