@@ -90,7 +90,17 @@ passed through — no new query needed:
 
 ## Status
 
-Code complete, not yet pushed as of writing this entry. Next: push, then a
-live re-test of at least one reminder email to confirm the new header +
-icon rows + button render correctly in an actual inbox (not just visually
-inspected HTML).
+Code complete and **verified live** (2026-07-26):
+- Pushed as `3fd8290`, deployed to production (`dpl_H1sibVE...`, confirmed
+  `READY`).
+- Temporarily set Centro Ignatius's `brand_color` to a distinct violet
+  (`#7c3aed`, was `#0d9488`) to confirm the header color is genuinely
+  dynamic and not coincidentally matching the old fixed teal.
+- Sent a fresh 1h reminder test booking through the real Supabase pg_cron
+  path — `reminder_1h_sent_at` set successfully, no failure recorded.
+- Reverted `brand_color` back to `#0d9488` and deleted the test booking
+  after verification.
+
+Check your inbox for the test email — it should show "Centro Ignatius" in a
+violet header (not "Kalendar"), icon-prefixed rows, and a "Gestionar mi
+cita" button. Say the word if the colors/icons need any adjustment.
