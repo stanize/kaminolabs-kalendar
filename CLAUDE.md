@@ -57,10 +57,13 @@ Kalendar is a SaaS online booking platform targeting Spanish-market professional
 - One dictionary file per module under `lib/i18n/dictionaries/` — see `MODULES.md` for which dictionary belongs to which module. Don't create a second i18n mechanism; add strings to the relevant module's dictionary file.
 
 ### Email
-- `lib/email.ts` — Resend REST API (no SDK), env-gated on `RESEND_API_KEY` + `EMAIL_FROM`, degrades gracefully without them. Used by auth (verification) and public-booking (confirm/cancel/owner-notify) — see `MODULES.md` for the full list of emails each module sends.
+- `lib/email.ts` — Resend REST API (no SDK), env-gated on `RESEND_API_KEY` + `EMAIL_FROM`, degrades gracefully without them. Used by auth (verification), public-booking (confirm/cancel/owner-notify), and the reminders cron (`send-reminders` → `appointmentReminder24hEmailHtml`/`appointmentReminder1hEmailHtml`) — see `MODULES.md` for the full list of emails each module sends.
+- **`EMAIL_LOCALE` pin (2026-07-25)**: every guest-facing email — confirmation, cancellation (client + expiry-sweep), under-review, and both reminder emails — is currently pinned to Spanish via `export const EMAIL_LOCALE: "es" | "en" = "es"` in `lib/email.ts`, regardless of the booking's stored `guest_locale`. This overrides what would otherwise be locale-aware guest emails, deliberately, until a real per-business `business.language` field exists (tracked in the backlog). `guest_locale` itself is untouched in the DB/wizard and still drives the on-page cancel UI — only email call sites were repointed to `EMAIL_LOCALE`. Swap the constant for the per-business value at each call site once that field lands; see `docs/reminders-build-log.md` for the full list of affected call sites.
 
 ### Cron
-- `app/api/cron/sweep-expired-bookings/route.ts` (Vercel Cron). See `MODULES.md` → `public-booking` / `panel-calendar` for what it touches.
+Two jobs, two different schedulers by design:
+- **`send-reminders`** (`app/api/cron/send-reminders/route.ts`) — 24h/1h appointment reminders. **Primary scheduler: Supabase `pg_cron` + `pg_net`** (job `send-appointment-reminders`, `*/15 * * * *`, `net.http_get` with the secret pulled from Supabase Vault). Moved off GitHub Actions on 2026-07-25 after real run data showed 1h50m–3h11m of Actions-scheduler jitter — too loose for ±15min reminder windows; `pg_cron` runs inside Supabase's own Postgres and shows ~zero jitter. `.github/workflows/reminders-cron.yml` is kept as a manual-only fallback (`workflow_dispatch` only, no `schedule:` trigger, so it can't double-send alongside `pg_cron` — sending is idempotent either way via the `_sent_at` columns). See `docs/reminders-build-log.md` for the full writeup and `MODULES.md` → `panel-calendar`/shared infra for what it touches.
+- **`sweep-expired-bookings`** (`app/api/cron/sweep-expired-bookings/route.ts`) — unaffected by the above, still scheduled via GitHub Actions (`sweep-cron.yml`) only. See `MODULES.md` → `public-booking` / `panel-calendar`.
 
 ---
 
@@ -78,7 +81,7 @@ Kalendar is a SaaS online booking platform targeting Spanish-market professional
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service-role key — used by `lib/supabase/server.ts` for all server-side DB access (bypasses RLS). Server-only, never exposed to the browser |
 | `RESEND_API_KEY` | Resend API key for verification emails (without it, emails are skipped/logged, not sent) |
 | `EMAIL_FROM` | Sender, e.g. `Kalendar <no-reply@kaminolabs.dev>` (domain must be verified in Resend) |
-| `CRON_SECRET` | Bearer token Vercel sets automatically; used to authorize `app/api/cron/sweep-expired-bookings/route.ts` |
+| `CRON_SECRET` | Bearer token authorizing both cron routes (`send-reminders`, `sweep-expired-bookings`). No longer a Vercel-only auto value — as of the 2026-07-25 pg_cron migration it's a manually-rotated secret kept in sync across **three** places: this Vercel env var, the GitHub Actions repo secret (used by both workflows' fallback/primary runs), and Supabase Vault (`cron_secret`, read by the `pg_cron` job body via `vault.decrypted_secrets`). Rotate all three together or the schedulers will start getting 401s. |
 | `INTERNAL_SCHEMA_API_SECRET` | Shared secret gating `app/api/internal/schema/route.ts`, a read-only endpoint that serves the two schema SQL files' text so the admin portal's (temporary, dev-phase-only) schema-reset feature can run whatever's currently deployed. No DB credentials in this route — worst case a leak exposes table/column names, not write access. Remove this route + var once the admin portal's schema-reset feature is retired. |
 
 ---
