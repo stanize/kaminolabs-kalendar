@@ -64,7 +64,8 @@ export async function GET(request: Request) {
       address_number,
       address_additional,
       city,
-      brand_color
+      brand_color,
+      team_mode
     )
   `;
 
@@ -129,6 +130,7 @@ type CandidateBooking = {
         address_additional: string | null;
         city: string;
         brand_color: string;
+        team_mode: "solo" | "team";
       }
     | {
         name: string;
@@ -137,6 +139,7 @@ type CandidateBooking = {
         address_additional: string | null;
         city: string;
         brand_color: string;
+        team_mode: "solo" | "team";
       }[];
 };
 
@@ -172,7 +175,7 @@ async function sendReminder(
   const cancelUrl = `${base}/bookings/cancel/${booking.confirm_token}`;
 
   let providerName: string | null = null;
-  if (booking.team_member_id) {
+  if (booking.team_member_id && biz.team_mode === "team") {
     const { data: member } = await supabase
       .from("kalendar_team_members")
       .select("name")

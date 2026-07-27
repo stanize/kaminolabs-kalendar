@@ -413,7 +413,7 @@ function emailBadge(text: string, tone: "success" | "info" | "danger" = "success
 }
 
 function emailInfoBox(
-  rows: { label: string; value: string; icon?: string }[],
+  rows: { label: string; value: string; icon?: string; href?: string }[],
   tone: "neutral" | "info" = "neutral"
 ): string {
   const colors = tone === "info" ? { bg: "#eff6ff", label: "#1e40af" } : { bg: "#f8fafc", label: "#64748b" };
@@ -421,17 +421,26 @@ function emailInfoBox(
     .map(
       (r, i) => `
       <tr>
-        <td style="padding:${i === 0 ? "0 0 10px" : "10px 0 0"};color:${colors.label};font-size:13.5px;font-weight:600;vertical-align:top;white-space:nowrap;">${r.icon ? `<span style="margin-right:6px;">${r.icon}</span>` : ""}${escapeHtml(r.label)}</td>
-        <td style="padding:${i === 0 ? "0 0 10px" : "10px 0 0"};font-size:13.5px;font-weight:600;text-align:right;vertical-align:top;">${escapeHtml(r.value)}</td>
+        <td style="padding:${i === 0 ? "0 0 7px" : "7px 0 0"};color:${colors.label};font-size:13px;font-weight:600;vertical-align:top;white-space:nowrap;">${r.icon ? `<span style="margin-right:5px;">${r.icon}</span>` : ""}${escapeHtml(r.label)}</td>
+        <td style="padding:${i === 0 ? "0 0 7px" : "7px 0 0"};font-size:13px;font-weight:600;text-align:right;vertical-align:top;">${
+          r.href
+            ? `<a href="${r.href}" style="color:inherit;text-decoration:underline;">${escapeHtml(r.value)}</a>`
+            : escapeHtml(r.value)
+        }</td>
       </tr>`
     )
     .join("");
   return `
-    <table style="width:100%;border-collapse:collapse;background:${colors.bg};border-radius:14px;margin:0 0 24px;">
-      <tr><td style="padding:18px 20px;">
+    <table style="width:100%;border-collapse:collapse;background:${colors.bg};border-radius:12px;margin:0 0 20px;">
+      <tr><td style="padding:14px 16px;">
         <table style="width:100%;border-collapse:collapse;"><tbody>${cells}</tbody></table>
       </td></tr>
     </table>`;
+}
+
+/** Google Maps search link for a formatted single-line address (opens the app on mobile, maps.google.com on desktop). */
+function mapsUrl(address: string): string {
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
 }
 
 function emailButton(label: string, url: string, brandColor?: string | null): string {
@@ -620,28 +629,30 @@ type ReminderEmailInput = {
 function reminderBody(
   input: ReminderEmailInput,
   t: {
-    badge: string;
     greeting: string;
-    intro: string;
-    service: string;
     when: string;
+    clinic: string;
+    service: string;
     address: string;
     professional: string;
+    manageHeading: string;
     manage: string;
   }
 ): string {
-  const { serviceName, whenLabel, providerName, businessAddress, cancelUrl, brandColor } = input;
+  const { businessName, serviceName, whenLabel, providerName, businessAddress, cancelUrl, brandColor } = input;
   const rows = [
-    { icon: ROW_ICON.service, label: t.service, value: serviceName },
     { icon: ROW_ICON.when, label: t.when, value: whenLabel },
+    { icon: ROW_ICON.clinic, label: t.clinic, value: businessName },
+    { icon: ROW_ICON.service, label: t.service, value: serviceName },
     ...(providerName ? [{ icon: ROW_ICON.professional, label: t.professional, value: providerName }] : []),
-    ...(businessAddress ? [{ icon: ROW_ICON.address, label: t.address, value: businessAddress }] : []),
+    ...(businessAddress
+      ? [{ icon: ROW_ICON.address, label: t.address, value: businessAddress, href: mapsUrl(businessAddress) }]
+      : []),
   ];
   return `
-    ${emailBadge(t.badge, "info")}
-    <p style="font-size:15px;line-height:1.6;margin:0 0 6px;">${t.greeting}</p>
-    <p style="font-size:15px;line-height:1.6;margin:0 0 18px;">${t.intro}</p>
+    <p style="font-size:15px;line-height:1.6;margin:0 0 18px;">${t.greeting}</p>
     ${emailInfoBox(rows, "info")}
+    <p style="font-size:14px;line-height:1.6;margin:0 0 14px;text-align:center;color:#475569;">${t.manageHeading}</p>
     ${emailButton(t.manage, cancelUrl, brandColor)}`;
 }
 
@@ -652,26 +663,26 @@ export function appointmentReminder24hEmailHtml(input: ReminderEmailInput): stri
   const t =
     locale === "en"
       ? {
-          badge:        "Reminder",
-          greeting:     clientName ? `Hi ${escapeHtml(clientName)},` : "Hi,",
-          intro:        `Just a reminder — your appointment at <strong>${escapeHtml(businessName)}</strong> is tomorrow.`,
-          service:      "Service",
-          when:         "When",
-          address:      "Address",
-          professional: "Professional",
-          manage:       "Manage my appointment",
-          footer:       "Kalendar · Online booking for your clinic",
+          greeting:      clientName ? `${escapeHtml(clientName)}, we'd like to remind you of your upcoming appointment:` : "We'd like to remind you of your upcoming appointment:",
+          when:          "Date and time",
+          clinic:        "Clinic",
+          service:       "Appointment type",
+          address:       "Address",
+          professional:  "Professional",
+          manageHeading: "Need to make a change?",
+          manage:        "Manage my appointment",
+          footer:        "Kalendar · Online booking for your clinic",
         }
       : {
-          badge:        "Recordatorio",
-          greeting:     clientName ? `Hola ${escapeHtml(clientName)},` : "Hola,",
-          intro:        `Te recordamos que tienes una cita mañana en <strong>${escapeHtml(businessName)}</strong>.`,
-          service:      "Servicio",
-          when:         "Cuándo",
-          address:      "Dirección",
-          professional: "Profesional",
-          manage:       "Gestionar mi cita",
-          footer:       "Kalendar · Reservas online para tu clínica",
+          greeting:      clientName ? `${escapeHtml(clientName)}, te recordamos tu próxima cita:` : "Te recordamos tu próxima cita:",
+          when:          "Fecha y hora",
+          clinic:        "Clínica",
+          service:       "Tipo de cita",
+          address:       "Dirección",
+          professional:  "Profesional",
+          manageHeading: "¿Necesitas hacer algún cambio?",
+          manage:        "Gestionar mi cita",
+          footer:        "Kalendar · Reservas online para tu clínica",
         };
   return emailShell(reminderBody(input, t), t.footer, businessName, brandColor);
 }
@@ -683,26 +694,26 @@ export function appointmentReminder1hEmailHtml(input: ReminderEmailInput): strin
   const t =
     locale === "en"
       ? {
-          badge:        "Starting soon",
-          greeting:     clientName ? `Hi ${escapeHtml(clientName)},` : "Hi,",
-          intro:        `Your appointment at <strong>${escapeHtml(businessName)}</strong> is in about 1 hour.`,
-          service:      "Service",
-          when:         "When",
-          address:      "Address",
-          professional: "Professional",
-          manage:       "Manage my appointment",
-          footer:       "Kalendar · Online booking for your clinic",
+          greeting:      clientName ? `${escapeHtml(clientName)}, your appointment is coming up soon:` : "Your appointment is coming up soon:",
+          when:          "Date and time",
+          clinic:        "Clinic",
+          service:       "Appointment type",
+          address:       "Address",
+          professional:  "Professional",
+          manageHeading: "Need to make a change?",
+          manage:        "Manage my appointment",
+          footer:        "Kalendar · Online booking for your clinic",
         }
       : {
-          badge:        "Empieza pronto",
-          greeting:     clientName ? `Hola ${escapeHtml(clientName)},` : "Hola,",
-          intro:        `Tu cita en <strong>${escapeHtml(businessName)}</strong> es dentro de aproximadamente 1 hora.`,
-          service:      "Servicio",
-          when:         "Cuándo",
-          address:      "Dirección",
-          professional: "Profesional",
-          manage:       "Gestionar mi cita",
-          footer:       "Kalendar · Reservas online para tu clínica",
+          greeting:      clientName ? `${escapeHtml(clientName)}, tu cita está a punto de empezar:` : "Tu cita está a punto de empezar:",
+          when:          "Fecha y hora",
+          clinic:        "Clínica",
+          service:       "Tipo de cita",
+          address:       "Dirección",
+          professional:  "Profesional",
+          manageHeading: "¿Necesitas hacer algún cambio?",
+          manage:        "Gestionar mi cita",
+          footer:        "Kalendar · Reservas online para tu clínica",
         };
   return emailShell(reminderBody(input, t), t.footer, businessName, brandColor);
 }

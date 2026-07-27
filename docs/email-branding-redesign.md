@@ -88,19 +88,49 @@ passed through — no new query needed:
 `app/api/cron/send-reminders/route.ts`,
 `app/api/cron/sweep-expired-bookings/route.ts`.
 
-## Status
+## Follow-up refinement (2026-07-27) — reminder email polish per Arun's feedback
 
-Code complete and **verified live** (2026-07-26):
-- Pushed as `3fd8290`, deployed to production (`dpl_H1sibVE...`, confirmed
-  `READY`).
-- Temporarily set Centro Ignatius's `brand_color` to a distinct violet
-  (`#7c3aed`, was `#0d9488`) to confirm the header color is genuinely
-  dynamic and not coincidentally matching the old fixed teal.
-- Sent a fresh 1h reminder test booking through the real Supabase pg_cron
-  path — `reminder_1h_sent_at` set successfully, no failure recorded.
-- Reverted `brand_color` back to `#0d9488` and deleted the test booking
-  after verification.
+After seeing a live reminder in the new format, Arun asked for three
+specific fixes, closer still to the Adeslas reference:
 
-Check your inbox for the test email — it should show "Centro Ignatius" in a
-violet header (not "Kalendar"), icon-prefixed rows, and a "Gestionar mi
-cita" button. Say the word if the colors/icons need any adjustment.
+1. **Greeting copy**: replaced the two-line badge + "Hola X, / Te
+   recordamos que..." intro with a single Adeslas-style line: "X, te
+   recordamos tu próxima cita:" (24h variant) / "X, tu cita está a punto de
+   empezar:" (1h variant — kept a slightly different phrase for the 1h
+   variant since it genuinely is a different moment, but matched the
+   single-line structure). Dropped the colored "Recordatorio"/"Empieza
+   pronto" badge entirely, since Adeslas doesn't use one.
+2. **Row order + address as a map link**: rows are now always in this
+   sequence — Fecha y hora, Clínica (business name, newly added to the
+   reminder rows), Tipo de cita, Profesional (only when the clinic is in
+   `team_mode = 'team'` — solo clinics no longer show a redundant "you're
+   seeing the one person who runs this clinic" row), Dirección. The address
+   row value is now a real link (`mapsUrl()` helper in `lib/email.ts`) to
+   `https://www.google.com/maps/search/?api=1&query=<address>` — opens the
+   Maps app on mobile, maps.google.com on desktop.
+3. **CTA sequencing + box size**: `emailInfoBox` padding tightened
+   (18px/20px → 14px/16px container, 10px → 7px between rows) so the box
+   reads more like Adeslas's compact table and less like a big card. The
+   "¿Necesitas hacer algún cambio?" question now renders *above* the
+   "Gestionar mi cita" button, matching the reference screenshot's order
+   (it wasn't there before at all for reminders — text was just the plain
+   cancel line prior to the first redesign pass).
+
+**Scope note**: these three fixes were applied to the two reminder
+templates specifically, since that's what Arun's Adeslas comparison was
+about. The compact-box change to `emailInfoBox` is a shared component, so
+it automatically applies to every other client template too (confirm,
+under-review, cancelled) — free consistency win. The team_mode-gated
+Profesional row and the clinic-name row were only added to the reminder
+templates this pass; `bookingConfirmEmailHtml` already had its own
+"Clínica" row from before, `bookingUnderReviewEmailHtml` does not — not
+touched this pass since it wasn't part of the specific ask, flagging here
+in case Arun wants the same row set applied there too for full consistency
+later.
+
+**Implementation**: `app/api/cron/send-reminders/route.ts` now also selects
+`team_mode` on the business join, and only looks up/passes `providerName`
+when `team_mode === 'team'`.
+
+Validated: `tsc --noEmit` and `eslint` clean on `lib/email.ts` and
+`app/api/cron/send-reminders/route.ts`.
