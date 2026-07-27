@@ -26,6 +26,10 @@ create extension if not exists "pgcrypto";
 -- Drop existing tables (cascade removes dependent objects: policies, indexes).
 -- Children before parents.
 -- ----------------------------------------------------------------------------
+drop table if exists public.kalendar_stripe_webhook_events       cascade;
+drop table if exists public.kalendar_discount_schedule_phases    cascade;
+drop table if exists public.kalendar_discount_schedule_templates cascade;
+drop table if exists public.kalendar_plan_prices                 cascade;
 drop table if exists public.kalendar_support_tickets  cascade;
 drop table if exists public.kalendar_user_preferences cascade;
 drop table if exists public.kalendar_bookings        cascade;
@@ -87,6 +91,54 @@ alter table public.kalendar_patients enable row level security;
 
 create policy "Patients: write"
   on public.kalendar_patients for all using (true) with check (true);
+
+-- ----------------------------------------------------------------------------
+-- kalendar_plan_prices
+-- List price per plan type. Config table, not hardcoded — editable without a
+-- code change. See docs/specs/pricing-and-discounts-spec.md.
+-- ----------------------------------------------------------------------------
+create table public.kalendar_plan_prices (
+  plan_type      text        primary key check (plan_type in ('solo', 'multi')),
+  monthly_price  numeric     not null,
+  currency       text        not null default 'EUR'
+);
+
+insert into public.kalendar_plan_prices (plan_type, monthly_price) values
+  ('solo', 49.00),
+  ('multi', 69.00);
+
+alter table public.kalendar_plan_prices enable row level security;
+
+create policy "PlanPrices: public read"
+  on public.kalendar_plan_prices for select using (true);
+create policy "PlanPrices: write"
+  on public.kalendar_plan_prices for all using (true) with check (true);
+
+-- ----------------------------------------------------------------------------
+-- kalendar_discount_schedule_templates
+-- Reusable, named discount schedules (e.g. "Standard Onboarding"). Exactly one
+-- row should have is_default = true at a time (app-layer enforced, same
+-- pattern as other single-flag invariants in this schema).
+-- ----------------------------------------------------------------------------
+create table public.kalendar_discount_schedule_templates (
+  id         uuid        primary key default gen_random_uuid(),
+  name       text        not null,
+  is_default boolean     not null default false,
+  created_at timestamptz not null default now()
+);
+
+-- Seed the default onboarding schedule referenced by pricing-and-discounts-spec.md
+-- (3mo free -> 6mo 50% -> 6mo 40% -> full price). Phases are inserted after
+-- kalendar_discount_schedule_phases exists further below.
+insert into public.kalendar_discount_schedule_templates (id, name, is_default) values
+  ('00000000-0000-0000-0000-000000000001', 'Standard Onboarding', true);
+
+alter table public.kalendar_discount_schedule_templates enable row level security;
+
+create policy "DiscountTemplates: public read"
+  on public.kalendar_discount_schedule_templates for select using (true);
+create policy "DiscountTemplates: write"
+  on public.kalendar_discount_schedule_templates for all using (true) with check (true);
 
 -- ----------------------------------------------------------------------------
 -- kalendar_businesses
@@ -154,6 +206,35 @@ create table public.kalendar_businesses (
     booking_window_months in (1, 2, 3)
   ),
   onboarding_completed_at timestamptz,
+  -- ---------------------------------------------------------------------
+  -- Pricing / discount-schedule (see docs/specs/pricing-and-discounts-spec.md).
+  -- plan_type drives the kalendar_plan_prices lookup; custom_monthly_price
+  -- overrides it per-business when set. discount_start_date is set once at
+  -- signup and never edited. If a business has its own rows in
+  -- kalendar_discount_schedule_phases (business_id = this row), those take
+  -- precedence over discount_template_id — enforced at the write layer, not
+  -- the schema, same pattern as other mutually-exclusive-state gates.
+  -- ---------------------------------------------------------------------
+  plan_type               text        not null default 'solo' check (
+    plan_type in ('solo', 'multi')
+  ),
+  custom_monthly_price    numeric,
+  discount_template_id    uuid        references public.kalendar_discount_schedule_templates (id),
+  discount_start_date     date        not null default current_date,
+  -- ---------------------------------------------------------------------
+  -- Stripe subscription linkage (see docs/specs/stripe-subscription-billing-spec.md).
+  -- Nullable until the clinic completes its first Checkout session.
+  -- subscription_status mirrors Stripe's own status strings 1:1 — do not
+  -- invent a parallel vocabulary, so webhook handling stays a pass-through.
+  -- ---------------------------------------------------------------------
+  stripe_customer_id      text        unique,
+  stripe_subscription_id  text        unique,
+  subscription_status     text        not null default 'incomplete' check (
+    subscription_status in (
+      'incomplete', 'trialing', 'active', 'past_due', 'cancelled', 'unpaid'
+    )
+  ),
+  subscription_current_period_end timestamptz,
   created_at              timestamptz not null default now()
 );
 
@@ -169,6 +250,66 @@ create policy "Businesses: public read"
   on public.kalendar_businesses for select using (true);
 create policy "Businesses: write"
   on public.kalendar_businesses for all using (true) with check (true);
+
+-- ----------------------------------------------------------------------------
+-- kalendar_discount_schedule_phases
+-- Ordered phases belonging to a parent — either a reusable template
+-- (template_id) or a single business's ad hoc, negotiated schedule
+-- (business_id). Exactly one of the two must be set (app-layer enforced,
+-- consistent with the patient_id forward-reference precedent in CLAUDE.md —
+-- kept as a check constraint here since both parents already exist by this
+-- point in the file, so there's no forward-reference problem to work around).
+-- After the last phase, discount is implicitly 0% forever.
+-- ----------------------------------------------------------------------------
+create table public.kalendar_discount_schedule_phases (
+  id                uuid        primary key default gen_random_uuid(),
+  template_id       uuid        references public.kalendar_discount_schedule_templates (id) on delete cascade,
+  business_id       uuid        references public.kalendar_businesses (id) on delete cascade,
+  phase_order       integer     not null,
+  duration_months   integer     not null,
+  discount_percent  numeric     not null check (discount_percent between 0 and 100),
+  constraint discount_schedule_phases_one_parent check (
+    (template_id is not null and business_id is null) or
+    (template_id is null and business_id is not null)
+  )
+);
+
+create index kalendar_discount_schedule_phases_template_idx
+  on public.kalendar_discount_schedule_phases (template_id, phase_order);
+create index kalendar_discount_schedule_phases_business_idx
+  on public.kalendar_discount_schedule_phases (business_id, phase_order);
+
+alter table public.kalendar_discount_schedule_phases enable row level security;
+
+create policy "DiscountPhases: write"
+  on public.kalendar_discount_schedule_phases for all using (true) with check (true);
+
+-- Seed phases for the default "Standard Onboarding" template:
+-- 3mo free -> 6mo 50% off -> 6mo 40% off -> full price thereafter.
+insert into public.kalendar_discount_schedule_phases
+  (template_id, phase_order, duration_months, discount_percent) values
+  ('00000000-0000-0000-0000-000000000001', 1, 3, 100),
+  ('00000000-0000-0000-0000-000000000001', 2, 6, 50),
+  ('00000000-0000-0000-0000-000000000001', 3, 6, 40);
+
+-- ----------------------------------------------------------------------------
+-- kalendar_stripe_webhook_events
+-- Idempotency ledger for Stripe webhook processing. Stripe explicitly
+-- documents that the same event can be delivered more than once — the event
+-- ID (evt_...) is checked BEFORE processing and inserted AFTER successful
+-- processing, same "write after success" pattern as reminder idempotency.
+-- See docs/specs/stripe-subscription-billing-spec.md.
+-- ----------------------------------------------------------------------------
+create table public.kalendar_stripe_webhook_events (
+  id           text        primary key,
+  type         text        not null,
+  processed_at timestamptz not null default now()
+);
+
+alter table public.kalendar_stripe_webhook_events enable row level security;
+
+create policy "StripeWebhookEvents: write"
+  on public.kalendar_stripe_webhook_events for all using (true) with check (true);
 
 -- ----------------------------------------------------------------------------
 -- kalendar_services

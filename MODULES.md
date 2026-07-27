@@ -126,6 +126,22 @@ because they're tightly coupled (availability can be per-member in the future).
 
 ---
 
+## Module: panel-payments
+"Pagos" — clinic subscription billing via Stripe Checkout + Customer Portal,
+and the underlying internal pricing/discount engine.
+
+- Routes: `app/panel/payments/page.tsx`, `app/api/webhooks/stripe/route.ts`, `app/api/cron/stripe-reconcile/route.ts`, `app/api/cron/pricing-phase-notify/route.ts`
+- Components: `components/panel/payments-manager.tsx`
+- Lib: `lib/pricing/{types,compute,data}.ts` (pure discount/price computation, always derived on read — never cached or stored), `lib/billing/{stripe,data}.ts`
+- Actions: `lib/actions/billing.ts` (`createCheckoutSession`, `createBillingPortalSession`)
+- DB tables: `kalendar_businesses` (plan/discount/Stripe columns), `kalendar_plan_prices`, `kalendar_discount_schedule_templates`, `kalendar_discount_schedule_phases`, `kalendar_stripe_webhook_events`
+- i18n: `lib/i18n/dictionaries/payments.ts`
+- Specs: `docs/specs/pricing-and-discounts-spec.md`, `docs/specs/stripe-subscription-billing-spec.md`
+- Env vars: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` — gracefully degraded/logged if unset, same convention as `RESEND_API_KEY` (see shared infra).
+- Gotchas: Stripe is the source of truth for subscription *lifecycle state* only, never for *price* — the amount is always computed by `currentPrice()` and passed to Stripe as a `price_data` line item at Checkout-session-creation time, so a subscription that lives across a discount-phase boundary keeps renewing at its original locked-in price. `pricing-phase-notify` (daily) currently only emails a notification on a boundary crossing — it does NOT push an updated price to the live Stripe subscription. Extending it (or a sibling job) to call `stripe.subscriptions.update()` at the boundary is a known, tracked gap, not yet built — flagged explicitly in both specs. Webhooks are the primary sync mechanism; `stripe-reconcile` (daily) is a backup only and logs mismatches rather than silently auto-correcting them. Idempotency via `kalendar_stripe_webhook_events`: checked before processing, inserted only after success (same "write after success" pattern as reminder idempotency). This SDK is pinned to API version `2025-08-27.basil` — `current_period_end` lives on `subscription.items.data[0]`, not the top-level `Subscription` object, and an invoice's originating subscription is at `invoice.parent.subscription_details.subscription`, not a top-level `invoice.subscription` field (both differ from older Stripe API versions — verify against installed SDK types before assuming either shape). No admin-portal CRUD for discount templates/phases yet — flagged in the pricing spec as needing its own design pass before building.
+
+---
+
 ## Shared infra (not a module — cross-cutting, used by multiple modules above)
 
 - **i18n mechanism**: `lib/i18n/config.ts`, `lib/i18n/server.ts`, `lib/actions/locale.ts`. Cookie: `kalendar_locale`. One dictionary file per module (see each module's "i18n" line above). If a module needs new UI strings, add to its own dictionary file — don't create a new mechanism.
@@ -143,7 +159,7 @@ because they're tightly coupled (availability can be per-member in the future).
 
 These appear in `CLAUDE.md` or memory as planned but were NOT found in the repo as of
 the last resync — don't assume they exist without checking: `/panel/clients`,
-`/panel/notifications`, `/panel/payments`, `/panel/invoices`, `/panel/reports`,
+`/panel/notifications`, `/panel/invoices`, `/panel/reports`,
 `/panel/integrations`, `/panel/settings`. When one of these gets built, add a new
 module section above.
 
