@@ -128,16 +128,21 @@ async function requireBusinessBillingRow(
   };
 }
 
+export type SetupIntentResult =
+  | { ok: true; clientSecret: string }
+  | { ok: false; error: string };
+
 /**
- * Portal session deep-linked straight to the card-update step (flow_data),
- * rather than the general portal home — used by the native in-app payments
- * page's "Actualizar" button so the person lands directly on the one thing
- * they clicked for. Card entry itself still happens on Stripe's hosted page
- * (never touches Kalendar's servers), same PCI-avoidance rationale as
- * Checkout.
+ * Creates a Stripe SetupIntent so the client can collect a new card via
+ * Stripe Elements (PaymentElement) in an in-app modal, instead of redirecting
+ * to Stripe's hosted portal — per Arun's request to match an in-app update
+ * flow (e.g. Claude.ai's own "Payment method" modal). Card entry still
+ * happens inside Stripe's own iframe (Elements), never touching Kalendar's
+ * servers — same PCI-avoidance rationale as Checkout, just without the
+ * full-page redirect.
  */
-export const createUpdatePaymentMethodSession = authedAction(
-  async (session): Promise<BillingActionResult> => {
+export const createSetupIntent = authedAction(
+  async (session): Promise<SetupIntentResult> => {
     if (!isStripeConfigured()) {
       return { ok: false, error: "La facturación no está disponible en este momento." };
     }
@@ -149,16 +154,47 @@ export const createUpdatePaymentMethodSession = authedAction(
       return { ok: false, error: "La facturación no está disponible en este momento." };
     }
 
-    const base = appBaseUrl();
-    const portalSession = await stripe.billingPortal.sessions.create({
+    const setupIntent = await stripe.setupIntents.create({
       customer: resolved.customerId,
-      return_url: `${base}/panel/settings/subscription`,
-      flow_data: {
-        type: "payment_method_update",
-      },
+      payment_method_types: ["card"],
     });
 
-    return { ok: true, url: portalSession.url };
+    if (!setupIntent.client_secret) {
+      return { ok: false, error: "No se pudo iniciar la actualización del método de pago." };
+    }
+
+    return { ok: true, clientSecret: setupIntent.client_secret };
+  }
+);
+
+/**
+ * Called after the client confirms the SetupIntent (card entered + validated
+ * via Stripe Elements) — sets the resulting payment method as the customer's
+ * default, so future renewals and the payments page's display both pick it
+ * up. Re-derives the customer/subscription from the session rather than
+ * trusting a client-passed customer id.
+ */
+export const setDefaultPaymentMethod = authedAction(
+  async (session, paymentMethodId: string): Promise<BillingPlainResult> => {
+    if (!isStripeConfigured()) {
+      return { ok: false, error: "La facturación no está disponible en este momento." };
+    }
+    const resolved = await requireBusinessBillingRow(session.user.id);
+    if (!resolved.ok) return resolved;
+
+    const stripe = getStripeClient();
+    if (!stripe) {
+      return { ok: false, error: "La facturación no está disponible en este momento." };
+    }
+
+    try {
+      await stripe.customers.update(resolved.customerId, {
+        invoice_settings: { default_payment_method: paymentMethodId },
+      });
+      return { ok: true };
+    } catch {
+      return { ok: false, error: "No se pudo actualizar el método de pago. Inténtalo de nuevo." };
+    }
   }
 );
 

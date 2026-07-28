@@ -7,10 +7,10 @@ import { Icon } from "@/components/ui/icon";
 import {
   createCheckoutSession,
   createBillingPortalSession,
-  createUpdatePaymentMethodSession,
   cancelSubscription,
   resumeSubscription,
 } from "@/lib/actions/billing";
+import { PaymentMethodModal } from "@/components/panel/payment-method-modal";
 import type { PaymentsDictionary } from "@/lib/i18n/dictionaries/payments";
 import type { BillingState, SubscriptionStatus } from "@/lib/billing/data";
 import type { PricingResult } from "@/lib/pricing/types";
@@ -44,6 +44,7 @@ export function SubscriptionManager({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmingCancel, setConfirmingCancel] = useState(false);
+  const [showPaymentMethodModal, setShowPaymentMethodModal] = useState(false);
 
   const status = billing?.subscriptionStatus ?? "incomplete";
   const isSubscribed = ACTIVE_LIKE.includes(status);
@@ -115,10 +116,7 @@ export function SubscriptionManager({
 
   return (
     <div className="max-w-2xl">
-      <h1 className="text-2xl font-display font-semibold text-ink">{dict.page.title}</h1>
-      <p className="mt-1 text-ink-soft">{dict.page.subtitle}</p>
-
-      <div className="mt-8 rounded-2xl border border-line bg-surface p-6">
+      <div className="rounded-2xl border border-line bg-surface p-6">
         <span
           className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-medium ${statusColor(status)}`}
         >
@@ -192,7 +190,7 @@ export function SubscriptionManager({
             <Btn
               variant="outline"
               size="sm"
-              onClick={() => runRedirectAction(createUpdatePaymentMethodSession)}
+              onClick={() => setShowPaymentMethodModal(true)}
               disabled={pending}
             >
               {dict.paymentMethod.update}
@@ -309,6 +307,14 @@ export function SubscriptionManager({
             </div>
           )}
         </div>
+      )}
+
+      {showPaymentMethodModal && (
+        <PaymentMethodModal
+          dict={dict}
+          onClose={() => setShowPaymentMethodModal(false)}
+          onSuccess={() => router.refresh()}
+        />
       )}
     </div>
   );
