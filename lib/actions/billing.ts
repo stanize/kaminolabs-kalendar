@@ -90,10 +90,139 @@ export const createCheckoutSession = authedAction(
   }
 );
 
+export type BillingPlainResult = { ok: true } | { ok: false; error: string };
+
 /**
- * Redirects the clinic to Stripe's hosted Customer Portal for self-serve card
- * updates, invoice history, and cancellation — no custom UI built for v1, per
- * spec section 8.
+ * Resolves the caller's business and its stripe_customer_id/subscription_id
+ * in one place — shared by every action below that needs them, so the
+ * "no Stripe configured" / "no business" / "no subscription yet" error
+ * messages stay consistent.
+ */
+async function requireBusinessBillingRow(
+  userId: string
+): Promise<
+  | { ok: true; businessId: string; customerId: string; subscriptionId: string }
+  | { ok: false; error: string }
+> {
+  const business = await getBusinessForUser(userId);
+  if (!business) {
+    return { ok: false, error: "No se encontró tu negocio." };
+  }
+
+  const supabase = await createClient();
+  const { data: bizRow } = await supabase
+    .from("kalendar_businesses")
+    .select("stripe_customer_id, stripe_subscription_id")
+    .eq("id", business.id)
+    .maybeSingle();
+
+  if (!bizRow?.stripe_customer_id || !bizRow?.stripe_subscription_id) {
+    return { ok: false, error: "Todavía no tienes una suscripción activa." };
+  }
+
+  return {
+    ok: true,
+    businessId: business.id,
+    customerId: bizRow.stripe_customer_id,
+    subscriptionId: bizRow.stripe_subscription_id,
+  };
+}
+
+/**
+ * Portal session deep-linked straight to the card-update step (flow_data),
+ * rather than the general portal home — used by the native in-app payments
+ * page's "Actualizar" button so the person lands directly on the one thing
+ * they clicked for. Card entry itself still happens on Stripe's hosted page
+ * (never touches Kalendar's servers), same PCI-avoidance rationale as
+ * Checkout.
+ */
+export const createUpdatePaymentMethodSession = authedAction(
+  async (session): Promise<BillingActionResult> => {
+    if (!isStripeConfigured()) {
+      return { ok: false, error: "La facturación no está disponible en este momento." };
+    }
+    const resolved = await requireBusinessBillingRow(session.user.id);
+    if (!resolved.ok) return resolved;
+
+    const stripe = getStripeClient();
+    if (!stripe) {
+      return { ok: false, error: "La facturación no está disponible en este momento." };
+    }
+
+    const base = appBaseUrl();
+    const portalSession = await stripe.billingPortal.sessions.create({
+      customer: resolved.customerId,
+      return_url: `${base}/panel/payments`,
+      flow_data: {
+        type: "payment_method_update",
+      },
+    });
+
+    return { ok: true, url: portalSession.url };
+  }
+);
+
+/**
+ * Soft cancel — sets cancel_at_period_end so the subscription stays active
+ * (and billable) through the period the clinic already paid for, then
+ * Stripe cancels it automatically at the period boundary and fires
+ * customer.subscription.deleted (see the webhook route). Does NOT call
+ * stripe.subscriptions.cancel() (immediate cancel) — that would end access
+ * the clinic already paid for.
+ */
+export const cancelSubscription = authedAction(
+  async (session): Promise<BillingPlainResult> => {
+    if (!isStripeConfigured()) {
+      return { ok: false, error: "La facturación no está disponible en este momento." };
+    }
+    const resolved = await requireBusinessBillingRow(session.user.id);
+    if (!resolved.ok) return resolved;
+
+    const stripe = getStripeClient();
+    if (!stripe) {
+      return { ok: false, error: "La facturación no está disponible en este momento." };
+    }
+
+    try {
+      await stripe.subscriptions.update(resolved.subscriptionId, {
+        cancel_at_period_end: true,
+      });
+      return { ok: true };
+    } catch {
+      return { ok: false, error: "No se pudo cancelar la suscripción. Inténtalo de nuevo." };
+    }
+  }
+);
+
+/** Undoes a pending cancellation, before the current period ends. */
+export const resumeSubscription = authedAction(
+  async (session): Promise<BillingPlainResult> => {
+    if (!isStripeConfigured()) {
+      return { ok: false, error: "La facturación no está disponible en este momento." };
+    }
+    const resolved = await requireBusinessBillingRow(session.user.id);
+    if (!resolved.ok) return resolved;
+
+    const stripe = getStripeClient();
+    if (!stripe) {
+      return { ok: false, error: "La facturación no está disponible en este momento." };
+    }
+
+    try {
+      await stripe.subscriptions.update(resolved.subscriptionId, {
+        cancel_at_period_end: false,
+      });
+      return { ok: true };
+    } catch {
+      return { ok: false, error: "No se pudo reanudar la suscripción. Inténtalo de nuevo." };
+    }
+  }
+);
+
+/**
+ * Redirects the clinic to Stripe's hosted Customer Portal home — kept as a
+ * fallback / "view everything on Stripe" escape hatch even though the native
+ * payments page (app/panel/payments) is now the primary UI.
  */
 export const createBillingPortalSession = authedAction(
   async (session): Promise<BillingActionResult> => {
