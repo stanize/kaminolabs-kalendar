@@ -17,6 +17,16 @@
 --   When a module stabilizes, add its mirror table + extend both functions
 --   below (see the pattern already used for the tables above).
 --
+--   KNOWN GAP (2026-07-27): kalendar_businesses has since gained pricing/
+--   Stripe columns (plan_type, custom_monthly_price, discount_template_id,
+--   discount_start_date, stripe_customer_id, stripe_subscription_id,
+--   subscription_status, subscription_current_period_end) that are NOT
+--   mirrored here on purpose — deliberately excluded until that area
+--   settles. seed_snapshot_take() silently drops these fields (explicit
+--   column list, not select *) — a restore will NOT bring back pricing/
+--   Stripe state on an otherwise-restored business. Add them to the mirror
+--   + both functions once ready.
+--
 -- Usage:
 --   select public.seed_snapshot_take();     -- capture current state
 --   select public.seed_snapshot_restore();  -- after a reset, bring it back
