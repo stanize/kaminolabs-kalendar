@@ -51,10 +51,19 @@ export const createCheckoutSession = authedAction(
       .maybeSingle();
 
     const base = appBaseUrl();
+    const existingCustomerId = bizRow?.stripe_customer_id ?? undefined;
 
     const checkoutSession = await stripe.checkout.sessions.create({
       mode: "subscription",
-      customer: bizRow?.stripe_customer_id ?? undefined,
+      customer: existingCustomerId,
+      // Stripe rejects passing customer_email together with an existing
+      // customer (the email is already on file for that customer), so this
+      // only applies on first-time checkout. Prefer the business's client-
+      // facing contact_email (Negocio page); fall back to the owner's
+      // Better Auth account email if that's somehow empty.
+      customer_email: existingCustomerId
+        ? undefined
+        : (business.contact_email || session.user.email || undefined),
       client_reference_id: business.id,
       line_items: [
         {
