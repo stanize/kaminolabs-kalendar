@@ -78,8 +78,8 @@ export const createCheckoutSession = authedAction(
           },
         },
       ],
-      success_url: `${base}/panel/payments?status=success`,
-      cancel_url: `${base}/panel/payments?status=cancelled`,
+      success_url: `${base}/panel/settings/subscription?status=success`,
+      cancel_url: `${base}/panel/settings/subscription?status=cancelled`,
     });
 
     if (!checkoutSession.url) {
@@ -152,7 +152,7 @@ export const createUpdatePaymentMethodSession = authedAction(
     const base = appBaseUrl();
     const portalSession = await stripe.billingPortal.sessions.create({
       customer: resolved.customerId,
-      return_url: `${base}/panel/payments`,
+      return_url: `${base}/panel/settings/subscription`,
       flow_data: {
         type: "payment_method_update",
       },
@@ -222,7 +222,7 @@ export const resumeSubscription = authedAction(
 /**
  * Redirects the clinic to Stripe's hosted Customer Portal home — kept as a
  * fallback / "view everything on Stripe" escape hatch even though the native
- * payments page (app/panel/payments) is now the primary UI.
+ * subscription tab (app/panel/settings/subscription) is now the primary UI.
  */
 export const createBillingPortalSession = authedAction(
   async (session): Promise<BillingActionResult> => {
@@ -254,7 +254,7 @@ export const createBillingPortalSession = authedAction(
     const base = appBaseUrl();
     const portalSession = await stripe.billingPortal.sessions.create({
       customer: bizRow.stripe_customer_id,
-      return_url: `${base}/panel/payments`,
+      return_url: `${base}/panel/settings/subscription`,
     });
 
     return { ok: true, url: portalSession.url };

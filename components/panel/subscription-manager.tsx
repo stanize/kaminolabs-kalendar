@@ -31,7 +31,7 @@ interface Props {
 
 const ACTIVE_LIKE: SubscriptionStatus[] = ["active", "trialing"];
 
-export function PaymentsManager({
+export function SubscriptionManager({
   dict,
   billing,
   pricing,

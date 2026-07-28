@@ -1,18 +1,17 @@
 import { redirect } from "next/navigation";
 import { requireSession } from "@/lib/auth-session";
 import { getBusinessForUser } from "@/lib/business/data";
-import { getBillingState } from "@/lib/billing/data";
-import { getBusinessPricing } from "@/lib/pricing/data";
-import {
-  getSubscriptionDetail,
-  getDefaultPaymentMethod,
-  listInvoices,
-} from "@/lib/billing/stripe-data";
 import { getLocale } from "@/lib/i18n/server";
-import { getPaymentsDictionary } from "@/lib/i18n/dictionaries/payments";
-import { PaymentsManager } from "@/components/panel/payments-manager";
+import { getClientPaymentsDictionary } from "@/lib/i18n/dictionaries/client-payments";
 
-export default async function PaymentsPage() {
+/**
+ * Payments FROM the clinic's own clients/patients (deposits, no-show
+ * charges, per-appointment payment status) — NOT the Kalendar SaaS
+ * subscription, which lives at /panel/settings/subscription. Placeholder
+ * for now; kalendar_bookings.payment_status already exists in the schema
+ * for a future build-out of this page. See MODULES.md.
+ */
+export default async function ClientPaymentsPage() {
   const session = await requireSession();
   const business = await getBusinessForUser(session.user.id);
 
@@ -20,34 +19,20 @@ export default async function PaymentsPage() {
     redirect("/panel/business?from=home");
   }
 
-  const [billing, pricing] = await Promise.all([
-    getBillingState(business.id),
-    getBusinessPricing(business.id),
-  ]);
-
-  // Richer live-from-Stripe data only fetched once a subscription actually
-  // exists — this is what powers the native billing UI (plan/renewal card,
-  // payment method, invoice history), distinct from billing.subscriptionStatus
-  // which is the webhook-synced value the rest of the app gates on.
-  const [subscriptionDetail, paymentMethod, invoices] = billing?.stripeSubscriptionId
-    ? await Promise.all([
-        getSubscriptionDetail(billing.stripeSubscriptionId),
-        billing.stripeCustomerId ? getDefaultPaymentMethod(billing.stripeCustomerId) : null,
-        billing.stripeCustomerId ? listInvoices(billing.stripeCustomerId) : [],
-      ])
-    : [null, null, []];
-
   const locale = await getLocale();
-  const dict = getPaymentsDictionary(locale);
+  const dict = getClientPaymentsDictionary(locale);
 
   return (
-    <PaymentsManager
-      dict={dict}
-      billing={billing}
-      pricing={pricing}
-      subscriptionDetail={subscriptionDetail}
-      paymentMethod={paymentMethod}
-      invoices={invoices}
-    />
+    <div className="mx-auto max-w-[820px] px-4 py-6 sm:px-8 sm:py-8">
+      <div className="mb-6">
+        <h1 className="mb-1 text-[24px] text-ink">{dict.page.title}</h1>
+        <p className="text-[15px] text-ink-soft">{dict.page.subtitle}</p>
+      </div>
+
+      <div className="rounded-2xl border border-line bg-surface p-6">
+        <h2 className="text-sm font-semibold text-ink">{dict.placeholder.title}</h2>
+        <p className="mt-2 text-sm text-ink-soft">{dict.placeholder.body}</p>
+      </div>
+    </div>
   );
 }

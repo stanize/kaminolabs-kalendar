@@ -126,20 +126,33 @@ because they're tightly coupled (availability can be per-member in the future).
 
 ---
 
-## Module: panel-payments
-"Pagos" — clinic subscription billing, native in-app UI (plan/renewal card,
-payment method, invoice history, cancel/resume) backed by Stripe, plus the
-underlying internal pricing/discount engine.
+## Module: panel-settings
+"Ajustes" — tabbed settings shell. First tab (Suscripción) holds the
+Kalendar SaaS subscription UI (moved here from the old `/panel/payments`
+route per Arun's 2026-07-29 request — `/panel/payments` is now a different,
+unrelated feature, see that module below). Other tabs are placeholder scaffolding.
 
-- Routes: `app/panel/payments/page.tsx`, `app/api/webhooks/stripe/route.ts`, `app/api/cron/stripe-reconcile/route.ts`, `app/api/cron/pricing-phase-notify/route.ts`
-- Components: `components/panel/payments-manager.tsx` — renders the native UI directly (plan card, payment-method row, invoices table, cancellation section) rather than just linking out to Stripe's Customer Portal. A "Ver todo en Stripe" ghost-button link to the full hosted portal is kept as a fallback/escape hatch, not the primary flow.
-- Lib: `lib/pricing/{types,compute,data}.ts` (pure discount/price computation, always derived on read — never cached or stored), `lib/billing/{stripe,data,stripe-data}.ts` — `stripe-data.ts` does live, read-only Stripe API reads (subscription detail, default payment method, invoice list) that power the native page's display; deliberately separate from `data.ts`'s `getBillingState()`, which reads the webhook-synced `kalendar_businesses` columns that the rest of the app gates on.
-- Actions: `lib/actions/billing.ts` — `createCheckoutSession`, `createBillingPortalSession` (fallback link to full portal), `createUpdatePaymentMethodSession` (portal `flow_data` deep-link straight to the card-update step — card entry still happens on Stripe's hosted page, never touches Kalendar's servers), `cancelSubscription`/`resumeSubscription` (soft cancel via `cancel_at_period_end`, not immediate `subscriptions.cancel()` — keeps access through the period already paid for)
+- Routes: `app/panel/settings/layout.tsx` (tab nav shell, guards on business existing), `app/panel/settings/page.tsx` (redirects to the subscription tab), `app/panel/settings/subscription/page.tsx`, `app/panel/settings/notifications/page.tsx` (placeholder), `app/panel/settings/security/page.tsx` (placeholder), `app/panel/settings/language/page.tsx` (placeholder)
+- Components: `components/panel/settings-tabs.tsx` (tab nav), `components/panel/subscription-manager.tsx` (renamed from `payments-manager.tsx` — plan/renewal card, payment method with Stripe portal deep-link update, invoice history, cancel/resume flow)
+- Lib: `lib/pricing/{types,compute,data}.ts` (pure discount/price computation, always derived on read — never cached or stored), `lib/billing/{stripe,data,stripe-data}.ts` — `stripe-data.ts` does live, read-only Stripe API reads (subscription detail, default payment method, invoice list); deliberately separate from `data.ts`'s `getBillingState()`, which reads the webhook-synced `kalendar_businesses` columns that the rest of the app gates on.
+- Actions: `lib/actions/billing.ts` — `createCheckoutSession`, `createBillingPortalSession` (fallback link to the full hosted portal), `createUpdatePaymentMethodSession` (portal `flow_data` deep-link straight to the card-update step), `cancelSubscription`/`resumeSubscription` (soft cancel via `cancel_at_period_end`, not immediate `subscriptions.cancel()`). All Checkout/Portal `success_url`/`cancel_url`/`return_url` values point at `/panel/settings/subscription` — if this route ever moves again, these need updating too.
 - DB tables: `kalendar_businesses` (plan/discount/Stripe columns), `kalendar_plan_prices`, `kalendar_discount_schedule_templates`, `kalendar_discount_schedule_phases`, `kalendar_stripe_webhook_events`
-- i18n: `lib/i18n/dictionaries/payments.ts`
+- i18n: `lib/i18n/dictionaries/settings.ts` (shell + tab labels + generic placeholder copy, reused verbatim by the notifications/security/language tabs), `lib/i18n/dictionaries/payments.ts` (subscription tab content — name is a holdover from before the move, not yet renamed)
 - Specs: `docs/specs/pricing-and-discounts-spec.md`, `docs/specs/stripe-subscription-billing-spec.md` (see its 2026-07-28 amendment)
 - Env vars: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` — gracefully degraded/logged if unset, same convention as `RESEND_API_KEY` (see shared infra).
-- Gotchas: Stripe is the source of truth for subscription *lifecycle state* only, never for *price* — the amount is always computed by `currentPrice()` and passed to Stripe as a `price_data` line item at Checkout-session-creation time, so a subscription that lives across a discount-phase boundary keeps renewing at its original locked-in price. `pricing-phase-notify` (daily) currently only emails a notification on a boundary crossing — it does NOT push an updated price to the live Stripe subscription. Extending it (or a sibling job) to call `stripe.subscriptions.update()` at the boundary is a known, tracked gap, not yet built — flagged explicitly in both specs. Webhooks are the primary sync mechanism; `stripe-reconcile` (daily) is a backup only and logs mismatches rather than silently auto-correcting them. Idempotency via `kalendar_stripe_webhook_events`: checked before processing, inserted only after success (same "write after success" pattern as reminder idempotency). **`customer.subscription.created` must be handled identically to `.updated`** — Stripe fires `.created`, not `.updated`, on first subscription creation; missing this left `subscription_status` stuck at `'incomplete'` after a real successful Checkout in testing (2026-07-28) — see spec amendment. Both events must also be selected in the Stripe dashboard's webhook endpoint config, or Stripe won't send `.created` regardless of the code. This SDK is pinned to API version `2025-08-27.basil` — `current_period_end` lives on `subscription.items.data[0]`, not the top-level `Subscription` object, and an invoice's originating subscription is at `invoice.parent.subscription_details.subscription`, not a top-level `invoice.subscription` field (both differ from older Stripe API versions — verify against installed SDK types before assuming either shape). `subscriptionDetail.cancelAtPeriodEnd`/`currentPeriodEnd` shown on the native page are fetched live from Stripe on each page load (`stripe-data.ts`), not stored in `kalendar_businesses` — there is currently no local column mirroring `cancel_at_period_end`. No admin-portal CRUD for discount templates/phases yet — flagged in the pricing spec as needing its own design pass before building.
+- Gotchas: Stripe is the source of truth for subscription *lifecycle state* only, never for *price* — the amount is always computed by `currentPrice()` and passed to Stripe as a `price_data` line item at Checkout-session-creation time, so a subscription that lives across a discount-phase boundary keeps renewing at its original locked-in price. `pricing-phase-notify` (daily) currently only emails a notification on a boundary crossing — it does NOT push an updated price to the live Stripe subscription; extending it to call `stripe.subscriptions.update()` at the boundary is a known, tracked gap. Webhooks are the primary sync mechanism; `stripe-reconcile` (daily) is a backup only and logs mismatches rather than silently auto-correcting them. Idempotency via `kalendar_stripe_webhook_events`: checked before processing, inserted only after success. **`customer.subscription.created` must be handled identically to `.updated`** — Stripe fires `.created`, not `.updated`, on first subscription creation; missing this left `subscription_status` stuck at `'incomplete'` after a real successful Checkout in testing (2026-07-28) — see spec amendment. Both events must also be selected in the Stripe dashboard's webhook endpoint config. This SDK is pinned to API version `2025-08-27.basil` — `current_period_end` lives on `subscription.items.data[0]`, not the top-level `Subscription` object, and an invoice's originating subscription is at `invoice.parent.subscription_details.subscription`, not a top-level `invoice.subscription` field. `subscriptionDetail.cancelAtPeriodEnd`/`currentPeriodEnd` shown on the page are fetched live from Stripe on each page load (`stripe-data.ts`), not stored in `kalendar_businesses`. No admin-portal CRUD for discount templates/phases yet. No plan-switching UI ("Adjust plan") — Kalendar only has solo/multi, fixed at signup; nothing to switch to yet. Notifications/Security/Language tabs are empty scaffolding — each `page.tsx` is a ~15-line placeholder rendering `dict.placeholder`, ready for a future module section once actually built.
+
+---
+
+## Module: panel-payments
+"Pagos" (client-facing) — payments the CLINIC collects FROM its own
+clients/patients (deposits, no-show charges, per-appointment payment
+status). NOT the Kalendar SaaS subscription — that moved to
+`panel-settings` (Suscripción tab) on 2026-07-29. Placeholder only for now.
+
+- Routes: `app/panel/payments/page.tsx` — static placeholder card, no data fetching beyond the standard business-exists guard.
+- i18n: `lib/i18n/dictionaries/client-payments.ts`
+- Gotchas: `kalendar_bookings.payment_status` and the `no_show` enum value already exist in the schema (added in an earlier session, see calendar-page booking-detail-modal's Pago selector) — a future build-out of this page would likely start from querying that column rather than adding new schema. Don't confuse this module's dictionary/component names with `panel-settings`'s subscription tab; both are colloquially "payments" to Arun but are unrelated features.
 
 ---
 
@@ -161,7 +174,7 @@ underlying internal pricing/discount engine.
 These appear in `CLAUDE.md` or memory as planned but were NOT found in the repo as of
 the last resync — don't assume they exist without checking: `/panel/clients`,
 `/panel/notifications`, `/panel/invoices`, `/panel/reports`,
-`/panel/integrations`, `/panel/settings`. When one of these gets built, add a new
+`/panel/integrations`. When one of these gets built, add a new
 module section above.
 
 ---
