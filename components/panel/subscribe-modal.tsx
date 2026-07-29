@@ -10,7 +10,7 @@ import {
 } from "@stripe/react-stripe-js";
 import { Icon } from "@/components/ui/icon";
 import { Btn } from "@/components/ui/button";
-import { createSubscriptionIntent } from "@/lib/actions/billing";
+import { createSubscriptionIntent, createCheckoutSession } from "@/lib/actions/billing";
 import type { PaymentsDictionary } from "@/lib/i18n/dictionaries/payments";
 
 const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
@@ -34,15 +34,30 @@ export function SubscribeModal({ dict, onClose, onSuccess }: Props) {
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [mode, setMode] = useState<"payment" | "setup" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [fallingBack, setFallingBack] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    createSubscriptionIntent().then((result) => {
+    createSubscriptionIntent().then(async (result) => {
       if (cancelled) return;
       if (result.ok) {
         setClientSecret(result.clientSecret);
         setMode(result.mode);
+        return;
+      }
+
+      // In-app intent creation failed — fall back to the known-working
+      // Checkout redirect rather than dead-ending the person on an error.
+      // This is a temporary safety net while the underlying cause (Stripe
+      // not returning a usable PaymentIntent/SetupIntent client secret for
+      // some accounts/subscriptions) is investigated — see MODULES.md.
+      setFallingBack(true);
+      const fallback = await createCheckoutSession();
+      if (cancelled) return;
+      if (fallback.ok) {
+        window.location.href = fallback.url;
       } else {
+        setFallingBack(false);
         setError(result.error);
       }
     });
@@ -88,6 +103,8 @@ export function SubscribeModal({ dict, onClose, onSuccess }: Props) {
 
         {!stripePromise ? (
           <p className="text-sm text-ink-soft">{dict.errUnexpected}</p>
+        ) : fallingBack ? (
+          <p className="text-sm text-ink-soft">{dict.subscribing}</p>
         ) : !clientSecret || !mode ? (
           <p className="text-sm text-ink-soft">{dict.opening}</p>
         ) : (
