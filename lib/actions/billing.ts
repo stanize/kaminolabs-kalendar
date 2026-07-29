@@ -21,6 +21,12 @@ function appBaseUrl(): string {
  * docs/specs/stripe-subscription-billing-spec.md section 4a. Reuses the
  * business's existing stripe_customer_id if one is already on record (e.g.
  * a lapsed clinic resubscribing).
+ *
+ * NOT currently wired into the UI — createSubscriptionIntent (below) is the
+ * primary subscribe flow as of 2026-07-29 (in-app modal, matching
+ * payment-method-modal.tsx). Kept as a working fallback in case the in-app
+ * flow needs to be bypassed for some payment method Elements doesn't support
+ * well, or a support/admin flow wants a plain link instead of a modal.
  */
 export const createCheckoutSession = authedAction(
   async (session): Promise<BillingActionResult> => {
@@ -87,6 +93,151 @@ export const createCheckoutSession = authedAction(
     }
 
     return { ok: true, url: checkoutSession.url };
+  }
+);
+
+export type SubscriptionIntentResult =
+  | { ok: true; clientSecret: string; mode: "payment" | "setup"; amountDue: number }
+  | { ok: false; error: string };
+
+/**
+ * Creates the Stripe customer (if needed) and subscription directly, for the
+ * in-app subscribe modal — replaces createCheckoutSession as the primary
+ * flow (kept below as an unused-but-available fallback). Uses
+ * payment_behavior: 'default_incomplete' so the subscription exists in
+ * Stripe immediately but stays 'incomplete' until the client confirms
+ * payment via Elements.
+ *
+ * Two cases, both returned as a client secret for the same <PaymentElement>
+ * to confirm against:
+ *   - Normal price (> 0): Stripe generates an invoice + PaymentIntent for the
+ *     first charge. Client calls stripe.confirmPayment().
+ *   - $0 first invoice (e.g. a 100%-off onboarding discount phase — see
+ *     lib/pricing): there's nothing to charge yet, so Stripe has nothing to
+ *     attach a PaymentIntent to. It attaches a pending_setup_intent instead,
+ *     purely to collect + save a card for when the discount ends. Client
+ *     calls stripe.confirmSetup() instead.
+ *
+ * KNOWN TRADE-OFF vs the old Checkout-based flow: a Stripe Subscription
+ * object is created here immediately, even if the clinic then closes the
+ * modal without paying — unlike an abandoned Checkout Session, which never
+ * creates a Subscription at all. Stripe auto-cancels unpaid
+ * 'default_incomplete' subscriptions after 23 hours, so this self-cleans,
+ * but a business row can show a real (if short-lived) stripe_subscription_id
+ * with subscription_status='incomplete' from an abandoned attempt. This is
+ * not meaningfully different from today's already-existing 'incomplete'
+ * default state, so treated as acceptable rather than worked around.
+ */
+export const createSubscriptionIntent = authedAction(
+  async (session): Promise<SubscriptionIntentResult> => {
+    if (!isStripeConfigured()) {
+      return { ok: false, error: "La facturación no está disponible en este momento." };
+    }
+
+    const business = await getBusinessForUser(session.user.id);
+    if (!business) {
+      return { ok: false, error: "No se encontró tu negocio." };
+    }
+
+    const pricing = await getBusinessPricing(business.id);
+    if (!pricing) {
+      return { ok: false, error: "No se pudo calcular el precio del plan." };
+    }
+
+    const stripe = getStripeClient();
+    if (!stripe) {
+      return { ok: false, error: "La facturación no está disponible en este momento." };
+    }
+
+    const supabase = await createClient();
+    const { data: bizRow } = await supabase
+      .from("kalendar_businesses")
+      .select("stripe_customer_id")
+      .eq("id", business.id)
+      .maybeSingle();
+
+    let customerId = bizRow?.stripe_customer_id ?? null;
+
+    if (!customerId) {
+      const customer = await stripe.customers.create({
+        email: business.contact_email || session.user.email || undefined,
+        name: business.name,
+        metadata: { business_id: business.id },
+      });
+      customerId = customer.id;
+      // Persist immediately so a retry (e.g. modal reopened after a failed
+      // first attempt) reuses this customer instead of creating another.
+      await supabase
+        .from("kalendar_businesses")
+        .update({ stripe_customer_id: customerId })
+        .eq("id", business.id);
+    }
+
+    // Unlike Checkout's line_items.price_data, a subscription item's
+    // price_data requires a real Product id — inline product_data isn't
+    // supported here. Creating one Product per subscribe attempt is the
+    // direct equivalent of what Checkout did for us automatically before.
+    const product = await stripe.products.create({
+      name: `Kalendar — ${business.name}`,
+    });
+
+    const subscription = await stripe.subscriptions.create({
+      customer: customerId,
+      items: [
+        {
+          price_data: {
+            currency: pricing.currency.toLowerCase(),
+            unit_amount: Math.round(pricing.price * 100),
+            recurring: { interval: "month" },
+            product: product.id,
+          },
+        },
+      ],
+      payment_behavior: "default_incomplete",
+      payment_settings: {
+        save_default_payment_method: "on_subscription",
+        payment_method_types: ["card"],
+      },
+      expand: ["latest_invoice", "pending_setup_intent"],
+    });
+
+    // Persist the subscription id right away — there's no Checkout Session
+    // completion event to hang this on in this flow, unlike the old
+    // createCheckoutSession path (see the trade-off note above).
+    await supabase
+      .from("kalendar_businesses")
+      .update({ stripe_subscription_id: subscription.id })
+      .eq("id", business.id);
+
+    const invoice = subscription.latest_invoice;
+    // Basil API: the PaymentIntent client secret lives at
+    // invoice.confirmation_secret.client_secret, not a separately-expanded
+    // invoice.payment_intent object (that field doesn't exist in this API
+    // version — see MODULES.md panel-settings gotchas for other examples of
+    // this same Basil-era shape shift).
+    const confirmationSecret =
+      invoice && typeof invoice !== "string" ? invoice.confirmation_secret : null;
+    const setupIntent = subscription.pending_setup_intent;
+
+    if (confirmationSecret?.client_secret) {
+      return {
+        ok: true,
+        clientSecret: confirmationSecret.client_secret,
+        mode: "payment",
+        amountDue: pricing.price,
+      };
+    }
+
+    if (setupIntent && typeof setupIntent !== "string" && setupIntent.client_secret) {
+      return {
+        ok: true,
+        clientSecret: setupIntent.client_secret,
+        mode: "setup",
+        amountDue: 0,
+      };
+    }
+
+    return { ok: false, error: "No se pudo iniciar la suscripción." };
   }
 );
 

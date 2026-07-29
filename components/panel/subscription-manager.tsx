@@ -5,12 +5,12 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Btn } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import {
-  createCheckoutSession,
   createBillingPortalSession,
   cancelSubscription,
   resumeSubscription,
 } from "@/lib/actions/billing";
 import { PaymentMethodModal } from "@/components/panel/payment-method-modal";
+import { SubscribeModal } from "@/components/panel/subscribe-modal";
 import type { PaymentsDictionary } from "@/lib/i18n/dictionaries/payments";
 import type { BillingState, SubscriptionStatus } from "@/lib/billing/data";
 import type { PricingResult } from "@/lib/pricing/types";
@@ -45,20 +45,27 @@ export function SubscriptionManager({
   const [error, setError] = useState<string | null>(null);
   const [confirmingCancel, setConfirmingCancel] = useState(false);
   const [showPaymentMethodModal, setShowPaymentMethodModal] = useState(false);
+  const [showSubscribeModal, setShowSubscribeModal] = useState(false);
+  const [justSubscribed, setJustSubscribed] = useState(false);
 
   const status = billing?.subscriptionStatus ?? "incomplete";
   const isSubscribed = ACTIVE_LIKE.includes(status);
+  // Legacy query param from the old Checkout-redirect flow — kept as a
+  // fallback trigger for the polling effect below in case anything still
+  // links here with it, but the modal flow now sets justSubscribed directly
+  // instead of relying on a redirect.
   const arrivedFromCheckout = searchParams.get("status") === "success";
+  const awaitingConfirmation = arrivedFromCheckout || justSubscribed;
 
   useEffect(() => {
-    if (!arrivedFromCheckout || isSubscribed) return;
+    if (!awaitingConfirmation || isSubscribed) return;
     const interval = setInterval(() => router.refresh(), 3000);
     const timeout = setTimeout(() => clearInterval(interval), 30000);
     return () => {
       clearInterval(interval);
       clearTimeout(timeout);
     };
-  }, [arrivedFromCheckout, isSubscribed, router]);
+  }, [awaitingConfirmation, isSubscribed, router]);
 
   async function runRedirectAction(
     action: () => Promise<{ ok: true; url: string } | { ok: false; error: string }>
@@ -149,7 +156,7 @@ export function SubscriptionManager({
           </p>
         ) : null}
 
-        {arrivedFromCheckout && !isSubscribed && (
+        {awaitingConfirmation && !isSubscribed && (
           <p className="mt-4 text-sm text-ink-soft">{dict.confirming}</p>
         )}
 
@@ -157,8 +164,8 @@ export function SubscriptionManager({
 
         <div className="mt-6 flex flex-wrap items-center gap-3">
           {!isSubscribed ? (
-            <Btn variant="primary" onClick={() => runRedirectAction(createCheckoutSession)} disabled={pending}>
-              {pending ? dict.subscribing : dict.subscribe}
+            <Btn variant="primary" onClick={() => setShowSubscribeModal(true)} disabled={pending}>
+              {dict.subscribe}
             </Btn>
           ) : (
             <Btn
@@ -314,6 +321,17 @@ export function SubscriptionManager({
           dict={dict}
           onClose={() => setShowPaymentMethodModal(false)}
           onSuccess={() => router.refresh()}
+        />
+      )}
+
+      {showSubscribeModal && (
+        <SubscribeModal
+          dict={dict}
+          onClose={() => setShowSubscribeModal(false)}
+          onSuccess={() => {
+            setJustSubscribed(true);
+            router.refresh();
+          }}
         />
       )}
     </div>
