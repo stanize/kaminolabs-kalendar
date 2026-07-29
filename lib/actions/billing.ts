@@ -209,10 +209,43 @@ export const createSubscriptionIntent = authedAction(
       .update({ stripe_subscription_id: subscription.id })
       .eq("id", business.id);
 
-    // Re-fetch the invoice explicitly by id rather than trusting the
-    // initial expand result from subscriptions.create — guards against any
-    // finalization-timing gap between subscription creation and the
-    // invoice's confirmation_secret being populated.
+    // Stripe omits client_secret from PaymentIntent/SetupIntent objects when
+    // they arrive nested inside another resource (e.g.
+    // subscription.pending_setup_intent, invoice's embedded intent) — a
+    // deliberate safeguard against leaking secrets via unrelated expands.
+    // client_secret is only populated on a DIRECT retrieve of that intent by
+    // its own id. Both branches below re-fetch directly rather than trusting
+    // the nested object from subscriptions.create's response.
+    //
+    // Check pending_setup_intent FIRST: per Stripe's own subscription-
+    // integration pattern, when the customer has no default payment method
+    // yet, Stripe routes through a SetupIntent-first flow to collect+attach
+    // a card — even for a non-zero first invoice — and then automatically
+    // charges that invoice once the card is attached as the default payment
+    // method (since payment_settings.save_default_payment_method is set to
+    // 'on_subscription' above). Confirmed via diagnostics 2026-07-29: a real
+    // €49 invoice still came back with a pending_setup_intent rather than an
+    // invoice-level confirmation secret.
+    const setupIntentRef = subscription.pending_setup_intent;
+    const setupIntentId = setupIntentRef
+      ? typeof setupIntentRef === "string"
+        ? setupIntentRef
+        : setupIntentRef.id
+      : null;
+
+    if (setupIntentId) {
+      const setupIntent = await stripe.setupIntents.retrieve(setupIntentId);
+      if (setupIntent.client_secret) {
+        return {
+          ok: true,
+          clientSecret: setupIntent.client_secret,
+          mode: "setup",
+          amountDue: pricing.price,
+        };
+      }
+    }
+
+    // Fallback: a real PaymentIntent-backed invoice (no setup-first routing).
     const invoiceRef = subscription.latest_invoice;
     const invoiceId = invoiceRef
       ? typeof invoiceRef === "string"
@@ -221,14 +254,7 @@ export const createSubscriptionIntent = authedAction(
       : null;
 
     const invoice = invoiceId ? await stripe.invoices.retrieve(invoiceId) : null;
-
-    // Basil API: the PaymentIntent client secret lives at
-    // invoice.confirmation_secret.client_secret, not a separately-expanded
-    // invoice.payment_intent object (that field doesn't exist in this API
-    // version — see MODULES.md panel-settings gotchas for other examples of
-    // this same Basil-era shape shift).
     const confirmationSecret = invoice?.confirmation_secret ?? null;
-    const setupIntent = subscription.pending_setup_intent;
 
     if (confirmationSecret?.client_secret) {
       return {
@@ -239,15 +265,6 @@ export const createSubscriptionIntent = authedAction(
       };
     }
 
-    if (setupIntent && typeof setupIntent !== "string" && setupIntent.client_secret) {
-      return {
-        ok: true,
-        clientSecret: setupIntent.client_secret,
-        mode: "setup",
-        amountDue: 0,
-      };
-    }
-
     console.error("[createSubscriptionIntent] no usable client secret found", {
       subscriptionId: subscription.id,
       subscriptionStatus: subscription.status,
@@ -255,7 +272,7 @@ export const createSubscriptionIntent = authedAction(
       invoiceStatus: invoice?.status ?? null,
       invoiceTotal: invoice?.total ?? null,
       hasConfirmationSecret: Boolean(confirmationSecret),
-      pendingSetupIntentType: typeof subscription.pending_setup_intent,
+      setupIntentId,
     });
 
     return { ok: false, error: "No se pudo iniciar la suscripción." };
