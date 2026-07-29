@@ -209,14 +209,25 @@ export const createSubscriptionIntent = authedAction(
       .update({ stripe_subscription_id: subscription.id })
       .eq("id", business.id);
 
-    const invoice = subscription.latest_invoice;
+    // Re-fetch the invoice explicitly by id rather than trusting the
+    // initial expand result from subscriptions.create — guards against any
+    // finalization-timing gap between subscription creation and the
+    // invoice's confirmation_secret being populated.
+    const invoiceRef = subscription.latest_invoice;
+    const invoiceId = invoiceRef
+      ? typeof invoiceRef === "string"
+        ? invoiceRef
+        : invoiceRef.id
+      : null;
+
+    const invoice = invoiceId ? await stripe.invoices.retrieve(invoiceId) : null;
+
     // Basil API: the PaymentIntent client secret lives at
     // invoice.confirmation_secret.client_secret, not a separately-expanded
     // invoice.payment_intent object (that field doesn't exist in this API
     // version — see MODULES.md panel-settings gotchas for other examples of
     // this same Basil-era shape shift).
-    const confirmationSecret =
-      invoice && typeof invoice !== "string" ? invoice.confirmation_secret : null;
+    const confirmationSecret = invoice?.confirmation_secret ?? null;
     const setupIntent = subscription.pending_setup_intent;
 
     if (confirmationSecret?.client_secret) {
@@ -236,6 +247,16 @@ export const createSubscriptionIntent = authedAction(
         amountDue: 0,
       };
     }
+
+    console.error("[createSubscriptionIntent] no usable client secret found", {
+      subscriptionId: subscription.id,
+      subscriptionStatus: subscription.status,
+      invoiceId,
+      invoiceStatus: invoice?.status ?? null,
+      invoiceTotal: invoice?.total ?? null,
+      hasConfirmationSecret: Boolean(confirmationSecret),
+      pendingSetupIntentType: typeof subscription.pending_setup_intent,
+    });
 
     return { ok: false, error: "No se pudo iniciar la suscripción." };
   }
