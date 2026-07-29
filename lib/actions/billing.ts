@@ -209,23 +209,45 @@ export const createSubscriptionIntent = authedAction(
       .update({ stripe_subscription_id: subscription.id })
       .eq("id", business.id);
 
-    // Stripe omits client_secret from PaymentIntent/SetupIntent objects when
-    // they arrive nested inside another resource (e.g.
-    // subscription.pending_setup_intent, invoice's embedded intent) — a
-    // deliberate safeguard against leaking secrets via unrelated expands.
-    // client_secret is only populated on a DIRECT retrieve of that intent by
-    // its own id. Both branches below re-fetch directly rather than trusting
-    // the nested object from subscriptions.create's response.
-    //
-    // Check pending_setup_intent FIRST: per Stripe's own subscription-
-    // integration pattern, when the customer has no default payment method
-    // yet, Stripe routes through a SetupIntent-first flow to collect+attach
-    // a card — even for a non-zero first invoice — and then automatically
-    // charges that invoice once the card is attached as the default payment
-    // method (since payment_settings.save_default_payment_method is set to
-    // 'on_subscription' above). Confirmed via diagnostics 2026-07-29: a real
-    // €49 invoice still came back with a pending_setup_intent rather than an
-    // invoice-level confirmation secret.
+    // ROOT CAUSE CONFIRMED (2026-07-29, via manual Stripe API testing — see
+    // MODULES.md): invoice.confirmation_secret is NOT returned by default,
+    // even on a direct stripe.invoices.retrieve() call — it must be
+    // explicitly requested via expand: ["confirmation_secret"]. Without it,
+    // the field is simply absent from the response (not null — genuinely
+    // missing), which is what caused every previous attempt at this to fail.
+    // Confirmed pending_setup_intent is genuinely null for a normal non-zero
+    // invoice with no existing default payment method — the earlier theory
+    // that Stripe routes through a SetupIntent-first flow in that case was
+    // wrong; that was a misread of a different, now-explained symptom.
+    const invoiceRef = subscription.latest_invoice;
+    const invoiceId = invoiceRef
+      ? typeof invoiceRef === "string"
+        ? invoiceRef
+        : invoiceRef.id
+      : null;
+
+    const invoice = invoiceId
+      ? await stripe.invoices.retrieve(invoiceId, {
+          expand: ["confirmation_secret"],
+        })
+      : null;
+    const confirmationSecret = invoice?.confirmation_secret ?? null;
+
+    if (confirmationSecret?.client_secret) {
+      return {
+        ok: true,
+        clientSecret: confirmationSecret.client_secret,
+        mode: "payment",
+        amountDue: pricing.price,
+      };
+    }
+
+    // Fallback: genuinely $0 first invoice (a 100%-off discount phase) has
+    // nothing to confirm a payment for — Stripe attaches a
+    // pending_setup_intent instead purely to collect+save a card for later.
+    // client_secret is omitted from the nested object on subscription.pending_setup_intent
+    // the same way confirmation_secret was above, so this still needs a
+    // direct retrieve by id.
     const setupIntentRef = subscription.pending_setup_intent;
     const setupIntentId = setupIntentRef
       ? typeof setupIntentRef === "string"
@@ -240,29 +262,9 @@ export const createSubscriptionIntent = authedAction(
           ok: true,
           clientSecret: setupIntent.client_secret,
           mode: "setup",
-          amountDue: pricing.price,
+          amountDue: 0,
         };
       }
-    }
-
-    // Fallback: a real PaymentIntent-backed invoice (no setup-first routing).
-    const invoiceRef = subscription.latest_invoice;
-    const invoiceId = invoiceRef
-      ? typeof invoiceRef === "string"
-        ? invoiceRef
-        : invoiceRef.id
-      : null;
-
-    const invoice = invoiceId ? await stripe.invoices.retrieve(invoiceId) : null;
-    const confirmationSecret = invoice?.confirmation_secret ?? null;
-
-    if (confirmationSecret?.client_secret) {
-      return {
-        ok: true,
-        clientSecret: confirmationSecret.client_secret,
-        mode: "payment",
-        amountDue: pricing.price,
-      };
     }
 
     console.error("[createSubscriptionIntent] no usable client secret found", {
