@@ -17,6 +17,8 @@ const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
   ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
   : null;
 
+const STRIPE_LOAD_TIMEOUT_MS = 8000;
+
 interface Props {
   dict: PaymentsDictionary;
   onClose: () => void;
@@ -38,19 +40,8 @@ export function SubscribeModal({ dict, onClose, onSuccess }: Props) {
 
   useEffect(() => {
     let cancelled = false;
-    createSubscriptionIntent().then(async (result) => {
-      if (cancelled) return;
-      if (result.ok) {
-        setClientSecret(result.clientSecret);
-        setMode(result.mode);
-        return;
-      }
 
-      // In-app intent creation failed — fall back to the known-working
-      // Checkout redirect rather than dead-ending the person on an error.
-      // This is a temporary safety net while the underlying cause (Stripe
-      // not returning a usable PaymentIntent/SetupIntent client secret for
-      // some accounts/subscriptions) is investigated — see MODULES.md.
+    async function fallBackToCheckout(errorIfFallbackFails: string) {
       setFallingBack(true);
       const fallback = await createCheckoutSession();
       if (cancelled) return;
@@ -58,13 +49,55 @@ export function SubscribeModal({ dict, onClose, onSuccess }: Props) {
         window.location.href = fallback.url;
       } else {
         setFallingBack(false);
-        setError(result.error);
+        setError(errorIfFallbackFails);
       }
-    });
+    }
+
+    async function init() {
+      // Browser extensions (ad blockers, and — confirmed in testing,
+      // 2026-07-30 — password managers like Bitwarden) can silently block
+      // js.stripe.com from ever loading, which would otherwise leave the
+      // modal stuck on "Abriendo..." forever with no explanation. Race the
+      // load against a timeout and fall back to the known-working Checkout
+      // redirect if it doesn't resolve in time. Checked BEFORE calling
+      // createSubscriptionIntent — no point creating a real Stripe
+      // subscription server-side if we already know the browser can't
+      // complete the in-app flow anyway (also reduces orphaned
+      // 'incomplete' subscriptions from this specific failure mode).
+      const stripe = stripePromise
+        ? await Promise.race([
+            stripePromise,
+            new Promise<null>((resolve) => setTimeout(() => resolve(null), STRIPE_LOAD_TIMEOUT_MS)),
+          ]).catch(() => null)
+        : null;
+
+      if (cancelled) return;
+
+      if (!stripe) {
+        await fallBackToCheckout(dict.errUnexpected);
+        return;
+      }
+
+      const result = await createSubscriptionIntent();
+      if (cancelled) return;
+
+      if (result.ok) {
+        setClientSecret(result.clientSecret);
+        setMode(result.mode);
+        return;
+      }
+
+      // In-app intent creation failed server-side (e.g. the
+      // confirmation_secret/setup-intent edge case documented in
+      // MODULES.md) — same fallback, different trigger.
+      await fallBackToCheckout(result.error);
+    }
+
+    init();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [dict.errUnexpected]);
 
   const appearance = useMemo(
     () => ({

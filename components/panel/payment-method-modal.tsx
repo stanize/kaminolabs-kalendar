@@ -10,12 +10,14 @@ import {
 } from "@stripe/react-stripe-js";
 import { Icon } from "@/components/ui/icon";
 import { Btn } from "@/components/ui/button";
-import { createSetupIntent, setDefaultPaymentMethod } from "@/lib/actions/billing";
+import { createSetupIntent, setDefaultPaymentMethod, createBillingPortalSession } from "@/lib/actions/billing";
 import type { PaymentsDictionary } from "@/lib/i18n/dictionaries/payments";
 
 const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
   ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
   : null;
+
+const STRIPE_LOAD_TIMEOUT_MS = 8000;
 
 interface Props {
   dict: PaymentsDictionary;
@@ -33,21 +35,52 @@ interface Props {
 export function PaymentMethodModal({ dict, onClose, onSuccess }: Props) {
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [fallingBack, setFallingBack] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    createSetupIntent().then((result) => {
+
+    async function init() {
+      // Same Bitwarden/ad-blocker-can-silently-block-js.stripe.com guard as
+      // subscribe-modal.tsx — see that file for the full explanation. No
+      // Checkout-equivalent exists for a scoped card-only update, so this
+      // falls back to the general Customer Portal link instead.
+      const stripe = stripePromise
+        ? await Promise.race([
+            stripePromise,
+            new Promise<null>((resolve) => setTimeout(() => resolve(null), STRIPE_LOAD_TIMEOUT_MS)),
+          ]).catch(() => null)
+        : null;
+
+      if (cancelled) return;
+
+      if (!stripe) {
+        setFallingBack(true);
+        const fallback = await createBillingPortalSession();
+        if (cancelled) return;
+        if (fallback.ok) {
+          window.location.href = fallback.url;
+        } else {
+          setFallingBack(false);
+          setError(dict.errUnexpected);
+        }
+        return;
+      }
+
+      const result = await createSetupIntent();
       if (cancelled) return;
       if (result.ok) {
         setClientSecret(result.clientSecret);
       } else {
         setError(result.error);
       }
-    });
+    }
+
+    init();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [dict.errUnexpected]);
 
   const appearance = useMemo(
     () => ({
@@ -86,6 +119,8 @@ export function PaymentMethodModal({ dict, onClose, onSuccess }: Props) {
 
         {!stripePromise ? (
           <p className="text-sm text-ink-soft">{dict.errUnexpected}</p>
+        ) : fallingBack ? (
+          <p className="text-sm text-ink-soft">{dict.opening}</p>
         ) : !clientSecret ? (
           <p className="text-sm text-ink-soft">{dict.opening}</p>
         ) : (
