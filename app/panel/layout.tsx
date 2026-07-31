@@ -71,6 +71,18 @@ export default async function PanelLayout({ children }: { children: ReactNode })
 
   return (
     <div className="flex min-h-screen flex-col bg-bg md:flex-row">
+      {/* Preconnect to Stripe's domains as early as possible — the panel is
+          the only part of the app that ever loads Stripe.js (subscribe /
+          payment-method modals under /panel/settings/subscription). This
+          gives the browser a head start on DNS+TLS before the person even
+          opens a modal, which meaningfully reduces how often Stripe.js's
+          own load-timeout fallback (see subscribe-modal.tsx /
+          payment-method-modal.tsx) actually gets triggered — though it
+          can't defeat a browser extension actively blocking the request
+          outright, which is what the fallback itself is for. */}
+      <link rel="preconnect" href="https://js.stripe.com" />
+      <link rel="preconnect" href="https://m.stripe.network" />
+      <link rel="dns-prefetch" href="https://js.stripe.com" />
       <PanelSidebar user={session.user} dict={dict.sidebar} locale={locale} />
       <main className="flex-1 overflow-y-auto">
         {children}
