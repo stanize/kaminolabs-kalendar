@@ -13,12 +13,12 @@ export const STEPS = [
 export const TOTAL_CONFIG_STEPS = STEPS.length - 1;
 
 export const BUSINESS_TYPES: { id: BusinessType; label: string; icon: string }[] = [
-  { id: "psychology",    label: "Psicología",        icon: "user" },
-  { id: "nutrition",     label: "Nutrición",          icon: "leaf" },
   { id: "physiotherapy", label: "Fisioterapia",       icon: "sparkles" },
-  { id: "beauty",        label: "Estética y belleza", icon: "sparkles" },
   { id: "fitness",       label: "Fitness y entreno",  icon: "sparkles" },
+  { id: "nutrition",     label: "Nutrición",          icon: "leaf" },
+  { id: "psychology",    label: "Psicología",        icon: "user" },
   { id: "coaching",      label: "Coaching",           icon: "users" },
+  { id: "beauty",        label: "Estética y belleza", icon: "sparkles" },
   { id: "tutoring",      label: "Clases y tutorías",  icon: "list" },
   { id: "other",         label: "Otro",               icon: "grid" },
 ];
