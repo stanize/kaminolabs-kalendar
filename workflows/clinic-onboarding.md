@@ -9,6 +9,8 @@ Criteria:
 - Google OAuth sign-up available via Better Auth
 - Email/password sign-up sends verification email (lib/auth.ts -> lib/email.ts)
 - Session created immediately on sign-up (autoSignInAfterVerification / requireEmailVerification: false)
+- No name field on the form — display name derived from email local-part (nameFromEmail) since Better Auth requires a name
+- Already-signed-in visitors to /signup are redirected straight to /panel (server-side session check)
 
 ## Step: email-verification-gate
 Status: done
