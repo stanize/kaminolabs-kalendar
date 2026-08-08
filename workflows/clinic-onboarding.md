@@ -3,13 +3,15 @@
 The path a new clinic/professional takes from sign-up to having a live, bookable public page.
 
 ## Step: sign-up
-Status: done
+Status: in_progress
 Criteria:
 - Sign-up form exists at /app/signup/page.tsx (components/auth/signup-form.tsx)
 - Google OAuth sign-up available via Better Auth
 - Email/password sign-up sends verification email (lib/auth.ts -> lib/email.ts)
 - Session created immediately on sign-up (autoSignInAfterVerification / requireEmailVerification: false)
 - No name field on the form — display name derived from email local-part (nameFromEmail) since Better Auth requires a name
+- BUG (not met): landing-page hero email capture does not carry forward to the sign-up form. HeroSignup (components/landing/hero-signup.tsx) pushes to /signup?email=<value>, but signup-form.tsx initializes email state to "" and never reads the query param — visitor has to retype the email they already entered.
+- BUG (not met): an invalid/mistyped email domain at sign-up fails ungracefully. No client-side email format/domain validation exists before authClient.signUp.email is called; the account is created and the session goes live regardless of whether the verification email could actually be delivered (lib/email.ts's sendEmail degrades silently — catches and logs rather than throwing). The user then lands on the blocking email-verification gate with only a Resend option and no way to correct the email address, so a typo'd domain leaves them stuck with no path forward.
 - Already-signed-in visitors to /signup are redirected straight to /panel (server-side session check)
 
 ## Step: email-verification-gate
