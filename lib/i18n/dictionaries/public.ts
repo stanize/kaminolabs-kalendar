@@ -106,6 +106,7 @@ export interface PublicDictionary {
     // errors
     errGoogle: string;
     errEmail: string;
+    errEmailInvalid: string;
     errPasswordLength: string;
     errPasswordMismatch: string;
     errEmailExists: string;
@@ -209,6 +210,7 @@ const es: PublicDictionary = {
     forgotPasswordLink: "¿Olvidaste tu contraseña?",
     errGoogle: "No se pudo conectar con Google. Inténtalo de nuevo.",
     errEmail: "Introduce tu email.",
+    errEmailInvalid: "Revisa tu email: parece que falta algo (por ejemplo, la parte después de @).",
     errPasswordLength: "La contraseña debe tener al menos 8 caracteres.",
     errPasswordMismatch: "Las contraseñas no coinciden.",
     errEmailExists: "Ya existe una cuenta con ese email.",
@@ -311,6 +313,7 @@ const en: PublicDictionary = {
     forgotPasswordLink: "Forgot your password?",
     errGoogle: "Couldn't connect to Google. Please try again.",
     errEmail: "Enter your email.",
+    errEmailInvalid: "Check your email address — something looks off (e.g. missing the part after @).",
     errPasswordLength: "Password must be at least 8 characters.",
     errPasswordMismatch: "Passwords don't match.",
     errEmailExists: "An account with that email already exists.",

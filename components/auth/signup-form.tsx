@@ -42,11 +42,23 @@ const GoogleIcon = () => (
 const inputClass =
   "w-full rounded-lg border border-line bg-surface px-3 py-2 text-[13px] text-ink placeholder:text-ink-soft focus:border-brand focus:outline-none disabled:opacity-50";
 
-export function SignupForm({ dict }: { dict: AuthDict }) {
+// Deliberately permissive — this only needs to catch obviously malformed
+// input (missing @, no domain, no dot) before we create an account and send
+// a verification email nobody can receive. Full RFC validation isn't the
+// goal; Better Auth / the email provider are the real source of truth.
+const EMAIL_FORMAT_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export function SignupForm({
+  dict,
+  initialEmail = "",
+}: {
+  dict: AuthDict;
+  initialEmail?: string;
+}) {
   const router = useRouter();
 
   const [loadingGoogle, setLoadingGoogle] = useState(false);
-  const [email, setEmail]                     = useState("");
+  const [email, setEmail]                     = useState(initialEmail);
   const [password, setPassword]               = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading]                 = useState(false);
@@ -66,7 +78,13 @@ export function SignupForm({ dict }: { dict: AuthDict }) {
 
   async function handleRegister() {
     setError(null);
-    if (!email.trim())                { setError(dict.errEmail); return; }
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail)                       { setError(dict.errEmail); return; }
+    // Catch obviously malformed addresses (missing @, no domain/TLD) before
+    // creating an account and sending a verification email nobody can
+    // receive — previously this went through silently and left the user
+    // stuck on the verification gate with no way to fix the typo.
+    if (!EMAIL_FORMAT_RE.test(trimmedEmail))  { setError(dict.errEmailInvalid); return; }
     if (password.length < 8)          { setError(dict.errPasswordLength); return; }
     if (password !== confirmPassword) { setError(dict.errPasswordMismatch); return; }
 
@@ -74,8 +92,8 @@ export function SignupForm({ dict }: { dict: AuthDict }) {
     try {
       const result = await withTimeout(
         authClient.signUp.email({
-          name: nameFromEmail(email.trim()),
-          email: email.trim(),
+          name: nameFromEmail(trimmedEmail),
+          email: trimmedEmail,
           password,
           // Drives the verification email link target after the user confirms.
           callbackURL: "/panel",

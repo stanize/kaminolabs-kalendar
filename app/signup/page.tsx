@@ -11,7 +11,11 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: `${dict.signup.title} — Kalendar` };
 }
 
-export default async function SignupPage() {
+export default async function SignupPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ email?: string }>;
+}) {
   // Already signed in — skip straight to the panel.
   try {
     const session = await auth.api.getSession({ headers: await headers() });
@@ -25,6 +29,11 @@ export default async function SignupPage() {
   // Language was chosen on the home page (navbar switcher); this page just
   // reads the cookie and carries it forward — no switcher shown here.
   const { dict } = await getPublicServerDictionary();
+
+  // Carries the email the visitor already typed into the landing-page hero
+  // capture (components/landing/hero-signup.tsx) into the sign-up form, so
+  // they don't have to retype it.
+  const { email: emailParam } = await searchParams;
 
   return (
     <div className="grid min-h-screen md:grid-cols-[42%_58%]">
@@ -57,7 +66,7 @@ export default async function SignupPage() {
 
         <div className="mx-auto w-full max-w-[380px]">
           <h2 className="mb-6 text-[20px] font-semibold">{dict.signup.title}</h2>
-          <SignupForm dict={dict.auth} />
+          <SignupForm dict={dict.auth} initialEmail={emailParam ?? ""} />
         </div>
       </div>
     </div>
