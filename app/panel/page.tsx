@@ -143,51 +143,59 @@ export default async function PanelHomePage() {
       )}
 
       {/* Widget tile grid — Hoy/Citas comes first (top-left); more widgets
-          get added here later, each as its own tile alongside it. */}
-      <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <TodayStatsWidget
-          isToday={hoyStats.isToday}
-          count={hoyStats.count}
-          dayLabel={hoyDayLabel}
-          dict={calendarDict.widget}
-        />
-        <WeekStatsWidget
-          isThisWeek={weekStats.isThisWeek}
-          count={weekStats.count}
-          dict={calendarDict.widget}
-        />
-
-        {business?.slug && (
-          <BookingPageCard
-            slug={business.slug}
-            bookingPath={bookingPath(business.slug)}
-            bookingUrl={bookingUrl(business.slug)}
-            title={h.bookingPageTitle}
-            viewPageLabel={h.viewPage}
-            downloadQrLabel={h.downloadQr}
-            qrModalTitle={h.qrModalTitle}
-            closeLabel={h.close}
+          get added here later, each as its own tile alongside it.
+          Gated on full setup completion: pre-completion, only the checklist
+          card above is shown, so a brand-new clinic isn't confronted with
+          empty stats/quick-links before there's anything to show. This is a
+          server component, so the grid appears automatically (no reload)
+          the moment a return-intent redirect re-renders this page with
+          allDone === true. */}
+      {allDone && (
+        <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <TodayStatsWidget
+            isToday={hoyStats.isToday}
+            count={hoyStats.count}
+            dayLabel={hoyDayLabel}
+            dict={calendarDict.widget}
           />
-        )}
+          <WeekStatsWidget
+            isThisWeek={weekStats.isThisWeek}
+            count={weekStats.count}
+            dict={calendarDict.widget}
+          />
 
-        <div className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
-          <p className="mb-1 text-[12px] font-bold uppercase tracking-[.05em] text-ink-soft">
-            {h.quickAccess}
-          </p>
-          <div className="mt-3 flex flex-col gap-1">
-            {quickLinks.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="flex items-center gap-2.5 rounded-[9px] px-3 py-2 text-[13.5px] font-medium text-ink-soft transition-colors hover:bg-surface-2 hover:text-ink"
-              >
-                <Icon name={item.icon} size={15} />
-                {item.label}
-              </Link>
-            ))}
+          {business?.slug && (
+            <BookingPageCard
+              slug={business.slug}
+              bookingPath={bookingPath(business.slug)}
+              bookingUrl={bookingUrl(business.slug)}
+              title={h.bookingPageTitle}
+              viewPageLabel={h.viewPage}
+              downloadQrLabel={h.downloadQr}
+              qrModalTitle={h.qrModalTitle}
+              closeLabel={h.close}
+            />
+          )}
+
+          <div className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
+            <p className="mb-1 text-[12px] font-bold uppercase tracking-[.05em] text-ink-soft">
+              {h.quickAccess}
+            </p>
+            <div className="mt-3 flex flex-col gap-1">
+              {quickLinks.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="flex items-center gap-2.5 rounded-[9px] px-3 py-2 text-[13.5px] font-medium text-ink-soft transition-colors hover:bg-surface-2 hover:text-ink"
+                >
+                  <Icon name={item.icon} size={15} />
+                  {item.label}
+                </Link>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
