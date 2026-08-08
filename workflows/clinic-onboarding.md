@@ -32,6 +32,7 @@ Status: in_progress
 Criteria:
 - Business form exists at /app/panel/business/page.tsx
 - Captures name, business type, legal ID, slug
+- Business type options ordered: Fisioterapia, Fitness y entreno, Nutrición, Psicología, Coaching, Estética y belleza, Clases y tutorías, Otro
 - Slug is permanent after creation (read-only on edit)
 - Slug moderation: clean slugs active instantly, flagged ones pending_review
 - Address captured as split fields (street, postal code, city, province) with postal-code autofill
