@@ -69,6 +69,14 @@ Criteria:
 - Booking link surfaced in panel (booking-page-card.tsx on panel home, business-form.tsx on Negocio)
 - setup-complete-banner.tsx reflects onboarding completion state
 
+## Step: panel-home-gating
+Status: not_started
+Criteria:
+- Stats widgets (Hoy / Esta semana) are hidden until onboarding checklist is 100% complete
+- Accesos rápidos panel is hidden until onboarding checklist is 100% complete
+- Only the onboarding checklist card is visible pre-completion
+- Widgets appear automatically once all 4 checklist items are done (no page reload required)
+
 ## Step: subscription-activation
 Status: not_started
 Criteria:
