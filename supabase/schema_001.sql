@@ -75,14 +75,20 @@ create policy "UserRoles: write"
 -- kalendar_patients
 -- Patient profile linked to an authenticated user. Created the first time a
 -- user completes the patient registration flow (booking page auth gate or
--- /patient/login). phone is optional. name and email are read from the linked
--- "user" record rather than duplicated here.
+-- /patient/login). phone, name, and contact_email are all optional/editable
+-- from the patient portal profile page — name/contact_email are deliberately
+-- separate from the linked "user" record's Better Auth name/email (same
+-- pattern as kalendar_businesses.contact_email), so a patient can present a
+-- different display name/contact address without touching their login
+-- credentials. Portal falls back to the "user" record's name/email when null.
 -- ----------------------------------------------------------------------------
 create table public.kalendar_patients (
-  id         uuid        primary key default gen_random_uuid(),
-  user_id    text        not null unique references public."user" (id) on delete cascade,
-  phone      text,
-  created_at timestamptz not null default now()
+  id            uuid        primary key default gen_random_uuid(),
+  user_id       text        not null unique references public."user" (id) on delete cascade,
+  phone         text,
+  name          text,
+  contact_email text,
+  created_at    timestamptz not null default now()
 );
 
 create index kalendar_patients_user_id_idx on public.kalendar_patients (user_id);

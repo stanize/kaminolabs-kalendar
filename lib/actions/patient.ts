@@ -1,8 +1,10 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { assignRole, getUserRoles } from "@/lib/roles/data";
 import { requireSession } from "@/lib/auth-session";
+import { notifyCancellation } from "@/lib/actions/booking";
 
 export type ProvisionResult =
   | { ok: true; patientId: string }
@@ -80,12 +82,16 @@ export async function provisionPatient(phone?: string): Promise<ProvisionResult>
 /**
  * Returns the current user's patient profile, or null if they are not yet
  * provisioned as a patient. Used by the patient portal to check registration
- * state and by the booking wizard to link authenticated bookings.
+ * state and by the booking wizard to link authenticated bookings. name/email
+ * fall back to the Better Auth "user" record when the patient hasn't set a
+ * portal-specific override (see kalendar_patients.name/contact_email).
  */
 export async function getPatientProfile(): Promise<{
   id: string;
   userId: string;
   phone: string | null;
+  name: string;
+  contactEmail: string;
 } | null> {
   let session;
   try {
@@ -97,10 +103,158 @@ export async function getPatientProfile(): Promise<{
   const supabase = await createClient();
   const { data } = await supabase
     .from("kalendar_patients")
-    .select("id, user_id, phone")
+    .select("id, user_id, phone, name, contact_email")
     .eq("user_id", session.user.id)
     .maybeSingle();
 
   if (!data) return null;
-  return { id: data.id, userId: data.user_id, phone: data.phone };
+  return {
+    id: data.id,
+    userId: data.user_id,
+    phone: data.phone,
+    name: data.name ?? session.user.name ?? "",
+    contactEmail: data.contact_email ?? session.user.email ?? "",
+  };
 }
+
+// ── Profile management ──────────────────────────────────────────────────────
+
+export type UpdatePatientProfileResult =
+  | { ok: true }
+  | { ok: false; error: string };
+
+export interface UpdatePatientProfileDict {
+  errNameRequired: string;
+  errEmailInvalid: string;
+  errSaveFailed: string;
+}
+
+const PROFILE_FALLBACK: UpdatePatientProfileDict = {
+  errNameRequired: "Introduce tu nombre.",
+  errEmailInvalid: "Introduce un email válido.",
+  errSaveFailed: "No se pudo guardar el perfil.",
+};
+
+/**
+ * Updates the current user's patient-facing profile (name, contact email,
+ * phone) — all separate from the login account's Better Auth name/email.
+ * Scoped to the caller's own kalendar_patients row via user_id. The caller
+ * must already be a provisioned patient (row created by provisionPatient).
+ */
+export const updatePatientProfile = async (
+  input: { name: string; contactEmail: string; phone: string },
+  dict?: Partial<UpdatePatientProfileDict>
+): Promise<UpdatePatientProfileResult> => {
+  const t = { ...PROFILE_FALLBACK, ...dict };
+
+  let session;
+  try {
+    session = await requireSession();
+  } catch {
+    return { ok: false, error: t.errSaveFailed };
+  }
+
+  const name = input.name.trim();
+  if (name.length < 1) return { ok: false, error: t.errNameRequired };
+
+  const contactEmail = input.contactEmail.trim();
+  if (!contactEmail.includes("@")) return { ok: false, error: t.errEmailInvalid };
+
+  const phone = input.phone.trim();
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("kalendar_patients")
+    .update({
+      name,
+      contact_email: contactEmail,
+      phone: phone || null,
+    })
+    .eq("user_id", session.user.id);
+
+  if (error) return { ok: false, error: t.errSaveFailed };
+
+  revalidatePath("/patient");
+  revalidatePath("/patient/profile");
+  return { ok: true };
+};
+
+// ── Self-service cancel ─────────────────────────────────────────────────────
+
+export type CancelPatientBookingResult =
+  | { ok: true }
+  | { ok: false; error: string };
+
+export interface CancelPatientBookingDict {
+  errNotFound: string;
+  errCannotCancel: string;
+  errCancelFailed: string;
+}
+
+const CANCEL_FALLBACK: CancelPatientBookingDict = {
+  errNotFound: "Reserva no encontrada.",
+  errCannotCancel: "Esta reserva ya no se puede cancelar.",
+  errCancelFailed: "No se pudo cancelar la reserva.",
+};
+
+/**
+ * Cancels a booking from the patient portal. Scoped to the caller's own
+ * patient_id — a patient can only cancel their own bookings, never another
+ * patient's or a guest booking. Same effect as the emailed cancel-token link
+ * (frees the slot, notifies the clinic) — this is just a second entry point
+ * for a patient who's already signed in and doesn't need the email link.
+ */
+export const cancelBookingAsPatient = async (
+  bookingId: string,
+  dict?: Partial<CancelPatientBookingDict>
+): Promise<CancelPatientBookingResult> => {
+  const t = { ...CANCEL_FALLBACK, ...dict };
+
+  let session;
+  try {
+    session = await requireSession();
+  } catch {
+    return { ok: false, error: t.errNotFound };
+  }
+
+  const supabase = await createClient();
+
+  const { data: patient } = await supabase
+    .from("kalendar_patients")
+    .select("id")
+    .eq("user_id", session.user.id)
+    .maybeSingle();
+
+  if (!patient) return { ok: false, error: t.errNotFound };
+
+  const { data: booking } = await supabase
+    .from("kalendar_bookings")
+    .select(
+      "id, status, business_id, team_member_id, service_name, starts_at, client_name, client_email, guest_locale, patient_id"
+    )
+    .eq("id", bookingId)
+    .eq("patient_id", patient.id)
+    .maybeSingle();
+
+  if (!booking) return { ok: false, error: t.errNotFound };
+  if (!["pending_confirmation", "confirmed"].includes(booking.status)) {
+    return { ok: false, error: t.errCannotCancel };
+  }
+
+  const { error } = await supabase
+    .from("kalendar_bookings")
+    .update({ status: "cancelled" })
+    .eq("id", bookingId)
+    .eq("patient_id", patient.id)
+    .in("status", ["pending_confirmation", "confirmed"]);
+
+  if (error) return { ok: false, error: t.errCancelFailed };
+
+  // Notify the clinic (and send the patient their own cancellation receipt) —
+  // same shared helper the token-based and owner-initiated cancel paths use.
+  await notifyCancellation(booking, false);
+
+  revalidatePath("/patient");
+  revalidatePath("/patient/bookings");
+  return { ok: true };
+};

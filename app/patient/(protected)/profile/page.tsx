@@ -1,18 +1,13 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { requireSession } from "@/lib/auth-session";
 import { getPatientProfile } from "@/lib/actions/patient";
-import { getPatientBookings } from "@/lib/booking/patient-data";
 import { Icon } from "@/components/ui/icon";
 import { Logo } from "@/components/ui/logo";
-import { PatientBookingsList } from "@/components/patient/patient-bookings-list";
+import { PatientProfileForm } from "@/components/patient/patient-profile-form";
 
-export default async function PatientBookingsPage() {
-  await requireSession();
+export default async function PatientProfilePage() {
   const profile = await getPatientProfile();
   if (!profile) redirect("/patient/login");
-
-  const bookings = await getPatientBookings(profile.id);
 
   return (
     <div className="min-h-screen bg-surface-2">
@@ -26,9 +21,19 @@ export default async function PatientBookingsPage() {
         </Link>
       </header>
 
-      <div className="mx-auto max-w-[680px] px-4 py-6 sm:px-8 sm:py-8">
-        <h1 className="mb-6 text-[24px]">Todas tus reservas</h1>
-        <PatientBookingsList bookings={bookings} />
+      <div className="mx-auto max-w-[520px] px-4 py-6 sm:px-8 sm:py-8">
+        <div className="mb-8">
+          <h1 className="mb-1 text-[24px]">Tu perfil</h1>
+          <p className="text-[15px] text-ink-soft">
+            Estos datos se comparten con las clínicas cuando reservas una cita.
+          </p>
+        </div>
+
+        <PatientProfileForm
+          initialName={profile.name}
+          initialContactEmail={profile.contactEmail}
+          initialPhone={profile.phone ?? ""}
+        />
       </div>
     </div>
   );

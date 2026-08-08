@@ -5,7 +5,7 @@ import { getPatientProfile } from "@/lib/actions/patient";
 import { getPatientBookings } from "@/lib/booking/patient-data";
 import { Icon } from "@/components/ui/icon";
 import { Logo } from "@/components/ui/logo";
-import { bookingPath } from "@/lib/business/booking-url";
+import { DashboardUpcomingList } from "@/components/patient/dashboard-upcoming-list";
 
 const TZ = "Europe/Madrid";
 
@@ -61,6 +61,12 @@ export default async function PatientDashboardPage() {
         <div className="flex items-center gap-3">
           <span className="hidden text-[13px] text-ink-soft sm:block">{session.user.email}</span>
           <Link
+            href="/patient/profile"
+            className="text-[13px] font-medium text-ink-soft hover:text-ink"
+          >
+            Perfil
+          </Link>
+          <Link
             href="/patient/bookings"
             className="text-[13px] font-medium text-ink-soft hover:text-ink"
           >
@@ -81,46 +87,7 @@ export default async function PatientDashboardPage() {
             Próximas ({upcoming.length})
           </h2>
 
-          {upcoming.length === 0 ? (
-            <div className="rounded-2xl border border-line bg-surface px-6 py-10 text-center">
-              <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-full bg-surface-2 text-ink-soft">
-                <Icon name="calendar" size={22} />
-              </div>
-              <p className="text-[14.5px] font-semibold text-ink">No tienes citas próximas</p>
-              <p className="mt-1 text-[13px] text-ink-soft">
-                Busca una clínica y reserva tu primera cita.
-              </p>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-2">
-              {upcoming.map((b) => (
-                <div
-                  key={b.id}
-                  className="flex items-center gap-4 rounded-xl border border-line bg-surface px-4 py-3.5"
-                >
-                  <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand-weak text-brand">
-                    <Icon name="calendar" size={18} />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="flex items-center gap-2 text-[14px] font-semibold text-ink">
-                      <span className="truncate">{b.serviceName}</span>
-                      {statusBadge(b.status)}
-                    </p>
-                    <p className="truncate text-[12.5px] text-ink-soft capitalize">
-                      {b.businessName} · {formatWhen(b.startsAt)}
-                    </p>
-                  </div>
-                  <Link
-                    href={bookingPath(b.businessSlug)}
-                    className="shrink-0 rounded-lg p-1.5 text-ink-soft hover:bg-surface-2 hover:text-ink"
-                    aria-label="Ver página del negocio"
-                  >
-                    <Icon name="externalLink" size={15} />
-                  </Link>
-                </div>
-              ))}
-            </div>
-          )}
+          <DashboardUpcomingList bookings={upcoming} />
         </section>
 
         {/* Past (last 3) */}
