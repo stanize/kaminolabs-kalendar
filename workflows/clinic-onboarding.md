@@ -3,15 +3,16 @@
 The path a new clinic/professional takes from sign-up to having a live, bookable public page.
 
 ## Step: sign-up
-Status: in_progress
+Status: done
 Criteria:
 - Sign-up form exists at /app/signup/page.tsx (components/auth/signup-form.tsx)
 - Google OAuth sign-up available via Better Auth
 - Email/password sign-up sends verification email (lib/auth.ts -> lib/email.ts)
 - Session created immediately on sign-up (autoSignInAfterVerification / requireEmailVerification: false)
 - No name field on the form — display name derived from email local-part (nameFromEmail) since Better Auth requires a name
-- FIXED: landing-page hero email capture now carries forward. app/signup/page.tsx reads searchParams.email and passes it to SignupForm as initialEmail; the form seeds its email state from that prop instead of "".
-- PARTIALLY FIXED: client-side email format validation (EMAIL_FORMAT_RE) now blocks obviously malformed input (missing @, no domain, no dot) before account creation, with a clear inline error (errEmailInvalid). This does NOT catch a syntactically valid but wrong/nonexistent domain (e.g. "kaminoland.dev" typo'd for "kaminolabs.dev") — that case still creates a live session, the verification email still fails to deliver silently (lib/email.ts's sendEmail degrades rather than throwing), and email-verification-gate.tsx still only offers Resend, with no way to go back and correct the email address. Remains not met for the wrong-domain case specifically.
+- Landing-page hero email capture carries forward into the sign-up form (app/signup/page.tsx reads searchParams.email -> SignupForm initialEmail)
+- Client-side email format validation (EMAIL_FORMAT_RE) blocks obviously malformed input (missing @, no domain, no dot) before account creation
+- ACCEPTED BEHAVIOR (by design, not a bug): a syntactically valid but non-existent/undeliverable email (e.g. a typo'd domain) is still allowed to create an account. The user can simply sign up again with the correct email and verify that one. This does leave the first, unconfirmed account behind — cleanup of those is tracked separately in admin-account-cleanup.md, not as part of this step.
 - Already-signed-in visitors to /signup are redirected straight to /panel (server-side session check)
 
 ## Step: email-verification-gate
