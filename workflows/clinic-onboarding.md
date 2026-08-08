@@ -73,7 +73,7 @@ Criteria:
 - setup-complete-banner.tsx reflects onboarding completion state
 
 ## Step: panel-home-gating
-Status: not_started
+Status: done
 Criteria:
 - Stats widgets (Hoy / Esta semana) are hidden until onboarding checklist is 100% complete
 - Accesos rápidos panel is hidden until onboarding checklist is 100% complete
