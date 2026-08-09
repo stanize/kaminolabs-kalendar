@@ -93,6 +93,9 @@ export function DashboardUpcomingList({ bookings }: { bookings: PatientBooking[]
             {["pending_confirmation", "confirmed"].includes(b.status) && (
               <PatientCancelButton
                 bookingId={b.id}
+                serviceName={b.serviceName}
+                businessName={b.businessName}
+                whenLabel={formatWhen(b.startsAt)}
                 labels={CANCEL_LABELS}
                 onCancelled={() => setCancelledIds((prev) => new Set(prev).add(b.id))}
               />

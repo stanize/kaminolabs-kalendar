@@ -91,6 +91,9 @@ export function PatientBookingsList({ bookings }: { bookings: PatientBooking[] }
           {cancellable && (
             <PatientCancelButton
               bookingId={b.id}
+              serviceName={b.serviceName}
+              businessName={b.businessName}
+              whenLabel={formatWhen(b.startsAt)}
               labels={CANCEL_LABELS}
               onCancelled={() => setCancelledIds((prev) => new Set(prev).add(b.id))}
             />
