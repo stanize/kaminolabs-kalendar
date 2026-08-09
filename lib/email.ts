@@ -95,14 +95,20 @@ export async function sendEmail({ to, subject, html, attachments }: SendEmailInp
  * selected on the home page navbar (read from the locale cookie), since
  * there's no business.language field yet to drive this properly.
  */
-export function verificationEmailHtml(url: string, locale: "es" | "en" = "es"): string {
+export function verificationEmailHtml(
+  url: string,
+  locale: "es" | "en" = "es",
+  audience: "clinic" | "patient" = "clinic"
+): string {
   const t =
     locale === "en"
       ? {
           heading: "Welcome to Kalendar!",
           greeting: "Hi,",
           intro:
-            "Thanks for creating your account. We're glad to have you here — just one step left before you can automate your clinic's admin work and spend more time on your clients.",
+            audience === "patient"
+              ? "Thanks for creating your account. Just one step left before you can book and manage your appointments."
+              : "Thanks for creating your account. We're glad to have you here — just one step left before you can automate your clinic's admin work and spend more time on your clients.",
           button: "Confirm my email",
           fallback: "If the button doesn't work, copy and paste this link into your browser:",
           ignore: "If you didn't create this account, you can ignore this message.",
@@ -111,7 +117,9 @@ export function verificationEmailHtml(url: string, locale: "es" | "en" = "es"): 
           heading: "¡Bienvenido a Kalendar!",
           greeting: "Hola,",
           intro:
-            "Gracias por crear tu cuenta. Nos alegra tenerte aquí — solo falta un paso para que puedas automatizar la gestión de tu clínica y dedicar más tiempo a tus clientes.",
+            audience === "patient"
+              ? "Gracias por crear tu cuenta. Solo falta un paso para que puedas reservar y gestionar tus citas."
+              : "Gracias por crear tu cuenta. Nos alegra tenerte aquí — solo falta un paso para que puedas automatizar la gestión de tu clínica y dedicar más tiempo a tus clientes.",
           button: "Confirmar mi email",
           fallback: "Si el botón no funciona, copia y pega este enlace en tu navegador:",
           ignore: "Si no has creado esta cuenta, puedes ignorar este mensaje.",

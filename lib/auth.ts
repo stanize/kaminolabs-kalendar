@@ -72,13 +72,28 @@ export const auth = betterAuth({
     expiresIn: 60 * 60 * 24, // 24h
     sendVerificationEmail: async ({ user, url }, request) => {
       const locale = localeFromRequest(request);
+      // sendVerificationEmail is one global Better Auth hook shared by both
+      // clinic sign-up (components/auth/signup-form.tsx) and patient
+      // sign-up (booking-wizard.tsx, patient-login-form.tsx) — there's no
+      // separate hook per audience. Both flows set a different callbackURL
+      // (clinic always goes to /panel; patient flows go to /patient or
+      // /bookings/...), and Better Auth embeds it as a query param on `url`,
+      // so we read it back out to pick the right copy instead of always
+      // showing clinic-oriented "automate your clinic" language to patients.
+      let audience: "clinic" | "patient" = "clinic";
+      try {
+        const callback = new URL(url).searchParams.get("callbackURL") ?? "";
+        if (callback && !callback.includes("/panel")) audience = "patient";
+      } catch {
+        // Malformed url — fall back to the clinic copy rather than guessing.
+      }
       await sendEmail({
         to: user.email,
         subject:
           locale === "en"
             ? "Welcome to Kalendar! Confirm your email"
             : "¡Bienvenido a Kalendar! Confirma tu email",
-        html: verificationEmailHtml(url, locale),
+        html: verificationEmailHtml(url, locale, audience),
       });
     },
   },
