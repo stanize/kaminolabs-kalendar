@@ -97,6 +97,7 @@ export default async function CalendarPage() {
           guestLocale: b.guestLocale,
           reminderSendFailed: b.reminderSendFailed,
           lastReminderError: b.lastReminderError,
+          cancellationRequestedAt: b.cancellationRequestedAt,
         }))}
         weekStartIso={weekStartIso}
       />

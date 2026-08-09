@@ -46,6 +46,10 @@ export interface WeekBookingVM {
   guestLocale: string | null;
   reminderSendFailed: boolean;
   lastReminderError: string | null;
+  // Set when a patient tried to self-cancel inside the clinic's
+  // cancellation window and is now awaiting owner approve/deny (see
+  // schema comment on kalendar_bookings.cancellation_requested_at).
+  cancellationRequestedAt: string | null;
 }
 
 export interface WeekServiceVM {
@@ -405,6 +409,9 @@ function DayProviderColumn({
               style={{ top, height }}
             >
               <div className="truncate">
+                {b.cancellationRequestedAt && (
+                  <span title="Solicitud de cancelación pendiente" className="mr-1 text-rose-600">🛑</span>
+                )}
                 {b.reminderSendFailed && (
                   <span title="Recordatorio no enviado" className="mr-1 text-amber-600">⚠</span>
                 )}

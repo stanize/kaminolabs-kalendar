@@ -43,18 +43,21 @@ const CANCEL_LABELS = {
   keep: "No",
 };
 
-// Owns local cancelled-status overrides so the row shows the "Cancelada"
-// badge the instant a cancellation succeeds — no page reload/refetch wait,
-// even though router.refresh() also runs in the background to resync.
+// Owns local cancelled/requested-status overrides so the row updates the
+// instant the action succeeds — no page reload/refetch wait, even though
+// router.refresh() also runs in the background to resync.
 export function DashboardUpcomingList({ bookings }: { bookings: PatientBooking[] }) {
   const [cancelledIds, setCancelledIds] = useState<Set<string>>(new Set());
+  const [requestedIds, setRequestedIds] = useState<Set<string>>(new Set());
 
   // Cancelled rows stay in place (badge flips to "Cancelada" instantly) rather
   // than disappearing — the patient gets immediate visual confirmation their
   // cancel action worked, without the list jumping around under them.
-  const visible = bookings.map((b) =>
-    cancelledIds.has(b.id) ? { ...b, status: "cancelled" as const } : b
-  );
+  const visible = bookings.map((b) => {
+    if (cancelledIds.has(b.id)) return { ...b, status: "cancelled" as const };
+    if (requestedIds.has(b.id)) return { ...b, cancellationRequestedAt: new Date().toISOString() };
+    return b;
+  });
 
   if (visible.length === 0) {
     return (
@@ -84,20 +87,29 @@ export function DashboardUpcomingList({ bookings }: { bookings: PatientBooking[]
             <p className="flex items-center gap-2 text-[14px] font-semibold text-ink">
               <span className="truncate">{b.serviceName}</span>
               {statusBadge(b.status)}
+              {b.cancellationRequestedAt && !cancelledIds.has(b.id) && (
+                <span className="shrink-0 rounded-full border border-line bg-surface-2 px-2.5 py-0.5 text-[11.5px] font-semibold text-ink-soft">
+                  Solicitud enviada
+                </span>
+              )}
             </p>
             <p className="truncate text-[12.5px] text-ink-soft capitalize">
               {b.businessName} · {formatWhen(b.startsAt)}
             </p>
           </div>
           <div className="ml-auto flex shrink-0 items-center gap-2">
-            {["pending_confirmation", "confirmed"].includes(b.status) && (
+            {["pending_confirmation", "confirmed"].includes(b.status) && !b.cancellationRequestedAt && (
               <PatientCancelButton
                 bookingId={b.id}
                 serviceName={b.serviceName}
                 businessName={b.businessName}
                 whenLabel={formatWhen(b.startsAt)}
                 labels={CANCEL_LABELS}
-                onCancelled={() => setCancelledIds((prev) => new Set(prev).add(b.id))}
+                onCancelled={(requested) =>
+                  requested
+                    ? setRequestedIds((prev) => new Set(prev).add(b.id))
+                    : setCancelledIds((prev) => new Set(prev).add(b.id))
+                }
               />
             )}
             <Link

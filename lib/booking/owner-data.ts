@@ -98,6 +98,7 @@ export interface WeekViewBooking {
   // the common case — only ever true when a 24h/1h reminder send threw.
   reminderSendFailed: boolean;
   lastReminderError: string | null;
+  cancellationRequestedAt: string | null;
 }
 
 export interface WeekViewService {
@@ -159,7 +160,7 @@ export async function getWeekCalendarData(
     supabase
       .from("kalendar_bookings")
       .select(
-        "id, service_id, service_name, service_duration_min, starts_at, ends_at, status, payment_status, client_name, client_email, client_phone, notes, team_member_id, pending_expiry_at, guest_locale, reminder_send_failed, last_reminder_error"
+        "id, service_id, service_name, service_duration_min, starts_at, ends_at, status, payment_status, client_name, client_email, client_phone, notes, team_member_id, pending_expiry_at, guest_locale, reminder_send_failed, last_reminder_error, cancellation_requested_at"
       )
       .eq("business_id", business.id)
       .gte("starts_at", weekStartIso)
@@ -193,6 +194,7 @@ export async function getWeekCalendarData(
           guest_locale: string | null;
           reminder_send_failed: boolean | null;
           last_reminder_error: string | null;
+          cancellation_requested_at: string | null;
         }[]
       | null) ?? []
   ).map((b) => ({
@@ -213,6 +215,7 @@ export async function getWeekCalendarData(
     guestLocale: b.guest_locale,
     reminderSendFailed: b.reminder_send_failed ?? false,
     lastReminderError: b.last_reminder_error,
+    cancellationRequestedAt: b.cancellation_requested_at,
   }));
 
   return {

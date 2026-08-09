@@ -46,10 +46,13 @@ const CANCEL_LABELS = {
 
 export function PatientBookingsList({ bookings }: { bookings: PatientBooking[] }) {
   const [cancelledIds, setCancelledIds] = useState<Set<string>>(new Set());
+  const [requestedIds, setRequestedIds] = useState<Set<string>>(new Set());
 
-  const visible = bookings.map((b) =>
-    cancelledIds.has(b.id) ? { ...b, status: "cancelled" as const } : b
-  );
+  const visible = bookings.map((b) => {
+    if (cancelledIds.has(b.id)) return { ...b, status: "cancelled" as const };
+    if (requestedIds.has(b.id)) return { ...b, cancellationRequestedAt: new Date().toISOString() };
+    return b;
+  });
 
   const upcoming = visible.filter(
     (b) => new Date(b.startsAt) >= new Date() && b.status !== "cancelled"
@@ -59,7 +62,8 @@ export function PatientBookingsList({ bookings }: { bookings: PatientBooking[] }
   );
 
   function BookingRow({ b }: { b: PatientBooking }) {
-    const cancellable = ["pending_confirmation", "confirmed"].includes(b.status);
+    const cancellable =
+      ["pending_confirmation", "confirmed"].includes(b.status) && !b.cancellationRequestedAt;
     return (
       <div className="flex flex-col gap-3 border-t border-line px-4 py-4 first:border-t-0 sm:flex-row sm:items-start">
         <div className="flex items-start gap-4">
@@ -70,6 +74,11 @@ export function PatientBookingsList({ bookings }: { bookings: PatientBooking[] }
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-[14px] font-semibold text-ink">{b.serviceName}</span>
               {statusBadge(b.status)}
+              {b.cancellationRequestedAt && b.status !== "cancelled" && (
+                <span className="shrink-0 rounded-full border border-line bg-surface-2 px-2.5 py-0.5 text-[11.5px] font-semibold text-ink-soft">
+                  Solicitud enviada
+                </span>
+              )}
             </div>
             <p className="mt-0.5 text-[13px] font-medium text-ink">{b.businessName}</p>
             <p className="capitalize text-[12.5px] text-ink-soft">{formatWhen(b.startsAt)}</p>
@@ -95,7 +104,11 @@ export function PatientBookingsList({ bookings }: { bookings: PatientBooking[] }
               businessName={b.businessName}
               whenLabel={formatWhen(b.startsAt)}
               labels={CANCEL_LABELS}
-              onCancelled={() => setCancelledIds((prev) => new Set(prev).add(b.id))}
+              onCancelled={(requested) =>
+                requested
+                  ? setRequestedIds((prev) => new Set(prev).add(b.id))
+                  : setCancelledIds((prev) => new Set(prev).add(b.id))
+              }
             />
           )}
         </div>

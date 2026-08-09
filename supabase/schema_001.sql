@@ -529,6 +529,14 @@ create table public.kalendar_bookings (
   -- the next successful send for that same window overwrites/clears it.
   reminder_send_failed boolean               not null default false,
   last_reminder_error  text,
+  -- Set when a patient tries to self-cancel inside the clinic's
+  -- cancellation_window_hours (kalendar_businesses) — the booking is NOT
+  -- cancelled outright; it stays in its current status (slot stays held,
+  -- per product decision) and waits for the owner to approve or deny via
+  -- the calendar booking-detail modal. NULL = no pending request. Cleared
+  -- (set back to null) on either approve (status also becomes 'cancelled')
+  -- or deny (status unchanged) — never left set after a decision.
+  cancellation_requested_at timestamptz,
   created_at           timestamptz           not null default now(),
   updated_at           timestamptz           not null default now()
 );
@@ -545,6 +553,9 @@ create index kalendar_bookings_expiry_idx       on public.kalendar_bookings (pen
 create index kalendar_bookings_reminder_due_idx on public.kalendar_bookings (starts_at)
   where status = 'confirmed'
     and (reminder_24h_sent_at is null or reminder_1h_sent_at is null);
+-- Owner calendar: find pending cancellation requests for a business quickly.
+create index kalendar_bookings_cancellation_requested_idx on public.kalendar_bookings (business_id)
+  where cancellation_requested_at is not null;
 
 -- NOTE: patient_id intentionally has no FK constraint in this file. The
 -- Supabase SQL editor validates all FK references against the live catalog

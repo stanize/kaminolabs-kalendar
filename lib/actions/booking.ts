@@ -12,6 +12,8 @@ import {
   ownerBookingNotificationHtml,
   bookingCancelledClientHtml,
   bookingCancelledOwnerHtml,
+  cancellationRequestOwnerHtml,
+  cancellationRequestDeniedClientHtml,
   formatBookingWhen,
   EMAIL_LOCALE,
 } from "@/lib/email";
@@ -664,4 +666,99 @@ export async function notifyCancellation(
       });
     }
   }
+}
+
+/**
+ * To the OWNER: a client's self-cancel attempt fell inside the clinic's
+ * cancellation window and became a request awaiting approve/deny (see
+ * kalendar_bookings.cancellation_requested_at). Called from
+ * lib/actions/patient.ts's cancelBookingAsPatient when the window blocks an
+ * immediate cancel. Always Spanish — owner-facing, not locale-branched.
+ */
+export async function notifyCancellationRequested(booking: {
+  business_id: string;
+  team_member_id: string | null;
+  service_name: string;
+  starts_at: string;
+  client_name: string;
+}): Promise<void> {
+  const supabase = await createClient();
+
+  const { data: biz } = await supabase
+    .from("kalendar_businesses")
+    .select("owner_id")
+    .eq("id", booking.business_id)
+    .maybeSingle();
+  if (!biz) return;
+
+  let providerName: string | null = null;
+  if (booking.team_member_id) {
+    const { data: m } = await supabase
+      .from("kalendar_team_members")
+      .select("name")
+      .eq("id", booking.team_member_id)
+      .maybeSingle();
+    providerName = m?.name ?? null;
+  }
+
+  const { data: owner } = await supabase
+    .from("user")
+    .select("email, emailVerified")
+    .eq("id", biz.owner_id)
+    .maybeSingle();
+  if (!owner?.email) return;
+
+  const prefix = owner.emailVerified ? "[Kalendar] " : "";
+  await sendEmail({
+    to: owner.email,
+    subject: `${prefix}Solicitud de cancelación: ${booking.service_name}`,
+    html: cancellationRequestOwnerHtml({
+      serviceName: booking.service_name,
+      whenLabel: formatBookingWhen(booking.starts_at),
+      clientName: booking.client_name,
+      providerName,
+    }),
+  });
+}
+
+/**
+ * To the CLIENT: the owner denied their cancellation request. Called from
+ * lib/actions/booking-owner.ts's reviewCancellationRequest on a deny
+ * decision. Mirrors notifyCancellation's client-facing branding/locale
+ * handling (business name + brand color in the header, guest_locale for
+ * copy) since this is a client-facing transactional email.
+ */
+export async function notifyCancellationRequestDenied(booking: {
+  business_id: string;
+  service_name: string;
+  starts_at: string;
+  client_name: string;
+  client_email: string;
+  guest_locale?: "es" | "en";
+}): Promise<void> {
+  const supabase = await createClient();
+
+  const { data: biz } = await supabase
+    .from("kalendar_businesses")
+    .select("name, brand_color")
+    .eq("id", booking.business_id)
+    .maybeSingle();
+  if (!biz) return;
+
+  const locale = booking.guest_locale ?? EMAIL_LOCALE;
+  await sendEmail({
+    to: booking.client_email,
+    subject:
+      locale === "en"
+        ? `About your cancellation request · ${biz.name}`
+        : `Sobre tu solicitud de cancelación · ${biz.name}`,
+    html: cancellationRequestDeniedClientHtml({
+      clientName: booking.client_name,
+      businessName: biz.name,
+      serviceName: booking.service_name,
+      whenLabel: formatBookingWhen(booking.starts_at, locale),
+      locale,
+      brandColor: biz.brand_color,
+    }),
+  });
 }

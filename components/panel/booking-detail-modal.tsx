@@ -7,6 +7,7 @@ import {
   cancelBookingAsOwner,
   confirmBookingAsOwner,
   updateBookingResult,
+  reviewCancellationRequest,
   type BookingResultStatus,
   type BookingPaymentStatus,
 } from "@/lib/actions/booking-owner";
@@ -63,6 +64,16 @@ export function BookingDetailModal({
     setBusy(true);
     setError(null);
     const res = await confirmBookingAsOwner(booking.id, dict.errors);
+    setBusy(false);
+    if (!res.ok) { setError(res.error); return; }
+    onUpdated();
+    onClose();
+  };
+
+  const handleReviewRequest = async (decision: "approve" | "deny") => {
+    setBusy(true);
+    setError(null);
+    const res = await reviewCancellationRequest(booking.id, decision, dict.errors);
     setBusy(false);
     if (!res.ok) { setError(res.error); return; }
     onUpdated();
@@ -141,6 +152,37 @@ export function BookingDetailModal({
               {d.notesLabel}
             </p>
             <p className="whitespace-pre-wrap text-ink">{booking.notes}</p>
+          </div>
+        )}
+
+        {booking.cancellationRequestedAt && (
+          <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-3">
+            <p className="mb-1 flex items-center gap-1.5 text-[13.5px] font-semibold text-rose-800">
+              <Icon name="bell" size={14} className="shrink-0" />
+              Solicitud de cancelación pendiente
+            </p>
+            <p className="mb-3 text-[12.5px] text-rose-700">
+              El cliente ha pedido cancelar esta cita, pero está dentro de tu ventana de
+              cancelación y necesita tu aprobación. La cita sigue reservada mientras decides.
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => handleReviewRequest("approve")}
+                disabled={busy}
+                className="flex-1 rounded-lg bg-error px-3 py-2 text-[13px] font-semibold text-white transition-colors hover:brightness-95 disabled:opacity-60"
+              >
+                Aprobar cancelación
+              </button>
+              <button
+                type="button"
+                onClick={() => handleReviewRequest("deny")}
+                disabled={busy}
+                className="flex-1 rounded-lg border border-line bg-surface px-3 py-2 text-[13px] font-semibold text-ink-soft transition-colors hover:bg-surface-2 disabled:opacity-60"
+              >
+                Denegar
+              </button>
+            </div>
           </div>
         )}
 

@@ -355,6 +355,77 @@ export function bookingCancelledOwnerHtml(input: {
   return emailShell(body, "Kalendar · Reservas y agenda para tu clínica", "Kalendar");
 }
 
+/**
+ * To the OWNER: a client tried to self-cancel inside the clinic's
+ * cancellation window (kalendar_businesses.cancellation_window_hours), so
+ * instead of cancelling outright it became a request awaiting the owner's
+ * approve/deny in the calendar booking-detail modal. Always Spanish —
+ * owner-facing emails aren't locale-branched (see EMAIL_LOCALE usage below).
+ */
+export function cancellationRequestOwnerHtml(input: {
+  serviceName: string;
+  whenLabel: string;
+  clientName: string;
+  providerName?: string | null;
+}): string {
+  const { serviceName, whenLabel, clientName, providerName } = input;
+  const rows = [
+    { label: "Servicio", value: serviceName },
+    { label: "Cuándo", value: whenLabel },
+    ...(providerName ? [{ label: "Profesional", value: providerName }] : []),
+    { label: "Cliente", value: clientName },
+  ];
+  const body = `
+    <h1 style="font-size:19px;margin:0 0 12px;">Solicitud de cancelación</h1>
+    ${emailBadge("Pendiente de tu revisión", "info")}
+    <p style="font-size:15px;line-height:1.6;margin:0 0 18px;">
+      Un cliente ha pedido cancelar esta cita, pero está dentro de tu ventana de cancelación —
+      necesita tu aprobación. La cita sigue reservada mientras tanto. Revísala desde tu calendario.
+    </p>
+    ${emailInfoBox(rows)}`;
+  return emailShell(body, "Kalendar · Reservas y agenda para tu clínica", "Kalendar");
+}
+
+/**
+ * To the CLIENT: the owner denied their cancellation request — the
+ * appointment stands as originally booked. Locale-branched and business-
+ * branded like other client-facing emails (bookingCancelledClientHtml).
+ */
+export function cancellationRequestDeniedClientHtml(input: {
+  clientName: string;
+  businessName: string;
+  serviceName: string;
+  whenLabel: string;
+  locale: "es" | "en";
+  brandColor?: string | null;
+}): string {
+  const { clientName, businessName, serviceName, whenLabel, locale, brandColor } = input;
+  const t =
+    locale === "en"
+      ? {
+          title: "Your cancellation request wasn't approved",
+          greeting: `Hi ${clientName || "there"},`,
+          body: `${businessName} reviewed your cancellation request and wasn't able to approve it. Your appointment below is still confirmed.`,
+          service: "Service", when: "When",
+        }
+      : {
+          title: "Tu solicitud de cancelación no fue aprobada",
+          greeting: `Hola ${clientName || ""},`,
+          body: `${businessName} ha revisado tu solicitud de cancelación y no ha podido aprobarla. Tu cita sigue confirmada.`,
+          service: "Servicio", when: "Cuándo",
+        };
+  const rows = [
+    { label: t.service, value: serviceName },
+    { label: t.when, value: whenLabel },
+  ];
+  const body = `
+    <h1 style="font-size:19px;margin:0 0 12px;">${t.title}</h1>
+    <p style="font-size:15px;line-height:1.6;margin:0 0 6px;">${t.greeting}</p>
+    <p style="font-size:15px;line-height:1.6;margin:0 0 18px;">${t.body}</p>
+    ${emailInfoBox(rows)}`;
+  return emailShell(body, "Kalendar · Reservas y agenda para tu clínica", businessName, brandColor);
+}
+
 function escapeHtml(s: string): string {
   return s
     .replace(/&/g, "&amp;")

@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { authedAction } from "@/lib/auth-action";
 import { createClient } from "@/lib/supabase/server";
 import { getBusinessForUser } from "@/lib/business/data";
-import { notifyCancellation } from "@/lib/actions/booking";
+import { notifyCancellation, notifyCancellationRequestDenied } from "@/lib/actions/booking";
 import { getWeekBookings, type WeekViewBooking } from "@/lib/booking/owner-data";
 import { buildBookingIcsBase64 } from "@/lib/booking/ics";
 import { formatBusinessAddress } from "@/lib/business/data";
@@ -78,6 +78,69 @@ export const cancelBookingAsOwner = authedAction(
 
     // Notify the client their booking was cancelled by the business.
     await notifyCancellation(booking, true);
+
+    revalidatePath("/panel/calendar");
+    revalidatePath("/panel");
+    return { ok: true };
+  }
+);
+
+/**
+ * Approves or denies a patient's cancellation request (see
+ * kalendar_bookings.cancellation_requested_at). Approve behaves exactly like
+ * cancelBookingAsOwner (status → cancelled, client gets the standard
+ * cancellation receipt) plus clears the request flag. Deny clears the flag
+ * only — status is untouched, booking stands, and the client gets a
+ * dedicated "request denied" email rather than a cancellation receipt.
+ * Scoped to the caller's business.
+ */
+export const reviewCancellationRequest = authedAction(
+  async (
+    session,
+    bookingId: string,
+    decision: "approve" | "deny",
+    dict?: Partial<BookingOwnerActionDict>
+  ): Promise<OwnerBookingResult> => {
+    const t = { ...FALLBACK, ...dict };
+
+    const business = await getBusinessForUser(session.user.id);
+    if (!business) return { ok: false, error: t.errNoBusiness };
+
+    const supabase = await createClient();
+
+    const { data: booking } = await supabase
+      .from("kalendar_bookings")
+      .select(
+        "id, status, business_id, team_member_id, service_name, starts_at, client_name, client_email, guest_locale, cancellation_requested_at"
+      )
+      .eq("id", bookingId)
+      .eq("business_id", business.id)
+      .maybeSingle();
+
+    if (!booking) return { ok: false, error: t.errNotFound };
+    if (!booking.cancellation_requested_at) {
+      return { ok: false, error: t.errCannotCancel };
+    }
+
+    if (decision === "approve") {
+      const { error } = await supabase
+        .from("kalendar_bookings")
+        .update({ status: "cancelled", cancellation_requested_at: null })
+        .eq("id", bookingId)
+        .eq("business_id", business.id);
+      if (error) return { ok: false, error: t.errCancelFailed };
+
+      await notifyCancellation(booking, true);
+    } else {
+      const { error } = await supabase
+        .from("kalendar_bookings")
+        .update({ cancellation_requested_at: null })
+        .eq("id", bookingId)
+        .eq("business_id", business.id);
+      if (error) return { ok: false, error: t.errCancelFailed };
+
+      await notifyCancellationRequestDenied(booking);
+    }
 
     revalidatePath("/panel/calendar");
     revalidatePath("/panel");

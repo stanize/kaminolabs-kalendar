@@ -11,6 +11,11 @@ export interface PatientBooking {
   endsAt: string;
   status: "pending_confirmation" | "confirmed" | "cancelled" | "completed";
   providerName: string | null;
+  // Non-null when the patient tried to self-cancel inside the clinic's
+  // cancellation window and it's now awaiting owner approve/deny — status
+  // stays whatever it was (confirmed/pending_confirmation), this is a
+  // separate flag layered on top, not a new status value.
+  cancellationRequestedAt: string | null;
 }
 
 /**
@@ -31,6 +36,7 @@ export async function getPatientBookings(patientId: string): Promise<PatientBook
       ends_at,
       status,
       team_member_id,
+      cancellation_requested_at,
       kalendar_businesses!inner (
         name,
         slug
@@ -63,6 +69,7 @@ export async function getPatientBookings(patientId: string): Promise<PatientBook
       endsAt: b.ends_at,
       status: b.status,
       providerName: member?.name ?? null,
+      cancellationRequestedAt: b.cancellation_requested_at,
     };
   });
 }

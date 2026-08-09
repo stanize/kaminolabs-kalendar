@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { assignRole, getUserRoles } from "@/lib/roles/data";
 import { requireSession } from "@/lib/auth-session";
-import { notifyCancellation } from "@/lib/actions/booking";
+import { notifyCancellation, notifyCancellationRequested } from "@/lib/actions/booking";
 
 export type ProvisionResult =
   | { ok: true; patientId: string }
@@ -177,27 +177,36 @@ export const updatePatientProfile = async (
 // ── Self-service cancel ─────────────────────────────────────────────────────
 
 export type CancelPatientBookingResult =
-  | { ok: true }
+  | { ok: true; requested: boolean } // requested=true means blocked by the
+    // cancellation window and submitted as a request instead of cancelled
   | { ok: false; error: string };
 
 export interface CancelPatientBookingDict {
   errNotFound: string;
   errCannotCancel: string;
   errCancelFailed: string;
+  errAlreadyRequested: string;
 }
 
 const CANCEL_FALLBACK: CancelPatientBookingDict = {
   errNotFound: "Reserva no encontrada.",
   errCannotCancel: "Esta reserva ya no se puede cancelar.",
   errCancelFailed: "No se pudo cancelar la reserva.",
+  errAlreadyRequested: "Ya has solicitado cancelar esta reserva.",
 };
 
 /**
- * Cancels a booking from the patient portal. Scoped to the caller's own
- * patient_id — a patient can only cancel their own bookings, never another
- * patient's or a guest booking. Same effect as the emailed cancel-token link
- * (frees the slot, notifies the clinic) — this is just a second entry point
- * for a patient who's already signed in and doesn't need the email link.
+ * Cancels a booking from the patient portal, or — if the appointment falls
+ * inside the clinic's cancellation_window_hours (kalendar_businesses) —
+ * submits a cancellation REQUEST instead, which the owner must approve or
+ * deny (calendar booking-detail modal). The slot stays held either way
+ * while a request is pending (product decision: no other booking can take
+ * it until the owner decides). window_hours = 0 means the window is
+ * disabled, so self-cancel is always immediate regardless of how close the
+ * appointment is — matches pre-window behavior.
+ *
+ * Scoped to the caller's own patient_id — a patient can only cancel/request
+ * on their own bookings, never another patient's or a guest booking.
  */
 export const cancelBookingAsPatient = async (
   bookingId: string,
@@ -225,7 +234,7 @@ export const cancelBookingAsPatient = async (
   const { data: booking } = await supabase
     .from("kalendar_bookings")
     .select(
-      "id, status, business_id, team_member_id, service_name, starts_at, client_name, client_email, guest_locale, patient_id"
+      "id, status, business_id, team_member_id, service_name, starts_at, client_name, client_email, guest_locale, patient_id, cancellation_requested_at"
     )
     .eq("id", bookingId)
     .eq("patient_id", patient.id)
@@ -234,6 +243,37 @@ export const cancelBookingAsPatient = async (
   if (!booking) return { ok: false, error: t.errNotFound };
   if (!["pending_confirmation", "confirmed"].includes(booking.status)) {
     return { ok: false, error: t.errCannotCancel };
+  }
+  if (booking.cancellation_requested_at) {
+    return { ok: false, error: t.errAlreadyRequested };
+  }
+
+  const { data: business } = await supabase
+    .from("kalendar_businesses")
+    .select("cancellation_window_hours")
+    .eq("id", booking.business_id)
+    .maybeSingle();
+
+  const windowHours = business?.cancellation_window_hours ?? 24;
+  const hoursUntilStart = (new Date(booking.starts_at).getTime() - Date.now()) / (1000 * 60 * 60);
+  const insideWindow = windowHours > 0 && hoursUntilStart < windowHours;
+
+  if (insideWindow) {
+    const { error } = await supabase
+      .from("kalendar_bookings")
+      .update({ cancellation_requested_at: new Date().toISOString() })
+      .eq("id", bookingId)
+      .eq("patient_id", patient.id)
+      .in("status", ["pending_confirmation", "confirmed"])
+      .is("cancellation_requested_at", null);
+
+    if (error) return { ok: false, error: t.errCancelFailed };
+
+    await notifyCancellationRequested(booking);
+
+    revalidatePath("/patient");
+    revalidatePath("/patient/bookings");
+    return { ok: true, requested: true };
   }
 
   const { error } = await supabase
@@ -251,5 +291,5 @@ export const cancelBookingAsPatient = async (
 
   revalidatePath("/patient");
   revalidatePath("/patient/bookings");
-  return { ok: true };
+  return { ok: true, requested: false };
 };
