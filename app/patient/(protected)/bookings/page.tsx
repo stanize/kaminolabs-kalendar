@@ -13,7 +13,7 @@ export default async function PatientBookingsPage() {
   const bookings = await getPatientBookings(profile.id);
 
   return (
-    <div className="min-h-screen bg-surface-2">
+    <div className="min-h-dvh bg-surface-2">
       <PatientHeader current="bookings" />
 
       <div className="mx-auto max-w-[680px] px-4 py-6 sm:px-8 sm:py-8">

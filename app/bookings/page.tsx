@@ -12,7 +12,7 @@ export default async function BookingsDirectoryPage() {
   const businesses = await getActiveBusinesses();
 
   return (
-    <div className="mx-auto min-h-screen max-w-[720px] px-5 py-16 sm:px-8">
+    <div className="mx-auto min-h-dvh max-w-[720px] px-5 py-16 sm:px-8">
       <header className="mb-10">
         <h1 className="text-[clamp(28px,4vw,40px)] leading-[1.1]">Clínicas y profesionales</h1>
         <p className="mt-3 text-[16px] leading-relaxed text-ink-soft">

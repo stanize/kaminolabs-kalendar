@@ -55,7 +55,7 @@ export default async function PatientDashboardPage() {
   const firstName = session.user.name?.split(" ")[0] ?? "Cliente";
 
   return (
-    <div className="min-h-screen bg-surface-2">
+    <div className="min-h-dvh bg-surface-2">
       {/* Top bar */}
       <PatientHeader current="home" email={session.user.email} />
 

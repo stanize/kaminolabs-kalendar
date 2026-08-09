@@ -34,7 +34,7 @@ export default async function PatientLoginPage({
   }
 
   return (
-    <div className="grid min-h-screen items-start justify-items-center bg-surface-2 px-5 pb-12 pt-16 sm:pt-20">
+    <div className="grid min-h-dvh items-start justify-items-center bg-surface-2 px-5 pb-12 pt-16 sm:pt-20">
       <div className="w-full max-w-[420px]">
         <PatientAuthCard redirectTo={redirectTo} />
 

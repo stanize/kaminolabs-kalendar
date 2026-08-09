@@ -21,7 +21,7 @@ export default async function CancelBookingPage({
   const dict = getBookingResultDictionary(guestLocale).cancel;
 
   return (
-    <div className="grid min-h-screen place-items-center bg-surface-2 px-5 py-16">
+    <div className="grid min-h-dvh place-items-center bg-surface-2 px-5 py-16">
       <div className="w-full max-w-[460px] rounded-2xl border border-line bg-surface p-8 text-center shadow-[0_12px_40px_rgba(15,31,46,.08)]">
         <div className="mb-6 flex justify-center">
           <Logo size={18} />

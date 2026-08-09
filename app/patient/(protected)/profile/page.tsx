@@ -8,7 +8,7 @@ export default async function PatientProfilePage() {
   if (!profile) redirect("/patient/login");
 
   return (
-    <div className="min-h-screen bg-surface-2">
+    <div className="min-h-dvh bg-surface-2">
       <PatientHeader current="profile" />
 
       <div className="mx-auto max-w-[520px] px-4 py-6 sm:px-8 sm:py-8">

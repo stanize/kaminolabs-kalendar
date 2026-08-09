@@ -70,8 +70,13 @@ export function BookingPageShell({
     setPatient(null);
   }
 
+  // min-h-dvh (not min-h-screen/100vh) — on iOS Safari, 100vh is measured
+  // against the collapsed-address-bar viewport, so the page's computed
+  // height shifts under the user as the address bar shows/hides during
+  // scroll. That can trap scroll position and make the top of the page
+  // unreachable. 100dvh tracks the actual visible viewport instead.
   return (
-    <div className="min-h-screen bg-surface-2 px-5 py-10">
+    <div className="min-h-dvh bg-surface-2 px-5 py-10">
       <div className="mx-auto w-full max-w-[560px]">
         {/* Top bar: language switcher + account/sign-in link */}
         <div className="mb-4 flex items-center justify-between">
