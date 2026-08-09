@@ -44,6 +44,15 @@ Criteria:
 - Cancelling frees the slot (active-slot unique index excludes cancelled rows)
 - Client is notified by email on owner-initiated cancellation (best-effort, notifyCancellation)
 
+## Step: cancellation-request-review
+Status: not_started
+Criteria:
+- A booking within 24h of its start time that a patient tries to self-cancel produces a cancellation *request* rather than an immediate cancel (see patient-portal.md's self-service-cancel step for the patient-facing half of this)
+- Pending cancellation requests are visible to the owner somewhere in the calendar view (e.g. a distinct badge/tab, similar to the existing Pendientes tab pattern for guest confirmation requests)
+- Owner can approve a request (booking becomes cancelled, slot frees, patient notified)
+- Owner can deny a request (booking stays as-is, patient notified with the denial)
+- Decision needed: does the slot stay held (blocking other bookings) or open up while a request is pending?
+
 ## Step: reminder-failure-visibility
 Status: done
 Criteria:
