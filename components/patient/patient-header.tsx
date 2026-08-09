@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { Icon } from "@/components/ui/icon";
 import { Logo } from "@/components/ui/logo";
 
 export type PatientPage = "home" | "profile" | "bookings";
@@ -36,8 +35,8 @@ export function PatientHeader({
         )}
 
         {current !== "home" && (
-          <Link href="/patient" className={`flex items-center gap-1.5 ${navLinkClass}`}>
-            <Icon name="chevronLeft" size={15} /> Inicio
+          <Link href="/patient" className={navLinkClass}>
+            Inicio
           </Link>
         )}
         {current !== "profile" && (
