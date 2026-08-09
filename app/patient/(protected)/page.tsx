@@ -2,10 +2,10 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { requireSession } from "@/lib/auth-session";
 import { getPatientProfile } from "@/lib/actions/patient";
-import { getPatientBookings } from "@/lib/booking/patient-data";
+import { getPatientBookings, getMostRecentBookingClinic } from "@/lib/booking/patient-data";
 import { Icon } from "@/components/ui/icon";
-import { Logo } from "@/components/ui/logo";
 import { DashboardUpcomingList } from "@/components/patient/dashboard-upcoming-list";
+import { PatientHeader } from "@/components/patient/patient-header";
 
 const TZ = "Europe/Madrid";
 
@@ -42,6 +42,7 @@ export default async function PatientDashboardPage() {
   if (!profile) redirect("/patient/login");
 
   const allBookings = await getPatientBookings(profile.id);
+  const bookAgainClinic = await getMostRecentBookingClinic(profile.id);
   const now = new Date();
 
   const upcoming = allBookings.filter(
@@ -56,24 +57,7 @@ export default async function PatientDashboardPage() {
   return (
     <div className="min-h-screen bg-surface-2">
       {/* Top bar */}
-      <header className="sticky top-0 z-10 flex items-center justify-between border-b border-line bg-surface px-4 py-3 sm:px-8">
-        <Logo size={17} />
-        <div className="flex items-center gap-3">
-          <span className="hidden text-[13px] text-ink-soft sm:block">{session.user.email}</span>
-          <Link
-            href="/patient/profile"
-            className="text-[13px] font-medium text-ink-soft hover:text-ink"
-          >
-            Perfil
-          </Link>
-          <Link
-            href="/patient/bookings"
-            className="text-[13px] font-medium text-ink-soft hover:text-ink"
-          >
-            Todas las reservas
-          </Link>
-        </div>
-      </header>
+      <PatientHeader current="home" email={session.user.email} bookAgainClinic={bookAgainClinic} />
 
       <div className="mx-auto max-w-[680px] px-4 py-6 sm:px-8 sm:py-8">
         <div className="mb-6">

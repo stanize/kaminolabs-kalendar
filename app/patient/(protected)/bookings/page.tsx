@@ -1,11 +1,9 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { requireSession } from "@/lib/auth-session";
 import { getPatientProfile } from "@/lib/actions/patient";
-import { getPatientBookings } from "@/lib/booking/patient-data";
-import { Icon } from "@/components/ui/icon";
-import { Logo } from "@/components/ui/logo";
+import { getPatientBookings, getMostRecentBookingClinic } from "@/lib/booking/patient-data";
 import { PatientBookingsList } from "@/components/patient/patient-bookings-list";
+import { PatientHeader } from "@/components/patient/patient-header";
 
 export default async function PatientBookingsPage() {
   await requireSession();
@@ -13,18 +11,11 @@ export default async function PatientBookingsPage() {
   if (!profile) redirect("/patient/login");
 
   const bookings = await getPatientBookings(profile.id);
+  const bookAgainClinic = await getMostRecentBookingClinic(profile.id);
 
   return (
     <div className="min-h-screen bg-surface-2">
-      <header className="sticky top-0 z-10 flex items-center justify-between border-b border-line bg-surface px-4 py-3 sm:px-8">
-        <Logo size={17} />
-        <Link
-          href="/patient"
-          className="flex items-center gap-1.5 text-[13px] font-medium text-ink-soft hover:text-ink"
-        >
-          <Icon name="chevronLeft" size={15} /> Inicio
-        </Link>
-      </header>
+      <PatientHeader current="bookings" bookAgainClinic={bookAgainClinic} />
 
       <div className="mx-auto max-w-[680px] px-4 py-6 sm:px-8 sm:py-8">
         <h1 className="mb-6 text-[24px]">Todas tus reservas</h1>

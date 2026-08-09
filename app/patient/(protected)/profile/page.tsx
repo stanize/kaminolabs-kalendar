@@ -1,25 +1,18 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { getPatientProfile } from "@/lib/actions/patient";
-import { Icon } from "@/components/ui/icon";
-import { Logo } from "@/components/ui/logo";
+import { getMostRecentBookingClinic } from "@/lib/booking/patient-data";
 import { PatientProfileForm } from "@/components/patient/patient-profile-form";
+import { PatientHeader } from "@/components/patient/patient-header";
 
 export default async function PatientProfilePage() {
   const profile = await getPatientProfile();
   if (!profile) redirect("/patient/login");
 
+  const bookAgainClinic = await getMostRecentBookingClinic(profile.id);
+
   return (
     <div className="min-h-screen bg-surface-2">
-      <header className="sticky top-0 z-10 flex items-center justify-between border-b border-line bg-surface px-4 py-3 sm:px-8">
-        <Logo size={17} />
-        <Link
-          href="/patient"
-          className="flex items-center gap-1.5 text-[13px] font-medium text-ink-soft hover:text-ink"
-        >
-          <Icon name="chevronLeft" size={15} /> Inicio
-        </Link>
-      </header>
+      <PatientHeader current="profile" bookAgainClinic={bookAgainClinic} />
 
       <div className="mx-auto max-w-[520px] px-4 py-6 sm:px-8 sm:py-8">
         <div className="mb-8">
