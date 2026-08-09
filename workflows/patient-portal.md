@@ -2,6 +2,14 @@
 
 A simple portal where a patient/client can log in and see their booking history across clinics — separate from the clinic-facing panel.
 
+## Step: forgot-password
+Status: done
+Criteria:
+- patient-login-form.tsx links to /forgot-password?from=patient (plus redirectTo when present)
+- Better Auth's sendResetPassword is wired in lib/auth.ts, sends a reset email with a 1h-expiring token
+- /forgot-password and /reset-password pages exist and handle the from=patient context specifically, so the flow returns the patient to the right place after resetting
+- redirectTo is validated as same-site-relative before being re-embedded in the /reset-password link (no open-redirect risk), consistent with the same guard used on /patient/login
+
 ## Step: patient-auth
 Status: done
 Criteria:
