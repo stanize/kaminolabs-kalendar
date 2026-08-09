@@ -16,15 +16,21 @@ export interface CalendarDictionary {
     tabWeek: string;
     tabUpcoming: string;
     tabPending: string;
+    tabCancellations: string;
     pendingLabel: string; // the small badge on a pending booking row
+    cancellationRequestedLabel: string; // the small badge on a cancellation-request row
     today: string;
     tomorrow: string;
     emptyPendingTitle: string;
+    emptyCancellationsTitle: string;
     emptyUpcomingTitle: string;
     emptySubtitle: string;
     cancel: string;
     confirm: string;
     confirming: string;
+    approveCancellation: string;
+    denyCancellation: string;
+    reviewing: string;
     minutesUnit: string;
     errCancelFailed: string;
     expiresIn: string; // e.g. "Caduca en {h}h {m}m" — {h} and {m} replaced client-side
@@ -127,15 +133,21 @@ const es: CalendarDictionary = {
     tabWeek: "Semana",
     tabUpcoming: "Próximas",
     tabPending: "Pendientes",
+    tabCancellations: "Cancelaciones",
     pendingLabel: "Pendiente",
+    cancellationRequestedLabel: "Cancelación solicitada",
     today: "Hoy",
     tomorrow: "Mañana",
     emptyPendingTitle: "No hay reservas pendientes",
+    emptyCancellationsTitle: "No hay solicitudes de cancelación",
     emptyUpcomingTitle: "No tienes reservas próximas",
     emptySubtitle: "Las reservas de tu página aparecerán aquí.",
     cancel: "Cancelar",
     confirm: "Confirmar",
     confirming: "Confirmando…",
+    approveCancellation: "Aprobar",
+    denyCancellation: "Denegar",
+    reviewing: "Guardando…",
     minutesUnit: "min",
     errCancelFailed: "No se pudo cancelar. Inténtalo de nuevo.",
     expiresIn: "Caduca en {h}h {m}m",
@@ -235,15 +247,21 @@ const en: CalendarDictionary = {
     tabWeek: "Week",
     tabUpcoming: "Upcoming",
     tabPending: "Pending",
+    tabCancellations: "Cancellations",
     pendingLabel: "Pending",
+    cancellationRequestedLabel: "Cancellation requested",
     today: "Today",
     tomorrow: "Tomorrow",
     emptyPendingTitle: "No pending bookings",
+    emptyCancellationsTitle: "No cancellation requests",
     emptyUpcomingTitle: "You have no upcoming bookings",
     emptySubtitle: "Bookings from your page will show up here.",
     cancel: "Cancel",
     confirm: "Confirm",
     confirming: "Confirming…",
+    approveCancellation: "Approve",
+    denyCancellation: "Deny",
+    reviewing: "Saving…",
     minutesUnit: "min",
     errCancelFailed: "Couldn't cancel. Please try again.",
     expiresIn: "Expires in {h}h {m}m",

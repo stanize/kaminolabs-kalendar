@@ -109,10 +109,10 @@ export function PatientCancelButton({
                     <Icon name="check" size={18} strokeWidth={2.5} />
                   </div>
                   <div>
-                    <h2 className="text-[16px] font-bold text-ink">Solicitud enviada</h2>
+                    <h2 className="text-[16px] font-bold text-ink">Cancelación solicitada</h2>
                     <p className="mt-0.5 text-[13.5px] text-ink-soft">
-                      Esta cita está muy próxima, así que hemos avisado a la clínica y están
-                      revisando tu solicitud. Tu cita sigue reservada mientras tanto.
+                      Está fuera del plazo de cancelación gratuita, así que la clínica debe
+                      aprobarlo. Tu cita sigue reservada mientras tanto.
                     </p>
                   </div>
                 </div>
@@ -133,8 +133,8 @@ export function PatientCancelButton({
                   <div>
                     <h2 className="text-[16px] font-bold text-ink">¿Cancelar esta cita?</h2>
                     <p className="mt-0.5 text-[13.5px] text-ink-soft">
-                      Si la cita está muy próxima, puede que necesite la aprobación de la clínica
-                      en vez de cancelarse al momento. Se avisará a la clínica.
+                      Puede estar fuera del plazo de cancelación gratuita de la clínica y
+                      necesitar su aprobación.
                     </p>
                   </div>
                 </div>

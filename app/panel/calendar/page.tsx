@@ -73,6 +73,7 @@ export default async function CalendarPage() {
           providerName: b.provider_name,
           pendingExpiryAt: b.pending_expiry_at,
           guestLocale: (b.guest_locale ?? "es") as "es" | "en",
+          cancellationRequestedAt: b.cancellation_requested_at,
         }))}
         weekMembers={(weekData?.members ?? []).map((m) => ({ id: m.id, name: m.name, isOwner: m.isOwner }))}
         weekHoursByDay={weekData?.hoursByDay ?? {}}

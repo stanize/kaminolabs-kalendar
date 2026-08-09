@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
-import { cancelBookingAsOwner, confirmBookingAsOwner, fetchWeekBookings } from "@/lib/actions/booking-owner";
+import { cancelBookingAsOwner, confirmBookingAsOwner, fetchWeekBookings, reviewCancellationRequest } from "@/lib/actions/booking-owner";
 import { CalendarHeader, type CalendarViewMode } from "@/components/panel/calendar-header";
 import {
   CalendarGridView,
@@ -43,6 +43,7 @@ interface BookingVM {
   providerName: string | null;
   pendingExpiryAt: string | null;
   guestLocale: "es" | "en";
+  cancellationRequestedAt: string | null;
 }
 
 const TZ = "Europe/Madrid";
@@ -110,7 +111,7 @@ export function CalendarBookings({
 }) {
   const router = useRouter();
   const m = dict.manager;
-  const [tab, setTab] = useState<"week" | "pending">("week");
+  const [tab, setTab] = useState<"week" | "pending" | "cancellations">("week");
   const [list, setList] = useState<BookingVM[]>(bookings);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -223,6 +224,19 @@ export function CalendarBookings({
       return new Date(a.pendingExpiryAt).getTime() - new Date(b.pendingExpiryAt).getTime();
     });
 
+  // Cancelaciones tab: bookings with a pending patient cancellation request
+  // (see kalendar_bookings.cancellation_requested_at) — status stays
+  // pending_confirmation/confirmed, this is a separate flag layered on top,
+  // so it's filtered independently of the "pending" (awaiting confirmation)
+  // list above rather than being a status value itself. Soonest-requested
+  // first, same ordering rationale as the Pendientes tab's expiry sort.
+  const cancellationCount = list.filter((b) => b.cancellationRequestedAt).length;
+  const cancellations = [...list]
+    .filter((b) => b.cancellationRequestedAt)
+    .sort((a, b) =>
+      new Date(a.cancellationRequestedAt!).getTime() - new Date(b.cancellationRequestedAt!).getTime()
+    );
+
   const handleCancel = useCallback(async (id: string) => {
     setError(null);
     setBusyId(id);
@@ -256,6 +270,29 @@ export function CalendarBookings({
     }
   }, [list, dict.errors, m.errCancelFailed, router]);
 
+  const handleReviewRequest = useCallback(async (id: string, decision: "approve" | "deny") => {
+    setError(null);
+    setBusyId(id);
+    const prev = list;
+    // Optimistic: approve removes it from the list (cancelled → filtered out
+    // by the pending/confirmed status check elsewhere); deny just clears the
+    // request flag and the row disappears from this tab either way.
+    setList((l) =>
+      decision === "approve"
+        ? l.map((b) => b.id === id ? { ...b, status: "cancelled" as Status, cancellationRequestedAt: null } : b)
+        : l.map((b) => b.id === id ? { ...b, cancellationRequestedAt: null } : b)
+    );
+    try {
+      const res = await reviewCancellationRequest(id, decision, dict.errors);
+      if (!res.ok) { setList(prev); setError(res.error); }
+    } catch {
+      setList(prev); setError(m.errCancelFailed);
+    } finally {
+      setBusyId(null);
+      router.refresh();
+    }
+  }, [list, dict.errors, m.errCancelFailed, router]);
+
   return (
     <div className="flex flex-col gap-5">
       {/* Tabs */}
@@ -266,6 +303,12 @@ export function CalendarBookings({
           onClick={() => setTab("pending")}
           label={m.tabPending}
           badge={pendingCount > 0 ? pendingCount : undefined}
+        />
+        <TabBtn
+          active={tab === "cancellations"}
+          onClick={() => setTab("cancellations")}
+          label={m.tabCancellations}
+          badge={cancellationCount > 0 ? cancellationCount : undefined}
         />
       </div>
 
@@ -392,6 +435,61 @@ export function CalendarBookings({
                     className="rounded-lg px-2.5 py-1.5 text-[12.5px] font-medium text-ink-soft hover:bg-error-weak hover:text-error disabled:opacity-50"
                   >
                     {m.cancel}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )
+      )}
+
+      {tab === "cancellations" && (
+        cancellations.length === 0 ? (
+          <div className="rounded-2xl border border-line bg-surface px-6 py-12 text-center">
+            <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-full bg-surface-2 text-ink-soft">
+              <Icon name="calendar" size={22} />
+            </div>
+            <p className="text-[14.5px] font-semibold text-ink">{m.emptyCancellationsTitle}</p>
+            <p className="mt-1 text-[13px] text-ink-soft">{m.emptySubtitle}</p>
+          </div>
+        ) : (
+          <div className="overflow-hidden rounded-xl border border-line bg-surface">
+            {cancellations.map((b, i) => (
+              <div
+                key={b.id}
+                className={`flex items-center gap-3 px-4 py-3.5 ${i > 0 ? "border-t border-line" : ""}`}
+              >
+                <div className="w-[52px] shrink-0 text-[15px] font-semibold text-ink">
+                  {timeLabel(b.startIso)}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="flex flex-wrap items-center gap-1.5 text-[14px] font-semibold text-ink">
+                    <span className="truncate">{b.serviceName}</span>
+                    <span className="shrink-0 rounded-full bg-error-weak px-2 py-0.5 text-[11px] font-semibold text-error">
+                      {m.cancellationRequestedLabel}
+                    </span>
+                  </p>
+                  <p className="truncate text-[12.5px] text-ink-soft">
+                    {b.clientName}
+                    {b.providerName ? ` · ${b.providerName}` : ""}
+                    {b.durationMin ? ` · ${b.durationMin} ${m.minutesUnit}` : ""}
+                  </p>
+                </div>
+
+                <div className="flex shrink-0 items-center gap-1">
+                  <button
+                    onClick={() => handleReviewRequest(b.id, "approve")}
+                    disabled={busyId === b.id}
+                    className="rounded-lg px-2.5 py-1.5 text-[12.5px] font-semibold text-error hover:bg-error-weak disabled:opacity-50"
+                  >
+                    {busyId === b.id ? m.reviewing : m.approveCancellation}
+                  </button>
+                  <button
+                    onClick={() => handleReviewRequest(b.id, "deny")}
+                    disabled={busyId === b.id}
+                    className="rounded-lg px-2.5 py-1.5 text-[12.5px] font-medium text-ink-soft hover:bg-surface-2 disabled:opacity-50"
+                  >
+                    {m.denyCancellation}
                   </button>
                 </div>
               </div>

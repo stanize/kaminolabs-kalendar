@@ -76,7 +76,7 @@ export function PatientBookingsList({ bookings }: { bookings: PatientBooking[] }
               {statusBadge(b.status)}
               {b.cancellationRequestedAt && b.status !== "cancelled" && (
                 <span className="shrink-0 rounded-full border border-line bg-surface-2 px-2.5 py-0.5 text-[11.5px] font-semibold text-ink-soft">
-                  Solicitud enviada
+                  Cancelación solicitada
                 </span>
               )}
             </div>

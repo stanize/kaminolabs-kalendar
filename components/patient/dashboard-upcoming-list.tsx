@@ -89,7 +89,7 @@ export function DashboardUpcomingList({ bookings }: { bookings: PatientBooking[]
               {statusBadge(b.status)}
               {b.cancellationRequestedAt && !cancelledIds.has(b.id) && (
                 <span className="shrink-0 rounded-full border border-line bg-surface-2 px-2.5 py-0.5 text-[11.5px] font-semibold text-ink-soft">
-                  Solicitud enviada
+                  Cancelación solicitada
                 </span>
               )}
             </p>
