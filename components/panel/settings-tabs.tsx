@@ -7,6 +7,7 @@ import type { SettingsDictionary } from "@/lib/i18n/dictionaries/settings";
 
 const TABS: { href: string; labelKey: keyof SettingsDictionary["tabs"] }[] = [
   { href: "/panel/settings/subscription", labelKey: "subscription" },
+  { href: "/panel/settings/bookings", labelKey: "bookings" },
   { href: "/panel/settings/notifications", labelKey: "notifications" },
   { href: "/panel/settings/security", labelKey: "security" },
   { href: "/panel/settings/language", labelKey: "language" },

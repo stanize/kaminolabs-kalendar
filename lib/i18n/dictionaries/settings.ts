@@ -8,6 +8,7 @@ export interface SettingsDictionary {
   tabs: {
     subscription: string;
     notifications: string;
+    bookings: string;
     security: string;
     language: string;
   };
@@ -25,6 +26,7 @@ const es: SettingsDictionary = {
   tabs: {
     subscription: "Suscripción",
     notifications: "Notificaciones",
+    bookings: "Reservas",
     security: "Seguridad",
     language: "Idioma",
   },
@@ -42,6 +44,7 @@ const en: SettingsDictionary = {
   tabs: {
     subscription: "Subscription",
     notifications: "Notifications",
+    bookings: "Bookings",
     security: "Security",
     language: "Language",
   },

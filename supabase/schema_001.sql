@@ -211,6 +211,15 @@ create table public.kalendar_businesses (
   booking_window_months   smallint    not null default 1 check (
     booking_window_months in (1, 2, 3)
   ),
+  -- How close to an appointment a patient can still self-cancel immediately
+  -- (patient-portal.md's self-service-cancel). Inside this window, self-cancel
+  -- is blocked and instead becomes a cancellation *request* requiring owner
+  -- approval (calendar-management-upcoming.md's cancellation-request-review —
+  -- not yet built as of this column's addition). Bounded to a sane range:
+  -- 0 (window disabled, self-cancel always immediate) up to 30 days (720h).
+  cancellation_window_hours smallint  not null default 24 check (
+    cancellation_window_hours >= 0 and cancellation_window_hours <= 720
+  ),
   onboarding_completed_at timestamptz,
   -- ---------------------------------------------------------------------
   -- Pricing / discount-schedule (see docs/specs/pricing-and-discounts-spec.md).
