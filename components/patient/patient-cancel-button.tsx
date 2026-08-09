@@ -2,8 +2,15 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Icon } from "@/components/ui/icon";
 import { cancelBookingAsPatient } from "@/lib/actions/patient";
+
+// Small filled pill — same shape/weight as the "Guardar cambios" button
+// elsewhere in the portal, just scaled down for an inline row action. Red
+// fill (bg-error) deliberately breaks from the portal's standard brand
+// teal, since this is a destructive action and should read differently at
+// a glance from "Pedir nueva cita".
+const pillBase =
+  "rounded-full px-3 py-1.5 text-[12px] font-semibold text-white transition-colors disabled:opacity-60";
 
 export function PatientCancelButton({
   bookingId,
@@ -52,7 +59,7 @@ export function PatientCancelButton({
             type="button"
             onClick={handleConfirm}
             disabled={busy}
-            className="rounded-lg bg-error px-2.5 py-1 text-[12px] font-semibold text-white transition-colors hover:brightness-95 disabled:opacity-60"
+            className={`${pillBase} bg-error hover:brightness-95`}
           >
             {busy ? labels.cancelling : labels.confirm}
           </button>
@@ -60,7 +67,7 @@ export function PatientCancelButton({
             type="button"
             onClick={() => setConfirming(false)}
             disabled={busy}
-            className="rounded-lg px-2.5 py-1 text-[12px] font-medium text-ink-soft hover:bg-surface-2"
+            className="rounded-full border border-line px-3 py-1.5 text-[12px] font-semibold text-ink-soft transition-colors hover:bg-surface-2 disabled:opacity-60"
           >
             {labels.keep}
           </button>
@@ -74,10 +81,8 @@ export function PatientCancelButton({
     <button
       type="button"
       onClick={() => setConfirming(true)}
-      className="flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-[12px] font-medium text-ink-soft transition-colors hover:bg-error-weak hover:text-error"
-      aria-label={labels.cancel}
+      className={`${pillBase} shrink-0 bg-error hover:brightness-95`}
     >
-      <Icon name="x" size={13} />
       {labels.cancel}
     </button>
   );

@@ -84,12 +84,12 @@ export default async function PatientDashboardPage() {
               {past.slice(0, 3).map((b) => (
                 <div
                   key={b.id}
-                  className="flex items-center gap-4 rounded-xl border border-line bg-surface px-4 py-3.5 opacity-70"
+                  className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-line bg-surface px-4 py-3.5 opacity-70"
                 >
                   <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-surface-2 text-ink-soft">
                     <Icon name="calendar" size={18} />
                   </div>
-                  <div className="min-w-0 flex-1">
+                  <div className="min-w-[160px] flex-1 basis-0">
                     <p className="flex items-center gap-2 text-[14px] font-semibold text-ink">
                       <span className="truncate">{b.serviceName}</span>
                       {statusBadge(b.status)}
@@ -100,7 +100,7 @@ export default async function PatientDashboardPage() {
                   </div>
                   <Link
                     href={bookingPath(b.businessSlug)}
-                    className="shrink-0 text-[12px] font-medium text-brand hover:underline"
+                    className="ml-auto shrink-0 rounded-full bg-brand px-3 py-1.5 text-[12px] font-semibold text-white transition-colors hover:brightness-95"
                   >
                     Pedir nueva cita
                   </Link>

@@ -61,28 +61,30 @@ export function PatientBookingsList({ bookings }: { bookings: PatientBooking[] }
   function BookingRow({ b }: { b: PatientBooking }) {
     const cancellable = ["pending_confirmation", "confirmed"].includes(b.status);
     return (
-      <div className="flex items-start gap-4 border-t border-line px-4 py-4 first:border-t-0">
-        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-surface-2 text-ink-soft">
-          <Icon name="calendar" size={18} />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[14px] font-semibold text-ink">{b.serviceName}</span>
-            {statusBadge(b.status)}
+      <div className="flex flex-col gap-3 border-t border-line px-4 py-4 first:border-t-0 sm:flex-row sm:items-start">
+        <div className="flex items-start gap-4">
+          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-surface-2 text-ink-soft">
+            <Icon name="calendar" size={18} />
           </div>
-          <p className="mt-0.5 text-[13px] font-medium text-ink">{b.businessName}</p>
-          <p className="capitalize text-[12.5px] text-ink-soft">{formatWhen(b.startsAt)}</p>
-          {b.providerName && (
-            <p className="text-[12.5px] text-ink-soft">{b.providerName}</p>
-          )}
-          <p className="text-[12.5px] text-ink-soft">
-            {b.durationMin} min · {b.servicePrice === 0 ? "Gratis" : `${b.servicePrice} €`}
-          </p>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[14px] font-semibold text-ink">{b.serviceName}</span>
+              {statusBadge(b.status)}
+            </div>
+            <p className="mt-0.5 text-[13px] font-medium text-ink">{b.businessName}</p>
+            <p className="capitalize text-[12.5px] text-ink-soft">{formatWhen(b.startsAt)}</p>
+            {b.providerName && (
+              <p className="text-[12.5px] text-ink-soft">{b.providerName}</p>
+            )}
+            <p className="text-[12.5px] text-ink-soft">
+              {b.durationMin} min · {b.servicePrice === 0 ? "Gratis" : `${b.servicePrice} €`}
+            </p>
+          </div>
         </div>
-        <div className="flex shrink-0 flex-col items-end gap-2">
+        <div className="flex shrink-0 items-center gap-2 pl-14 sm:ml-auto sm:pl-0">
           <Link
             href={bookingPath(b.businessSlug)}
-            className="text-[12px] font-medium text-brand hover:underline"
+            className="rounded-full bg-brand px-3 py-1.5 text-[12px] font-semibold text-white transition-colors hover:brightness-95"
           >
             Pedir nueva cita
           </Link>

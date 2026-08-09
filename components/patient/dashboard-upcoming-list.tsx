@@ -75,12 +75,12 @@ export function DashboardUpcomingList({ bookings }: { bookings: PatientBooking[]
       {visible.map((b) => (
         <div
           key={b.id}
-          className="flex items-center gap-4 rounded-xl border border-line bg-surface px-4 py-3.5"
+          className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-line bg-surface px-4 py-3.5"
         >
           <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand-weak text-brand">
             <Icon name="calendar" size={18} />
           </div>
-          <div className="min-w-0 flex-1">
+          <div className="min-w-[160px] flex-1 basis-0">
             <p className="flex items-center gap-2 text-[14px] font-semibold text-ink">
               <span className="truncate">{b.serviceName}</span>
               {statusBadge(b.status)}
@@ -89,19 +89,21 @@ export function DashboardUpcomingList({ bookings }: { bookings: PatientBooking[]
               {b.businessName} · {formatWhen(b.startsAt)}
             </p>
           </div>
-          {["pending_confirmation", "confirmed"].includes(b.status) && (
-            <PatientCancelButton
-              bookingId={b.id}
-              labels={CANCEL_LABELS}
-              onCancelled={() => setCancelledIds((prev) => new Set(prev).add(b.id))}
-            />
-          )}
-          <Link
-            href={bookingPath(b.businessSlug)}
-            className="shrink-0 text-[12px] font-medium text-brand hover:underline"
-          >
-            Pedir nueva cita
-          </Link>
+          <div className="ml-auto flex shrink-0 items-center gap-2">
+            {["pending_confirmation", "confirmed"].includes(b.status) && (
+              <PatientCancelButton
+                bookingId={b.id}
+                labels={CANCEL_LABELS}
+                onCancelled={() => setCancelledIds((prev) => new Set(prev).add(b.id))}
+              />
+            )}
+            <Link
+              href={bookingPath(b.businessSlug)}
+              className="shrink-0 rounded-full bg-brand px-3 py-1.5 text-[12px] font-semibold text-white transition-colors hover:brightness-95"
+            >
+              Pedir nueva cita
+            </Link>
+          </div>
         </div>
       ))}
     </div>
