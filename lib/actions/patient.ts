@@ -82,16 +82,17 @@ export async function provisionPatient(phone?: string): Promise<ProvisionResult>
 /**
  * Returns the current user's patient profile, or null if they are not yet
  * provisioned as a patient. Used by the patient portal to check registration
- * state and by the booking wizard to link authenticated bookings. name/email
- * fall back to the Better Auth "user" record when the patient hasn't set a
- * portal-specific override (see kalendar_patients.name/contact_email).
+ * state and by the booking wizard to link authenticated bookings. name falls
+ * back to the Better Auth "user" record when the patient hasn't set a
+ * portal-specific override (see kalendar_patients.name). Contact email is
+ * intentionally not editable from the portal — patients only edit name and
+ * phone; login email (Better Auth) remains the single contact address.
  */
 export async function getPatientProfile(): Promise<{
   id: string;
   userId: string;
   phone: string | null;
   name: string;
-  contactEmail: string;
 } | null> {
   let session;
   try {
@@ -103,7 +104,7 @@ export async function getPatientProfile(): Promise<{
   const supabase = await createClient();
   const { data } = await supabase
     .from("kalendar_patients")
-    .select("id, user_id, phone, name, contact_email")
+    .select("id, user_id, phone, name")
     .eq("user_id", session.user.id)
     .maybeSingle();
 
@@ -113,7 +114,6 @@ export async function getPatientProfile(): Promise<{
     userId: data.user_id,
     phone: data.phone,
     name: data.name ?? session.user.name ?? "",
-    contactEmail: data.contact_email ?? session.user.email ?? "",
   };
 }
 
@@ -125,24 +125,23 @@ export type UpdatePatientProfileResult =
 
 export interface UpdatePatientProfileDict {
   errNameRequired: string;
-  errEmailInvalid: string;
   errSaveFailed: string;
 }
 
 const PROFILE_FALLBACK: UpdatePatientProfileDict = {
   errNameRequired: "Introduce tu nombre.",
-  errEmailInvalid: "Introduce un email válido.",
   errSaveFailed: "No se pudo guardar el perfil.",
 };
 
 /**
- * Updates the current user's patient-facing profile (name, contact email,
- * phone) — all separate from the login account's Better Auth name/email.
- * Scoped to the caller's own kalendar_patients row via user_id. The caller
- * must already be a provisioned patient (row created by provisionPatient).
+ * Updates the current user's patient-facing profile (name, phone only) —
+ * separate from the login account's Better Auth name. Contact email is
+ * deliberately not editable here (see getPatientProfile comment). Scoped to
+ * the caller's own kalendar_patients row via user_id. The caller must
+ * already be a provisioned patient (row created by provisionPatient).
  */
 export const updatePatientProfile = async (
-  input: { name: string; contactEmail: string; phone: string },
+  input: { name: string; phone: string },
   dict?: Partial<UpdatePatientProfileDict>
 ): Promise<UpdatePatientProfileResult> => {
   const t = { ...PROFILE_FALLBACK, ...dict };
@@ -157,9 +156,6 @@ export const updatePatientProfile = async (
   const name = input.name.trim();
   if (name.length < 1) return { ok: false, error: t.errNameRequired };
 
-  const contactEmail = input.contactEmail.trim();
-  if (!contactEmail.includes("@")) return { ok: false, error: t.errEmailInvalid };
-
   const phone = input.phone.trim();
 
   const supabase = await createClient();
@@ -167,7 +163,6 @@ export const updatePatientProfile = async (
     .from("kalendar_patients")
     .update({
       name,
-      contact_email: contactEmail,
       phone: phone || null,
     })
     .eq("user_id", session.user.id);

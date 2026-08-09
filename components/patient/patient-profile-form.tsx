@@ -9,16 +9,13 @@ import { updatePatientProfile } from "@/lib/actions/patient";
 
 export function PatientProfileForm({
   initialName,
-  initialContactEmail,
   initialPhone,
 }: {
   initialName: string;
-  initialContactEmail: string;
   initialPhone: string;
 }) {
   const router = useRouter();
   const [name, setName] = useState(initialName);
-  const [contactEmail, setContactEmail] = useState(initialContactEmail);
   const [phone, setPhone] = useState(initialPhone);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -32,16 +29,11 @@ export function PatientProfileForm({
       setError("Introduce tu nombre.");
       return;
     }
-    if (!contactEmail.trim().includes("@")) {
-      setError("Introduce un email válido.");
-      return;
-    }
 
     setSaving(true);
     try {
       const result = await updatePatientProfile({
         name: name.trim(),
-        contactEmail: contactEmail.trim(),
         phone: phone.trim(),
       });
       if (!result.ok) {
@@ -69,17 +61,6 @@ export function PatientProfileForm({
           setSaved(false);
         }}
         maxLength={80}
-      />
-      <Field
-        label="Email de contacto"
-        hint="Distinto del email con el que inicias sesión — se usa para que las clínicas te contacten."
-        placeholder="tu@email.com"
-        value={contactEmail}
-        onChange={(e) => {
-          setContactEmail(e.target.value);
-          setSaved(false);
-        }}
-        maxLength={120}
       />
       <Field
         label="Teléfono"

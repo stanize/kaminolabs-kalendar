@@ -21,7 +21,6 @@ export default async function PatientProfilePage() {
 
         <PatientProfileForm
           initialName={profile.name}
-          initialContactEmail={profile.contactEmail}
           initialPhone={profile.phone ?? ""}
         />
       </div>
