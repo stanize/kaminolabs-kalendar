@@ -98,10 +98,9 @@ export function DashboardUpcomingList({ bookings }: { bookings: PatientBooking[]
           )}
           <Link
             href={bookingPath(b.businessSlug)}
-            className="shrink-0 rounded-lg p-1.5 text-ink-soft hover:bg-surface-2 hover:text-ink"
-            aria-label="Ver página del negocio"
+            className="shrink-0 text-[12px] font-medium text-brand hover:underline"
           >
-            <Icon name="externalLink" size={15} />
+            Pedir nueva cita
           </Link>
         </div>
       ))}

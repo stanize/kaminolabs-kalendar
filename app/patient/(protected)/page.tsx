@@ -2,10 +2,11 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { requireSession } from "@/lib/auth-session";
 import { getPatientProfile } from "@/lib/actions/patient";
-import { getPatientBookings, getMostRecentBookingClinic } from "@/lib/booking/patient-data";
+import { getPatientBookings } from "@/lib/booking/patient-data";
 import { Icon } from "@/components/ui/icon";
 import { DashboardUpcomingList } from "@/components/patient/dashboard-upcoming-list";
 import { PatientHeader } from "@/components/patient/patient-header";
+import { bookingPath } from "@/lib/business/booking-url";
 
 const TZ = "Europe/Madrid";
 
@@ -42,7 +43,6 @@ export default async function PatientDashboardPage() {
   if (!profile) redirect("/patient/login");
 
   const allBookings = await getPatientBookings(profile.id);
-  const bookAgainClinic = await getMostRecentBookingClinic(profile.id);
   const now = new Date();
 
   const upcoming = allBookings.filter(
@@ -57,7 +57,7 @@ export default async function PatientDashboardPage() {
   return (
     <div className="min-h-screen bg-surface-2">
       {/* Top bar */}
-      <PatientHeader current="home" email={session.user.email} bookAgainClinic={bookAgainClinic} />
+      <PatientHeader current="home" email={session.user.email} />
 
       <div className="mx-auto max-w-[680px] px-4 py-6 sm:px-8 sm:py-8">
         <div className="mb-6">
@@ -98,6 +98,12 @@ export default async function PatientDashboardPage() {
                       {b.businessName} · {formatWhen(b.startsAt)}
                     </p>
                   </div>
+                  <Link
+                    href={bookingPath(b.businessSlug)}
+                    className="shrink-0 text-[12px] font-medium text-brand hover:underline"
+                  >
+                    Pedir nueva cita
+                  </Link>
                 </div>
               ))}
             </div>

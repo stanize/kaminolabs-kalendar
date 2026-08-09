@@ -66,32 +66,3 @@ export async function getPatientBookings(patientId: string): Promise<PatientBook
     };
   });
 }
-
-/**
- * Returns the slug of the clinic the patient booked with most recently
- * (by created_at, not starts_at — we want their last interaction, not their
- * next upcoming appointment), for the portal's "Pedir cita" shortcut. Null
- * if the patient has no bookings yet, in which case the nav hides the link
- * rather than guessing which clinic to send them to.
- */
-export async function getMostRecentBookingClinic(
-  patientId: string
-): Promise<{ slug: string; name: string } | null> {
-  const supabase = await createClient();
-
-  const { data } = await supabase
-    .from("kalendar_bookings")
-    .select("created_at, kalendar_businesses!inner (name, slug)")
-    .eq("patient_id", patientId)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (!data) return null;
-  const biz = Array.isArray(data.kalendar_businesses)
-    ? data.kalendar_businesses[0]
-    : data.kalendar_businesses;
-  if (!biz?.slug) return null;
-
-  return { slug: biz.slug, name: biz.name };
-}

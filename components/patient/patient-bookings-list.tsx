@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Icon } from "@/components/ui/icon";
 import { PatientCancelButton } from "@/components/patient/patient-cancel-button";
+import { bookingPath } from "@/lib/business/booking-url";
 import type { PatientBooking } from "@/lib/booking/patient-data";
 
 const TZ = "Europe/Madrid";
@@ -77,13 +79,21 @@ export function PatientBookingsList({ bookings }: { bookings: PatientBooking[] }
             {b.durationMin} min · {b.servicePrice === 0 ? "Gratis" : `${b.servicePrice} €`}
           </p>
         </div>
-        {cancellable && (
-          <PatientCancelButton
-            bookingId={b.id}
-            labels={CANCEL_LABELS}
-            onCancelled={() => setCancelledIds((prev) => new Set(prev).add(b.id))}
-          />
-        )}
+        <div className="flex shrink-0 flex-col items-end gap-2">
+          <Link
+            href={bookingPath(b.businessSlug)}
+            className="text-[12px] font-medium text-brand hover:underline"
+          >
+            Pedir nueva cita
+          </Link>
+          {cancellable && (
+            <PatientCancelButton
+              bookingId={b.id}
+              labels={CANCEL_LABELS}
+              onCancelled={() => setCancelledIds((prev) => new Set(prev).add(b.id))}
+            />
+          )}
+        </div>
       </div>
     );
   }

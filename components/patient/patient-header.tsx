@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { Icon } from "@/components/ui/icon";
 import { Logo } from "@/components/ui/logo";
-import { bookingPath } from "@/lib/business/booking-url";
 
 export type PatientPage = "home" | "profile" | "bookings";
 
@@ -11,20 +10,22 @@ const navLinkClass =
 /**
  * Header shown on every /patient/(protected) page. Always links to the
  * OTHER pages (never the current one), so the patient can jump between
- * Inicio / Perfil / Todas las reservas / Pedir cita from anywhere in the
- * portal, instead of only being able to go "back" to the dashboard.
+ * Inicio / Perfil / Todas las reservas from anywhere in the portal, instead
+ * of only being able to go "back" to the dashboard.
+ *
+ * Deliberately does NOT include a generic "book an appointment" link here —
+ * a patient can have bookings with several different clinics, and Kalendar
+ * has no clinic directory, so there's no single sensible destination for
+ * a portal-wide "book" action. Booking again is a per-booking action (see
+ * the "Pedir nueva cita" link next to each booking row) scoped to that
+ * booking's specific clinic.
  */
 export function PatientHeader({
   current,
   email,
-  bookAgainClinic,
 }: {
   current: PatientPage;
   email?: string;
-  // Slug of the clinic to send "Pedir cita" to (their most recent clinic).
-  // Null when the patient has no bookings yet — link is hidden rather than
-  // guessing which clinic they'd want.
-  bookAgainClinic: { slug: string; name: string } | null;
 }) {
   return (
     <header className="sticky top-0 z-10 flex items-center justify-between border-b border-line bg-surface px-4 py-3 sm:px-8">
@@ -47,11 +48,6 @@ export function PatientHeader({
         {current !== "bookings" && (
           <Link href="/patient/bookings" className={navLinkClass}>
             Todas las reservas
-          </Link>
-        )}
-        {bookAgainClinic && (
-          <Link href={bookingPath(bookAgainClinic.slug)} className={navLinkClass}>
-            Pedir cita
           </Link>
         )}
       </div>
