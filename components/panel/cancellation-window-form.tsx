@@ -125,12 +125,6 @@ export function CancellationWindowForm({ initialHours }: { initialHours: number 
           <span>Ajuste guardado.</span>
         </div>
       )}
-
-      <p className="mt-4 text-[12px] text-ink-soft">
-        Nota: por ahora este valor se guarda, pero la lógica de cancelación de clientes todavía no
-        lo consulta — sigue siendo inmediata en cualquier momento. La aplicación de esta ventana
-        (bloqueo de autocancelación + solicitud de cancelación) es un paso futuro.
-      </p>
     </div>
   );
 }
