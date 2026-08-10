@@ -362,6 +362,27 @@ export async function getWeekWidgetStats(userId: string): Promise<WeekWidgetStat
 }
 
 /**
+ * Count of bookings with a pending patient cancellation request awaiting
+ * owner approve/deny (see kalendar_bookings.cancellation_requested_at).
+ * Used to conditionally show the panel-home cancellation-requests widget —
+ * only rendered when this is > 0, so it doesn't take up space when there's
+ * nothing to review.
+ */
+export async function getPendingCancellationCount(userId: string): Promise<number> {
+  const business = await getBusinessForUser(userId);
+  if (!business) return 0;
+
+  const supabase = await createClient();
+  const { count } = await supabase
+    .from("kalendar_bookings")
+    .select("id", { count: "exact", head: true })
+    .eq("business_id", business.id)
+    .not("cancellation_requested_at", "is", null);
+
+  return count ?? 0;
+}
+
+/**
  * The calendar page's default landing week: this week if it still has any
  * open business hours left from right now, otherwise next week (e.g. Friday
  * evening after closing, with the weekend closed, lands on next week

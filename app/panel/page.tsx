@@ -7,10 +7,11 @@ import { bookingPath, bookingUrl } from "@/lib/business/booking-url";
 import { SetupCompleteBanner } from "@/components/panel/setup-complete-banner";
 import { EditableGreetingName } from "@/components/panel/editable-greeting-name";
 import { getPanelShellServerDictionary, getLocale } from "@/lib/i18n/server";
-import { getHoyWidgetStats, getWeekWidgetStats } from "@/lib/booking/owner-data";
+import { getHoyWidgetStats, getWeekWidgetStats, getPendingCancellationCount } from "@/lib/booking/owner-data";
 import { getCalendarDictionary } from "@/lib/i18n/dictionaries/calendar";
 import { TodayStatsWidget } from "@/components/panel/today-stats-widget";
 import { WeekStatsWidget } from "@/components/panel/week-stats-widget";
+import { CancellationRequestsWidget } from "@/components/panel/cancellation-requests-widget";
 import { BookingPageCard } from "@/components/panel/booking-page-card";
 
 export default async function PanelHomePage() {
@@ -23,9 +24,10 @@ export default async function PanelHomePage() {
   const h = dict.home;
 
   const locale = await getLocale();
-  const [hoyStats, weekStats] = await Promise.all([
+  const [hoyStats, weekStats, pendingCancellationCount] = await Promise.all([
     getHoyWidgetStats(session.user.id),
     getWeekWidgetStats(session.user.id),
+    getPendingCancellationCount(session.user.id),
   ]);
   const calendarDict = getCalendarDictionary(locale);
   const hoyDayLabel = hoyStats.isToday || !hoyStats.dateIso ? undefined : new Intl.DateTimeFormat(calendarDict.intlLocale, {
@@ -163,6 +165,10 @@ export default async function PanelHomePage() {
             count={weekStats.count}
             dict={calendarDict.widget}
           />
+
+          {pendingCancellationCount > 0 && (
+            <CancellationRequestsWidget count={pendingCancellationCount} />
+          )}
 
           {business?.slug && (
             <BookingPageCard

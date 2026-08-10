@@ -73,11 +73,12 @@ export function PatientBookingsList({ bookings }: { bookings: PatientBooking[] }
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-[14px] font-semibold text-ink">{b.serviceName}</span>
-              {statusBadge(b.status)}
-              {b.cancellationRequestedAt && b.status !== "cancelled" && (
+              {b.cancellationRequestedAt && b.status !== "cancelled" ? (
                 <span className="shrink-0 rounded-full border border-line bg-surface-2 px-2.5 py-0.5 text-[11.5px] font-semibold text-ink-soft">
                   Cancelación solicitada
                 </span>
+              ) : (
+                statusBadge(b.status)
               )}
             </div>
             <p className="mt-0.5 text-[13px] font-medium text-ink">{b.businessName}</p>

@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
+import { Btn } from "@/components/ui/button";
 import { cancelBookingAsOwner, confirmBookingAsOwner, fetchWeekBookings, reviewCancellationRequest } from "@/lib/actions/booking-owner";
 import { CalendarHeader, type CalendarViewMode } from "@/components/panel/calendar-header";
 import {
@@ -110,8 +111,14 @@ export function CalendarBookings({
   weekStartIso: string;
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const m = dict.manager;
-  const [tab, setTab] = useState<"week" | "pending" | "cancellations">("week");
+  // Supports deep-linking straight to a tab (e.g. the panel-home
+  // cancellation-requests widget links to ?tab=cancellations) — only read
+  // once on mount, not reactively, so the URL doesn't fight the user if they
+  // switch tabs afterward.
+  const initialTab = searchParams.get("tab") === "cancellations" ? "cancellations" : "week";
+  const [tab, setTab] = useState<"week" | "pending" | "cancellations">(initialTab);
   const [list, setList] = useState<BookingVM[]>(bookings);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -457,40 +464,45 @@ export function CalendarBookings({
             {cancellations.map((b, i) => (
               <div
                 key={b.id}
-                className={`flex items-center gap-3 px-4 py-3.5 ${i > 0 ? "border-t border-line" : ""}`}
+                className={`flex flex-col gap-3 px-4 py-3.5 sm:flex-row sm:items-center ${i > 0 ? "border-t border-line" : ""}`}
               >
-                <div className="w-[52px] shrink-0 text-[15px] font-semibold text-ink">
-                  {timeLabel(b.startIso)}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="flex flex-wrap items-center gap-1.5 text-[14px] font-semibold text-ink">
-                    <span className="truncate">{b.serviceName}</span>
-                    <span className="shrink-0 rounded-full bg-error-weak px-2 py-0.5 text-[11px] font-semibold text-error">
-                      {m.cancellationRequestedLabel}
-                    </span>
-                  </p>
-                  <p className="truncate text-[12.5px] text-ink-soft">
-                    {b.clientName}
-                    {b.providerName ? ` · ${b.providerName}` : ""}
-                    {b.durationMin ? ` · ${b.durationMin} ${m.minutesUnit}` : ""}
-                  </p>
+                <div className="flex items-start gap-3 sm:flex-1 sm:items-center">
+                  <div className="w-[52px] shrink-0 text-[15px] font-semibold text-ink">
+                    {timeLabel(b.startIso)}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="flex flex-wrap items-center gap-1.5 text-[14px] font-semibold text-ink">
+                      <span className="truncate">{b.serviceName}</span>
+                      <span className="shrink-0 rounded-full bg-error-weak px-2 py-0.5 text-[11px] font-semibold text-error">
+                        {m.cancellationRequestedLabel}
+                      </span>
+                    </p>
+                    <p className="truncate text-[12.5px] text-ink-soft">
+                      {b.clientName}
+                      {b.providerName ? ` · ${b.providerName}` : ""}
+                      {b.durationMin ? ` · ${b.durationMin} ${m.minutesUnit}` : ""}
+                    </p>
+                  </div>
                 </div>
 
-                <div className="flex shrink-0 items-center gap-1">
-                  <button
+                <div className="flex shrink-0 items-center gap-2 pl-[64px] sm:pl-0">
+                  <Btn
+                    size="sm"
+                    variant="outline"
                     onClick={() => handleReviewRequest(b.id, "approve")}
                     disabled={busyId === b.id}
-                    className="rounded-lg px-2.5 py-1.5 text-[12.5px] font-semibold text-error hover:bg-error-weak disabled:opacity-50"
+                    className="!border-error !text-error hover:!bg-error-weak"
                   >
                     {busyId === b.id ? m.reviewing : m.approveCancellation}
-                  </button>
-                  <button
+                  </Btn>
+                  <Btn
+                    size="sm"
+                    variant="ghost"
                     onClick={() => handleReviewRequest(b.id, "deny")}
                     disabled={busyId === b.id}
-                    className="rounded-lg px-2.5 py-1.5 text-[12.5px] font-medium text-ink-soft hover:bg-surface-2 disabled:opacity-50"
                   >
                     {m.denyCancellation}
-                  </button>
+                  </Btn>
                 </div>
               </div>
             ))}

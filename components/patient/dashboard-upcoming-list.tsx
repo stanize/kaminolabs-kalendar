@@ -86,11 +86,12 @@ export function DashboardUpcomingList({ bookings }: { bookings: PatientBooking[]
           <div className="min-w-[160px] flex-1 basis-0">
             <p className="flex items-center gap-2 text-[14px] font-semibold text-ink">
               <span className="truncate">{b.serviceName}</span>
-              {statusBadge(b.status)}
-              {b.cancellationRequestedAt && !cancelledIds.has(b.id) && (
+              {b.cancellationRequestedAt && b.status !== "cancelled" ? (
                 <span className="shrink-0 rounded-full border border-line bg-surface-2 px-2.5 py-0.5 text-[11.5px] font-semibold text-ink-soft">
                   Cancelación solicitada
                 </span>
+              ) : (
+                statusBadge(b.status)
               )}
             </p>
             <p className="truncate text-[12.5px] text-ink-soft capitalize">
