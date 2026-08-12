@@ -42,7 +42,7 @@ Criteria:
 - Same status badge / formatting conventions as the dashboard
 
 ## Step: self-service-cancel
-Status: in_progress
+Status: done
 Criteria:
 - Patient can cancel an upcoming booking directly from the portal (dashboard's upcoming list and full bookings list), not only via the emailed cancel-token link
 - cancelBookingAsPatient is scoped to the caller's own patient_id — cannot touch another patient's or a guest booking
@@ -50,11 +50,11 @@ Criteria:
 - Cancelling from the portal notifies the clinic via the same shared notifyCancellation helper used by owner- and token-based cancellation
 - UI has an inline confirm/keep step before cancelling (PatientCancelButton), not an immediate destructive click
 - Cancelled booking's status flips immediately via onCancelled callback (optimistic local update) rather than waiting on a full page reload; router.refresh() syncs server state in the background
-- DESIGN DECISION (not yet built): a configurable cancellation-window cutoff (default 24h, set per-clinic — see clinic-configuration.md's cancellation-window-setting) gates immediate self-cancel. Outside that window, cancellation goes through as it does today (immediate, no approval needed).
-- NOT BUILT: within the clinic's configured cancellation window, direct self-cancel is blocked. Instead the patient can submit a cancellation *request*, which requires clinic approval before the booking is actually cancelled — not an immediate cancel.
-- NOT BUILT: a new booking status (or equivalent flag) distinguishing "cancellation requested, pending clinic approval" from a normal cancelled booking; needs a decision on whether the slot stays held or opens up while a request is pending.
-- NOT BUILT: clinic-side approve/deny action for a pending cancellation request — this half lives in calendar-management-upcoming.md, not here; see that file's cancellation-request-review step.
-- NOT BUILT: patient is notified of the clinic's approve/deny decision on their request.
+- Configurable cancellation window (kalendar_businesses.cancellation_window_hours, default 24, 0–720 range) gates immediate self-cancel — see clinic-configuration.md's cancellation-window-setting
+- Inside the window: cancelBookingAsPatient sets cancellation_requested_at instead of cancelling outright; booking status stays pending_confirmation/confirmed (slot stays held, not freed, while a request is pending)
+- Duplicate requests guarded against (booking.cancellation_requested_at already set is rejected)
+- notifyCancellationRequested emails the clinic when a request is submitted
+- Patient-facing copy distinguishes "cancellation requested, pending review" from an actual cancellation in both the dashboard and full bookings list
 
 ## Step: profile-management
 Status: done

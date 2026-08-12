@@ -45,13 +45,14 @@ Criteria:
 - Client is notified by email on owner-initiated cancellation (best-effort, notifyCancellation)
 
 ## Step: cancellation-request-review
-Status: not_started
+Status: done
 Criteria:
 - A booking within the clinic's configured cancellation window (see clinic-configuration.md's cancellation-window-setting, default 24h) that a patient tries to self-cancel produces a cancellation *request* rather than an immediate cancel (see patient-portal.md's self-service-cancel step for the patient-facing half of this)
-- Pending cancellation requests are visible to the owner somewhere in the calendar view (e.g. a distinct badge/tab, similar to the existing Pendientes tab pattern for guest confirmation requests)
-- Owner can approve a request (booking becomes cancelled, slot frees, patient notified)
-- Owner can deny a request (booking stays as-is, patient notified with the denial)
-- Decision needed: does the slot stay held (blocking other bookings) or open up while a request is pending?
+- Pending cancellation requests are visible to the owner in a dedicated "Cancelaciones" tab in the panel calendar, sorted soonest-requested-first (mirrors Pendientes tab's expiry-sort rationale)
+- A rose-styled panel-home widget (CancellationRequestsWidget) surfaces the pending count and deep-links to the Cancelaciones tab; only rendered when count > 0
+- reviewCancellationRequest handles both decisions, scoped to the caller's business: approve sets status → cancelled and clears the request flag (client gets the standard cancellation receipt via notifyCancellation); deny clears the request flag only, booking status is untouched, client gets a dedicated "request denied" email (notifyCancellationRequestDenied) instead
+- Slot stays held while a request is pending — status remains pending_confirmation/confirmed throughout, cancellation_requested_at is a separate flag layered on top rather than a status value, so the request doesn't free the slot for another booking until actually approved
+- Mobile-friendly Cancelaciones tab uses standard buttons rather than a layout that breaks on narrow viewports
 
 ## Step: reminder-failure-visibility
 Status: done
