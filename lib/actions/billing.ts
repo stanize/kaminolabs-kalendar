@@ -2,7 +2,7 @@
 
 import { authedAction } from "@/lib/auth-action";
 import { createClient } from "@/lib/supabase/server";
-import { getStripeClient, isStripeConfigured, nextBillingCycleAnchorUnix } from "@/lib/billing/stripe";
+import { getStripeClient, isStripeConfigured, nextBillingCycleAnchorUnix, trialEndFromSignup } from "@/lib/billing/stripe";
 import { getBusinessPricing } from "@/lib/pricing/data";
 import { getBusinessForUser } from "@/lib/business/data";
 
@@ -29,7 +29,7 @@ function appBaseUrl(): string {
  * well, or a support/admin flow wants a plain link instead of a modal.
  */
 export const createCheckoutSession = authedAction(
-  async (session): Promise<BillingActionResult> => {
+  async (session, startTrial: boolean = false): Promise<BillingActionResult> => {
     if (!isStripeConfigured()) {
       return { ok: false, error: "La facturación no está disponible en este momento." };
     }
@@ -88,11 +88,13 @@ export const createCheckoutSession = authedAction(
       // the fuller comment on createSubscriptionIntent below, which is the
       // primary subscribe path; this fallback matches it so a clinic ends
       // up on the same billing cycle regardless of which path they went
-      // through.
-      subscription_data: {
-        billing_cycle_anchor: nextBillingCycleAnchorUnix(),
-        proration_behavior: "create_prorations",
-      },
+      // through. startTrial mirrors createSubscriptionIntent's trial_end
+      // handling too — without this, a trial signup that happened to fall
+      // back to Checkout (Stripe.js blocked/slow) would silently become a
+      // normal paid subscription instead.
+      subscription_data: startTrial
+        ? { trial_end: trialEndFromSignup() }
+        : { billing_cycle_anchor: nextBillingCycleAnchorUnix(), proration_behavior: "create_prorations" },
       success_url: `${base}/panel/settings/subscription?status=success`,
       cancel_url: `${base}/panel/settings/subscription?status=cancelled`,
     });
@@ -136,9 +138,24 @@ export type SubscriptionIntentResult =
  * with subscription_status='incomplete' from an abandoned attempt. This is
  * not meaningfully different from today's already-existing 'incomplete'
  * default state, so treated as acceptable rather than worked around.
+ * $0 first invoice (setup-intent) path below doubles as the trial path — a
+ * subscription with a future trial_end has nothing to charge immediately
+ * either, for the same underlying Stripe reason, so no new code path was
+ * needed for trials beyond passing trial_end through.
+ *
+ * No card is required to START a trial (startTrial: true) — Stripe still
+ * attaches a pending_setup_intent to optionally save a card for when the
+ * trial converts, but the client is free to skip that step (see
+ * SubscribeForm's setup-mode handling in subscribe-modal.tsx) and add a
+ * card later from Suscripción settings before the trial ends. This was an
+ * open call in workflows/subscription-billing.md — chosen for lower-
+ * friction signup; if the trial ends with no card on file, Stripe's normal
+ * attempted-charge-fails behavior applies (subscription_status moves away
+ * from 'trialing', same as any other failed-payment case webhook-sync
+ * already handles).
  */
 export const createSubscriptionIntent = authedAction(
-  async (session): Promise<SubscriptionIntentResult> => {
+  async (session, startTrial: boolean = false): Promise<SubscriptionIntentResult> => {
     if (!isStripeConfigured()) {
       return { ok: false, error: "La facturación no está disponible en este momento." };
     }
@@ -209,12 +226,20 @@ export const createSubscriptionIntent = authedAction(
       },
       // Calendar-aligned billing (workflows/subscription-billing.md): every
       // clinic bills on the 1st, not on a per-signup-date anniversary.
-      // Stripe prorates the first partial period up to this anchor
-      // automatically (proration_behavior defaults to create_prorations,
-      // set explicitly here for clarity) — e.g. signing up on the 15th
-      // charges a prorated ~half-month now, then full price from the 1st.
-      billing_cycle_anchor: nextBillingCycleAnchorUnix(),
-      proration_behavior: "create_prorations",
+      //
+      // Non-trial path: billing_cycle_anchor pins the first (prorated)
+      // charge's cycle to the next 1st explicitly.
+      //
+      // Trial path: trial_end ITSELF already resolves to a 1st-of-month date
+      // (see trialEndFromSignup) and is far later than the next calendar
+      // 1st, so billing_cycle_anchor is deliberately OMITTED here — passing
+      // both would conflict (two different target dates). Stripe anchors
+      // post-trial recurring billing to trial_end automatically once the
+      // trial converts, which already lands on the 1st, so alignment holds
+      // without an explicit anchor param in this branch.
+      ...(startTrial
+        ? { trial_end: trialEndFromSignup() }
+        : { billing_cycle_anchor: nextBillingCycleAnchorUnix(), proration_behavior: "create_prorations" as const }),
       expand: ["latest_invoice", "pending_setup_intent"],
     });
 
@@ -504,3 +529,68 @@ export const createBillingPortalSession = authedAction(
     return { ok: true, url: portalSession.url };
   }
 );
+
+// ── Trial extension (not yet wired to any UI) ───────────────────────────────
+
+export type ExtendTrialResult =
+  | { ok: true; newTrialEnd: number }
+  | { ok: false; error: string };
+
+/**
+ * Extends (or shortens) a business's active trial to a new end date, for
+ * Arun's "auto-extension for certain clients" case (workflows/subscription-
+ * billing.md's trial-period-mechanism). Deliberately NOT an authedAction —
+ * a clinic owner must never be able to extend their own trial, so this
+ * takes businessId directly rather than scoping to the caller's session.
+ *
+ * NOT YET WIRED to any UI in this repo — intended to be called from a
+ * future admin "Suscripciones" tool (tracked as subscriptions-lookup-tool
+ * in the admin portal's workflows/admin-portal-tools.md, which lives in the
+ * separate stanize/kaminolabs-kalendar-admin repo/session). This function
+ * is the reusable mechanism that tool would call; building the actual admin
+ * trigger/UI is a separate piece of work.
+ *
+ * newTrialEnd should itself be a 1st-of-month date for the same calendar-
+ * alignment reason as trialEndFromSignup, but this function doesn't enforce
+ * that — whoever calls it (the future admin tool) is responsible for
+ * picking a sensible date, since "extend for certain clients" is a manual/
+ * judgment call per business, not a formula like the initial 3-month grant.
+ */
+export async function extendTrial(
+  businessId: string,
+  newTrialEnd: Date
+): Promise<ExtendTrialResult> {
+  if (!isStripeConfigured()) {
+    return { ok: false, error: "La facturación no está disponible en este momento." };
+  }
+
+  const stripe = getStripeClient();
+  if (!stripe) {
+    return { ok: false, error: "La facturación no está disponible en este momento." };
+  }
+
+  const supabase = await createClient();
+  const { data: bizRow } = await supabase
+    .from("kalendar_businesses")
+    .select("stripe_subscription_id")
+    .eq("id", businessId)
+    .maybeSingle();
+
+  if (!bizRow?.stripe_subscription_id) {
+    return { ok: false, error: "Este negocio no tiene una suscripción." };
+  }
+
+  const newTrialEndUnix = Math.floor(newTrialEnd.getTime() / 1000);
+
+  try {
+    const updated = await stripe.subscriptions.update(bizRow.stripe_subscription_id, {
+      trial_end: newTrialEndUnix,
+      // A trial extension shouldn't generate a proration invoice — nothing
+      // was charged during the trial, so there's nothing to prorate.
+      proration_behavior: "none",
+    });
+    return { ok: true, newTrialEnd: updated.trial_end ?? newTrialEndUnix };
+  } catch {
+    return { ok: false, error: "No se pudo extender la prueba." };
+  }
+}

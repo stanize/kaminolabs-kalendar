@@ -27,6 +27,9 @@ export interface PaymentsDictionary {
   confirming: string;
   renewsOn: string; // contains "{date}"
   cancelsOn: string; // contains "{date}"
+  trialEndsOn: string; // contains "{date}"
+  startTrial: string; // "Start 3-month free trial" CTA, next to the paid Subscribe button
+  startingTrial: string;
   errUnexpected: string;
   errNoBusiness: string;
   paymentMethod: {
@@ -84,6 +87,9 @@ const es: PaymentsDictionary = {
   confirming: "Confirmando tu suscripción...",
   renewsOn: "Se renueva el {date}",
   cancelsOn: "Se cancelará el {date}",
+  trialEndsOn: "Tu prueba gratis termina el {date}",
+  startTrial: "Empezar prueba gratis (3 meses)",
+  startingTrial: "Iniciando prueba...",
   errUnexpected: "Ha ocurrido un error inesperado. Inténtalo de nuevo.",
   errNoBusiness: "Configura primero tu negocio.",
   paymentMethod: {
@@ -141,6 +147,9 @@ const en: PaymentsDictionary = {
   confirming: "Confirming your subscription...",
   renewsOn: "Renews on {date}",
   cancelsOn: "Cancels on {date}",
+  trialEndsOn: "Your free trial ends on {date}",
+  startTrial: "Start free trial (3 months)",
+  startingTrial: "Starting trial...",
   errUnexpected: "An unexpected error occurred. Please try again.",
   errNoBusiness: "Set up your business first.",
   paymentMethod: {

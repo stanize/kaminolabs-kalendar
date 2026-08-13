@@ -5,6 +5,7 @@ export interface SubscriptionDetail {
   status: string;
   cancelAtPeriodEnd: boolean;
   currentPeriodEnd: number | null; // unix seconds
+  trialEnd: number | null; // unix seconds — null unless status is 'trialing'
   priceAmount: number; // major units, e.g. 49.00
   currency: string;
   interval: string; // "month"
@@ -48,6 +49,7 @@ export async function getSubscriptionDetail(
     status: subscription.status,
     cancelAtPeriodEnd: subscription.cancel_at_period_end,
     currentPeriodEnd: item.current_period_end ?? null,
+    trialEnd: subscription.trial_end ?? null,
     priceAmount: (item.price.unit_amount ?? 0) / 100,
     currency: (item.price.currency ?? "eur").toUpperCase(),
     interval: item.price.recurring?.interval ?? "month",

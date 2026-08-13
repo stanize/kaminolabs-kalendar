@@ -46,6 +46,7 @@ export function SubscriptionManager({
   const [confirmingCancel, setConfirmingCancel] = useState(false);
   const [showPaymentMethodModal, setShowPaymentMethodModal] = useState(false);
   const [showSubscribeModal, setShowSubscribeModal] = useState(false);
+  const [subscribeAsTrial, setSubscribeAsTrial] = useState(false);
   const [justSubscribed, setJustSubscribed] = useState(false);
 
   const status = billing?.subscriptionStatus ?? "incomplete";
@@ -147,6 +148,10 @@ export function SubscriptionManager({
           <p className="mt-2 text-sm text-error">
             {dict.cancelsOn.replace("{date}", formatDate(subscriptionDetail.currentPeriodEnd))}
           </p>
+        ) : status === "trialing" && subscriptionDetail?.trialEnd ? (
+          <p className="mt-2 text-sm text-brand-ink">
+            {dict.trialEndsOn.replace("{date}", formatDate(subscriptionDetail.trialEnd))}
+          </p>
         ) : billing?.subscriptionCurrentPeriodEnd ? (
           <p className="mt-2 text-sm text-ink-soft">
             {dict.renewsOn.replace(
@@ -164,9 +169,22 @@ export function SubscriptionManager({
 
         <div className="mt-6 flex flex-wrap items-center gap-3">
           {!isSubscribed ? (
-            <Btn variant="primary" onClick={() => setShowSubscribeModal(true)} disabled={pending}>
-              {dict.subscribe}
-            </Btn>
+            <>
+              <Btn
+                variant="primary"
+                onClick={() => { setSubscribeAsTrial(false); setShowSubscribeModal(true); }}
+                disabled={pending}
+              >
+                {dict.subscribe}
+              </Btn>
+              <Btn
+                variant="soft"
+                onClick={() => { setSubscribeAsTrial(true); setShowSubscribeModal(true); }}
+                disabled={pending}
+              >
+                {dict.startTrial}
+              </Btn>
+            </>
           ) : (
             <Btn
               variant="ghost"
@@ -327,6 +345,7 @@ export function SubscriptionManager({
       {showSubscribeModal && (
         <SubscribeModal
           dict={dict}
+          startTrial={subscribeAsTrial}
           onClose={() => setShowSubscribeModal(false)}
           onSuccess={() => {
             setJustSubscribed(true);

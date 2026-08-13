@@ -21,6 +21,7 @@ const STRIPE_LOAD_TIMEOUT_MS = 8000;
 
 interface Props {
   dict: PaymentsDictionary;
+  startTrial?: boolean;
   onClose: () => void;
   onSuccess: () => void;
 }
@@ -31,8 +32,13 @@ interface Props {
  * payment-method-modal.tsx, per Arun's request to bring the initial
  * subscribe flow into the modal too. Card entry still happens inside
  * Stripe's own iframe (Elements), never touching Kalendar's servers.
+ *
+ * startTrial routes through the same createSubscriptionIntent flow but with
+ * trial_end set (see lib/actions/billing.ts) — a trial's first invoice is
+ * always $0, which is exactly the existing "setup" mode branch below (save
+ * a card, nothing to charge yet), so no separate trial UI path was needed.
  */
-export function SubscribeModal({ dict, onClose, onSuccess }: Props) {
+export function SubscribeModal({ dict, startTrial = false, onClose, onSuccess }: Props) {
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [mode, setMode] = useState<"payment" | "setup" | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -43,7 +49,7 @@ export function SubscribeModal({ dict, onClose, onSuccess }: Props) {
 
     async function fallBackToCheckout(errorIfFallbackFails: string) {
       setFallingBack(true);
-      const fallback = await createCheckoutSession();
+      const fallback = await createCheckoutSession(startTrial);
       if (cancelled) return;
       if (fallback.ok) {
         window.location.href = fallback.url;
@@ -78,7 +84,7 @@ export function SubscribeModal({ dict, onClose, onSuccess }: Props) {
         return;
       }
 
-      const result = await createSubscriptionIntent();
+      const result = await createSubscriptionIntent(startTrial);
       if (cancelled) return;
 
       if (result.ok) {
@@ -97,7 +103,7 @@ export function SubscribeModal({ dict, onClose, onSuccess }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [dict.errUnexpected]);
+  }, [dict.errUnexpected, startTrial]);
 
   const appearance = useMemo(
     () => ({
