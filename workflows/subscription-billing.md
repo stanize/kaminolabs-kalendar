@@ -58,12 +58,16 @@ Criteria:
 Status: not_started
 Criteria:
 - Depends on trial-period-mechanism being decided first (gating logic needs to treat trialing as allowed, not just active)
-- A single shared helper (e.g. hasActiveAccess(business) checking subscription_status in ('trialing', 'active')) is used everywhere gating is needed, rather than scattered inline status checks
-- Scope of what's gated: booking creation/editing (manual + guest wizard reachable via the public page), calendar actions, and settings changes are blocked for a non-trialing/non-active business — viewing existing data (calendar, past bookings) stays available so a lapsed clinic isn't locked out of their own records, only from taking new actions
-- past_due gets a distinct, softer treatment than cancelled/unpaid/incomplete — e.g. a warning banner with a grace period rather than immediate hard block, since past_due often resolves itself (Stripe retries) — exact grace period TBD
-- Gated actions show a clear, specific upgrade/reactivate prompt (not a generic error) linking to /panel/settings' Suscripción tab
-- Public booking page (guest-facing) is NOT gated by the clinic's subscription status — a guest should still be able to book with a clinic mid-lapse; gating applies to the clinic's own panel actions only (open question: confirm this is actually the intended behavior, since a lapsed clinic still taking new bookings they can't manage may not be desired either)
-- Admin "Suscripciones" tool exists in the admin portal for support staff to look up/cancel stray subscriptions per-business — this is an admin-portal-tools.md concern by file organization, but listed here too since it's part of the same gating story; avoid building it twice
+- Billing is pay-in-advance (standard Stripe subscription behavior — a period's payment is due at that period's start, covering the period ahead)
+- Three-phase non-payment policy, keyed off the unpaid billing period's own start/end (not fixed calendar dates — a clinic's cycle may not start on the 1st):
+  - Phase 1 (period start to period start + 15 days, subscription_status = past_due): full access, nothing restricted. This is the grace window for a failed card to resolve itself (Stripe auto-retry, or the clinic updates their card) without the clinic or their patients noticing anything.
+  - Phase 2 (period start + 15 days to period end, still unpaid): public booking page (guest-facing) stops accepting new bookings. Panel otherwise stays fully usable — clinic can still see their calendar, manage existing bookings, view everything as normal.
+  - Phase 3 (past period end, still unpaid — subscription_status likely unpaid or cancelled by Stripe's own dunning by this point): full panel lockout. The only screen/action available is paying the outstanding bill (/panel/settings Suscripción tab or equivalent). The moment payment succeeds, full access reopens immediately (webhook-sync already handles the status flip back to active).
+- BUILD NOTE: schema currently only stores subscription_current_period_end, not the period's start — computing "15 days into the period" needs either storing current_period_start too (mirrored from Stripe, consistent with the existing "mirror Stripe's own values" pattern), or deriving day-15 as 15 days after the previous period's end. Decide which before building.
+- A single shared helper reads subscription_status + the phase computation above, rather than scattered inline status checks
+- Public booking page's restriction (Phase 2/3) only affects the specific lapsed clinic's slug — unrelated clinics are entirely unaffected
+- Gated panel actions (Phase 3) show a clear payment prompt, not a generic error
+- Admin "Suscripciones" tool exists in the admin portal for support staff to look up/cancel stray subscriptions per-business — tracked as subscriptions-lookup-tool in admin-portal-tools.md, avoid building it twice
 
 ## Notes / Deviations
 (freeform — anything found in code that doesn't map to a defined step)
