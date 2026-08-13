@@ -2,7 +2,7 @@
 
 import { authedAction } from "@/lib/auth-action";
 import { createClient } from "@/lib/supabase/server";
-import { getStripeClient, isStripeConfigured } from "@/lib/billing/stripe";
+import { getStripeClient, isStripeConfigured, nextBillingCycleAnchorUnix } from "@/lib/billing/stripe";
 import { getBusinessPricing } from "@/lib/pricing/data";
 import { getBusinessForUser } from "@/lib/business/data";
 
@@ -84,6 +84,15 @@ export const createCheckoutSession = authedAction(
           },
         },
       ],
+      // Calendar-aligned billing (workflows/subscription-billing.md) — see
+      // the fuller comment on createSubscriptionIntent below, which is the
+      // primary subscribe path; this fallback matches it so a clinic ends
+      // up on the same billing cycle regardless of which path they went
+      // through.
+      subscription_data: {
+        billing_cycle_anchor: nextBillingCycleAnchorUnix(),
+        proration_behavior: "create_prorations",
+      },
       success_url: `${base}/panel/settings/subscription?status=success`,
       cancel_url: `${base}/panel/settings/subscription?status=cancelled`,
     });
@@ -198,6 +207,14 @@ export const createSubscriptionIntent = authedAction(
         save_default_payment_method: "on_subscription",
         payment_method_types: ["card"],
       },
+      // Calendar-aligned billing (workflows/subscription-billing.md): every
+      // clinic bills on the 1st, not on a per-signup-date anniversary.
+      // Stripe prorates the first partial period up to this anchor
+      // automatically (proration_behavior defaults to create_prorations,
+      // set explicitly here for clarity) — e.g. signing up on the 15th
+      // charges a prorated ~half-month now, then full price from the 1st.
+      billing_cycle_anchor: nextBillingCycleAnchorUnix(),
+      proration_behavior: "create_prorations",
       expand: ["latest_invoice", "pending_setup_intent"],
     });
 
