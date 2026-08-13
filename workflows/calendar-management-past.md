@@ -40,9 +40,7 @@ Criteria:
 ## Step: client-session-history
 Status: not_started
 Criteria:
-- Past appointments roll up into a per-client history (total sessions, completed count, no-show count)
-- kalendar_bookings.clinic_client_id is populated by at least one write path (manual booking or guest wizard) so past bookings can be linked to a client record
-- Denormalized session counters on kalendar_clients are kept in sync when a booking's result changes
+- SUPERSEDED BY clinic-clients-page.md — this step's criteria (client-linking-on-booking, denormalized-counters-updated) now live there in more detail, since the clinic clients page is the actual place a per-client history would surface. Kept here as a pointer rather than removed, since this step originated from a calendar-management-past.md discussion.
 
 ## Notes / Deviations
 - updateBookingResult's own code comment flags that it does NOT yet update kalendar_clients' denormalized session counters (total_sessions/completed_count/etc.) because clinic_client_id isn't populated by any write path yet — this is the direct cause of the client-session-history step being not_started, not a separate unrelated gap.
