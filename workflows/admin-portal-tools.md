@@ -22,6 +22,12 @@ Status: done
 Criteria:
 - /admin/users exists — manages the admin allowlist
 
+## Step: subscriptions-lookup-tool
+Status: not_started
+Criteria:
+- Admin tool for support staff to look up a business's live Stripe subscription state and take action (e.g. cancel a stray/duplicate subscription) — see subscription-billing.md's feature-gating step, which this supports
+- Not yet built; no /admin/subscriptions route or equivalent exists today
+
 ## Step: appointment-generator-dev-tool
 Status: done
 Criteria:

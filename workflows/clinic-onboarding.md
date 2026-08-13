@@ -81,12 +81,5 @@ Criteria:
 - Only the onboarding checklist card is visible pre-completion
 - Widgets appear automatically once all 4 checklist items are done (no page reload required)
 
-## Step: subscription-activation
-Status: not_started
-Criteria:
-- Panel features are gated on kalendar_businesses.subscription_status
-- Unsubscribed/incomplete businesses are blocked from key panel actions
-- Clear upgrade prompt shown when gated
-
 ## Notes / Deviations
-(freeform — anything found in code that doesn't map to a defined step)
+- Subscription/trial gating (what happens once a clinic's Negocio/Servicios/Equipo/Disponibilidad setup is done but they haven't subscribed, or their subscription lapses) is tracked in subscription-billing.md under feature-gating and trial-period-mechanism, not here — it's a continuous billing-state concern rather than a one-time onboarding step, so it made more sense consolidated there than duplicated across both files.
