@@ -530,6 +530,105 @@ export const createBillingPortalSession = authedAction(
   }
 );
 
+// ── Auto-provisioned trial (onboarding completion) ──────────────────────────
+
+export type EnsureTrialResult =
+  | { ok: true; created: boolean } // created=false means one already existed (idempotent no-op)
+  | { ok: false; error: string };
+
+/**
+ * Auto-provisions a trial subscription for the caller's business the moment
+ * onboarding finishes, with NO button click and no card required — Arun's
+ * decision that every clinic gets the free trial by default rather than
+ * choosing between "subscribe now" / "start trial" (workflows/subscription-
+ * billing.md's trial-period-mechanism). Called from
+ * components/panel/auto-trial-provisioner.tsx, a tiny client component
+ * mounted on the panel home page only when setup is 100% complete and no
+ * subscription exists yet — it fires this once on mount, silently.
+ *
+ * Idempotent: if the business already has a stripe_subscription_id (this
+ * ran before, or the clinic manually subscribed/started a trial from
+ * settings before finishing onboarding), this is a no-op that returns
+ * created: false rather than creating a second subscription.
+ *
+ * Deliberately does NOT return a client secret / require Elements
+ * confirmation — unlike createSubscriptionIntent, nothing needs confirming
+ * here since no card is being collected. A card can be added later from
+ * Suscripción settings before the trial ends.
+ */
+export const ensureTrialSubscription = authedAction(
+  async (session): Promise<EnsureTrialResult> => {
+    if (!isStripeConfigured()) {
+      // Billing not configured (e.g. local dev without Stripe keys) —
+      // silently skip rather than erroring; onboarding shouldn't be blocked
+      // by billing infra being unavailable.
+      return { ok: true, created: false };
+    }
+
+    const business = await getBusinessForUser(session.user.id);
+    if (!business) return { ok: false, error: "No se encontró tu negocio." };
+
+    const supabase = await createClient();
+    const { data: bizRow } = await supabase
+      .from("kalendar_businesses")
+      .select("stripe_customer_id, stripe_subscription_id")
+      .eq("id", business.id)
+      .maybeSingle();
+
+    if (bizRow?.stripe_subscription_id) {
+      return { ok: true, created: false };
+    }
+
+    const stripe = getStripeClient();
+    if (!stripe) return { ok: true, created: false };
+
+    let customerId = bizRow?.stripe_customer_id ?? null;
+    if (!customerId) {
+      const customer = await stripe.customers.create({
+        email: business.contact_email || session.user.email || undefined,
+        name: business.name,
+        metadata: { business_id: business.id },
+      });
+      customerId = customer.id;
+      await supabase
+        .from("kalendar_businesses")
+        .update({ stripe_customer_id: customerId })
+        .eq("id", business.id);
+    }
+
+    const pricing = await getBusinessPricing(business.id);
+    const product = await stripe.products.create({
+      name: `Kalendar — ${business.name}`,
+    });
+
+    const subscription = await stripe.subscriptions.create({
+      customer: customerId,
+      items: [
+        {
+          price_data: {
+            currency: (pricing?.currency ?? "eur").toLowerCase(),
+            unit_amount: Math.round((pricing?.price ?? 0) * 100),
+            recurring: { interval: "month" },
+            product: product.id,
+          },
+        },
+      ],
+      trial_end: trialEndFromSignup(),
+      // No card collected at this point (see doc comment above), so there's
+      // no PaymentElement/Elements confirmation step to gate on — the
+      // subscription simply starts in 'trialing' immediately.
+      payment_settings: { save_default_payment_method: "on_subscription" },
+    });
+
+    await supabase
+      .from("kalendar_businesses")
+      .update({ stripe_subscription_id: subscription.id })
+      .eq("id", business.id);
+
+    return { ok: true, created: true };
+  }
+);
+
 // ── Trial extension (not yet wired to any UI) ───────────────────────────────
 
 export type ExtendTrialResult =

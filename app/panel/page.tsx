@@ -13,6 +13,8 @@ import { TodayStatsWidget } from "@/components/panel/today-stats-widget";
 import { WeekStatsWidget } from "@/components/panel/week-stats-widget";
 import { CancellationRequestsWidget } from "@/components/panel/cancellation-requests-widget";
 import { BookingPageCard } from "@/components/panel/booking-page-card";
+import { AutoTrialProvisioner } from "@/components/panel/auto-trial-provisioner";
+import { getBillingState } from "@/lib/billing/data";
 
 export default async function PanelHomePage() {
   const session = await requireSession();
@@ -75,6 +77,12 @@ export default async function PanelHomePage() {
   const completedCount = setupItems.filter((i) => i.done).length;
   const percentage     = Math.round((completedCount / setupItems.length) * 100);
   const allDone        = completedCount === setupItems.length;
+
+  // Trial auto-provisioning check — only fetched when it might matter
+  // (setup complete), to avoid an extra query on every home-page render for
+  // clinics still mid-onboarding.
+  const billingState = allDone && business ? await getBillingState(business.id) : null;
+  const needsTrialProvision = allDone && !billingState?.stripeSubscriptionId;
 
   const quickLinks = [
     { label: dict.sidebar.services,      href: "/panel/services",      icon: "sparkles" },
@@ -143,6 +151,8 @@ export default async function PanelHomePage() {
           />
         </div>
       )}
+
+      {needsTrialProvision && <AutoTrialProvisioner />}
 
       {/* Widget tile grid — Hoy/Citas comes first (top-left); more widgets
           get added here later, each as its own tile alongside it.
