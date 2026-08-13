@@ -31,15 +31,15 @@ Criteria:
 - RoleUpgradeGate exists for role-conflict resolution
 
 ## Step: negocio-setup
-Status: in_progress
+Status: done
 Criteria:
 - Business form exists at /app/panel/business/page.tsx
 - Captures name, business type, legal ID, slug
-- Business type options ordered: Fisioterapia, Fitness y entreno, Nutrición, Psicología, Coaching, Estética y belleza, Clases y tutorías, Otro
+- Business type options ordered: Fisioterapia, Fitness y entreno, Nutrición, Psicología, Coaching, Estética y belleza, Clases y tutorías, Otro (lib/onboarding/data.ts's BUSINESS_TYPES array)
 - Slug is permanent after creation (read-only on edit)
 - Slug moderation: clean slugs active instantly, flagged ones pending_review
-- Address captured as split fields (street, postal code, city, province) with postal-code autofill
-- Phone captured as country code (+34 default) + number, separate columns
+- Address captured as split fields (street, postal code, city, province) with postal-code autofill (lib/business/postal-codes.ts, silent-miss — convenience, not required)
+- Phone captured as country code (+34 default, lib/business/phone-country-codes.ts) + number, separate fields
 - Contact email field editable and separate from login email
 
 ## Step: servicios-setup
