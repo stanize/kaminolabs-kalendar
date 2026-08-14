@@ -56,11 +56,6 @@ export function PanelSidebar({
     { href: "/panel/services", label: dict.services, icon: "sparkles" },
     { href: "/panel/team", label: dict.team, icon: "user" },
     { href: "/panel/availability", label: dict.availability, icon: "clock" },
-    { href: "/panel/payments", label: dict.payments, icon: "creditCard" },
-    { href: "/panel/invoices", label: dict.invoices, icon: "fileText" },
-    { href: "/panel/notifications", label: dict.notifications, icon: "bell" },
-    { href: "/panel/reports", label: dict.reports, icon: "barChart" },
-    { href: "/panel/integrations", label: dict.integrations, icon: "grid" },
     { href: "/panel/settings", label: dict.settings, icon: "settings" },
   ];
 
