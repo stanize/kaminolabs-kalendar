@@ -15,13 +15,13 @@ export interface CalendarDictionary {
   manager: {
     tabWeek: string;
     tabUpcoming: string;
-    tabPending: string;
+    tabClients: string;
     tabCancellations: string;
-    pendingLabel: string; // the small badge on a pending booking row
+    filterAll: string; // "Todos" filter chip on the Clientes tab
     cancellationRequestedLabel: string; // the small badge on a cancellation-request row
     today: string;
     tomorrow: string;
-    emptyPendingTitle: string;
+    emptyClientsTitle: string;
     emptyCancellationsTitle: string;
     emptyUpcomingTitle: string;
     emptySubtitle: string;
@@ -132,13 +132,13 @@ const es: CalendarDictionary = {
   manager: {
     tabWeek: "Semana",
     tabUpcoming: "Próximas",
-    tabPending: "Pendientes",
+    tabClients: "Clientes",
     tabCancellations: "Cancelaciones",
-    pendingLabel: "Pendiente",
+    filterAll: "Todos",
     cancellationRequestedLabel: "Cancelación solicitada",
     today: "Hoy",
     tomorrow: "Mañana",
-    emptyPendingTitle: "No hay reservas pendientes",
+    emptyClientsTitle: "No hay reservas próximas",
     emptyCancellationsTitle: "No hay solicitudes de cancelación",
     emptyUpcomingTitle: "No tienes reservas próximas",
     emptySubtitle: "Las reservas de tu página aparecerán aquí.",
@@ -246,13 +246,13 @@ const en: CalendarDictionary = {
   manager: {
     tabWeek: "Week",
     tabUpcoming: "Upcoming",
-    tabPending: "Pending",
+    tabClients: "Clients",
     tabCancellations: "Cancellations",
-    pendingLabel: "Pending",
+    filterAll: "All",
     cancellationRequestedLabel: "Cancellation requested",
     today: "Today",
     tomorrow: "Tomorrow",
-    emptyPendingTitle: "No pending bookings",
+    emptyClientsTitle: "No upcoming bookings",
     emptyCancellationsTitle: "No cancellation requests",
     emptyUpcomingTitle: "You have no upcoming bookings",
     emptySubtitle: "Bookings from your page will show up here.",

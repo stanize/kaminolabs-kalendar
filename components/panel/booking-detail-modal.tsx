@@ -12,7 +12,7 @@ import {
   type BookingPaymentStatus,
 } from "@/lib/actions/booking-owner";
 import type { CalendarDictionary } from "@/lib/i18n/dictionaries/calendar";
-import type { WeekBookingVM } from "@/components/panel/calendar-grid-view";
+import { CLIENT_STATUS_LABEL, CLIENT_STATUS_BADGE_CLASS, type WeekBookingVM } from "@/components/panel/calendar-grid-view";
 
 const TZ = "Europe/Madrid";
 
@@ -109,7 +109,12 @@ export function BookingDetailModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" onClick={onClose}>
       <div className="w-full max-w-[420px] rounded-2xl bg-surface p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-[17px] font-bold text-ink">{booking.serviceName}</h2>
+          <div className="flex min-w-0 items-center gap-2">
+            <h2 className="truncate text-[17px] font-bold text-ink">{booking.serviceName}</h2>
+            <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${CLIENT_STATUS_BADGE_CLASS[booking.clientStatus]}`}>
+              {CLIENT_STATUS_LABEL[booking.clientStatus]}
+            </span>
+          </div>
           <button
             onClick={onClose}
             aria-label={d.close}
@@ -131,7 +136,7 @@ export function BookingDetailModal({
           {isAwaitingConfirmation && (
             <div className="flex items-center gap-2 text-orange-700">
               <Icon name="bell" size={14} className="shrink-0" />
-              <span className="font-semibold">{dict.manager.pendingLabel}</span>
+              <span className="font-semibold">Pendiente de confirmación</span>
             </div>
           )}
           {booking.clientPhone && (

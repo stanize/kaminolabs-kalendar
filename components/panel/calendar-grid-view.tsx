@@ -28,6 +28,36 @@ export interface WeekMemberVM {
   isOwner: boolean;
 }
 
+// Client-relationship status labels/colors (lib/booking/client-status.ts) —
+// exported so calendar-bookings.tsx and booking-detail-modal.tsx can reuse
+// the exact same labels/colors instead of redefining them, keeping the
+// badge visually consistent everywhere it appears (grid chip dot, tab rows,
+// detail modal). Kept here (not in the server-only lib/booking/client-
+// status.ts) since it needs to be importable from client components without
+// pulling in that file's server-only createClient import.
+export type ClientStatusValue = "guest_unconfirmed" | "guest_confirmed" | "first_time" | "returning";
+
+export const CLIENT_STATUS_LABEL: Record<ClientStatusValue, string> = {
+  guest_unconfirmed: "Invitado · sin confirmar",
+  guest_confirmed: "Invitado · confirmado",
+  first_time: "Cliente registrado · primera vez",
+  returning: "Cliente registrado · recurrente",
+};
+
+export const CLIENT_STATUS_DOT_CLASS: Record<ClientStatusValue, string> = {
+  guest_unconfirmed: "bg-amber-500",
+  guest_confirmed: "bg-sky-500",
+  first_time: "bg-violet-500",
+  returning: "bg-emerald-500",
+};
+
+export const CLIENT_STATUS_BADGE_CLASS: Record<ClientStatusValue, string> = {
+  guest_unconfirmed: "bg-amber-50 text-amber-800 border-amber-200",
+  guest_confirmed: "bg-sky-50 text-sky-800 border-sky-200",
+  first_time: "bg-violet-50 text-violet-800 border-violet-200",
+  returning: "bg-emerald-50 text-emerald-800 border-emerald-200",
+};
+
 export interface WeekBookingVM {
   id: string;
   serviceId: string | null;
@@ -50,6 +80,9 @@ export interface WeekBookingVM {
   // cancellation window and is now awaiting owner approve/deny (see
   // schema comment on kalendar_bookings.cancellation_requested_at).
   cancellationRequestedAt: string | null;
+  // See lib/booking/client-status.ts — how much the clinic should
+  // double-check this reservation, independent of `status` above.
+  clientStatus: ClientStatusValue;
 }
 
 export interface WeekServiceVM {
@@ -415,6 +448,10 @@ function DayProviderColumn({
                 {b.reminderSendFailed && (
                   <span title="Recordatorio no enviado" className="mr-1 text-amber-600">⚠</span>
                 )}
+                <span
+                  title={CLIENT_STATUS_LABEL[b.clientStatus]}
+                  className={`mr-1 inline-block h-[7px] w-[7px] rounded-full align-middle ${CLIENT_STATUS_DOT_CLASS[b.clientStatus]}`}
+                />
                 {b.serviceName}
               </div>
               <div className="truncate opacity-90">{timeLabel(b.startIso)} · {b.clientName}</div>

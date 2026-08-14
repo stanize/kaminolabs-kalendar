@@ -4,11 +4,13 @@ import { getBusinessForUser } from "@/lib/business/data";
 import { getTeamForUser } from "@/lib/team/data";
 import { getServicesForUser } from "@/lib/services/data";
 import { dayIdInTz, tzDateParts, zonedTimeToUtc, BUSINESS_TZ } from "@/lib/booking/slots";
+import { attachClientStatus, type ClientStatus } from "@/lib/booking/client-status";
 import type { DayId } from "@/lib/onboarding/types";
 import type { TimeRange } from "@/lib/booking/slots";
 
 export type BookingStatus = "pending_confirmation" | "confirmed" | "cancelled" | "completed" | "no_show";
 export type PaymentStatus = "unpaid" | "paid";
+export type { ClientStatus };
 
 export interface OwnerBooking {
   id: string;
@@ -16,6 +18,7 @@ export interface OwnerBooking {
   service_duration_min: number;
   service_price: number;
   team_member_id: string | null;
+  patient_id: string | null;
   starts_at: string;
   ends_at: string;
   status: BookingStatus;
@@ -29,10 +32,11 @@ export interface OwnerBooking {
 
 export interface OwnerBookingWithProvider extends OwnerBooking {
   provider_name: string | null;
+  clientStatus: ClientStatus;
 }
 
 const BOOKING_COLUMNS =
-  "id, service_name, service_duration_min, service_price, team_member_id, starts_at, ends_at, status, client_name, client_email, client_phone, pending_expiry_at, guest_locale, cancellation_requested_at";
+  "id, service_name, service_duration_min, service_price, team_member_id, patient_id, starts_at, ends_at, status, client_name, client_email, client_phone, pending_expiry_at, guest_locale, cancellation_requested_at";
 
 /**
  * Bookings for the owner's business, scoped by userId via the owning business.
@@ -65,10 +69,11 @@ export async function getUpcomingBookings(userId: string): Promise<OwnerBookingW
     ((membersRes.data as { id: string; name: string }[] | null) ?? []).map((m) => [m.id, m.name])
   );
 
-  return ((bookingsRes.data as OwnerBooking[] | null) ?? []).map((b) => ({
+  const withProvider = ((bookingsRes.data as OwnerBooking[] | null) ?? []).map((b) => ({
     ...b,
     provider_name: b.team_member_id ? memberName.get(b.team_member_id) ?? null : null,
   }));
+  return attachClientStatus(business.id, withProvider);
 }
 
 // ── Week view (Outlook-style grid, one column per provider) ────────────────
@@ -100,6 +105,7 @@ export interface WeekViewBooking {
   reminderSendFailed: boolean;
   lastReminderError: string | null;
   cancellationRequestedAt: string | null;
+  clientStatus: ClientStatus;
 }
 
 export interface WeekViewService {
@@ -161,7 +167,7 @@ export async function getWeekCalendarData(
     supabase
       .from("kalendar_bookings")
       .select(
-        "id, service_id, service_name, service_duration_min, starts_at, ends_at, status, payment_status, client_name, client_email, client_phone, notes, team_member_id, pending_expiry_at, guest_locale, reminder_send_failed, last_reminder_error, cancellation_requested_at"
+        "id, service_id, service_name, service_duration_min, starts_at, ends_at, status, payment_status, client_name, client_email, client_phone, notes, team_member_id, patient_id, pending_expiry_at, guest_locale, reminder_send_failed, last_reminder_error, cancellation_requested_at"
       )
       .eq("business_id", business.id)
       .gte("starts_at", weekStartIso)
@@ -175,7 +181,7 @@ export async function getWeekCalendarData(
       .order("starts_at", { ascending: true }),
   ]);
 
-  const bookings: WeekViewBooking[] = (
+  const rawBookings =
     (bookingsRes.data as
       | {
           id: string;
@@ -191,14 +197,18 @@ export async function getWeekCalendarData(
           client_phone: string | null;
           notes: string | null;
           team_member_id: string | null;
+          patient_id: string | null;
           pending_expiry_at: string | null;
           guest_locale: string | null;
           reminder_send_failed: boolean | null;
           last_reminder_error: string | null;
           cancellation_requested_at: string | null;
         }[]
-      | null) ?? []
-  ).map((b) => ({
+      | null) ?? [];
+
+  const withStatus = await attachClientStatus(business.id, rawBookings);
+
+  const bookings: WeekViewBooking[] = withStatus.map((b) => ({
     id: b.id,
     serviceId: b.service_id,
     serviceName: b.service_name,
@@ -217,6 +227,7 @@ export async function getWeekCalendarData(
     reminderSendFailed: b.reminder_send_failed ?? false,
     lastReminderError: b.last_reminder_error,
     cancellationRequestedAt: b.cancellation_requested_at,
+    clientStatus: b.clientStatus,
   }));
 
   return {
@@ -407,10 +418,11 @@ export async function getPendingCancellationRequests(
     ((membersRes.data as { id: string; name: string }[] | null) ?? []).map((m) => [m.id, m.name])
   );
 
-  return ((bookingsRes.data as OwnerBooking[] | null) ?? []).map((b) => ({
+  const withProvider = ((bookingsRes.data as OwnerBooking[] | null) ?? []).map((b) => ({
     ...b,
     provider_name: b.team_member_id ? memberName.get(b.team_member_id) ?? null : null,
   }));
+  return attachClientStatus(business.id, withProvider);
 }
 
 export async function getPendingCancellationCount(userId: string): Promise<number> {

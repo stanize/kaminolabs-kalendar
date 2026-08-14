@@ -13,6 +13,9 @@ import {
   type WeekBookingVM,
   type WeekServiceVM,
   type TimeRangeVM,
+  type ClientStatusValue,
+  CLIENT_STATUS_LABEL,
+  CLIENT_STATUS_BADGE_CLASS,
 } from "@/components/panel/calendar-grid-view";
 import { CalendarMonthView } from "@/components/panel/calendar-month-view";
 import { BookingDetailModal } from "@/components/panel/booking-detail-modal";
@@ -45,6 +48,7 @@ interface BookingVM {
   pendingExpiryAt: string | null;
   guestLocale: "es" | "en";
   cancellationRequestedAt: string | null;
+  clientStatus: ClientStatusValue;
 }
 
 const TZ = "Europe/Madrid";
@@ -95,6 +99,7 @@ function toWeekBookingVM(b: BookingVM): WeekBookingVM {
     reminderSendFailed: false,
     lastReminderError: null,
     cancellationRequestedAt: b.cancellationRequestedAt,
+    clientStatus: b.clientStatus,
   };
 }
 
@@ -169,7 +174,7 @@ export function CalendarBookings({
   // once on mount, not reactively, so the URL doesn't fight the user if they
   // switch tabs afterward.
   const initialTab = searchParams.get("tab") === "cancellations" ? "cancellations" : "week";
-  const [tab, setTab] = useState<"week" | "pending" | "cancellations">(initialTab);
+  const [tab, setTab] = useState<"week" | "clients" | "cancellations">(initialTab);
   const [list, setList] = useState<BookingVM[]>(bookings);
   const [cancellationList, setCancellationList] = useState<BookingVM[]>(cancellationRequests);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -271,17 +276,23 @@ export function CalendarBookings({
     [range.start, view, dict.intlLocale]
   );
 
-  // ── Pendientes tab (unchanged) ────────────────────────────────────────────
-  const pendingCount = list.filter((b) => b.status === "pending_confirmation").length;
+  // ── Clientes tab ─────────────────────────────────────────────────────────
+  // Replaces the old "Pendientes" (awaiting-confirmation-only) tab per
+  // Arun's decision: what a clinic actually wants at a glance isn't "which
+  // bookings need my confirmation" but "which reservations need a closer
+  // look, based on who's booking" — guest bookings and first-time patients
+  // need more scrutiny than a returning registered client. A flat row list
+  // (no calendar grid), filterable by the categories that actually warrant
+  // attention; "returning" isn't offered as a filter chip since that's the
+  // no-action-needed segment — it's still visible under "Todos" though.
+  const [clientFilter, setClientFilter] = useState<"all" | ClientStatusValue>("all");
+  const needsAttentionCount = list.filter(
+    (b) => b.clientStatus === "guest_unconfirmed" || b.clientStatus === "first_time"
+  ).length;
 
-  // Pendientes tab: flat list, sorted by expiry soonest first.
-  const pending = [...list]
-    .filter((b) => b.status === "pending_confirmation")
-    .sort((a, b) => {
-      if (!a.pendingExpiryAt) return 1;
-      if (!b.pendingExpiryAt) return -1;
-      return new Date(a.pendingExpiryAt).getTime() - new Date(b.pendingExpiryAt).getTime();
-    });
+  const clientRows = [...list]
+    .filter((b) => clientFilter === "all" || b.clientStatus === clientFilter)
+    .sort((a, b) => new Date(a.startIso).getTime() - new Date(b.startIso).getTime());
 
   // Cancelaciones tab: dedicated cancellationList (see prop doc comment) —
   // NOT filtered from `list`/`bookings`, since those are future-only and
@@ -371,10 +382,10 @@ export function CalendarBookings({
       <div className="flex gap-2">
         <TabBtn active={tab === "week"} onClick={() => setTab("week")} label={m.tabWeek} />
         <TabBtn
-          active={tab === "pending"}
-          onClick={() => setTab("pending")}
-          label={m.tabPending}
-          badge={pendingCount > 0 ? pendingCount : undefined}
+          active={tab === "clients"}
+          onClick={() => setTab("clients")}
+          label={m.tabClients}
+          badge={needsAttentionCount > 0 ? needsAttentionCount : undefined}
         />
         <TabBtn
           active={tab === "cancellations"}
@@ -464,60 +475,95 @@ export function CalendarBookings({
         />
       )}
 
-      {tab === "pending" && (
-        pending.length === 0 ? (
-          <div className="rounded-2xl border border-line bg-surface px-6 py-12 text-center">
-            <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-full bg-surface-2 text-ink-soft">
-              <Icon name="calendar" size={22} />
-            </div>
-            <p className="text-[14.5px] font-semibold text-ink">{m.emptyPendingTitle}</p>
-            <p className="mt-1 text-[13px] text-ink-soft">{m.emptySubtitle}</p>
+      {tab === "clients" && (
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-wrap gap-2">
+            <FilterChip active={clientFilter === "all"} onClick={() => setClientFilter("all")} label={m.filterAll} />
+            <FilterChip
+              active={clientFilter === "guest_unconfirmed"}
+              onClick={() => setClientFilter("guest_unconfirmed")}
+              label={CLIENT_STATUS_LABEL.guest_unconfirmed}
+              dotClass="bg-amber-500"
+            />
+            <FilterChip
+              active={clientFilter === "guest_confirmed"}
+              onClick={() => setClientFilter("guest_confirmed")}
+              label={CLIENT_STATUS_LABEL.guest_confirmed}
+              dotClass="bg-sky-500"
+            />
+            <FilterChip
+              active={clientFilter === "first_time"}
+              onClick={() => setClientFilter("first_time")}
+              label={CLIENT_STATUS_LABEL.first_time}
+              dotClass="bg-violet-500"
+            />
           </div>
-        ) : (
-          <div className="overflow-hidden rounded-xl border border-line bg-surface">
-            {pending.map((b, i) => (
-              <div
-                key={b.id}
-                className={`flex items-center gap-3 px-4 py-3.5 ${i > 0 ? "border-t border-line" : ""}`}
-              >
-                <div className="w-[52px] shrink-0 text-[15px] font-semibold text-ink">
-                  {timeLabel(b.startIso)}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="flex flex-wrap items-center gap-1.5 text-[14px] font-semibold text-ink">
-                    <span className="truncate">{b.serviceName}</span>
-                    <span className="shrink-0 rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-semibold text-ink-soft">
-                      {m.pendingLabel}
-                    </span>
-                    {b.pendingExpiryAt && <CountdownBadge expiryIso={b.pendingExpiryAt} m={m} />}
-                  </p>
-                  <p className="truncate text-[12.5px] text-ink-soft">
-                    {b.clientName}
-                    {b.providerName ? ` · ${b.providerName}` : ""}
-                    {b.durationMin ? ` · ${b.durationMin} ${m.minutesUnit}` : ""}
-                  </p>
-                </div>
 
-                <div className="flex shrink-0 items-center gap-1">
-                  <button
-                    onClick={() => handleConfirm(b.id)}
-                    disabled={busyId === b.id}
-                    className="rounded-lg px-2.5 py-1.5 text-[12.5px] font-semibold text-brand hover:bg-brand-weak disabled:opacity-50"
-                  >
-                    {busyId === b.id ? m.confirming : m.confirm}
-                  </button>
-                  <button
-                    onClick={() => handleCancel(b.id)}
-                    disabled={busyId === b.id}
-                    className="rounded-lg px-2.5 py-1.5 text-[12.5px] font-medium text-ink-soft hover:bg-error-weak hover:text-error disabled:opacity-50"
-                  >
-                    {m.cancel}
-                  </button>
-                </div>
+          {clientRows.length === 0 ? (
+            <div className="rounded-2xl border border-line bg-surface px-6 py-12 text-center">
+              <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-full bg-surface-2 text-ink-soft">
+                <Icon name="calendar" size={22} />
               </div>
-            ))}
-          </div>
-        )
+              <p className="text-[14.5px] font-semibold text-ink">{m.emptyClientsTitle}</p>
+              <p className="mt-1 text-[13px] text-ink-soft">{m.emptySubtitle}</p>
+            </div>
+          ) : (
+            <div className="overflow-hidden rounded-xl border border-line bg-surface">
+              {clientRows.map((b, i) => (
+                <div
+                  key={b.id}
+                  onClick={() => setSelectedBooking(toWeekBookingVM(b))}
+                  className={`flex cursor-pointer flex-col gap-3 px-4 py-3.5 transition-colors hover:bg-surface-2 sm:flex-row sm:items-center ${i > 0 ? "border-t border-line" : ""}`}
+                >
+                  <div className="flex items-start gap-3 sm:flex-1 sm:items-center">
+                    <div className="w-[70px] shrink-0">
+                      <p className="text-[15px] font-semibold text-ink">{timeLabel(b.startIso)}</p>
+                      <p className="text-[11.5px] capitalize text-ink-soft">{dateLabel(b.startIso, dict.intlLocale)}</p>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="flex flex-wrap items-center gap-1.5 text-[14px] font-semibold text-ink">
+                        <span className="truncate">{b.serviceName}</span>
+                        <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${CLIENT_STATUS_BADGE_CLASS[b.clientStatus]}`}>
+                          {CLIENT_STATUS_LABEL[b.clientStatus]}
+                        </span>
+                        {b.pendingExpiryAt && b.clientStatus === "guest_unconfirmed" && (
+                          <CountdownBadge expiryIso={b.pendingExpiryAt} m={m} />
+                        )}
+                      </p>
+                      <p className="truncate text-[12.5px] text-ink-soft">
+                        {b.clientName}
+                        {b.providerName ? ` · ${b.providerName}` : ""}
+                        {b.durationMin ? ` · ${b.durationMin} ${m.minutesUnit}` : ""}
+                      </p>
+                    </div>
+                  </div>
+
+                  {b.status === "pending_confirmation" && (
+                    <div
+                      className="flex shrink-0 items-center gap-1 pl-[82px] sm:pl-0"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <button
+                        onClick={() => handleConfirm(b.id)}
+                        disabled={busyId === b.id}
+                        className="rounded-lg px-2.5 py-1.5 text-[12.5px] font-semibold text-brand hover:bg-brand-weak disabled:opacity-50"
+                      >
+                        {busyId === b.id ? m.confirming : m.confirm}
+                      </button>
+                      <button
+                        onClick={() => handleCancel(b.id)}
+                        disabled={busyId === b.id}
+                        className="rounded-lg px-2.5 py-1.5 text-[12.5px] font-medium text-ink-soft hover:bg-error-weak hover:text-error disabled:opacity-50"
+                      >
+                        {m.cancel}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       )}
 
       {tab === "cancellations" && (
@@ -608,6 +654,26 @@ function TabBtn({
           {badge}
         </span>
       )}
+    </button>
+  );
+}
+
+function FilterChip({
+  active, onClick, label, dotClass,
+}: {
+  active: boolean; onClick: () => void; label: string; dotClass?: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12.5px] font-medium transition-colors ${
+        active
+          ? "border-brand bg-brand-weak text-brand-ink"
+          : "border-line text-ink-soft hover:bg-surface-2"
+      }`}
+    >
+      {dotClass && <span className={`h-[7px] w-[7px] shrink-0 rounded-full ${dotClass}`} />}
+      {label}
     </button>
   );
 }

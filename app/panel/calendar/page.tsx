@@ -76,6 +76,7 @@ export default async function CalendarPage() {
           pendingExpiryAt: b.pending_expiry_at,
           guestLocale: (b.guest_locale ?? "es") as "es" | "en",
           cancellationRequestedAt: b.cancellation_requested_at,
+          clientStatus: b.clientStatus,
         }))}
         cancellationRequests={cancellationRequests.map((b) => ({
           id: b.id,
@@ -90,6 +91,7 @@ export default async function CalendarPage() {
           pendingExpiryAt: b.pending_expiry_at,
           guestLocale: (b.guest_locale ?? "es") as "es" | "en",
           cancellationRequestedAt: b.cancellation_requested_at,
+          clientStatus: b.clientStatus,
         }))}
         weekMembers={(weekData?.members ?? []).map((m) => ({ id: m.id, name: m.name, isOwner: m.isOwner }))}
         weekHoursByDay={weekData?.hoursByDay ?? {}}
@@ -115,6 +117,7 @@ export default async function CalendarPage() {
           reminderSendFailed: b.reminderSendFailed,
           lastReminderError: b.lastReminderError,
           cancellationRequestedAt: b.cancellationRequestedAt,
+          clientStatus: b.clientStatus,
         }))}
         weekStartIso={weekStartIso}
       />
