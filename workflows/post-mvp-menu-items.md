@@ -12,12 +12,11 @@ Criteria:
 ## Step: payments-page
 Status: not_started
 Criteria:
-- REMOVED FROM NAV: no longer linked in the sidebar (commit ce5f610), but the route/page itself still exists at /app/panel/payments/page.tsx, unreachable via nav but not deleted — differs from invoices/notifications/reports/integrations below, which were deleted outright
-- /app/panel/payments/page.tsx exists but is explicitly a placeholder — its own code comment confirms this
-- Intended scope per that comment: payments FROM the clinic's own clients (deposits, no-show charges, per-appointment payment status) — NOT the Kalendar SaaS subscription (that's /panel/settings/subscription, already built)
+- HISTORY CONFIRMED: /panel/payments was originally built as the Kalendar SaaS subscription page (fd3bb57 "Add Stripe subscription billing... panel-payments module", then 0eedcf0 built it out further as native in-app billing UI). c4dae9d then moved that real subscription work to the new tabbed /panel/settings (Suscripción tab — see subscription-billing.md, correctly tracked as done) and repurposed /panel/payments as a placeholder for a different, unrelated feature: client-to-clinic payments.
+- CONFIRMED (not just inferred from the code comment): client-to-clinic payments (deposits, no-show charges, per-appointment payment status) has never actually been built — what's at /panel/payments today is inert placeholder debris left over from the subscription-page migration, not a partial implementation of this feature. Safe to delete along with the other four rather than preserve.
+- Intended scope if revisited later: payments FROM the clinic's own clients — NOT the Kalendar SaaS subscription (that's settled, done, lives at /panel/settings)
 - kalendar_bookings.payment_status already exists in schema for this future build-out (paid/unpaid, set via updateBookingResult — see calendar-management-past.md's mark-payment step, which already covers the per-booking toggle)
-- Not yet decided what this page adds beyond what mark-payment already covers — possibly a clinic-wide payments ledger/report view rather than new per-booking functionality
-- Confirm with Arun whether leaving the now-orphaned page.tsx in place (vs. deleting it like the other four) was intentional, or just missed in the cleanup pass
+- Not yet decided what this page would add beyond what mark-payment already covers — possibly a clinic-wide payments ledger/report view rather than new per-booking functionality
 
 ## Step: invoices-page
 Status: not_started
@@ -44,5 +43,5 @@ Criteria:
 - Scope undecided — no specific integrations identified as wanted yet (e.g. calendar sync, other tools)
 
 ## Notes / Deviations
-- CLEANUP DONE (commit ce5f610): Arun removed Pagos, Facturas, Notificaciones, Informes, and Integraciones from the sidebar. Invoices/notifications/reports/integrations routes were deleted outright; payments' route was left in place but unlinked — flagged above as worth confirming whether that was intentional.
+- CLEANUP DONE (commit ce5f610): Arun removed Pagos, Facturas, Notificaciones, Informes, and Integraciones from the sidebar. Invoices/notifications/reports/integrations routes were deleted outright; payments' route was left in place unlinked — confirmed via git history (see payments-page step) that this is leftover debris from the subscription-page migration, not a partial feature worth preserving. Safe to delete in a follow-up cleanup pass.
 - These remain valid post-MVP candidates to build later; removing the nav link doesn't remove the underlying idea, just declutters the panel until each one has a real design.
