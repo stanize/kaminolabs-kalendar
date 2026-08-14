@@ -3,6 +3,7 @@ import { requireSession } from "@/lib/auth-session";
 import { getBusinessForUser } from "@/lib/business/data";
 import {
   getUpcomingBookings,
+  getPendingCancellationRequests,
   getWeekCalendarData,
   getDefaultCalendarWeekBounds,
   getHoyWidgetStats,
@@ -24,8 +25,9 @@ export default async function CalendarPage() {
 
   const { weekStartIso, weekEndIso } = await getDefaultCalendarWeekBounds(session.user.id);
 
-  const [bookings, weekData, hoyStats, weekStats] = await Promise.all([
+  const [bookings, cancellationRequests, weekData, hoyStats, weekStats] = await Promise.all([
     getUpcomingBookings(session.user.id),
+    getPendingCancellationRequests(session.user.id),
     getWeekCalendarData(session.user.id, weekStartIso, weekEndIso),
     getHoyWidgetStats(session.user.id),
     getWeekWidgetStats(session.user.id),
@@ -62,6 +64,20 @@ export default async function CalendarPage() {
       <CalendarBookings
         dict={dict}
         bookings={bookings.map((b) => ({
+          id: b.id,
+          serviceName: b.service_name,
+          startIso: b.starts_at,
+          durationMin: b.service_duration_min,
+          status: b.status,
+          clientName: b.client_name,
+          clientEmail: b.client_email,
+          clientPhone: b.client_phone,
+          providerName: b.provider_name,
+          pendingExpiryAt: b.pending_expiry_at,
+          guestLocale: (b.guest_locale ?? "es") as "es" | "en",
+          cancellationRequestedAt: b.cancellation_requested_at,
+        }))}
+        cancellationRequests={cancellationRequests.map((b) => ({
           id: b.id,
           serviceName: b.service_name,
           startIso: b.starts_at,

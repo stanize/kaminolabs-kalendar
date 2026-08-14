@@ -95,6 +95,7 @@ function CountdownBadge({ expiryIso, m }: { expiryIso: string; m: CalendarDictio
 
 export function CalendarBookings({
   bookings,
+  cancellationRequests,
   dict,
   weekMembers,
   weekHoursByDay,
@@ -103,6 +104,13 @@ export function CalendarBookings({
   weekStartIso,
 }: {
   bookings: BookingVM[];
+  // Separate from `bookings` — `bookings` is deliberately future-only
+  // (getUpcomingBookings' date filter), but a cancellation request can
+  // exist on a booking whose appointment time has already passed. Fetched
+  // from getPendingCancellationRequests, which has no date filter, so this
+  // always matches the panel-home widget's count exactly (previously they
+  // could disagree — see the fuller comment on that data function).
+  cancellationRequests: BookingVM[];
   dict: CalendarDictionary;
   weekMembers: WeekMemberVM[];
   weekHoursByDay: Partial<Record<DayId, TimeRangeVM[]>>;
@@ -120,6 +128,7 @@ export function CalendarBookings({
   const initialTab = searchParams.get("tab") === "cancellations" ? "cancellations" : "week";
   const [tab, setTab] = useState<"week" | "pending" | "cancellations">(initialTab);
   const [list, setList] = useState<BookingVM[]>(bookings);
+  const [cancellationList, setCancellationList] = useState<BookingVM[]>(cancellationRequests);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -231,18 +240,17 @@ export function CalendarBookings({
       return new Date(a.pendingExpiryAt).getTime() - new Date(b.pendingExpiryAt).getTime();
     });
 
-  // Cancelaciones tab: bookings with a pending patient cancellation request
-  // (see kalendar_bookings.cancellation_requested_at) — status stays
-  // pending_confirmation/confirmed, this is a separate flag layered on top,
-  // so it's filtered independently of the "pending" (awaiting confirmation)
-  // list above rather than being a status value itself. Soonest-requested
-  // first, same ordering rationale as the Pendientes tab's expiry sort.
-  const cancellationCount = list.filter((b) => b.cancellationRequestedAt).length;
-  const cancellations = [...list]
-    .filter((b) => b.cancellationRequestedAt)
-    .sort((a, b) =>
+  // Cancelaciones tab: dedicated cancellationList (see prop doc comment) —
+  // NOT filtered from `list`/`bookings`, since those are future-only and
+  // would silently drop a request on a past-dated booking. Soonest-
+  // requested first, same ordering rationale as the Pendientes tab's expiry
+  // sort. All already have cancellationRequestedAt set (that's the fetch
+  // criteria), so no further filtering needed here.
+  const cancellationCount = cancellationList.length;
+  const cancellations = [...cancellationList].sort(
+    (a, b) =>
       new Date(a.cancellationRequestedAt!).getTime() - new Date(b.cancellationRequestedAt!).getTime()
-    );
+  );
 
   const handleCancel = useCallback(async (id: string) => {
     setError(null);
@@ -280,25 +288,39 @@ export function CalendarBookings({
   const handleReviewRequest = useCallback(async (id: string, decision: "approve" | "deny") => {
     setError(null);
     setBusyId(id);
-    const prev = list;
-    // Optimistic: approve removes it from the list (cancelled → filtered out
-    // by the pending/confirmed status check elsewhere); deny just clears the
-    // request flag and the row disappears from this tab either way.
-    setList((l) =>
-      decision === "approve"
-        ? l.map((b) => b.id === id ? { ...b, status: "cancelled" as Status, cancellationRequestedAt: null } : b)
-        : l.map((b) => b.id === id ? { ...b, cancellationRequestedAt: null } : b)
-    );
+    const prevCancellationList = cancellationList;
+    const prevList = list;
+    // Optimistic: either decision removes the row from the Cancelaciones
+    // tab (approve resolves it as cancelled, deny clears the request flag
+    // — either way there's no more pending request to show). Approve also
+    // needs to update `list` (the week/pending tabs) so a still-upcoming
+    // booking's status flips to cancelled there too, in case it's visible
+    // in another tab; cancellationList itself doesn't need that same
+    // status update since the row is being removed from it entirely.
+    setCancellationList((l) => l.filter((b) => b.id !== id));
+    if (decision === "approve") {
+      setList((l) =>
+        l.map((b) => (b.id === id ? { ...b, status: "cancelled" as Status, cancellationRequestedAt: null } : b))
+      );
+    } else {
+      setList((l) => l.map((b) => (b.id === id ? { ...b, cancellationRequestedAt: null } : b)));
+    }
     try {
       const res = await reviewCancellationRequest(id, decision, dict.errors);
-      if (!res.ok) { setList(prev); setError(res.error); }
+      if (!res.ok) {
+        setCancellationList(prevCancellationList);
+        setList(prevList);
+        setError(res.error);
+      }
     } catch {
-      setList(prev); setError(m.errCancelFailed);
+      setCancellationList(prevCancellationList);
+      setList(prevList);
+      setError(m.errCancelFailed);
     } finally {
       setBusyId(null);
       router.refresh();
     }
-  }, [list, dict.errors, m.errCancelFailed, router]);
+  }, [list, cancellationList, dict.errors, m.errCancelFailed, router]);
 
   return (
     <div className="flex flex-col gap-5">

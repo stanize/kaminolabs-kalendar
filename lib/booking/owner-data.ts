@@ -368,18 +368,54 @@ export async function getWeekWidgetStats(userId: string): Promise<WeekWidgetStat
  * only rendered when this is > 0, so it doesn't take up space when there's
  * nothing to review.
  */
-export async function getPendingCancellationCount(userId: string): Promise<number> {
+/**
+ * Every booking with a pending cancellation request (see
+ * kalendar_bookings.cancellation_requested_at), regardless of whether the
+ * appointment date itself is in the past or future. Deliberately NOT
+ * date-filtered like getUpcomingBookings — a patient can submit a
+ * cancellation request on a booking whose start time has already passed
+ * but hasn't been marked completed/no_show yet, and the owner still needs
+ * to see and act on that request. This is the single source of truth for
+ * the panel-home widget count AND the calendar page's Cancelaciones tab —
+ * previously they used different queries (this one vs. getUpcomingBookings'
+ * future-only list) which could disagree, e.g. the widget showing "1
+ * pending" while the tab showed none because the one pending request was
+ * on a past-dated booking that getUpcomingBookings' date filter excluded.
+ */
+export async function getPendingCancellationRequests(
+  userId: string
+): Promise<OwnerBookingWithProvider[]> {
   const business = await getBusinessForUser(userId);
-  if (!business) return 0;
+  if (!business) return [];
 
   const supabase = await createClient();
-  const { count } = await supabase
-    .from("kalendar_bookings")
-    .select("id", { count: "exact", head: true })
-    .eq("business_id", business.id)
-    .not("cancellation_requested_at", "is", null);
 
-  return count ?? 0;
+  const [bookingsRes, membersRes] = await Promise.all([
+    supabase
+      .from("kalendar_bookings")
+      .select(BOOKING_COLUMNS)
+      .eq("business_id", business.id)
+      .not("cancellation_requested_at", "is", null)
+      .order("cancellation_requested_at", { ascending: true }),
+    supabase
+      .from("kalendar_team_members")
+      .select("id, name")
+      .eq("business_id", business.id),
+  ]);
+
+  const memberName = new Map(
+    ((membersRes.data as { id: string; name: string }[] | null) ?? []).map((m) => [m.id, m.name])
+  );
+
+  return ((bookingsRes.data as OwnerBooking[] | null) ?? []).map((b) => ({
+    ...b,
+    provider_name: b.team_member_id ? memberName.get(b.team_member_id) ?? null : null,
+  }));
+}
+
+export async function getPendingCancellationCount(userId: string): Promise<number> {
+  const requests = await getPendingCancellationRequests(userId);
+  return requests.length;
 }
 
 /**
