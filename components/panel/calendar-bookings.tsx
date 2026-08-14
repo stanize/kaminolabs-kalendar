@@ -55,6 +55,49 @@ function timeLabel(iso: string): string {
   }).format(new Date(iso));
 }
 
+// Short date label (e.g. "mar, 11 ago") — used on the Pendientes/
+// Cancelaciones tabs, which are flat lists spanning multiple days, so a
+// bare time alone (e.g. "09:00") is ambiguous about which day it's for.
+function dateLabel(iso: string, locale: string): string {
+  return new Intl.DateTimeFormat(locale, {
+    timeZone: TZ, weekday: "short", day: "numeric", month: "short",
+  }).format(new Date(iso));
+}
+
+// Converts a flat-list BookingVM (Pendientes/Cancelaciones tabs) into the
+// richer WeekBookingVM shape BookingDetailModal expects — used so clicking
+// a row in those tabs can open the SAME detail modal the week grid uses,
+// instead of duplicating a second, thinner detail view. Fields the flat
+// list doesn't carry (serviceId, notes, paymentStatus, teamMemberId,
+// reminder-failure fields) default to null/unpaid/false since the modal
+// doesn't read them for anything critical here (no provider name display,
+// for instance) — "Modificar" on a row opened this way may show fewer
+// preselected values than one opened from the week grid, a minor and
+// acceptable tradeoff for these two summary tabs.
+function toWeekBookingVM(b: BookingVM): WeekBookingVM {
+  const endIso = new Date(new Date(b.startIso).getTime() + b.durationMin * 60_000).toISOString();
+  return {
+    id: b.id,
+    serviceId: null,
+    serviceName: b.serviceName,
+    startIso: b.startIso,
+    endIso,
+    durationMin: b.durationMin,
+    status: b.status,
+    paymentStatus: "unpaid",
+    clientName: b.clientName,
+    clientEmail: b.clientEmail,
+    clientPhone: b.clientPhone,
+    notes: null,
+    teamMemberId: null,
+    pendingExpiryAt: b.pendingExpiryAt,
+    guestLocale: b.guestLocale,
+    reminderSendFailed: false,
+    lastReminderError: null,
+    cancellationRequestedAt: b.cancellationRequestedAt,
+  };
+}
+
 /** Returns remaining ms until expiry, or 0 if already expired. */
 function msUntilExpiry(expiryIso: string): number {
   return Math.max(0, new Date(expiryIso).getTime() - Date.now());
@@ -391,6 +434,11 @@ export function CalendarBookings({
           dict={dict}
           onClose={() => setSelectedBooking(null)}
           onUpdated={handleGridBookingCreated}
+          onCancellationReviewed={() => {
+            const id = selectedBooking.id;
+            setCancellationList((l) => l.filter((b) => b.id !== id));
+            setList((l) => l.map((b) => (b.id === id ? { ...b, cancellationRequestedAt: null } : b)));
+          }}
           onModify={(booking) => {
             setSelectedBooking(null);
             setEditingBooking(booking);
@@ -486,11 +534,13 @@ export function CalendarBookings({
             {cancellations.map((b, i) => (
               <div
                 key={b.id}
-                className={`flex flex-col gap-3 px-4 py-3.5 sm:flex-row sm:items-center ${i > 0 ? "border-t border-line" : ""}`}
+                onClick={() => setSelectedBooking(toWeekBookingVM(b))}
+                className={`flex cursor-pointer flex-col gap-3 px-4 py-3.5 transition-colors hover:bg-surface-2 sm:flex-row sm:items-center ${i > 0 ? "border-t border-line" : ""}`}
               >
                 <div className="flex items-start gap-3 sm:flex-1 sm:items-center">
-                  <div className="w-[52px] shrink-0 text-[15px] font-semibold text-ink">
-                    {timeLabel(b.startIso)}
+                  <div className="w-[70px] shrink-0">
+                    <p className="text-[15px] font-semibold text-ink">{timeLabel(b.startIso)}</p>
+                    <p className="text-[11.5px] capitalize text-ink-soft">{dateLabel(b.startIso, dict.intlLocale)}</p>
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="flex flex-wrap items-center gap-1.5 text-[14px] font-semibold text-ink">
@@ -507,7 +557,10 @@ export function CalendarBookings({
                   </div>
                 </div>
 
-                <div className="flex shrink-0 items-center gap-2 pl-[64px] sm:pl-0">
+                <div
+                  className="flex shrink-0 items-center gap-2 pl-[82px] sm:pl-0"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <Btn
                     size="sm"
                     variant="outline"

@@ -23,6 +23,7 @@ export function BookingDetailModal({
   onClose,
   onUpdated,
   onModify,
+  onCancellationReviewed,
 }: {
   booking: WeekBookingVM;
   intlLocale: string;
@@ -30,6 +31,15 @@ export function BookingDetailModal({
   onClose: () => void;
   onUpdated: () => void;
   onModify: (booking: WeekBookingVM) => void;
+  // Fired specifically after a successful approve/deny — distinct from
+  // onUpdated (which just refetches the grid) because the caller may also
+  // be showing this booking in a separate flat list (e.g. the calendar
+  // page's Cancelaciones tab) that needs its own local state updated too,
+  // and onUpdated alone doesn't tell the caller WHICH action succeeded —
+  // e.g. saving a Resultado on a booking that also happens to have an
+  // unrelated pending cancellation request shouldn't clear that request
+  // from such a list, only an actual approve/deny should.
+  onCancellationReviewed?: () => void;
 }) {
   const d = dict.detailModal;
   const [busy, setBusy] = useState(false);
@@ -77,6 +87,7 @@ export function BookingDetailModal({
     setBusy(false);
     if (!res.ok) { setError(res.error); return; }
     onUpdated();
+    onCancellationReviewed?.();
     onClose();
   };
 
