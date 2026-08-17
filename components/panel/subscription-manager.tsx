@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Btn } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import {
-  createBillingPortalSession,
   cancelSubscription,
   resumeSubscription,
 } from "@/lib/actions/billing";
@@ -67,25 +66,6 @@ export function SubscriptionManager({
       clearTimeout(timeout);
     };
   }, [awaitingConfirmation, isSubscribed, router]);
-
-  async function runRedirectAction(
-    action: () => Promise<{ ok: true; url: string } | { ok: false; error: string }>
-  ) {
-    setPending(true);
-    setError(null);
-    try {
-      const result = await action();
-      if (result.ok) {
-        window.location.href = result.url;
-      } else {
-        setError(result.error);
-        setPending(false);
-      }
-    } catch {
-      setError(dict.errUnexpected);
-      setPending(false);
-    }
-  }
 
   async function handleCancelConfirm() {
     setPending(true);
@@ -185,17 +165,7 @@ export function SubscriptionManager({
                 {dict.startTrial}
               </Btn>
             </>
-          ) : (
-            <Btn
-              variant="ghost"
-              size="sm"
-              onClick={() => runRedirectAction(createBillingPortalSession)}
-              disabled={pending}
-            >
-              <Icon name="externalLink" size={15} />
-              {pending ? dict.opening : dict.manageBilling}
-            </Btn>
-          )}
+          ) : null}
         </div>
       </div>
 
