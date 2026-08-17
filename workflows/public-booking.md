@@ -10,6 +10,22 @@ Criteria:
 - Step 2: provider selection
 - Step 3: date/time selection backed by slot engine (lib/booking/slots.ts)
 - Double-booking prevented via partial unique index in schema
+- Service list shows price inline per option (priceLabel helper, e.g. "52 min · 52 €") — already matches the reference service's price-in-list pattern
+
+## Step: visible-progress-indicator
+Status: not_started
+Criteria:
+- A visible step-progress bar is rendered at the top of the wizard (numbered circles connected by a line, current step highlighted, e.g. "① Servicio → ② Fecha/Hora → ③ Detalles → ④ Confirmación") — inspired by a reference service (clinic-cloud.com)'s "Tratamientos / Calendario / Solicitud / Reserva" indicator
+- Internal step state already exists (booking-wizard.tsx's Step type: service | provider | date | done) — this is a UI addition on top of existing state, not a new state machine
+- Step labels adapt correctly whether the business is solo (3 visible steps: service, date, confirm) or team (4 visible steps: service, provider, date, confirm) — matches the existing conditional skip of the provider step for solo businesses
+- Works on mobile widths without wrapping awkwardly (this is a phone-first booking flow)
+
+## Step: appointment-summary-recap
+Status: not_started
+Criteria:
+- Once a service + provider (if team) + slot are chosen, a summary recap ("Resumen Cita" style — service name, price, provider if applicable, date/time) is shown at the top of the final details-collection step, before the guest fills in their contact info — inspired by the same reference service, which shows this directly above the "Usuario no registrado / Usuario registrado" contact form
+- Recap stays visible through the auth-gate step too (ConfirmAuthModal), not just the guest-details form, so a returning/registering user also sees what they're confirming
+- Purely a display addition — doesn't change submission logic, booking.ts's actual submit path is unaffected
 
 ## Step: auth-gate
 Status: done
