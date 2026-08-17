@@ -24,6 +24,14 @@ Criteria:
 - Daily stripe-reconcile cron job exists
 - Reconciliation logs mismatches rather than silently auto-correcting them
 
+## Step: billing-failure-banner
+Status: in_progress
+Criteria:
+- past_due state is rendered by subscription-manager.tsx — confirmed working, but ONLY visible if the owner navigates to /panel/settings (Suscripción tab) themselves
+- Missing: a global banner/indicator visible from anywhere in the panel (e.g. panel home, calendar, any page under /panel) when subscription_status is past_due, so an owner isn't relying on remembering to check settings
+- Banner should link directly to the Suscripción tab to resolve it
+- This is the visibility half of the payment-failure story — see feature-gating below for the actual access-restriction phases (1st-14th full access / 15th-EOM booking blocked / next 1st lockout); the banner should appear starting Phase 1 (immediately on past_due), well before any restriction actually kicks in, so the clinic has maximum warning
+
 ## Step: payment-method-update
 Status: done
 Criteria:
