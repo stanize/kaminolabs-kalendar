@@ -50,6 +50,14 @@ export function SubscriptionManager({
 
   const status = billing?.subscriptionStatus ?? "incomplete";
   const isSubscribed = ACTIVE_LIKE.includes(status);
+  // Trials generate a $0 invoice marking the trial period start (Stripe's
+  // own behavior when a subscription has a future trial_end — the first
+  // invoice covers the trial period, nothing owed, auto-marked paid). It's
+  // real but not useful for a clinic to see in Facturas, so it's filtered
+  // out here rather than at the data layer — listInvoices should still
+  // return the complete, accurate history; hiding $0 rows is a display
+  // choice, not a data-correctness one.
+  const visibleInvoices = invoices.filter((inv) => inv.total > 0);
   // Legacy query param from the old Checkout-redirect flow — kept as a
   // fallback trigger for the polling effect below in case anything still
   // links here with it, but the modal flow now sets justSubscribed directly
@@ -198,7 +206,7 @@ export function SubscriptionManager({
         <div className="mt-6 rounded-2xl border border-line bg-surface p-6">
           <h2 className="text-sm font-semibold text-ink">{dict.invoices.title}</h2>
 
-          {invoices.length === 0 ? (
+          {visibleInvoices.length === 0 ? (
             <p className="mt-3 text-sm text-ink-soft">{dict.invoices.empty}</p>
           ) : (
             <div className="mt-3 overflow-x-auto">
@@ -212,7 +220,7 @@ export function SubscriptionManager({
                   </tr>
                 </thead>
                 <tbody>
-                  {invoices.map((inv) => (
+                  {visibleInvoices.map((inv) => (
                     <tr key={inv.id} className="border-b border-line last:border-0">
                       <td className="py-2.5 pr-4 text-ink">{formatDate(inv.date)}</td>
                       <td className="py-2.5 pr-4 text-ink">
