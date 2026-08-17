@@ -234,6 +234,24 @@ export function SubscriptionManager({
                         </span>
                       </td>
                       <td className="py-2.5">
+                        {/* Deliberate choice, not a shortcut: "Ver" opens
+                            Stripe's hosted invoice page directly rather than
+                            a Kalendar-branded invoice view. This IS the
+                            market-standard approach at this stage — Stripe
+                            already handles PDF generation, tax/VAT lines,
+                            multi-currency, and receipts correctly, and its
+                            hosted page already shows the business name, not
+                            generic Stripe branding. A fully custom in-app
+                            invoice page is real ongoing engineering (staying
+                            in sync with Stripe's invoice format, tax rules,
+                            etc.) that's only worth it once there's a
+                            specific white-labeling need.
+                            Revisit post-MVP as part of the separate PDF/
+                            invoicing portal work (kaminolabs-pdfs repo,
+                            docs/specs/pdf-invoicing spec / workflows/
+                            pdf-invoicing.md) — that's the natural home for
+                            a custom invoice page if/when it's needed,
+                            not a change to make here. */}
                         {inv.hostedInvoiceUrl ? (
                           <a
                             href={inv.hostedInvoiceUrl}
