@@ -98,6 +98,16 @@ export interface BookingPageDictionary {
     minutesUnit: string;
     errNameRequired: string;
     errEmailInvalid: string;
+    // Step-progress bar labels (visible-progress-indicator) — chooseService/
+    // chooseDateTime already exist and are reused as-is for consistency
+    // (same word choice a guest already saw as a section heading); only the
+    // short "Profesional"/"Confirmación" progress-bar-specific labels are
+    // new — these are short chip labels, not full section headings, so
+    // they're distinct from chooseProvider ("Elige profesional").
+    progressProvider: string;
+    progressConfirm: string;
+    // Appointment summary recap (appointment-summary-recap)
+    recapTitle: string; // e.g. "Resumen de tu cita"
   };
   errors: {
     // lib/actions/booking.ts getAvailableSlots + submitBooking
@@ -199,6 +209,9 @@ const es: BookingPageDictionary = {
     minutesUnit: "min",
     errNameRequired: "Indica tu nombre.",
     errEmailInvalid: "Indica un email válido.",
+    progressProvider: "Profesional",
+    progressConfirm: "Confirmación",
+    recapTitle: "Resumen de tu cita",
   },
   errors: {
     errBusinessUnavailable: "Negocio no disponible.",
@@ -300,6 +313,9 @@ const en: BookingPageDictionary = {
     minutesUnit: "min",
     errNameRequired: "Enter your name.",
     errEmailInvalid: "Enter a valid email.",
+    progressProvider: "Professional",
+    progressConfirm: "Confirm",
+    recapTitle: "Your appointment summary",
   },
   errors: {
     errBusinessUnavailable: "Business unavailable.",

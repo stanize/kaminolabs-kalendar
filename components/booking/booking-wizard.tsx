@@ -122,8 +122,28 @@ export function BookingWizard({
 
   const showBack = step !== "service" && step !== "done";
 
+  // visible-progress-indicator: labels adapt to solo (3 steps) vs team (4
+  // steps) — matches the wizard's own conditional skip of the provider
+  // step. `current` is 1-indexed; confirmOpen counts as the final step even
+  // though the underlying Step value is still "date" (see WizardProgress
+  // doc comment); on "done", everything shows complete (current one past
+  // the end) rather than the last step staying highlighted as "current".
+  const progressLabels = isTeam
+    ? [w.chooseService, w.progressProvider, w.chooseDateTime, w.progressConfirm]
+    : [w.chooseService, w.chooseDateTime, w.progressConfirm];
+  const progressCurrent = (() => {
+    if (step === "done") return progressLabels.length + 1;
+    if (confirmOpen) return progressLabels.length;
+    if (step === "service") return 1;
+    if (step === "provider") return 2;
+    if (step === "date") return isTeam ? 3 : 2;
+    return 1;
+  })();
+
   return (
     <div className="rounded-2xl border border-line bg-surface p-6 shadow-[0_12px_40px_rgba(15,31,46,.06)]">
+      <WizardProgress labels={progressLabels} current={progressCurrent} />
+
       {showBack && (
         <button onClick={backStep} className="mb-4 flex items-center gap-1.5 text-[13px] font-medium text-ink-soft hover:text-ink">
           <Icon name="chevronLeft" size={15} /> {w.back}
@@ -220,7 +240,7 @@ export function BookingWizard({
 
       {confirmOpen && service && slot && (
         <ConfirmAuthModal
-          slug={slug} serviceId={service.id} slot={slot} serviceName={service.name}
+          slug={slug} serviceId={service.id} slot={slot} serviceName={service.name} servicePrice={service.price}
           businessName={businessName} businessAddress={businessAddress}
           locale={locale} dict={dict} patient={patient}
           onPatientChange={onPatientChange}
@@ -238,10 +258,10 @@ export function BookingWizard({
 // only appears at the point of confirming an appointment, IKEA-checkout style):
 // "Join Kalendar or sign in" vs "Continue as guest".
 function ConfirmAuthModal({
-  slug, serviceId, slot, serviceName, businessName, businessAddress, locale, dict, patient,
+  slug, serviceId, slot, serviceName, servicePrice, businessName, businessAddress, locale, dict, patient,
   onPatientChange, onError, onClose, onDone,
 }: {
-  slug: string; serviceId: string; slot: SlotDTO; serviceName: string;
+  slug: string; serviceId: string; slot: SlotDTO; serviceName: string; servicePrice: number;
   businessName: string; businessAddress: string;
   locale: Locale; dict: BookingPageDictionary;
   patient: PatientInfo | null;
@@ -404,6 +424,21 @@ function ConfirmAuthModal({
           <Icon name="x" size={18} />
         </button>
 
+        {/* appointment-summary-recap: shown once here, above the per-view
+            switch below, so it stays visible through every view (already-
+            authenticated confirm, start, login, register, guest, and the
+            role-conflict confirm) rather than being duplicated per view or
+            only shown on the guest-details form. Purely a display addition
+            — doesn't touch submission logic. */}
+        <AppointmentRecap
+          title={w.recapTitle}
+          serviceName={serviceName}
+          servicePrice={servicePrice}
+          freeLabel={w.freeLabel}
+          providerName={slot.providerName}
+          whenLabel={formatFullDateTime(slot.startIso, locale)}
+        />
+
         {/* Already authenticated — show confirm button. */}
         {patient ? (
           <Section title={am.confirmTitle}>
@@ -416,20 +451,6 @@ function ConfirmAuthModal({
                 <dt className="shrink-0 text-[13px] text-ink-soft">{w.doneFieldAddress}</dt>
                 <dd className="text-right text-[13.5px] font-semibold text-ink">{businessAddress}</dd>
               </div>
-              <div className="flex items-start justify-between gap-3">
-                <dt className="shrink-0 text-[13px] text-ink-soft">{w.doneFieldDate}</dt>
-                <dd className="text-right text-[13.5px] font-semibold text-ink">{formatFullDateTime(slot.startIso, locale)}</dd>
-              </div>
-              <div className="flex items-start justify-between gap-3">
-                <dt className="shrink-0 text-[13px] text-ink-soft">{w.doneFieldService}</dt>
-                <dd className="text-right text-[13.5px] font-semibold text-ink">{serviceName}</dd>
-              </div>
-              {slot.providerName && (
-                <div className="flex items-start justify-between gap-3">
-                  <dt className="shrink-0 text-[13px] text-ink-soft">{w.doneFieldProfessional}</dt>
-                  <dd className="text-right text-[13.5px] font-semibold text-ink">{slot.providerName}</dd>
-                </div>
-              )}
             </dl>
             <textarea placeholder={w.notesPlaceholder} value={notes} rows={3}
               onChange={(e) => setNotes(e.target.value)} disabled={busy} maxLength={500}
@@ -624,8 +645,79 @@ function ConfirmAuthModal({
   );
 }
 
+// appointment-summary-recap: compact "what you're confirming" card shown
+// once at the top of ConfirmAuthModal, above the auth-gate/guest-details
+// views — so a guest sees exactly what they're about to confirm regardless
+// of which of those views they're currently on.
+function AppointmentRecap({
+  title, serviceName, servicePrice, freeLabel, providerName, whenLabel,
+}: {
+  title: string; serviceName: string; servicePrice: number; freeLabel: string;
+  providerName: string | null; whenLabel: string;
+}) {
+  return (
+    <div className="mb-5 rounded-xl border border-line bg-surface-2 px-4 py-3.5">
+      <p className="mb-2 text-[11px] font-bold uppercase tracking-[.04em] text-ink-soft">{title}</p>
+      <div className="flex items-start justify-between gap-3">
+        <span className="text-[14.5px] font-semibold text-ink">{serviceName}</span>
+        <span className="shrink-0 text-[14.5px] font-semibold text-ink">{priceLabel(servicePrice, freeLabel)}</span>
+      </div>
+      <p className="mt-1 text-[13px] text-ink-soft">
+        {whenLabel}
+        {providerName ? ` · ${providerName}` : ""}
+      </p>
+    </div>
+  );
+}
+
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return <div><h2 className="mb-4 text-[17px]">{title}</h2>{children}</div>;
+}
+
+// Visible step-progress bar (visible-progress-indicator) — a display-only
+// addition on top of the wizard's existing Step state, not a new state
+// machine. `current` is 1-indexed; confirmOpen (the auth/details modal
+// being open) is treated as the final "Confirmación" step even though the
+// underlying Step value is still "date", since from the guest's point of
+// view picking a slot and then confirming are two distinct moments.
+function WizardProgress({ labels, current }: { labels: string[]; current: number }) {
+  return (
+    <div className="mb-5 flex items-center" aria-label="Progreso de la reserva">
+      {labels.map((label, i) => {
+        const stepNum = i + 1;
+        const isDone = stepNum < current;
+        const isCurrent = stepNum === current;
+        return (
+          <div key={label} className="flex flex-1 items-center last:flex-none">
+            <div className="flex flex-col items-center gap-1.5">
+              <div
+                className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-[12px] font-bold transition-colors ${
+                  isDone
+                    ? "bg-brand text-white"
+                    : isCurrent
+                      ? "border-2 border-brand text-brand"
+                      : "border border-line text-ink-soft"
+                }`}
+              >
+                {isDone ? <Icon name="check" size={13} strokeWidth={3} /> : stepNum}
+              </div>
+              <span
+                className={`hidden text-center text-[10.5px] font-medium leading-tight sm:block ${
+                  isCurrent ? "text-ink" : "text-ink-soft"
+                }`}
+                style={{ maxWidth: 64 }}
+              >
+                {label}
+              </span>
+            </div>
+            {stepNum < labels.length && (
+              <div className={`mx-1.5 h-px flex-1 ${isDone ? "bg-brand" : "bg-line"}`} />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 function ProviderButton({ label, sub, onClick }: { label: string; sub?: string; onClick: () => void }) {
