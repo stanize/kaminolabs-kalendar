@@ -144,12 +144,6 @@ export function BookingWizard({
     <div className="rounded-2xl border border-line bg-surface p-6 shadow-[0_12px_40px_rgba(15,31,46,.06)]">
       <WizardProgress labels={progressLabels} current={progressCurrent} />
 
-      {showBack && (
-        <button onClick={backStep} className="mb-4 flex items-center gap-1.5 text-[13px] font-medium text-ink-soft hover:text-ink">
-          <Icon name="chevronLeft" size={15} /> {w.back}
-        </button>
-      )}
-
       {error && (
         <div className="mb-4 flex items-start gap-2 rounded-xl border border-error bg-error-weak px-4 py-3 text-[13.5px] text-error">
           <Icon name="x" size={16} className="mt-0.5 shrink-0" /><span>{error}</span>
@@ -157,7 +151,7 @@ export function BookingWizard({
       )}
 
       {step === "service" && (
-        <Section title={w.chooseService}>
+        <div>
           <div className="flex flex-col gap-2">
             {services.length === 0 && <p className="text-[14px] text-ink-soft">{w.noServices}</p>}
             {services.map((s) => (
@@ -171,18 +165,18 @@ export function BookingWizard({
               </button>
             ))}
           </div>
-        </Section>
+        </div>
       )}
 
       {step === "provider" && (
-        <Section title={w.chooseProvider}>
+        <div>
           <div className="flex flex-col gap-2">
             <ProviderButton label={w.anyProvider} sub={w.anyProviderSub} onClick={() => chooseProvider(null)} />
             {members.map((m) => (
               <ProviderButton key={m.id} label={m.name} sub={m.role ?? undefined} onClick={() => chooseProvider(m.id)} />
             ))}
           </div>
-        </Section>
+        </div>
       )}
 
       {step === "date" && service && (
@@ -236,6 +230,12 @@ export function BookingWizard({
 
           <Btn variant="outline" onClick={reset}>{w.bookAnother}</Btn>
         </div>
+      )}
+
+      {showBack && (
+        <button onClick={backStep} className="mt-5 flex items-center gap-1.5 text-[13px] font-medium text-ink-soft hover:text-ink">
+          <Icon name="chevronLeft" size={15} /> {w.back}
+        </button>
       )}
 
       {confirmOpen && service && slot && (
@@ -702,8 +702,8 @@ function WizardProgress({ labels, current }: { labels: string[]; current: number
                 {isDone ? <Icon name="check" size={13} strokeWidth={3} /> : stepNum}
               </div>
               <span
-                className={`hidden text-center text-[10.5px] font-medium leading-tight sm:block ${
-                  isCurrent ? "text-ink" : "text-ink-soft"
+                className={`hidden text-center text-[10.5px] leading-tight sm:block ${
+                  isCurrent ? "font-bold text-ink" : "font-medium text-ink-soft"
                 }`}
                 style={{ maxWidth: 64 }}
               >
@@ -828,7 +828,7 @@ function DateTimeStep({ slug, serviceId, providerId, openDays, bookingWindowMont
   const monthLabel = `${dict.months[weekStart.getMonth()]} ${weekStart.getFullYear()}`;
 
   return (
-    <Section title={w.chooseDateTime}>
+    <div>
       <div className="mb-3 flex items-center justify-between">
         <button onClick={() => setWeekStart((d) => { const n = new Date(d); n.setDate(n.getDate() - 7); return n; })}
           disabled={!canPrev} className="grid h-8 w-8 place-items-center rounded-lg text-ink-soft hover:bg-surface-2 disabled:opacity-30" aria-label={w.prevWeek}>
@@ -893,6 +893,6 @@ function DateTimeStep({ slug, serviceId, providerId, openDays, bookingWindowMont
           })}
         </div>
       )}
-    </Section>
+    </div>
   );
 }
