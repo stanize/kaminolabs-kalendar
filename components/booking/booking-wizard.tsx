@@ -29,6 +29,15 @@ function jsDowToDayId(dow: number): DayId {
 // "jueves, 11 de junio · 16:45" style — used on the confirmation screen,
 // where the compact time-only slot.label isn't enough context on its own.
 function formatFullDateTime(iso: string, locale: Locale): string {
+  const { date, time } = splitDateTime(iso, locale);
+  return `${date} · ${time}`;
+}
+
+// Separate date/time strings — used by the confirm modal's merged appointment
+// details list, which shows Fecha and Hora as two distinct rows rather than
+// one combined "date · time" string (see formatFullDateTime, still used
+// combined on the post-submit "done" screen).
+function splitDateTime(iso: string, locale: Locale): { date: string; time: string } {
   const d = new Date(iso);
   const datePart = new Intl.DateTimeFormat(locale === "es" ? "es-ES" : "en-GB", {
     timeZone: "Europe/Madrid", weekday: "long", day: "numeric", month: "long",
@@ -36,8 +45,7 @@ function formatFullDateTime(iso: string, locale: Locale): string {
   const timePart = new Intl.DateTimeFormat(locale === "es" ? "es-ES" : "en-GB", {
     timeZone: "Europe/Madrid", hour: "2-digit", minute: "2-digit", hour12: false,
   }).format(d);
-  const capitalized = datePart.charAt(0).toUpperCase() + datePart.slice(1);
-  return `${capitalized} · ${timePart}`;
+  return { date: datePart.charAt(0).toUpperCase() + datePart.slice(1), time: timePart };
 }
 
 function groupByProvider(slots: SlotDTO[]): { providerId: string | null; providerName: string | null; slots: SlotDTO[] }[] {
@@ -424,25 +432,52 @@ function ConfirmAuthModal({
           <Icon name="x" size={18} />
         </button>
 
-        {/* appointment-summary-recap: shown once here, above the per-view
-            switch below, so it stays visible through every view (already-
-            authenticated confirm, start, login, register, guest, and the
-            role-conflict confirm) rather than being duplicated per view or
-            only shown on the guest-details form. Purely a display addition
-            — doesn't touch submission logic. */}
-        <AppointmentRecap
-          title={w.recapTitle}
-          serviceName={serviceName}
-          servicePrice={servicePrice}
-          freeLabel={w.freeLabel}
-          providerName={slot.providerName}
-          whenLabel={formatFullDateTime(slot.startIso, locale)}
-        />
+        {/* appointment-summary-recap: shown for the auth-gate views (start,
+            login, register, guest, role-conflict) so the recap stays
+            visible through those too. The already-authenticated branch
+            below builds its own richer merged list instead (service,
+            price, date, time, clinic, address all together under one
+            "Confirmar reserva" heading) rather than showing this compact
+            recap AND a second details box, which looked disjointed. */}
+        {!patient && (
+          <AppointmentRecap
+            title={w.recapTitle}
+            serviceName={serviceName}
+            servicePrice={servicePrice}
+            freeLabel={w.freeLabel}
+            providerName={slot.providerName}
+            whenLabel={formatFullDateTime(slot.startIso, locale)}
+          />
+        )}
 
-        {/* Already authenticated — show confirm button. */}
+        {/* Already authenticated — one merged appointment-details list
+            (service, price, date, time, provider, clinic, address) under a
+            single "Confirmar reserva" heading, then notes + confirm. */}
         {patient ? (
           <Section title={am.confirmTitle}>
             <dl className="mb-5 flex flex-col gap-2.5 rounded-xl bg-surface-2 px-4 py-4 text-left">
+              <div className="flex items-start justify-between gap-3">
+                <dt className="shrink-0 text-[13px] text-ink-soft">{w.doneFieldService}</dt>
+                <dd className="text-right text-[13.5px] font-semibold text-ink">{serviceName}</dd>
+              </div>
+              <div className="flex items-start justify-between gap-3">
+                <dt className="shrink-0 text-[13px] text-ink-soft">{w.recapPrice}</dt>
+                <dd className="text-right text-[13.5px] font-semibold text-ink">{priceLabel(servicePrice, w.freeLabel)}</dd>
+              </div>
+              <div className="flex items-start justify-between gap-3">
+                <dt className="shrink-0 text-[13px] text-ink-soft">{w.recapDate}</dt>
+                <dd className="text-right text-[13.5px] font-semibold text-ink">{splitDateTime(slot.startIso, locale).date}</dd>
+              </div>
+              <div className="flex items-start justify-between gap-3">
+                <dt className="shrink-0 text-[13px] text-ink-soft">{w.recapTime}</dt>
+                <dd className="text-right text-[13.5px] font-semibold text-ink">{splitDateTime(slot.startIso, locale).time}</dd>
+              </div>
+              {slot.providerName && (
+                <div className="flex items-start justify-between gap-3">
+                  <dt className="shrink-0 text-[13px] text-ink-soft">{w.doneFieldProfessional}</dt>
+                  <dd className="text-right text-[13.5px] font-semibold text-ink">{slot.providerName}</dd>
+                </div>
+              )}
               <div className="flex items-start justify-between gap-3">
                 <dt className="shrink-0 text-[13px] text-ink-soft">{w.doneFieldClinic}</dt>
                 <dd className="text-right text-[13.5px] font-semibold text-ink">{businessName}</dd>

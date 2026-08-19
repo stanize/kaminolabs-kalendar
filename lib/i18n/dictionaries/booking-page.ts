@@ -109,6 +109,9 @@ export interface BookingPageDictionary {
     progressConfirm: string;
     // Appointment summary recap (appointment-summary-recap)
     recapTitle: string; // e.g. "Resumen de tu cita"
+    recapPrice: string;
+    recapDate: string;
+    recapTime: string;
   };
   errors: {
     // lib/actions/booking.ts getAvailableSlots + submitBooking
@@ -214,6 +217,9 @@ const es: BookingPageDictionary = {
     progressProvider: "Profesional",
     progressConfirm: "Confirmación",
     recapTitle: "Resumen de tu cita",
+    recapPrice: "Precio",
+    recapDate: "Fecha",
+    recapTime: "Hora",
   },
   errors: {
     errBusinessUnavailable: "Negocio no disponible.",
@@ -319,6 +325,9 @@ const en: BookingPageDictionary = {
     progressProvider: "Professional",
     progressConfirm: "Confirm",
     recapTitle: "Your appointment summary",
+    recapPrice: "Price",
+    recapDate: "Date",
+    recapTime: "Time",
   },
   errors: {
     errBusinessUnavailable: "Business unavailable.",
