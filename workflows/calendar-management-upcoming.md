@@ -14,11 +14,12 @@ Criteria:
 ## Step: pending-guest-requests
 Status: done
 Criteria:
-- "Pendientes" tab exists, separate from the day/week/month grid (calendar-bookings.tsx)
-- Flat list, no day grouping, sorted soonest-expiry-first
-- Live countdown badge (CountdownBadge) re-renders every 60s, turns urgent under 2h remaining
-- confirmBookingAsOwner transitions pending_confirmation -> confirmed, clears pending_expiry_at, emails guest a confirmation receipt with ICS attachment
-- A guest booking not confirmed before its expiry is auto-expired by the reminders/cron sweep (not confirmed) — see appointment-reminders workflow
+- RENAMED/REDESIGNED: the old "Pendientes" (awaiting-confirmation-only) tab was replaced by a "Clientes" tab, per Arun's decision — the real question a clinic wants answered at a glance isn't "which bookings need my confirmation" but "which reservations need a closer look, based on who's booking" (guest bookings and first-time patients warrant more scrutiny than a returning registered client)
+- "Clientes" tab exists, separate from the day/week/month grid (calendar-bookings.tsx) — a flat row list (no day grouping, no calendar grid)
+- Filterable by clientStatus (guest_unconfirmed, first_time), sorted by start time (not expiry) — "returning" isn't offered as its own filter chip since it's the no-action-needed segment, but still visible under "Todos"
+- Live countdown badge (CountdownBadge) still shown per-row for guest_unconfirmed bookings with a pendingExpiryAt, re-renders every 60s, turns urgent under 2h remaining
+- Underlying data/logic unchanged from the old Pendientes tab: confirmBookingAsOwner still transitions pending_confirmation -> confirmed, clears pending_expiry_at, emails guest a confirmation receipt with ICS attachment — this was a UI reframing of the same status/action, not a backend change
+- A guest booking not confirmed before its expiry is still auto-expired by the reminders/cron sweep (not confirmed) — see appointment-reminders workflow
 
 ## Step: manual-appointment-creation
 Status: done
@@ -48,7 +49,7 @@ Criteria:
 Status: done
 Criteria:
 - A booking within the clinic's configured cancellation window (see clinic-configuration.md's cancellation-window-setting, default 24h) that a patient tries to self-cancel produces a cancellation *request* rather than an immediate cancel (see patient-portal.md's self-service-cancel step for the patient-facing half of this)
-- Pending cancellation requests are visible to the owner in a dedicated "Cancelaciones" tab in the panel calendar, sorted soonest-requested-first (mirrors Pendientes tab's expiry-sort rationale)
+- Pending cancellation requests are visible to the owner in a dedicated "Cancelaciones" tab in the panel calendar, sorted soonest-requested-first (mirrors the old Pendientes tab's expiry-sort rationale — the Cancelaciones tab itself is separate from the renamed Clientes tab, see pending-guest-requests above)
 - A rose-styled panel-home widget (CancellationRequestsWidget) surfaces the pending count and deep-links to the Cancelaciones tab; only rendered when count > 0
 - reviewCancellationRequest handles both decisions, scoped to the caller's business: approve sets status → cancelled and clears the request flag (client gets the standard cancellation receipt via notifyCancellation); deny clears the request flag only, booking status is untouched, client gets a dedicated "request denied" email (notifyCancellationRequestDenied) instead
 - Slot stays held while a request is pending — status remains pending_confirmation/confirmed throughout, cancellation_requested_at is a separate flag layered on top rather than a status value, so the request doesn't free the slot for another booking until actually approved

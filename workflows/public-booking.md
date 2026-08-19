@@ -46,7 +46,7 @@ Criteria:
 Status: done
 Criteria:
 - Guest bookings requiring owner review land in pending_confirmation status
-- "Pendientes" tab in panel calendar lists them sorted soonest-expiry-first
+- Owner-side review UI is the "Clientes" tab in panel calendar (renamed/redesigned from the old "Pendientes" tab — filterable by client status, not just confirmation-pending; see calendar-management-upcoming.md's pending-guest-requests step for full detail), lists them sorted by start time
 - confirmBookingAsOwner transitions pending_confirmation -> confirmed and emails guest
 - A separate cron sweep expires (not confirms) stale pending bookings
 
