@@ -78,15 +78,18 @@ export function BookingPageShell({
   return (
     <div className="min-h-dvh bg-surface-2 px-5 py-10">
       <div className="mx-auto w-full max-w-[560px]">
-        {/* Top bar: language switcher + account/sign-in link */}
-        <div className="mb-4 flex items-center justify-between">
+        {/* Top bar: account/sign-in link (or welcome + sign-out for a
+            signed-in patient) + language switcher */}
+        <div className="mb-4 flex items-center justify-between gap-3">
           {patient ? (
             <Link
               href="/patient"
-              className="flex items-center gap-1.5 text-[13px] font-medium text-brand hover:underline"
+              className="flex min-w-0 items-center gap-1.5 text-[13px] font-medium text-brand hover:underline"
             >
-              <Icon name="user" size={14} />
-              {dict.header.myAccount}
+              <Icon name="user" size={14} className="shrink-0" />
+              <span className="truncate">
+                {dict.header.welcome.replace("{name}", patient.name || patient.email)}
+              </span>
             </Link>
           ) : (
             <Link
@@ -97,7 +100,18 @@ export function BookingPageShell({
               Iniciar sesión
             </Link>
           )}
-          <LocaleSwitcher current={locale} onChange={setLocale} />
+          <div className="flex shrink-0 items-center gap-3">
+            {patient && (
+              <button
+                type="button"
+                onClick={handleSignOut}
+                className="text-[13px] font-medium text-ink-soft hover:text-ink"
+              >
+                {dict.header.signOut}
+              </button>
+            )}
+            <LocaleSwitcher current={locale} onChange={setLocale} />
+          </div>
         </div>
 
         {/* Business header */}
@@ -132,19 +146,6 @@ export function BookingPageShell({
             <span>{dict.header.poweredBy}</span>
             <Logo size={14} />
           </div>
-          {patient && (
-            <p className="flex items-center gap-1.5 text-[12px] text-ink-soft">
-              <span>{patient.name || patient.email}</span>
-              <span aria-hidden="true">·</span>
-              <button
-                type="button"
-                onClick={handleSignOut}
-                className="text-brand hover:underline"
-              >
-                {dict.header.signOut}
-              </button>
-            </p>
-          )}
         </div>
       </div>
     </div>
