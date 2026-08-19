@@ -78,8 +78,8 @@ export function BookingPageShell({
   return (
     <div className="min-h-dvh bg-surface-2 px-5 py-10">
       <div className="mx-auto w-full max-w-[560px]">
-        {/* Top bar: account/sign-in link (or welcome + sign-out for a
-            signed-in patient) + language switcher */}
+        {/* Top bar: account/sign-in link (welcome greeting for a signed-in
+            patient) + language switcher */}
         <div className="mb-4 flex items-center justify-between gap-3">
           {patient ? (
             <Link
@@ -100,18 +100,7 @@ export function BookingPageShell({
               Iniciar sesión
             </Link>
           )}
-          <div className="flex shrink-0 items-center gap-3">
-            {patient && (
-              <button
-                type="button"
-                onClick={handleSignOut}
-                className="text-[13px] font-medium text-ink-soft hover:text-ink"
-              >
-                {dict.header.signOut}
-              </button>
-            )}
-            <LocaleSwitcher current={locale} onChange={setLocale} />
-          </div>
+          <LocaleSwitcher current={locale} onChange={setLocale} />
         </div>
 
         {/* Business header */}
@@ -146,6 +135,15 @@ export function BookingPageShell({
             <span>{dict.header.poweredBy}</span>
             <Logo size={14} />
           </div>
+          {patient && (
+            <button
+              type="button"
+              onClick={handleSignOut}
+              className="text-[12px] text-brand hover:underline"
+            >
+              {dict.header.signOut}
+            </button>
+          )}
         </div>
       </div>
     </div>
