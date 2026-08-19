@@ -222,6 +222,21 @@ create table public.kalendar_businesses (
   ),
   onboarding_completed_at timestamptz,
   -- ---------------------------------------------------------------------
+  -- Demo accounts (workflows/presales-demo-onboarding.md). A demo account is
+  -- created through the exact same signup + onboarding flow as a real clinic
+  -- (dummy email Arun controls), then flagged after the fact — structurally
+  -- identical to a real business row, only these columns distinguish it.
+  -- ---------------------------------------------------------------------
+  is_demo                 boolean     not null default false,
+  demo_created_at         timestamptz,
+  -- Source URL of the prospect's public website the demo was researched
+  -- from (clinic-prospect-scraper skill output). Null for real accounts.
+  demo_source_url         text,
+  -- Set on successful migration-execution: the demo's slug gets a "demo-"
+  -- prefix applied at that moment, freeing the original slug for the new
+  -- real account. Null until migrated.
+  demo_migrated_at        timestamptz,
+  -- ---------------------------------------------------------------------
   -- Pricing / discount-schedule (see docs/specs/pricing-and-discounts-spec.md).
   -- plan_type drives the kalendar_plan_prices lookup; custom_monthly_price
   -- overrides it per-business when set. discount_start_date is set once at
