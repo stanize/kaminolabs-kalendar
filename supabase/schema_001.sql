@@ -30,6 +30,7 @@ drop table if exists public.kalendar_stripe_webhook_events       cascade;
 drop table if exists public.kalendar_discount_schedule_phases    cascade;
 drop table if exists public.kalendar_discount_schedule_templates cascade;
 drop table if exists public.kalendar_plan_prices                 cascade;
+drop table if exists public.kalendar_presales_codes   cascade;
 drop table if exists public.kalendar_support_tickets  cascade;
 drop table if exists public.kalendar_user_preferences cascade;
 drop table if exists public.kalendar_bookings        cascade;
@@ -280,6 +281,43 @@ create policy "Businesses: public read"
   on public.kalendar_businesses for select using (true);
 create policy "Businesses: write"
   on public.kalendar_businesses for all using (true) with check (true);
+
+-- ----------------------------------------------------------------------------
+-- kalendar_presales_codes
+-- Single-use codes tied to one demo business (workflows/presales-demo-onboarding.md
+-- step: presales-code-generation), letting Arun hand a prospect a code + signup
+-- link that migrates the demo into their own real account. Short, human-typeable
+-- (Arun sends it directly — sometimes read aloud on a call), not a long opaque
+-- token. Only one ACTIVE code per business at a time — app layer revokes any
+-- prior active code when a new one is generated for the same business (not a
+-- DB constraint, consistent with other business-logic gates in this schema).
+-- Default validity is 14 days; a stale/expired code is just regenerated, not
+-- extended.
+-- ----------------------------------------------------------------------------
+create table public.kalendar_presales_codes (
+  id             uuid        primary key default gen_random_uuid(),
+  business_id    uuid        not null references public.kalendar_businesses (id) on delete cascade,
+  code           text        not null unique,
+  status         text        not null default 'active' check (
+    status in ('active', 'used', 'revoked')
+  ),
+  created_at     timestamptz not null default now(),
+  expires_at     timestamptz not null,
+  used_at        timestamptz,
+  -- Set on successful migration signup. No FK — Better Auth's "user" id,
+  -- same forward-reference-avoidance rationale as kalendar_bookings.patient_id.
+  used_by_user_id text
+);
+
+create index kalendar_presales_codes_business_idx on public.kalendar_presales_codes (business_id);
+create index kalendar_presales_codes_active_idx
+  on public.kalendar_presales_codes (code)
+  where status = 'active';
+
+alter table public.kalendar_presales_codes enable row level security;
+
+create policy "Presales codes: write"
+  on public.kalendar_presales_codes for all using (true) with check (true);
 
 -- ----------------------------------------------------------------------------
 -- kalendar_discount_schedule_phases
