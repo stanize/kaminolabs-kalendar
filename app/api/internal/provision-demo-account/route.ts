@@ -18,6 +18,8 @@ import type { BusinessType } from "@/lib/onboarding/types";
  */
 
 type DemoServiceInput = { name: string; duration_min: number; price: number };
+type DemoHourInterval = { day: string; start: string; end: string };
+type DemoTeamMemberInput = { name: string; role?: string };
 
 type DemoProvisionInput = {
   email: string;
@@ -38,6 +40,13 @@ type DemoProvisionInput = {
     contactEmail: string;
   };
   services: DemoServiceInput[];
+  // Optional — omit to fall back to the default Mon-Fri 09:00-17:00 the
+  // wizard itself pre-fills for a brand-new business.
+  hours?: DemoHourInterval[];
+  // Optional — additional practitioners beyond the owner. Presence of any
+  // entries here flips team_mode to 'team', same distinction the real
+  // Equipo page makes (solo vs multi-provider).
+  additionalTeamMembers?: DemoTeamMemberInput[];
   sourceUrl?: string;
 };
 
@@ -132,6 +141,7 @@ export async function POST(request: Request) {
       is_demo: true,
       demo_created_at: new Date().toISOString(),
       demo_source_url: input.sourceUrl || null,
+      team_mode: (input.additionalTeamMembers?.length ?? 0) > 0 ? "team" : "solo",
     })
     .select("id, slug")
     .single();
@@ -143,13 +153,25 @@ export async function POST(request: Request) {
     );
   }
 
-  // 3) Owner as team member (solo mode — same as ensureOwnerSeeded).
+  // 3) Owner as team member (same as ensureOwnerSeeded), plus any additional
+  //    practitioners the scraper found (team_size > 1 case).
   await supabase.from("kalendar_team_members").insert({
     business_id: business.id,
     name: input.ownerName,
     is_owner: true,
     sort_order: 0,
   });
+
+  if (input.additionalTeamMembers && input.additionalTeamMembers.length > 0) {
+    const memberRows = input.additionalTeamMembers.map((m, i) => ({
+      business_id: business.id,
+      name: m.name,
+      role: m.role || null,
+      is_owner: false,
+      sort_order: i + 1,
+    }));
+    await supabase.from("kalendar_team_members").insert(memberRows);
+  }
 
   // 4) Services.
   if (input.services.length > 0) {
@@ -169,8 +191,17 @@ export async function POST(request: Request) {
     }
   }
 
-  // 5) Default clinic hours.
-  const hourRows = DEFAULT_HOURS.map((h, i) => ({
+  // 5) Clinic hours — use what was scraped/reviewed if provided and valid,
+  //    else the same Mon-Fri 09:00-17:00 default the wizard pre-fills.
+  const VALID_DAYS = new Set(["mon", "tue", "wed", "thu", "fri", "sat", "sun"]);
+  const providedHours = (input.hours ?? []).filter(
+    (h) => VALID_DAYS.has(h.day) && h.start && h.end && h.start < h.end
+  );
+  const hoursToInsert = providedHours.length > 0
+    ? providedHours.map((h) => ({ day: h.day, start: h.start, end: h.end }))
+    : DEFAULT_HOURS;
+
+  const hourRows = hoursToInsert.map((h, i) => ({
     business_id: business.id,
     day: h.day,
     start_time: h.start,
