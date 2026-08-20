@@ -74,6 +74,12 @@ create table public.account (
   "updatedAt"               timestamp   not null
 );
 
+-- OIDC issuer for the linked provider (e.g. Google's issuer URL). Required
+-- by better-auth >=1.3.x's account-lookup query; added via ALTER rather than
+-- in the CREATE block above since this table predates the requirement and
+-- existing account rows must not be dropped to add it.
+alter table public.account add column if not exists issuer text;
+
 -- ----------------------------------------------------------------------------
 -- verification
 -- Email verification and magic-link tokens. Better Auth writes these when
