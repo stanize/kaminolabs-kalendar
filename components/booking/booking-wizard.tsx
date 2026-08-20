@@ -715,39 +715,48 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 // being open) is treated as the final "Confirmación" step even though the
 // underlying Step value is still "date", since from the guest's point of
 // view picking a slot and then confirming are two distinct moments.
+// Redesigned to match a reference booking flow's step indicator (small dot
+// markers + label directly above the line, brand-colored line for
+// completed steps) instead of our earlier numbered-circle style. One
+// deliberate simplification vs. the reference: the reference shows a
+// segment as partially colored to suggest progress *through* the current
+// step (e.g. half-red, half-gray). That implies a real sub-progress
+// percentage, which doesn't map to anything our flow tracks — a step here
+// is either done or not, there's no "60% through picking a date". So
+// segment coloring is binary: colored once the step at its start is fully
+// done, plain otherwise; the current step's own dot gets a highlighted
+// ring instead to show where you are.
 function WizardProgress({ labels, current }: { labels: string[]; current: number }) {
   return (
-    <div className="mb-5 flex items-center" aria-label="Progreso de la reserva">
+    <div className="mb-6 flex items-start" aria-label="Progreso de la reserva">
       {labels.map((label, i) => {
         const stepNum = i + 1;
         const isDone = stepNum < current;
         const isCurrent = stepNum === current;
         return (
-          <div key={label} className="flex flex-1 items-center last:flex-none">
-            <div className="flex flex-col items-center gap-1.5">
-              <div
-                className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-[12px] font-bold transition-colors ${
-                  isDone
-                    ? "bg-brand text-white"
-                    : isCurrent
-                      ? "border-2 border-brand text-brand"
-                      : "border border-line text-ink-soft"
-                }`}
-              >
-                {isDone ? <Icon name="check" size={13} strokeWidth={3} /> : stepNum}
-              </div>
+          <div key={label} className="flex flex-1 flex-col items-start last:flex-none">
+            <span
+              className={`mb-2 truncate text-[11.5px] leading-tight ${
+                isCurrent ? "font-bold text-ink" : isDone ? "font-medium text-ink" : "font-medium text-ink-soft"
+              }`}
+              style={{ maxWidth: 96 }}
+            >
+              {label}
+            </span>
+            <div className="flex w-full items-center">
               <span
-                className={`hidden text-center text-[10.5px] leading-tight sm:block ${
-                  isCurrent ? "font-bold text-ink" : "font-medium text-ink-soft"
+                className={`h-[10px] w-[10px] shrink-0 rounded-full border-2 transition-colors ${
+                  isDone
+                    ? "border-brand bg-brand"
+                    : isCurrent
+                      ? "border-brand bg-brand ring-4 ring-brand-weak"
+                      : "border-line bg-surface"
                 }`}
-                style={{ maxWidth: 64 }}
-              >
-                {label}
-              </span>
+              />
+              {stepNum < labels.length && (
+                <div className={`ml-1 h-[2px] flex-1 rounded-full ${isDone ? "bg-brand" : "bg-line"}`} />
+              )}
             </div>
-            {stepNum < labels.length && (
-              <div className={`mx-1.5 h-px flex-1 ${isDone ? "bg-brand" : "bg-line"}`} />
-            )}
           </div>
         );
       })}
