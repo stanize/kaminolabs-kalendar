@@ -88,22 +88,39 @@ export async function POST(request: Request) {
     );
   }
 
-  // 1) Create the Better Auth user. requireEmailVerification is false
-  //    project-wide, so this account is immediately usable — no
-  //    verification-gate bypass needed, same as any real email/password
-  //    sign-up.
-  let userId: string;
-  try {
-    const signUpResult = await auth.api.signUpEmail({
-      body: { email: input.email, password: input.password, name: input.ownerName },
-    });
-    userId = signUpResult.user.id;
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Sign-up failed";
-    return NextResponse.json({ error: `Could not create user: ${message}` }, { status: 400 });
-  }
-
   const supabase = await createClient();
+
+  // 1) Create the Better Auth user — unless one already exists for this
+  //    email. That happens on a re-provision attempt after a destructive
+  //    schema_001.sql reset wiped kalendar_businesses but not the "user"
+  //    table (they're defined in separate schema files, so a reset of one
+  //    doesn't necessarily touch the other). Reusing the existing user is
+  //    safe here: demo emails are checked unique at draft-creation time, so
+  //    an existing row with this email can only be this same demo's prior
+  //    attempt, never someone else's account.
+  let userId: string;
+  const { data: existingUser } = await supabase
+    .from("user")
+    .select("id")
+    .eq("email", input.email)
+    .maybeSingle();
+
+  if (existingUser) {
+    userId = existingUser.id;
+  } else {
+    // requireEmailVerification is false project-wide, so this account is
+    // immediately usable — no verification-gate bypass needed, same as any
+    // real email/password sign-up.
+    try {
+      const signUpResult = await auth.api.signUpEmail({
+        body: { email: input.email, password: input.password, name: input.ownerName },
+      });
+      userId = signUpResult.user.id;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Sign-up failed";
+      return NextResponse.json({ error: `Could not create user: ${message}` }, { status: 400 });
+    }
+  }
 
   // 2) Business row — same slug logic as saveBusinessSettings's CREATE path.
   const baseSlug = sanitizeSlug(suggestSlug(input.business.name));
@@ -215,5 +232,6 @@ export async function POST(request: Request) {
     userId,
     businessId: business.id,
     slug: business.slug,
+    reusedExistingUser: !!existingUser,
   });
 }
