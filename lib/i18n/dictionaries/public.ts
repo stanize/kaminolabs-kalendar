@@ -46,6 +46,7 @@ export interface PublicDictionary {
     previewDefaultTagline: string;
     previewChooseService: string;
     previewFirstService: string;
+    previewOnRequest: string;
     previewService: string;
     previewChooseDay: string;
   };
@@ -152,6 +153,7 @@ const es: PublicDictionary = {
     previewDefaultTagline: "Reserva tu cita online",
     previewChooseService: "Elige un servicio",
     previewFirstService: "Tu primer servicio",
+    previewOnRequest: "Consultar precio",
     previewService: "Servicio",
     previewChooseDay: "Elige día",
   },
@@ -255,6 +257,7 @@ const en: PublicDictionary = {
     previewDefaultTagline: "Book your appointment online",
     previewChooseService: "Choose a service",
     previewFirstService: "Your first service",
+    previewOnRequest: "Price on request",
     previewService: "Service",
     previewChooseDay: "Choose a day",
   },

@@ -29,7 +29,7 @@ export interface ServicesDictionary {
     durationOther: string;
     durationUnit: string;
     priceLabel: string;
-    priceFree: string;
+    priceOnRequest: string;
     priceLower: string; // aria-label, contains "{step}"
     priceRaise: string; // aria-label, contains "{step}"
     orDivider: string; // separator between manual add and template picker
@@ -80,7 +80,7 @@ const es: ServicesDictionary = {
     durationOther: "Otra",
     durationUnit: "min",
     priceLabel: "Precio",
-    priceFree: "Gratis",
+    priceOnRequest: "Consultar precio",
     priceLower: "Bajar {step} €",
     priceRaise: "Subir {step} €",
     orDivider: "o",
@@ -129,7 +129,7 @@ const en: ServicesDictionary = {
     durationOther: "Other",
     durationUnit: "min",
     priceLabel: "Price",
-    priceFree: "Free",
+    priceOnRequest: "Price on request",
     priceLower: "Lower {step} €",
     priceRaise: "Raise {step} €",
     orDivider: "or",

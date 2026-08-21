@@ -78,7 +78,9 @@ export function BookingPreview({
                 <div className="text-[13.5px] font-semibold">{s.name || dict.previewService}</div>
                 <div className="text-[12px] text-ink-soft">{s.min} min</div>
               </div>
-              <span className="font-display text-[14px] font-semibold text-brand">{s.price} €</span>
+              <span className="font-display text-[14px] font-semibold text-brand">
+                {s.price === 0 ? dict.previewOnRequest : `${s.price} €`}
+              </span>
             </div>
           ))}
         </div>

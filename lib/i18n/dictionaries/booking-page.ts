@@ -95,7 +95,7 @@ export interface BookingPageDictionary {
     doneFieldService: string;
     doneFieldProfessional: string;
     bookAnother: string;
-    freeLabel: string;
+    priceOnRequestLabel: string;
     minutesUnit: string;
     errNameRequired: string;
     errEmailInvalid: string;
@@ -210,7 +210,7 @@ const es: BookingPageDictionary = {
     doneFieldService: "Tipo de cita",
     doneFieldProfessional: "Profesional",
     bookAnother: "Hacer otra reserva",
-    freeLabel: "Gratis",
+    priceOnRequestLabel: "Consultar precio",
     minutesUnit: "min",
     errNameRequired: "Indica tu nombre.",
     errEmailInvalid: "Indica un email válido.",
@@ -318,7 +318,7 @@ const en: BookingPageDictionary = {
     doneFieldService: "Appointment type",
     doneFieldProfessional: "Professional",
     bookAnother: "Make another booking",
-    freeLabel: "Free",
+    priceOnRequestLabel: "Price on request",
     minutesUnit: "min",
     errNameRequired: "Enter your name.",
     errEmailInvalid: "Enter a valid email.",

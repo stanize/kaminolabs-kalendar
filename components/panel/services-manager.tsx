@@ -68,8 +68,8 @@ function draftFromTemplate(t: { name: string; duration_min: number; price: numbe
   return { ...t, durationCustom: !isPreset(t.duration_min) };
 }
 
-function formatPrice(euros: number, freeLabel: string): string {
-  return euros === 0 ? freeLabel : `${euros} €`;
+function formatPrice(euros: number, priceOnRequestLabel: string): string {
+  return euros === 0 ? priceOnRequestLabel : `${euros} €`;
 }
 
 function tmpl(s: string, vars: Record<string, string | number>): string {
@@ -301,7 +301,7 @@ export function ServicesManager({
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[14px] font-semibold text-ink">{svc.name}</p>
                   <p className="truncate text-[12.5px] text-ink-soft">
-                    {svc.duration_min} {m.durationUnit} · {formatPrice(svc.price, m.priceFree)}
+                    {svc.duration_min} {m.durationUnit} · {formatPrice(svc.price, m.priceOnRequest)}
                   </p>
                 </div>
                 <button
@@ -592,7 +592,7 @@ function ServiceFields({
             <span className="text-[14px] font-medium text-ink-soft">€</span>
           </div>
         </div>
-        <p className="text-[12px] text-ink-soft">{formatPrice(draft.price, m.priceFree)}</p>
+        <p className="text-[12px] text-ink-soft">{formatPrice(draft.price, m.priceOnRequest)}</p>
       </div>
     </>
   );
@@ -656,7 +656,7 @@ function TemplatePicker({
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-[14px] font-semibold text-ink">{t.name}</span>
                 <span className="block truncate text-[12.5px] text-ink-soft">
-                  {t.duration_min} {m.durationUnit} · {formatPrice(t.price, m.priceFree)}
+                  {t.duration_min} {m.durationUnit} · {formatPrice(t.price, m.priceOnRequest)}
                 </span>
               </span>
             </button>

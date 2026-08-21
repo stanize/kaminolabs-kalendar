@@ -15,8 +15,8 @@ import type { PatientInfo } from "@/components/booking/booking-page-shell";
 interface Service { id: string; name: string; duration_min: number; price: number; }
 interface Member  { id: string; name: string; role: string | null; }
 
-function priceLabel(p: number, freeLabel: string): string {
-  return p === 0 ? freeLabel : `${p} €`;
+function priceLabel(p: number, priceOnRequestLabel: string): string {
+  return p === 0 ? priceOnRequestLabel : `${p} €`;
 }
 
 function ymd(d: Date): string {
@@ -167,7 +167,7 @@ export function BookingWizard({
                 className="flex items-center justify-between rounded-xl border border-line px-4 py-3.5 text-left transition-all hover:border-brand-line hover:bg-brand-weak">
                 <span>
                   <span className="block text-[14.5px] font-semibold text-ink">{s.name}</span>
-                  <span className="block text-[12.5px] text-ink-soft">{s.duration_min} {w.minutesUnit} · {priceLabel(s.price, w.freeLabel)}</span>
+                  <span className="block text-[12.5px] text-ink-soft">{s.duration_min} {w.minutesUnit} · {priceLabel(s.price, w.priceOnRequestLabel)}</span>
                 </span>
                 <Icon name="chevronRight" size={16} className="text-ink-soft" />
               </button>
@@ -444,7 +444,7 @@ function ConfirmAuthModal({
             title={w.recapTitle}
             serviceName={serviceName}
             servicePrice={servicePrice}
-            freeLabel={w.freeLabel}
+            priceOnRequestLabel={w.priceOnRequestLabel}
             providerName={slot.providerName}
             whenLabel={formatFullDateTime(slot.startIso, locale)}
           />
@@ -462,7 +462,7 @@ function ConfirmAuthModal({
               </div>
               <div className="flex items-start justify-between gap-3">
                 <dt className="shrink-0 text-[13px] text-ink-soft">{w.recapPrice}</dt>
-                <dd className="text-right text-[13.5px] font-semibold text-ink">{priceLabel(servicePrice, w.freeLabel)}</dd>
+                <dd className="text-right text-[13.5px] font-semibold text-ink">{priceLabel(servicePrice, w.priceOnRequestLabel)}</dd>
               </div>
               <div className="flex items-start justify-between gap-3">
                 <dt className="shrink-0 text-[13px] text-ink-soft">{w.recapDate}</dt>
@@ -685,9 +685,9 @@ function ConfirmAuthModal({
 // views — so a guest sees exactly what they're about to confirm regardless
 // of which of those views they're currently on.
 function AppointmentRecap({
-  title, serviceName, servicePrice, freeLabel, providerName, whenLabel,
+  title, serviceName, servicePrice, priceOnRequestLabel, providerName, whenLabel,
 }: {
-  title: string; serviceName: string; servicePrice: number; freeLabel: string;
+  title: string; serviceName: string; servicePrice: number; priceOnRequestLabel: string;
   providerName: string | null; whenLabel: string;
 }) {
   return (
@@ -695,7 +695,7 @@ function AppointmentRecap({
       <p className="mb-2 text-[11px] font-bold uppercase tracking-[.04em] text-ink-soft">{title}</p>
       <div className="flex items-start justify-between gap-3">
         <span className="text-[14.5px] font-semibold text-ink">{serviceName}</span>
-        <span className="shrink-0 text-[14.5px] font-semibold text-ink">{priceLabel(servicePrice, freeLabel)}</span>
+        <span className="shrink-0 text-[14.5px] font-semibold text-ink">{priceLabel(servicePrice, priceOnRequestLabel)}</span>
       </div>
       <p className="mt-1 text-[13px] text-ink-soft">
         {whenLabel}
