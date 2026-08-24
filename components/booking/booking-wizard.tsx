@@ -383,6 +383,12 @@ function ConfirmAuthModal({
         12000, "Tiempo agotado."
       );
       if (result.error) {
+        // Logged (not just swallowed into a generic message) so a failed
+        // sign-up is diagnosable from the browser console alone next time,
+        // without needing to dig through Vercel logs — that's how this
+        // exact bug (trustedOrigins missing the Vercel-assigned domain) got
+        // found: the client showed a generic error with zero trace of why.
+        console.error("[signUp.email] failed:", result.error);
         const msg = (result.error.message ?? "").toLowerCase();
         setLocalError(msg.includes("already") || msg.includes("exist") ? "Ya existe una cuenta con ese email." : "Ocurrió un error. Inténtalo de nuevo.");
         setBusy(false); return;
@@ -541,9 +547,9 @@ function ConfirmAuthModal({
             <div className="flex flex-col gap-3">
               <input type="email" placeholder={af.emailPlaceholder} value={email}
                 onChange={(e) => setEmail(e.target.value)} disabled={busy} className={`${inputBase} rounded-full`} />
-              <input type="password" placeholder={af.passwordPlaceholder} value={password}
+              <PasswordInput placeholder={af.passwordPlaceholder} value={password}
                 onChange={(e) => setPassword(e.target.value)} disabled={busy}
-                onKeyDown={(e) => e.key === "Enter" && handleLogin()} className={`${inputBase} rounded-full`} />
+                onKeyDown={(e) => e.key === "Enter" && handleLogin()} />
               <div className="-mt-1 flex justify-start">
                 <button
                   type="button"
@@ -651,11 +657,11 @@ function ConfirmAuthModal({
                 onChange={(e) => setName(e.target.value)} disabled={busy} className={`${inputBase} rounded-full`} />
               <input type="email" placeholder={af.emailPlaceholder} value={email}
                 onChange={(e) => setEmail(e.target.value)} disabled={busy} className={`${inputBase} rounded-full`} />
-              <input type="password" placeholder={af.passwordPlaceholder} value={password}
-                onChange={(e) => setPassword(e.target.value)} disabled={busy} className={`${inputBase} rounded-full`} />
-              <input type="password" placeholder={af.confirmPasswordPlaceholder} value={confirmPassword}
+              <PasswordInput placeholder={af.passwordPlaceholder} value={password}
+                onChange={(e) => setPassword(e.target.value)} disabled={busy} />
+              <PasswordInput placeholder={af.confirmPasswordPlaceholder} value={confirmPassword}
                 onChange={(e) => setConfirm(e.target.value)} disabled={busy}
-                onKeyDown={(e) => e.key === "Enter" && handleRegister()} className={`${inputBase} rounded-full`} />
+                onKeyDown={(e) => e.key === "Enter" && handleRegister()} />
               <button type="button" onClick={handleRegister} disabled={busy}
                 className="w-full rounded-full bg-brand px-4 py-3.5 text-[14.5px] font-semibold text-white transition-all hover:opacity-90 disabled:opacity-60">
                 {busy ? af.creatingAccount : af.createAccount}
@@ -701,6 +707,40 @@ function AppointmentRecap({
         {whenLabel}
         {providerName ? ` · ${providerName}` : ""}
       </p>
+    </div>
+  );
+}
+
+// Show/hide toggle, self-contained (each instance owns its own visibility
+// state) so the login field and the two register fields can each be
+// revealed independently rather than sharing one global toggle.
+function PasswordInput({
+  placeholder, value, onChange, disabled, onKeyDown,
+}: {
+  placeholder: string; value: string; onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  disabled?: boolean; onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
+}) {
+  const [show, setShow] = useState(false);
+  return (
+    <div className="relative">
+      <input
+        type={show ? "text" : "password"}
+        placeholder={placeholder}
+        value={value}
+        onChange={onChange}
+        disabled={disabled}
+        onKeyDown={onKeyDown}
+        className={`${inputBase} rounded-full pr-11`}
+      />
+      <button
+        type="button"
+        onClick={() => setShow((s) => !s)}
+        tabIndex={-1}
+        aria-label={show ? "Ocultar contraseña" : "Mostrar contraseña"}
+        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-ink-soft hover:text-ink"
+      >
+        <Icon name={show ? "eyeOff" : "eye"} size={16} />
+      </button>
     </div>
   );
 }

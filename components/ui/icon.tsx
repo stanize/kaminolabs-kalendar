@@ -33,6 +33,8 @@ import {
   Send,
   Pencil,
   QrCode,
+  Eye,
+  EyeOff,
   type LucideIcon,
 } from "lucide-react";
 
@@ -71,6 +73,8 @@ export const ICONS: Record<string, LucideIcon> = {
   send: Send,
   pencil: Pencil,
   qrCode: QrCode,
+  eye: Eye,
+  eyeOff: EyeOff,
 };
 
 export function Icon({

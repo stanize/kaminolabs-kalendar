@@ -106,5 +106,24 @@ export const auth = betterAuth({
   trustedOrigins: [
     "https://kalendar.kaminolabs.dev",
     "http://localhost:3000",
+    // Vercel-assigned domains for this project specifically (not a
+    // *.vercel.app wildcard — that would trust ANY Vercel project's
+    // deployment, not just ours, which is an unnecessary CSRF-surface
+    // widening). These are easy to test against by accident instead of the
+    // custom domain (Vercel shows them prominently in the dashboard), and
+    // without listing them a sign-up/sign-in from one silently 400s
+    // ("invalid origin") before ever touching the database — indistinguishable
+    // from a generic/unexplained failure on the client (this is exactly
+    // what caused a "Ocurrió un error" registration failure with no trace
+    // in Postgres logs — root-caused via Vercel runtime logs showing a
+    // clean 400 on POST /api/auth/sign-up/email).
+    "https://kalendar-rouge.vercel.app",
+    "https://kalendar-stanizes-projects.vercel.app",
+    "https://kalendar-git-main-stanizes-projects.vercel.app",
+    // Per-deployment preview URLs (kalendar-<hash>-stanizes-projects.vercel.app)
+    // change on every deploy, so they can't be listed individually — this
+    // narrower wildcard only matches this project's own preview URL pattern,
+    // not other Vercel projects.
+    "https://kalendar-*-stanizes-projects.vercel.app",
   ],
 });
