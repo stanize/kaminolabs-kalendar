@@ -35,6 +35,7 @@ drop table if exists public.kalendar_support_tickets  cascade;
 drop table if exists public.kalendar_user_preferences cascade;
 drop table if exists public.kalendar_bookings        cascade;
 drop table if exists public.kalendar_clients         cascade;
+drop table if exists public.kalendar_client_notes     cascade;
 drop table if exists public.kalendar_patients        cascade;
 drop table if exists public.user_roles               cascade;
 drop table if exists public.kalendar_team_members    cascade;
@@ -503,6 +504,45 @@ alter table public.kalendar_clients enable row level security;
 
 create policy "Clients: write"
   on public.kalendar_clients for all using (true) with check (true);
+
+-- ----------------------------------------------------------------------------
+-- kalendar_client_notes
+-- Private clinic notes about a client (private-clinic-notes,
+-- clinic-clients-page.md) — one row per note, timestamped, NOT a single
+-- overwritable field on kalendar_clients, so the clinic gets a running
+-- history rather than losing what was written before.
+--
+-- STRICTLY PRIVATE by design: never surfaced to the patient portal, never
+-- included in any email, never reachable from a patient-authenticated
+-- request — even if the client has a linked kalendar_patients account via
+-- kalendar_clients.patient_id, that soft link grants zero note visibility.
+-- Notes survive deletion of the linked patient-portal account (on delete
+-- set null on kalendar_clients.patient_id already; notes only cascade off
+-- kalendar_clients itself, never off kalendar_patients) — this table has no
+-- foreign key to kalendar_patients at all, only to kalendar_clients.
+--
+-- Editable/deletable by the clinic (not append-only) — DECIDED in
+-- clinic-clients-page.md; revisit append-only later if a real audit-trail
+-- need emerges.
+-- ----------------------------------------------------------------------------
+create table public.kalendar_client_notes (
+  id          uuid        primary key default gen_random_uuid(),
+  client_id   uuid        not null references public.kalendar_clients (id) on delete cascade,
+  -- Redundant with client_id -> kalendar_clients.business_id, but stored
+  -- directly for straightforward RLS/query scoping without a join.
+  business_id uuid        not null references public.kalendar_businesses (id) on delete cascade,
+  author_id   text        references public."user" (id) on delete set null,
+  body        text        not null,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+
+create index kalendar_client_notes_client_id_idx on public.kalendar_client_notes (client_id);
+
+alter table public.kalendar_client_notes enable row level security;
+
+create policy "Client notes: write"
+  on public.kalendar_client_notes for all using (true) with check (true);
 
 -- ----------------------------------------------------------------------------
 -- kalendar_bookings
