@@ -251,12 +251,14 @@ const RESULT_FALLBACK: UpdateBookingResultDict = {
  * independent of each other — a no-show can still be marked paid (deposit
  * kept), a completed session can be pending payment, etc.
  *
- * NOTE: doesn't yet update kalendar_clients' denormalized session counters
- * (total_sessions/completed_count/etc.) — clinic_client_id isn't populated
- * by any write path yet (manual bookings and the guest wizard don't create/
- * link a client record yet either). Wiring the counters is follow-up work
- * once those write paths exist, so it can be tested against real linked
- * bookings instead of guessed at.
+ * Also updates kalendar_clients' denormalized session counters
+ * (denormalized-counters-updated, clinic-clients-page.md) when the booking
+ * is linked (clinic_client_id set) — skipped silently for older/unlinked
+ * bookings, same graceful-degradation as everywhere else clinic_client_id
+ * is optional. Read-modify-write against the current counter values (not a
+ * SQL increment/RPC) — acceptable for a single owner clicking through
+ * results sequentially; would need a real atomic increment if this ever
+ * saw concurrent writers on the same client.
  */
 export const updateBookingResult = authedAction(
   async (
@@ -273,7 +275,7 @@ export const updateBookingResult = authedAction(
 
     const { data: booking } = await supabase
       .from("kalendar_bookings")
-      .select("id")
+      .select("id, status, clinic_client_id, starts_at")
       .eq("id", input.bookingId)
       .eq("business_id", business.id)
       .maybeSingle();
@@ -288,11 +290,95 @@ export const updateBookingResult = authedAction(
 
     if (error) return { ok: false, error: t.errUpdateFailed };
 
+    if (booking.clinic_client_id) {
+      await applyResultToClientCounters({
+        clinicClientId: booking.clinic_client_id,
+        previousStatus: booking.status as BookingResultStatus | "pending_confirmation" | "confirmed",
+        newStatus: input.status,
+        bookingStartsAt: booking.starts_at,
+      }).catch((e) => {
+        // Best-effort — a counters-update failure should never fail the
+        // owner's actual action (the booking's own status/payment write
+        // above already succeeded). Not reported further; if the counters
+        // drift, the future clients-list-page/client-detail-view is the
+        // place that would surface it visibly, not a silent background op.
+        console.error("[updateBookingResult] counters update failed", e);
+      });
+    }
+
     revalidatePath("/panel/calendar");
     revalidatePath("/panel");
     return { ok: true };
   }
 );
+
+const RESULT_STATUSES = new Set(["completed", "no_show", "cancelled"]);
+
+/**
+ * Recomputes one client's denormalized counters after a booking's result
+ * changed. total_sessions counts each booking's result exactly once — it
+ * only increments the FIRST time a booking is marked with one of the three
+ * result statuses (pending_confirmation/confirmed -> completed/no_show/
+ * cancelled), not again if the owner later changes their mind (completed ->
+ * no_show, say) — that's a correction, not a second appointment, so the
+ * specific completed_count/no_show_count/cancelled_count buckets shift but
+ * the total doesn't move.
+ *
+ * first_visit_at/last_visit_at only move on a 'completed' result (an actual
+ * visit happened) — a no-show or cancellation isn't a visit. They're
+ * monotonic: extended forward/backward as needed, never reset if a booking
+ * is later changed AWAY from 'completed' (recomputing them from full
+ * history on every edit would need scanning all of the client's other
+ * bookings; not worth it for what should be a rare correction).
+ */
+async function applyResultToClientCounters(input: {
+  clinicClientId: string;
+  previousStatus: BookingResultStatus | "pending_confirmation" | "confirmed";
+  newStatus: BookingResultStatus;
+  bookingStartsAt: string;
+}): Promise<void> {
+  const supabase = await createClient();
+
+  const { data: client } = await supabase
+    .from("kalendar_clients")
+    .select("total_sessions, completed_count, no_show_count, cancelled_count, first_visit_at, last_visit_at")
+    .eq("id", input.clinicClientId)
+    .maybeSingle();
+  if (!client) return;
+
+  const wasAlreadyResolved = RESULT_STATUSES.has(input.previousStatus);
+  const counts = {
+    total_sessions: client.total_sessions,
+    completed_count: client.completed_count,
+    no_show_count: client.no_show_count,
+    cancelled_count: client.cancelled_count,
+  };
+
+  const countKey = (s: BookingResultStatus) =>
+    s === "completed" ? "completed_count" : s === "no_show" ? "no_show_count" : "cancelled_count";
+
+  if (wasAlreadyResolved && input.previousStatus !== input.newStatus) {
+    // Correction: same appointment, different result — move it from the
+    // old bucket to the new one, total_sessions unchanged.
+    const oldKey = countKey(input.previousStatus as BookingResultStatus);
+    counts[oldKey] = Math.max(0, counts[oldKey] - 1);
+    counts[countKey(input.newStatus)] += 1;
+  } else if (!wasAlreadyResolved) {
+    // First time this booking gets a result — a genuinely new data point.
+    counts.total_sessions += 1;
+    counts[countKey(input.newStatus)] += 1;
+  }
+  // else: previousStatus === newStatus (no-op re-save) — nothing changes.
+
+  const update: Record<string, unknown> = { ...counts };
+  if (input.newStatus === "completed") {
+    const startsAt = input.bookingStartsAt;
+    if (!client.first_visit_at || startsAt < client.first_visit_at) update.first_visit_at = startsAt;
+    if (!client.last_visit_at || startsAt > client.last_visit_at) update.last_visit_at = startsAt;
+  }
+
+  await supabase.from("kalendar_clients").update(update).eq("id", input.clinicClientId);
+}
 
 // ── Manual (owner-created) appointment — week grid slot click ──────────────
 
