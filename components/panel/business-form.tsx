@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Icon } from "@/components/ui/icon";
 import { Btn } from "@/components/ui/button";
 import { Field, inputClasses } from "@/components/ui/field";
@@ -21,7 +22,7 @@ import {
   sanitizeSlug,
   suggestSlug,
 } from "@/lib/business/slug-screen";
-import { bookingUrlDisplay } from "@/lib/business/booking-url";
+import { bookingUrlDisplay, bookingPath } from "@/lib/business/booking-url";
 import type { SlugStatus } from "@/lib/business/data";
 import type { Locale } from "@/lib/i18n/config";
 import type { BusinessDictionary } from "@/lib/i18n/dictionaries/business";
@@ -305,7 +306,7 @@ export function BusinessForm({
     <div className="flex flex-col gap-7">
       <SaveOverlay state={overlay} savingLabel={f.saving} successLabel={f.saved} />
 
-      {initial && <LogoUploader initialLogoUrl={initial.logoUrl} />}
+      {initial && <LogoUploader initialLogoUrl={initial.logoUrl} slug={initial.slug} />}
 
       {/* Name */}
       <Field
@@ -556,7 +557,7 @@ function SlugStatusBadge({ status, f }: { status: SlugStatus; f: BusinessDiction
 // fields, so there's no reason to delay it or bundle it into the primary
 // save action. Only rendered once a business exists (see call site) since
 // uploadBusinessLogo needs a business.id to attach the logo to.
-function LogoUploader({ initialLogoUrl }: { initialLogoUrl: string | null }) {
+function LogoUploader({ initialLogoUrl, slug }: { initialLogoUrl: string | null; slug: string }) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [logoUrl, setLogoUrl] = useState(initialLogoUrl);
@@ -644,6 +645,16 @@ function LogoUploader({ initialLogoUrl }: { initialLogoUrl: string | null }) {
             >
               {uploading ? "Subiendo…" : logoUrl ? "Cambiar logo" : "Subir logo"}
             </Btn>
+            <Link
+              href={bookingPath(slug)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 text-[12.5px] font-medium text-ink-soft hover:text-brand"
+              title="Abre tu página de reservas real en una pestaña nueva"
+            >
+              <Icon name="externalLink" size={13} />
+              Vista previa
+            </Link>
             {logoUrl && (
               <button
                 type="button"
