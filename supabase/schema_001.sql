@@ -202,6 +202,15 @@ create table public.kalendar_businesses (
   slug_reviewed_at        timestamptz, -- null = awaiting human review (the review queue)
   slug_reviewed_by        text,        -- admin user id who actioned the review; null until reviewed
   brand_color             text        not null default '#0d9488',
+  -- Clinic-uploaded logo (business-logos storage bucket, see bottom of this
+  -- file). Rendered at a flexible max-height/preserved-aspect-ratio on the
+  -- public booking page instead of forcing every clinic's logo into the
+  -- fixed square icon slot — many real clinic logos are wide wordmarks
+  -- (e.g. "david pueyo fisioterapia y osteopatía"), not square marks, and
+  -- squashing those into a square looks broken. Null = fall back to the
+  -- default calendar-icon square in brand_color (unchanged from before this
+  -- column existed).
+  logo_url                text,
   -- Solo vs multi-provider clinic. Controls whether per-member availability/
   -- service rows are materialized (team) or availability is the clinic hours
   -- read directly (solo).
@@ -695,6 +704,21 @@ values (
   true,
   5242880,
   array['image/png','image/jpeg','image/webp','image/gif']
+) on conflict (id) do nothing;
+
+-- ============================================================================
+-- business-logos storage bucket
+-- Clinic-uploaded logos (kalendar_businesses.logo_url), rendered on the
+-- public booking page. Public bucket, same pattern as support-attachments
+-- above. 2MB limit — logos don't need to be large; keeps upload/render fast.
+-- ============================================================================
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'business-logos',
+  'business-logos',
+  true,
+  2097152,
+  array['image/png','image/jpeg','image/webp','image/svg+xml']
 ) on conflict (id) do nothing;
 
 -- ----------------------------------------------------------------------------

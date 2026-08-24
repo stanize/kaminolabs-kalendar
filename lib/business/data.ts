@@ -25,6 +25,7 @@ export interface Business {
   slug_flag_reason: string | null;
   slug_reviewed_at: string | null;
   brand_color: string;
+  logo_url: string | null;
   team_mode: "solo" | "team";
   booking_window_months: number;
   cancellation_window_hours: number;
@@ -48,7 +49,7 @@ export function formatBusinessAddress(
 
 const BUSINESS_TABLE = "kalendar_businesses";
 const BUSINESS_COLUMNS =
-  "id, owner_id, name, type, legal_id, address_street, address_number, address_additional, city, address_postal_code, address_province, address_country, phone_country_code, phone_number, contact_email, slug, slug_status, slug_flag_reason, slug_reviewed_at, brand_color, team_mode, booking_window_months, cancellation_window_hours, onboarding_completed_at, created_at";
+  "id, owner_id, name, type, legal_id, address_street, address_number, address_additional, city, address_postal_code, address_province, address_country, phone_country_code, phone_number, contact_email, slug, slug_status, slug_flag_reason, slug_reviewed_at, brand_color, logo_url, team_mode, booking_window_months, cancellation_window_hours, onboarding_completed_at, created_at";
 
 /**
  * The business owned by a given user, or null. Always scoped by the userId

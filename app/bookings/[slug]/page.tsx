@@ -67,6 +67,7 @@ export default async function BusinessPublicPage({
         name: business.name,
         address: addressLine,
         brand_color: business.brand_color,
+        logo_url: business.logo_url,
       }}
       services={services}
       members={members}

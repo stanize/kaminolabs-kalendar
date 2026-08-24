@@ -55,6 +55,7 @@ export default async function BusinessPage({
                 contactEmail: business.contact_email,
                 slug: business.slug,
                 slugStatus: business.slug_status,
+                logoUrl: business.logo_url,
               }
             : null
         }

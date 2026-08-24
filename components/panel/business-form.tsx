@@ -13,6 +13,8 @@ import {
   saveBusinessSettings,
   checkSlugAvailability,
   lookupPostalCode,
+  uploadBusinessLogo,
+  removeBusinessLogo,
   type SlugCheckResult,
 } from "@/lib/actions/business";
 import {
@@ -44,6 +46,7 @@ interface InitialBusiness {
   contactEmail: string;
   slug: string;
   slugStatus: SlugStatus;
+  logoUrl: string | null;
 }
 
 export function BusinessForm({
@@ -302,6 +305,8 @@ export function BusinessForm({
     <div className="flex flex-col gap-7">
       <SaveOverlay state={overlay} savingLabel={f.saving} successLabel={f.saved} />
 
+      {initial && <LogoUploader initialLogoUrl={initial.logoUrl} />}
+
       {/* Name */}
       <Field
         label={f.nameLabel}
@@ -542,5 +547,125 @@ function SlugStatusBadge({ status, f }: { status: SlugStatus; f: BusinessDiction
     <span className={`shrink-0 rounded-full border px-2.5 py-0.5 text-[11.5px] font-semibold ${s.className}`}>
       {s.label}
     </span>
+  );
+}
+
+// Uploads immediately on file select (like the QR-code/booking-page card
+// elsewhere in the panel), rather than waiting for the main form's Save —
+// a logo isn't part of the same "draft until saved" data as the text
+// fields, so there's no reason to delay it or bundle it into the primary
+// save action. Only rendered once a business exists (see call site) since
+// uploadBusinessLogo needs a business.id to attach the logo to.
+function LogoUploader({ initialLogoUrl }: { initialLogoUrl: string | null }) {
+  const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [logoUrl, setLogoUrl] = useState(initialLogoUrl);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-selecting the same file later
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      setError("El archivo debe pesar menos de 2MB.");
+      return;
+    }
+    if (!["image/png", "image/jpeg", "image/webp", "image/svg+xml"].includes(file.type)) {
+      setError("Sube una imagen PNG, JPG, WEBP o SVG.");
+      return;
+    }
+
+    setError(null);
+    setUploading(true);
+    const formData = new FormData();
+    formData.set("logo", file);
+    try {
+      const result = await uploadBusinessLogo(formData);
+      if (!result.ok) {
+        setError(result.error);
+      } else {
+        setLogoUrl(result.logoUrl);
+        router.refresh();
+      }
+    } catch {
+      setError("No se pudo subir el logo.");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function handleRemove() {
+    setError(null);
+    setUploading(true);
+    try {
+      const result = await removeBusinessLogo();
+      if (!result.ok) {
+        setError(result.error);
+      } else {
+        setLogoUrl(null);
+        router.refresh();
+      }
+    } catch {
+      setError("No se pudo guardar el cambio.");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-[9px]">
+      <span className="text-[13px] font-semibold text-ink">Logo de tu negocio</span>
+      <p className="text-[12.5px] text-ink-soft">
+        Se muestra en tu página de reservas en lugar del icono por defecto. Funciona mejor con
+        logos anchos (wordmarks) — se ajusta manteniendo su proporción, sin recortarlo a un
+        cuadrado.
+      </p>
+
+      <div className="flex items-center gap-4">
+        <div className="flex h-16 min-w-[64px] max-w-[220px] items-center justify-center rounded-xl border border-line bg-surface-2 px-3">
+          {logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element -- external Supabase Storage URL, not a local/optimizable asset
+            <img src={logoUrl} alt="Logo" className="max-h-12 max-w-full object-contain" />
+          ) : (
+            <Icon name="calendar" size={22} className="text-ink-soft" />
+          )}
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2">
+            <Btn
+              variant="outline"
+              size="sm"
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+            >
+              {uploading ? "Subiendo…" : logoUrl ? "Cambiar logo" : "Subir logo"}
+            </Btn>
+            {logoUrl && (
+              <button
+                type="button"
+                onClick={handleRemove}
+                disabled={uploading}
+                className="text-[12.5px] font-medium text-ink-soft hover:text-error disabled:opacity-50"
+              >
+                Quitar
+              </button>
+            )}
+          </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/svg+xml"
+            className="hidden"
+            onChange={handleFileChange}
+          />
+        </div>
+      </div>
+
+      {error && <p className="text-[12.5px] text-error">{error}</p>}
+    </div>
   );
 }

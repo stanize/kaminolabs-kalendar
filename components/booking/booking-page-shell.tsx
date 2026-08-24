@@ -50,6 +50,7 @@ export function BookingPageShell({
     name: string;
     address: string;
     brand_color: string;
+    logo_url: string | null;
   };
   services: Service[];
   members: Member[];
@@ -103,14 +104,28 @@ export function BookingPageShell({
           <LocaleSwitcher current={locale} onChange={setLocale} />
         </div>
 
-        {/* Business header */}
+        {/* Business header — clinic-uploaded logo (flexible width, capped
+            height, preserved aspect ratio) when set, otherwise the default
+            brand-colored calendar icon square. Flexible width deliberately,
+            not forced into the old fixed square slot: many real clinic
+            logos are wide wordmarks (name + tagline side by side), and
+            squashing those into a square crops or distorts them. */}
         <div className="mb-6 text-center">
-          <div
-            className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-2xl text-white"
-            style={{ backgroundColor: business.brand_color }}
-          >
-            <Icon name="calendar" size={28} />
-          </div>
+          {business.logo_url ? (
+            // eslint-disable-next-line @next/next/no-img-element -- external Supabase Storage URL, not a local/optimizable asset
+            <img
+              src={business.logo_url}
+              alt={business.name}
+              className="mx-auto mb-4 max-h-20 max-w-full object-contain"
+            />
+          ) : (
+            <div
+              className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-2xl text-white"
+              style={{ backgroundColor: business.brand_color }}
+            >
+              <Icon name="calendar" size={28} />
+            </div>
+          )}
           <h1 className="mb-1 text-[24px]">{business.name}</h1>
           <p className="text-[14.5px] text-ink-soft">{business.address}</p>
         </div>

@@ -11,6 +11,7 @@ import {
   screenSlug,
 } from "@/lib/business/slug-screen";
 import { lookupPostalCode as lookupPostalCodeData } from "@/lib/business/postal-codes";
+import { getBusinessForUser } from "@/lib/business/data";
 
 const VALID_TYPES = new Set<string>(BUSINESS_TYPES.map((t) => t.id));
 
@@ -285,5 +286,111 @@ export const saveBusinessSettings = authedAction(
     revalidatePath("/panel");
     revalidatePath("/panel/business");
     return { ok: true, slug, pendingReview: !screen.clean };
+  }
+);
+
+// ── Logo upload ──────────────────────────────────────────────────────────
+
+export type UploadLogoResult =
+  | { ok: true; logoUrl: string }
+  | { ok: false; error: string };
+
+const LOGO_MAX_BYTES = 2 * 1024 * 1024; // matches business-logos bucket's file_size_limit
+const LOGO_ALLOWED_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/svg+xml"]);
+
+/**
+ * Uploads a clinic's logo to the business-logos storage bucket (see
+ * supabase/schema_001.sql) and saves the public URL on kalendar_businesses.
+ * Same upload pattern as lib/actions/support.ts's attachment handling —
+ * server-side upload via the service-role Supabase client (no client-side
+ * bucket RLS needed, matching that precedent). Old logo file is deleted
+ * from storage on replace, so orphaned files don't accumulate.
+ */
+export const uploadBusinessLogo = authedAction(
+  async (session, formData: FormData, dict?: { errNoBusiness: string; errInvalidFile: string; errUploadFailed: string }): Promise<UploadLogoResult> => {
+    const t = {
+      errNoBusiness: dict?.errNoBusiness ?? "No se encontró tu negocio.",
+      errInvalidFile: dict?.errInvalidFile ?? "Sube una imagen PNG, JPG, WEBP o SVG de menos de 2MB.",
+      errUploadFailed: dict?.errUploadFailed ?? "No se pudo subir el logo.",
+    };
+
+    const business = await getBusinessForUser(session.user.id);
+    if (!business) return { ok: false, error: t.errNoBusiness };
+
+    const file = formData.get("logo") as File | null;
+    if (!file || file.size === 0) return { ok: false, error: t.errInvalidFile };
+    if (file.size > LOGO_MAX_BYTES || !LOGO_ALLOWED_TYPES.has(file.type)) {
+      return { ok: false, error: t.errInvalidFile };
+    }
+
+    const supabase = await createClient();
+    const ext = file.name.split(".").pop() ?? "png";
+    const fileName = `${business.id}/logo-${Date.now()}.${ext}`;
+
+    const arrayBuffer = await file.arrayBuffer();
+    const { error: uploadError } = await supabase.storage
+      .from("business-logos")
+      .upload(fileName, new Uint8Array(arrayBuffer), { contentType: file.type, upsert: false });
+
+    if (uploadError) return { ok: false, error: t.errUploadFailed };
+
+    const { data: publicUrlData } = supabase.storage.from("business-logos").getPublicUrl(fileName);
+    const logoUrl = publicUrlData.publicUrl;
+
+    const { error: updateError } = await supabase
+      .from("kalendar_businesses")
+      .update({ logo_url: logoUrl })
+      .eq("id", business.id)
+      .eq("owner_id", session.user.id);
+
+    if (updateError) return { ok: false, error: t.errUploadFailed };
+
+    // Best-effort cleanup of the previous logo file — not fatal if it fails
+    // (an orphaned file in storage costs nothing functionally, just some
+    // unused storage), so this doesn't affect the result returned above.
+    if (business.logo_url) {
+      const prevPath = business.logo_url.split("/business-logos/")[1];
+      if (prevPath) {
+        await supabase.storage.from("business-logos").remove([prevPath]);
+      }
+    }
+
+    revalidatePath("/panel/business");
+    revalidatePath(`/bookings/${business.slug}`);
+    return { ok: true, logoUrl };
+  }
+);
+
+export type RemoveLogoResult = { ok: true } | { ok: false; error: string };
+
+export const removeBusinessLogo = authedAction(
+  async (session, dict?: { errNoBusiness: string; errSaveFailed: string }): Promise<RemoveLogoResult> => {
+    const t = {
+      errNoBusiness: dict?.errNoBusiness ?? "No se encontró tu negocio.",
+      errSaveFailed: dict?.errSaveFailed ?? "No se pudo guardar el cambio.",
+    };
+
+    const business = await getBusinessForUser(session.user.id);
+    if (!business) return { ok: false, error: t.errNoBusiness };
+
+    const supabase = await createClient();
+    const { error } = await supabase
+      .from("kalendar_businesses")
+      .update({ logo_url: null })
+      .eq("id", business.id)
+      .eq("owner_id", session.user.id);
+
+    if (error) return { ok: false, error: t.errSaveFailed };
+
+    if (business.logo_url) {
+      const prevPath = business.logo_url.split("/business-logos/")[1];
+      if (prevPath) {
+        await supabase.storage.from("business-logos").remove([prevPath]);
+      }
+    }
+
+    revalidatePath("/panel/business");
+    revalidatePath(`/bookings/${business.slug}`);
+    return { ok: true };
   }
 );
