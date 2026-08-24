@@ -26,6 +26,18 @@ export default async function BusinessPage({
   return (
     <div className="mx-auto max-w-[680px] px-4 py-6 sm:px-8 sm:py-8">
       <div className="mb-8">
+        {/* Logo shown here too (not just the public booking page) so it's
+            visible right where the owner manages their business info — a
+            second, always-in-view place to notice/confirm branding, beyond
+            the uploader control further down the form. */}
+        {business?.logo_url && (
+          // eslint-disable-next-line @next/next/no-img-element -- external Supabase Storage URL, not a local/optimizable asset
+          <img
+            src={business.logo_url}
+            alt={business.name}
+            className="mb-4 max-h-16 max-w-full object-contain"
+          />
+        )}
         <h1 className="mb-1 text-[24px]">{dict.page.titleNew}</h1>
         <p className="text-[15px] text-ink-soft">
           {isNew ? dict.page.subtitleNew : dict.page.subtitleEdit}

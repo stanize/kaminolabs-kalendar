@@ -306,8 +306,6 @@ export function BusinessForm({
     <div className="flex flex-col gap-7">
       <SaveOverlay state={overlay} savingLabel={f.saving} successLabel={f.saved} />
 
-      {initial && <LogoUploader initialLogoUrl={initial.logoUrl} slug={initial.slug} slugStatus={initial.slugStatus} />}
-
       {/* Name */}
       <Field
         label={f.nameLabel}
@@ -485,6 +483,12 @@ export function BusinessForm({
           <p className="text-[12px] text-ink-soft">{f.slugImmutableEdit}</p>
         </div>
       )}
+
+      {/* Logo — sits after the slug deliberately, following the natural
+          sequence: fill in business details, confirm the booking-page slug,
+          then customize how that page looks. Only shown once a business
+          (and slug) exists — see LogoUploader's own prop requirements. */}
+      {initial && <LogoUploader initialLogoUrl={initial.logoUrl} slug={initial.slug} slugStatus={initial.slugStatus} />}
 
       {error && (
         <div className="flex items-start gap-2 rounded-xl border border-error bg-error-weak px-4 py-3 text-[13.5px] text-error">
