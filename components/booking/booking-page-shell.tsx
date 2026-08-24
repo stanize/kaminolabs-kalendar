@@ -105,26 +105,17 @@ export function BookingPageShell({
         </div>
 
         {/* Business header — clinic-uploaded logo (flexible width, capped
-            height, preserved aspect ratio) when set, otherwise the default
-            brand-colored calendar icon square. Flexible width deliberately,
-            not forced into the old fixed square slot: many real clinic
-            logos are wide wordmarks (name + tagline side by side), and
-            squashing those into a square crops or distorts them. */}
+            height, preserved aspect ratio) when set. No fallback icon —
+            a clinic that hasn't uploaded one just gets name + address,
+            no placeholder graphic standing in for a logo nobody chose. */}
         <div className="mb-6 text-center">
-          {business.logo_url ? (
+          {business.logo_url && (
             // eslint-disable-next-line @next/next/no-img-element -- external Supabase Storage URL, not a local/optimizable asset
             <img
               src={business.logo_url}
               alt={business.name}
               className="mx-auto mb-4 max-h-20 max-w-full object-contain"
             />
-          ) : (
-            <div
-              className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-2xl text-white"
-              style={{ backgroundColor: business.brand_color }}
-            >
-              <Icon name="calendar" size={28} />
-            </div>
           )}
           <h1 className="mb-1 text-[24px]">{business.name}</h1>
           <p className="text-[14.5px] text-ink-soft">{business.address}</p>
