@@ -7,6 +7,7 @@ import { Btn } from "@/components/ui/button";
 import { getAvailableSlots, submitBooking, type SlotDTO } from "@/lib/actions/booking";
 import { provisionPatient, checkPatientRoleConflict } from "@/lib/actions/patient";
 import { authClient } from "@/lib/auth-client";
+import { reportClientError } from "@/lib/report-client-error";
 import type { DayId } from "@/lib/onboarding/types";
 import type { Locale } from "@/lib/i18n/config";
 import { getBookingPageDictionary, type BookingPageDictionary } from "@/lib/i18n/dictionaries/booking-page";
@@ -367,7 +368,13 @@ function ConfirmAuthModal({
       const result = await withTimeout(authClient.signIn.email({ email: email.trim(), password }), 12000, "Tiempo agotado.");
       if (result.error || !result.data?.user) { setLocalError("Email o contraseña incorrectos."); setBusy(false); return; }
       await afterAuth();
-    } catch (e) { setLocalError(e instanceof Error ? e.message : "Error inesperado."); setBusy(false); }
+    } catch (e) {
+      // Unexpected exceptions here (network, timeout, etc.) are worth
+      // reporting — a plain wrong-password result above isn't, that's
+      // expected user error and would just add noise.
+      reportClientError("signIn.email", e);
+      setLocalError(e instanceof Error ? e.message : "Error inesperado."); setBusy(false);
+    }
   }
 
   async function handleRegister() {
@@ -383,18 +390,23 @@ function ConfirmAuthModal({
         12000, "Tiempo agotado."
       );
       if (result.error) {
-        // Logged (not just swallowed into a generic message) so a failed
-        // sign-up is diagnosable from the browser console alone next time,
-        // without needing to dig through Vercel logs — that's how this
-        // exact bug (trustedOrigins missing the Vercel-assigned domain) got
-        // found: the client showed a generic error with zero trace of why.
+        // Logged both locally (browser console) and forwarded server-side
+        // via reportClientError — that second part is what actually gets
+        // this into Vercel's runtime logs, queryable without needing
+        // someone to have watched the failure happen live in a browser.
+        // This exact gap (client-only console.error) is how the
+        // trustedOrigins bug stayed invisible until manually reproduced.
         console.error("[signUp.email] failed:", result.error);
+        reportClientError("signUp.email", result.error, { email: email.trim() });
         const msg = (result.error.message ?? "").toLowerCase();
         setLocalError(msg.includes("already") || msg.includes("exist") ? "Ya existe una cuenta con ese email." : "Ocurrió un error. Inténtalo de nuevo.");
         setBusy(false); return;
       }
       await afterAuth();
-    } catch (e) { setLocalError(e instanceof Error ? e.message : "Error inesperado."); setBusy(false); }
+    } catch (e) {
+      reportClientError("signUp.email:exception", e, { email: email.trim() });
+      setLocalError(e instanceof Error ? e.message : "Error inesperado."); setBusy(false);
+    }
   }
 
   async function submitGuest() {
