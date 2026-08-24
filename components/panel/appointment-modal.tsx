@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import { createBookingAsOwner, updateBookingAsOwner } from "@/lib/actions/booking-owner";
+import { searchClients, type ClientSearchResult } from "@/lib/actions/clients";
 import { reportClientError } from "@/lib/report-client-error";
 import { zonedTimeToUtc, dayIdInTz, tzDateParts, TZ } from "@/lib/calendar/client-date";
 import type { CalendarDictionary } from "@/lib/i18n/dictionaries/calendar";
@@ -111,11 +112,57 @@ export function AppointmentModal(props: AppointmentModalProps) {
   const [clientName, setClientName] = useState(isEdit ? props.booking.clientName : "");
   const [clientEmail, setClientEmail] = useState(initialClientEmail);
   const [clientPhone, setClientPhone] = useState(isEdit ? props.booking.clientPhone ?? "" : "");
+  // client-linking-on-booking: set when the owner picks an existing client
+  // from the search results below; cleared the moment they type anything
+  // afterward, since editing the fields after picking means they're now
+  // diverging from that client's stored data — safer to fall back to
+  // creating a fresh kalendar_clients row than silently keep a stale link.
+  // Only offered for NEW bookings (isEdit already has a fixed client).
+  const [clinicClientId, setClinicClientId] = useState<string | null>(null);
+  const [clientResults, setClientResults] = useState<ClientSearchResult[]>([]);
+  const [showClientResults, setShowClientResults] = useState(false);
+  const clientSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [notes, setNotes] = useState(isEdit ? props.booking.notes ?? "" : "");
   const [sendEmail, setSendEmail] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [timeMenuOpen, setTimeMenuOpen] = useState(false);
+
+  // client-linking-on-booking: type-ahead search on the name field, new
+  // bookings only. Debounced to avoid a request per keystroke; the "clear
+  // results" case is also inside the timeout (not called synchronously in
+  // the effect body) to avoid the cascading-render setState-in-effect
+  // pattern.
+  useEffect(() => {
+    if (isEdit) return;
+    if (clientSearchDebounceRef.current) clearTimeout(clientSearchDebounceRef.current);
+    const q = clientName.trim();
+    clientSearchDebounceRef.current = setTimeout(async () => {
+      if (q.length < 2) {
+        setClientResults([]);
+        setShowClientResults(false);
+        return;
+      }
+      try {
+        const results = await searchClients(q);
+        setClientResults(results);
+        setShowClientResults(results.length > 0);
+      } catch (e) {
+        reportClientError("searchClients", e);
+      }
+    }, 300);
+    return () => {
+      if (clientSearchDebounceRef.current) clearTimeout(clientSearchDebounceRef.current);
+    };
+  }, [clientName, isEdit]);
+
+  function selectExistingClient(c: ClientSearchResult) {
+    setClientName(c.name);
+    setClientEmail(c.email ?? "");
+    setClientPhone(c.phone ?? "");
+    setClinicClientId(c.id);
+    setShowClientResults(false);
+  }
 
   const dateValid = /^\d{4}-\d{2}-\d{2}$/.test(dateStr);
   const timeValid = /^\d{2}:\d{2}$/.test(timeStr);
@@ -189,6 +236,7 @@ export function AppointmentModal(props: AppointmentModalProps) {
         clientPhone: clientPhone || undefined,
         notes: notes || undefined,
         sendConfirmationEmail: sendEmail,
+        clinicClientId: clinicClientId || undefined,
       };
       const res = isEdit
         ? await updateBookingAsOwner({ bookingId: editBookingId as string, ...payload }, errorsDict)
@@ -317,18 +365,51 @@ export function AppointmentModal(props: AppointmentModalProps) {
           )}
 
           <Field label={dict.clientNameLabel}>
-            <input
-              value={clientName}
-              onChange={(e) => setClientName(e.target.value)}
-              placeholder={dict.clientNamePlaceholder}
-              className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[16px] text-ink"
-            />
+            <div className="relative">
+              <input
+                value={clientName}
+                onChange={(e) => { setClientName(e.target.value); setClinicClientId(null); }}
+                onFocus={() => setShowClientResults(clientResults.length > 0)}
+                onBlur={() => setTimeout(() => setShowClientResults(false), 150)}
+                placeholder={dict.clientNamePlaceholder}
+                className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[16px] text-ink"
+                autoComplete="off"
+              />
+              {clinicClientId && (
+                <span
+                  title="Cliente existente"
+                  className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 rounded-full bg-brand-weak px-2 py-0.5 text-[11px] font-semibold text-brand-ink"
+                >
+                  <Icon name="check" size={11} className="mr-0.5 inline" strokeWidth={3} />
+                  Cliente
+                </span>
+              )}
+              {showClientResults && !isEdit && (
+                <div className="absolute left-0 right-0 top-full z-10 mt-1 max-h-52 overflow-y-auto rounded-lg border border-line bg-surface shadow-lg">
+                  {clientResults.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()} // keep focus so onBlur doesn't fire first
+                      onClick={() => selectExistingClient(c)}
+                      className="flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left hover:bg-surface-2"
+                    >
+                      <span className="text-[13.5px] font-semibold text-ink">{c.name}</span>
+                      <span className="text-[12px] text-ink-soft">
+                        {[c.email, c.phone].filter(Boolean).join(" · ") || "Sin contacto"}
+                        {c.totalSessions > 0 ? ` · ${c.totalSessions} cita${c.totalSessions === 1 ? "" : "s"}` : ""}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </Field>
 
           <Field label={dict.clientEmailLabel}>
             <input
               value={clientEmail}
-              onChange={(e) => setClientEmail(e.target.value)}
+              onChange={(e) => { setClientEmail(e.target.value); setClinicClientId(null); }}
               placeholder={dict.clientEmailPlaceholder}
               type="email"
               className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[16px] text-ink"
@@ -338,7 +419,7 @@ export function AppointmentModal(props: AppointmentModalProps) {
           <Field label={dict.clientPhoneLabel}>
             <input
               value={clientPhone}
-              onChange={(e) => setClientPhone(e.target.value)}
+              onChange={(e) => { setClientPhone(e.target.value); setClinicClientId(null); }}
               placeholder={dict.clientPhonePlaceholder}
               className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[16px] text-ink"
             />

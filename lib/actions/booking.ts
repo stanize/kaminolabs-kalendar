@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getPublicBookingData, getTakenIntervals } from "@/lib/booking/data";
 import { buildBookingIcsBase64 } from "@/lib/booking/ics";
 import { formatBusinessAddress } from "@/lib/business/data";
+import { resolveClinicClientId } from "@/lib/booking/client-link";
 import {
   sendEmail,
   bookingConfirmEmailHtml,
@@ -269,6 +270,17 @@ export async function submitBooking(input: {
   const token = randomBytes(24).toString("base64url");
   const isAuthenticated = !!input.patientId;
 
+  // client-linking-on-booking (clinic-clients-page.md) — best-effort: a
+  // failure here should never block the booking itself (clinic_client_id
+  // is nullable, degrades gracefully — same as before this existed).
+  const clinicClientId = await resolveClinicClientId({
+    businessId: data.business.id,
+    patientId: input.patientId ?? null,
+    name,
+    email,
+    phone: phone || null,
+  }).catch(() => null);
+
   // Authenticated patients: confirmed immediately, no expiry window.
   // Guests: pending_confirmation, clinic has 24h to confirm.
   // statusOverride (admin tooling only) takes precedence over the
@@ -284,6 +296,7 @@ export async function submitBooking(input: {
     service_id: service.id,
     team_member_id: teamMemberId,
     patient_id: input.patientId ?? null,
+    clinic_client_id: clinicClientId,
     service_name: service.name,
     service_duration_min: service.duration_min,
     service_price: service.price,

@@ -345,6 +345,12 @@ export const createBookingAsOwner = authedAction(
       clientPhone?: string;
       notes?: string;
       sendConfirmationEmail: boolean;
+      // client-linking-on-booking: when set (owner picked an existing
+      // client from the search picker), the booking links to that row
+      // directly instead of creating a new kalendar_clients row. Must
+      // belong to the caller's own business — validated below, not just
+      // trusted from the client.
+      clinicClientId?: string | null;
     },
     dict?: Partial<ManualBookingActionDict>
   ): Promise<CreateManualBookingResult> => {
@@ -403,6 +409,36 @@ export const createBookingAsOwner = authedAction(
       .limit(1);
     if (overlapping && overlapping.length > 0) return { ok: false, error: t.errSlotTaken };
 
+    // client-linking-on-booking: use the picked existing client (validated
+    // to belong to this business — never trust a raw id from the client
+    // without scoping it), or create a new kalendar_clients row from the
+    // entered details. Best-effort — a linking failure never blocks the
+    // booking itself, same rationale as the guest path in submitBooking.
+    let clinicClientId: string | null = null;
+    if (input.clinicClientId) {
+      const { data: pickedClient } = await supabase
+        .from("kalendar_clients")
+        .select("id")
+        .eq("id", input.clinicClientId)
+        .eq("business_id", business.id)
+        .maybeSingle();
+      clinicClientId = pickedClient?.id ?? null;
+    }
+    if (!clinicClientId) {
+      const { data: createdClient } = await supabase
+        .from("kalendar_clients")
+        .insert({
+          business_id: business.id,
+          patient_id: null,
+          name,
+          email: email || null,
+          phone: (input.clientPhone ?? "").trim() || null,
+        })
+        .select("id")
+        .single();
+      clinicClientId = createdClient?.id ?? null;
+    }
+
     const token = randomBytes(24).toString("base64url");
 
     const { error } = await supabase.from("kalendar_bookings").insert({
@@ -410,6 +446,7 @@ export const createBookingAsOwner = authedAction(
       service_id: service.id,
       team_member_id: member.id,
       patient_id: null,
+      clinic_client_id: clinicClientId,
       service_name: service.name,
       service_duration_min: service.duration_min,
       service_price: service.price,
