@@ -19,10 +19,10 @@ Criteria:
 - Not yet decided what this page would add beyond what mark-payment already covers — possibly a clinic-wide payments ledger/report view rather than new per-booking functionality
 
 ## Step: invoices-page
-Status: not_started
+Status: superseded — now actively specced, not post-MVP
 Criteria:
-- REMOVED (commit ce5f610): both nav link and route deleted outright — no /app/panel/invoices anymore
-- Likely the clinic-facing surface for pdf-invoicing.md's work (viewing/resending invoices sent to their clients) — cross-reference that workflow before rebuilding this one, avoid duplicating scope
+- SUPERSEDED (2026-08-25): a full spec for clinic-patient invoicing landed and is now tracked in pdf-invoicing.md's invoice-history-view step, which fills this exact nav slot (/panel/invoices or similar, exact placement TBD there). This item has moved from "post-MVP, unscoped" to "in active build scope" — no longer belongs in this post-MVP list.
+- Previously: nav link + route were removed outright in commit ce5f610 as part of the general cleanup; the route will be rebuilt fresh per pdf-invoicing.md's spec, not restored as-was
 
 ## Step: notifications-page
 Status: not_started

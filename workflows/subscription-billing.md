@@ -2,6 +2,8 @@
 
 Stripe-backed SaaS subscription lifecycle for a clinic business, and the app-side gating that should depend on it.
 
+STRATEGIC DEFERRAL (2026-08-25): Arun has decided to go to market without the subscription model for MVP — clinics onboarding in September get 6 months free, with real live usage prioritized over billing before the product is battle-tested. Steps below marked "deferred" are explicitly out of MVP scope, not just unbuilt — do not build them as part of the current push. The already-built steps (subscribe, webhook-sync, reconciliation, payment-method-update, cancel-resume) remain done/dormant — no need to rip them out, they're just not being activated/gated yet.
+
 ## Step: subscribe
 Status: done
 Criteria:
@@ -25,7 +27,7 @@ Criteria:
 - Reconciliation logs mismatches rather than silently auto-correcting them
 
 ## Step: billing-failure-banner
-Status: in_progress
+Status: deferred (out of MVP scope — see strategic deferral note at top)
 Criteria:
 - past_due state is rendered by subscription-manager.tsx — confirmed working, but ONLY visible if the owner navigates to /panel/settings (Suscripción tab) themselves
 - Missing: a global banner/indicator visible from anywhere in the panel (e.g. panel home, calendar, any page under /panel) when subscription_status is past_due, so an owner isn't relying on remembering to check settings
@@ -47,14 +49,14 @@ Criteria:
 - UI reflects cancelAtPeriodEnd / currentPeriodEnd fetched live from Stripe
 
 ## Step: pricing-phase-transitions
-Status: in_progress
+Status: deferred (out of MVP scope — see strategic deferral note at top)
 Criteria:
 - Discount schedule (kalendar_discount_schedule_templates/phases) drives a locked-in price per subscription
 - pricing-phase-notify cron emails a notification on a boundary crossing
 - Boundary crossing also pushes an updated price to the live Stripe subscription (stripe.subscriptions.update) — known gap, not yet built
 
 ## Step: calendar-aligned-billing
-Status: not_started
+Status: deferred (out of MVP scope — see strategic deferral note at top)
 Criteria:
 - DECIDED: every subscription bills on the 1st of the month, regardless of signup date — not per-clinic anniversary billing (Stripe's default). Chosen over per-client cycles for operational simplicity: one billing day, one "who's overdue" check, no per-clinic period-start tracking needed anywhere downstream (this directly simplifies feature-gating's day-15 computation below).
 - Mechanism: Stripe's billing_cycle_anchor set to the 1st of the following month at subscription creation, so recurring charges land on the 1st going forward
@@ -64,7 +66,7 @@ Criteria:
 - Applies to trial-period-mechanism too: trial_end (see below) should itself land on the 1st of a month, not an arbitrary date, so a converting trial rolls straight into the same aligned cycle rather than creating an off-cycle subscription
 
 ## Step: trial-period-mechanism
-Status: not_started
+Status: deferred (out of MVP scope — see strategic deferral note at top)
 Criteria:
 - Depends on calendar-aligned-billing (trial_end should resolve to a 1st-of-month date)
 - Trial approach: Stripe-native trial via trial_end as an absolute date (not trial_period_days) — a day-count doesn't map cleanly onto "free until the aligned cycle starts" the way an absolute date does. Example: sign up mid-January intending "~3 months free" -> trial_end = April 1st. Sign up January 20th -> nearest useful cutoff is either April 1st or, if a touch more runway is intended, May 1st (Arun's own example: "you get two extra weeks free" when the last free month would otherwise end mid-month) — exact rule for picking the cutoff date from a signup date is Arun's call, not yet decided
@@ -74,7 +76,7 @@ Criteria:
 - Panel UI shows remaining trial time somewhere visible (e.g. a banner) so a trialing clinic isn't surprised when it ends
 
 ## Step: feature-gating
-Status: not_started
+Status: deferred (out of MVP scope — see strategic deferral note at top)
 Criteria:
 - Depends on trial-period-mechanism and calendar-aligned-billing being decided/built first (gating logic needs to treat trialing as allowed, not just active, and relies on period-start always being the 1st)
 - Billing is pay-in-advance (standard Stripe subscription behavior — a period's payment is due at that period's start, covering the period ahead)
