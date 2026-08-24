@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { updateDisplayName } from "@/lib/actions/account";
+import { reportClientError } from "@/lib/report-client-error";
 
 export function EditableGreetingName({
   initialName,
@@ -68,7 +69,8 @@ export function EditableGreetingName({
       setEditing(false);
       setSaving(false);
       router.refresh();
-    } catch {
+    } catch (e) {
+      reportClientError("updateDisplayName", e);
       setError(errSaveFailed);
       setSaving(false);
     }

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { cancelBookingAsPatient } from "@/lib/actions/patient";
+import { reportClientError } from "@/lib/report-client-error";
 
 // Small filled pill — same shape/weight as the "Guardar cambios" button
 // elsewhere in the portal, just scaled down for an inline row action. Red
@@ -70,7 +71,8 @@ export function PatientCancelButton({
       }
       setOpen(false);
       router.refresh();
-    } catch {
+    } catch (e) {
+      reportClientError("cancelBookingAsPatient", e);
       setError("No se pudo procesar la solicitud.");
       setBusy(false);
     }

@@ -6,6 +6,7 @@ import { Icon } from "@/components/ui/icon";
 import { Btn } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { updatePatientProfile } from "@/lib/actions/patient";
+import { reportClientError } from "@/lib/report-client-error";
 
 export function PatientProfileForm({
   initialName,
@@ -44,7 +45,8 @@ export function PatientProfileForm({
       setSaving(false);
       setSaved(true);
       router.refresh();
-    } catch {
+    } catch (e) {
+      reportClientError("updatePatientProfile", e);
       setError("No se pudo guardar el perfil.");
       setSaving(false);
     }

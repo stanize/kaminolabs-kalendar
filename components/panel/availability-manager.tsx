@@ -11,6 +11,7 @@ import {
   type WizardStep,
 } from "@/components/panel/availability-setup-wizard";
 import { saveAvailability, checkAvailabilityConflicts, type WeekHours, type ConflictingBooking } from "@/lib/actions/availability";
+import { reportClientError } from "@/lib/report-client-error";
 import {
   WEEKDAY_ORDER,
   DEFAULT_RANGE_START,
@@ -195,7 +196,8 @@ export function AvailabilityManager({
         setConflicts(result.conflicts);
         return; // wait for the owner to confirm or cancel in the modal
       }
-    } catch {
+    } catch (e) {
+      reportClientError("checkAvailabilityConflicts", e);
       setChecking(false);
       setError(m.errUnexpected);
       return;
@@ -233,7 +235,8 @@ export function AvailabilityManager({
         setOverlay(null);
         router.refresh();
       });
-    } catch {
+    } catch (e) {
+      reportClientError("saveAvailability", e);
       setError(m.errUnexpected);
       setSaving(false);
       setOverlay(null);

@@ -6,6 +6,7 @@ import { Icon } from "@/components/ui/icon";
 import { Btn } from "@/components/ui/button";
 import { SaveOverlay, useSaveOverlay } from "@/components/panel/save-overlay";
 import { saveTeam } from "@/lib/actions/team";
+import { reportClientError } from "@/lib/report-client-error";
 import type { TeamDictionary } from "@/lib/i18n/dictionaries/team";
 
 type TeamMode = "solo" | "team";
@@ -154,7 +155,8 @@ export function TeamManager({
         setOverlay(null);
         router.refresh();
       });
-    } catch {
+    } catch (e) {
+      reportClientError("saveTeam", e);
       setError(m.errUnexpected);
       setSaving(false);
       setOverlay(null);

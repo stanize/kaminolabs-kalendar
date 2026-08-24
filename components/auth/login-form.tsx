@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { authClient, navigateWithFallback } from "@/lib/auth-client";
+import { reportClientError } from "@/lib/report-client-error";
 import type { PublicDictionary } from "@/lib/i18n/dictionaries/public";
 
 type AuthDict = PublicDictionary["auth"];
@@ -57,6 +58,7 @@ export function LoginForm({ dict }: { dict: AuthDict }) {
       navigateWithFallback(router, "/panel");
     } catch (e) {
       console.error("[login-form] email sign-in failed", e);
+      reportClientError("signIn.email", e, { email: email.trim() });
       setError(e instanceof Error ? e.message : dict.errUnexpected);
       setLoading(false);
     }
@@ -67,7 +69,8 @@ export function LoginForm({ dict }: { dict: AuthDict }) {
     setLoadingGoogle(true);
     try {
       await authClient.signIn.social({ provider: "google", callbackURL: "/panel" });
-    } catch {
+    } catch (e) {
+      reportClientError("signIn.social:google", e);
       setError(dict.errGoogle);
       setLoadingGoogle(false);
     }

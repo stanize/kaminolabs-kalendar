@@ -10,6 +10,7 @@ import {
 } from "@/lib/actions/billing";
 import { PaymentMethodModal } from "@/components/panel/payment-method-modal";
 import { SubscribeModal } from "@/components/panel/subscribe-modal";
+import { reportClientError } from "@/lib/report-client-error";
 import type { PaymentsDictionary } from "@/lib/i18n/dictionaries/payments";
 import type { BillingState, SubscriptionStatus } from "@/lib/billing/data";
 import type { PricingResult } from "@/lib/pricing/types";
@@ -86,7 +87,8 @@ export function SubscriptionManager({
       } else {
         setError(result.error);
       }
-    } catch {
+    } catch (e) {
+      reportClientError("cancelSubscription", e);
       setError(dict.errUnexpected);
     } finally {
       setPending(false);
@@ -103,7 +105,8 @@ export function SubscriptionManager({
       } else {
         setError(result.error);
       }
-    } catch {
+    } catch (e) {
+      reportClientError("resumeSubscription", e);
       setError(dict.errUnexpected);
     } finally {
       setPending(false);

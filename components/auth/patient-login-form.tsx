@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { authClient, navigateWithFallback } from "@/lib/auth-client";
+import { reportClientError } from "@/lib/report-client-error";
 import { Icon } from "@/components/ui/icon";
 import { provisionPatient, checkPatientRoleConflict } from "@/lib/actions/patient";
 
@@ -195,7 +196,8 @@ export function PatientLoginForm({
         provider: "google",
         callbackURL: redirectTo,
       });
-    } catch {
+    } catch (e) {
+      reportClientError("patient:signIn.social:google", e);
       setError(L.errGoogle);
       setLoading(false);
     }
@@ -218,6 +220,7 @@ export function PatientLoginForm({
       }
       await afterAuth();
     } catch (e) {
+      reportClientError("patient:signIn.email", e, { email: email.trim() });
       setError(e instanceof Error ? e.message : L.errUnexpected);
       setLoading(false);
     }
@@ -242,6 +245,7 @@ export function PatientLoginForm({
         L.errTimeout
       );
       if (result.error) {
+        reportClientError("patient:signUp.email", result.error, { email: email.trim() });
         const msg = (result.error.message ?? "").toLowerCase();
         setError(
           msg.includes("already") || msg.includes("exist")
@@ -253,6 +257,7 @@ export function PatientLoginForm({
       }
       await afterAuth();
     } catch (e) {
+      reportClientError("patient:signUp.email:exception", e, { email: email.trim() });
       setError(e instanceof Error ? e.message : L.errUnexpected);
       setLoading(false);
     }

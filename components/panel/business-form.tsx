@@ -24,6 +24,7 @@ import {
 } from "@/lib/business/slug-screen";
 import { bookingUrlDisplay, bookingPath } from "@/lib/business/booking-url";
 import type { SlugStatus } from "@/lib/business/data";
+import { reportClientError } from "@/lib/report-client-error";
 import type { Locale } from "@/lib/i18n/config";
 import type { BusinessDictionary } from "@/lib/i18n/dictionaries/business";
 import {
@@ -295,7 +296,8 @@ export function BusinessForm({
         // Refresh server components (this page's create/edit mode, home checklist).
         router.refresh();
       });
-    } catch {
+    } catch (e) {
+      reportClientError("saveBusinessSettings", e);
       setError(f.errUnexpected);
       setSaving(false);
       setOverlay(null);
@@ -598,7 +600,8 @@ function LogoUploader({
         setLogoUrl(result.logoUrl);
         router.refresh();
       }
-    } catch {
+    } catch (e) {
+      reportClientError("uploadBusinessLogo", e);
       setError("No se pudo subir el logo.");
     } finally {
       setUploading(false);
@@ -616,7 +619,8 @@ function LogoUploader({
         setLogoUrl(null);
         router.refresh();
       }
-    } catch {
+    } catch (e) {
+      reportClientError("removeBusinessLogo", e);
       setError("No se pudo guardar el cambio.");
     } finally {
       setUploading(false);

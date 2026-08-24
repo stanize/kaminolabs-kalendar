@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { authClient, navigateWithFallback } from "@/lib/auth-client";
+import { reportClientError } from "@/lib/report-client-error";
 import { useRouter } from "next/navigation";
 import type { PublicDictionary } from "@/lib/i18n/dictionaries/public";
 
@@ -62,6 +63,7 @@ export function ResetPasswordForm({
       setSuccess(true);
     } catch (e) {
       console.error("[reset-password-form] reset failed", e);
+      reportClientError("resetPassword", e);
       setError(e instanceof Error ? e.message : authDict.errUnexpected);
       setLoading(false);
     }

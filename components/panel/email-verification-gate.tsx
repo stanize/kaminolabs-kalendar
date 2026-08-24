@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
+import { reportClientError } from "@/lib/report-client-error";
 import { Icon } from "@/components/ui/icon";
 import type { PanelShellDictionary } from "@/lib/i18n/dictionaries/panel-shell";
 
@@ -33,8 +34,12 @@ export function EmailVerificationGate({ email, dict }: { email: string; dict: Ve
         window.location.reload();
         return true;
       }
-    } catch {
-      // ignore — keep showing the gate
+    } catch (e) {
+      // Reported but not surfaced to the user — this poll runs every 5s in
+      // the background, so a single blip shouldn't interrupt the gate; a
+      // sustained failure here (session fetch broken) is still worth
+      // knowing about, just not worth showing an error for.
+      reportClientError("emailGate:refreshIfVerified", e);
     }
     return false;
   }, [router]);
@@ -60,7 +65,8 @@ export function EmailVerificationGate({ email, dict }: { email: string; dict: Ve
       await authClient.sendVerificationEmail({ email, callbackURL: "/panel" });
       setResendState("sent");
       setCooldown(30);
-    } catch {
+    } catch (e) {
+      reportClientError("sendVerificationEmail", e);
       setResendState("error");
     }
   }

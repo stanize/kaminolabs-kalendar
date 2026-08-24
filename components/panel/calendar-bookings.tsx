@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { Btn } from "@/components/ui/button";
 import { cancelBookingAsOwner, confirmBookingAsOwner, fetchWeekBookings, reviewCancellationRequest } from "@/lib/actions/booking-owner";
+import { reportClientError } from "@/lib/report-client-error";
 import { CalendarHeader, type CalendarViewMode } from "@/components/panel/calendar-header";
 import {
   CalendarGridView,
@@ -314,7 +315,8 @@ export function CalendarBookings({
     try {
       const res = await cancelBookingAsOwner(id, dict.errors);
       if (!res.ok) { setList(prev); setError(res.error); }
-    } catch {
+    } catch (e) {
+      reportClientError("cancelBookingAsOwner", e);
       setList(prev); setError(m.errCancelFailed);
     } finally {
       setBusyId(null);
@@ -331,7 +333,8 @@ export function CalendarBookings({
     try {
       const res = await confirmBookingAsOwner(id, dict.errors);
       if (!res.ok) { setList(prev); setError(res.error); }
-    } catch {
+    } catch (e) {
+      reportClientError("confirmBookingAsOwner", e);
       setList(prev); setError(m.errCancelFailed);
     } finally {
       setBusyId(null);
@@ -366,7 +369,8 @@ export function CalendarBookings({
         setList(prevList);
         setError(res.error);
       }
-    } catch {
+    } catch (e) {
+      reportClientError("reviewCancellationRequest", e);
       setCancellationList(prevCancellationList);
       setList(prevList);
       setError(m.errCancelFailed);

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { authClient } from "@/lib/auth-client";
+import { reportClientError } from "@/lib/report-client-error";
 import type { PublicDictionary } from "@/lib/i18n/dictionaries/public";
 
 type AuthDict = PublicDictionary["auth"];
@@ -62,6 +63,7 @@ export function ForgotPasswordForm({
       setSent(true);
     } catch (e) {
       console.error("[forgot-password-form] request failed", e);
+      reportClientError("requestPasswordReset", e);
       setError(e instanceof Error ? e.message : authDict.errUnexpected);
     } finally {
       setLoading(false);

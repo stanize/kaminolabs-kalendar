@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { ensureTrialSubscription } from "@/lib/actions/billing";
+import { reportClientError } from "@/lib/report-client-error";
 
 /**
  * Fires ensureTrialSubscription once, silently, when mounted. Rendered by
@@ -32,13 +33,22 @@ export function AutoTrialProvisioner() {
           // Refresh so the panel picks up the new subscription_status
           // (e.g. any trial banner elsewhere) without a manual reload.
           router.refresh();
+        } else if (!result.ok) {
+          // A controlled failure (not a thrown exception) — this is
+          // revenue-relevant (a clinic silently not getting their trial),
+          // so it's worth reporting even though it never surfaces to the
+          // clinic itself. Previously this branch was entirely invisible.
+          reportClientError("ensureTrialSubscription:result", new Error(result.error));
         }
       })
-      .catch(() => {
-        // Silent — this is a background convenience action, not something
-        // that should surface an error to a clinic mid-onboarding. Worst
-        // case, the trial simply doesn't start automatically and the
-        // clinic can still start one manually from Suscripción settings.
+      .catch((e) => {
+        // Reported (not fully silent anymore) — this is a background
+        // convenience action, so it still shouldn't surface an error to a
+        // clinic mid-onboarding, but a silently-failing trial grant is
+        // worth knowing about since it directly affects revenue. Worst
+        // case for the clinic, the trial simply doesn't start automatically
+        // and they can still start one manually from Suscripción settings.
+        reportClientError("ensureTrialSubscription:exception", e);
       });
   }, [router]);
 

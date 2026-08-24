@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import { createBookingAsOwner, updateBookingAsOwner } from "@/lib/actions/booking-owner";
+import { reportClientError } from "@/lib/report-client-error";
 import { zonedTimeToUtc, dayIdInTz, tzDateParts, TZ } from "@/lib/calendar/client-date";
 import type { CalendarDictionary } from "@/lib/i18n/dictionaries/calendar";
 import type { DayId } from "@/lib/onboarding/types";
@@ -198,7 +199,8 @@ export function AppointmentModal(props: AppointmentModalProps) {
         return;
       }
       onSaved();
-    } catch {
+    } catch (e) {
+      reportClientError(isEdit ? "updateBookingAsOwner" : "createBookingAsOwner", e);
       setError(isEdit ? errorsDict.errUpdateFailed : errorsDict.errCreateFailed);
       setSubmitting(false);
     }

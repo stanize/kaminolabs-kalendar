@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { authClient, navigateWithFallback } from "@/lib/auth-client";
+import { reportClientError } from "@/lib/report-client-error";
 import type { PublicDictionary } from "@/lib/i18n/dictionaries/public";
 
 type AuthDict = PublicDictionary["auth"];
@@ -70,7 +71,8 @@ export function SignupForm({
     try {
       // Google emails are pre-verified, so the panel loads with no gate.
       await authClient.signIn.social({ provider: "google", callbackURL: "/panel" });
-    } catch {
+    } catch (e) {
+      reportClientError("clinic:signIn.social:google", e);
       setError(dict.errGoogle);
       setLoadingGoogle(false);
     }
@@ -103,6 +105,7 @@ export function SignupForm({
       );
 
       if (result.error) {
+        reportClientError("clinic:signUp.email", result.error, { email: trimmedEmail });
         const msg = (result.error.message ?? "").toLowerCase();
         setError(
           msg.includes("already") || msg.includes("exist")
@@ -118,6 +121,7 @@ export function SignupForm({
       // blocking confirmation gate until the user verifies.
       navigateWithFallback(router, "/panel");
     } catch (e) {
+      reportClientError("clinic:signUp.email:exception", e, { email: trimmedEmail });
       setError(e instanceof Error ? e.message : dict.errUnexpected);
       setLoading(false);
     }

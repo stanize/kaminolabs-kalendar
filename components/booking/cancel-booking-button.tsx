@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { Btn } from "@/components/ui/button";
 import { cancelBookingByToken } from "@/lib/actions/booking";
+import { reportClientError } from "@/lib/report-client-error";
 import type { BookingResultDictionary } from "@/lib/i18n/dictionaries/booking-result";
 
 export function CancelBookingButton({
@@ -40,7 +41,8 @@ export function CancelBookingButton({
         return; // keep the busy state through the navigation
       }
       setDone(true);
-    } catch {
+    } catch (e) {
+      reportClientError("cancelBookingByToken", e);
       setError(dict.errUnexpected);
       setBusy(false);
     }

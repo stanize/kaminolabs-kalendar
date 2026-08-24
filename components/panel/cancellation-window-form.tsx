@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { Btn } from "@/components/ui/button";
 import { updateCancellationWindow } from "@/lib/actions/settings";
+import { reportClientError } from "@/lib/report-client-error";
 
 // Preset options plus a free-entry fallback — mirrors the pattern used for
 // booking_window_months (a small fixed set of sensible choices) rather than
@@ -43,7 +44,8 @@ export function CancellationWindowForm({ initialHours }: { initialHours: number 
       setSaving(false);
       setSaved(true);
       router.refresh();
-    } catch {
+    } catch (e) {
+      reportClientError("updateCancellationWindow", e);
       setError("No se pudo guardar el ajuste.");
       setSaving(false);
     }

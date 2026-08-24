@@ -23,6 +23,7 @@ import {
   NAME_MAX_LENGTH,
 } from "@/lib/services/constants";
 import type { ServicesDictionary } from "@/lib/i18n/dictionaries/services";
+import { reportClientError } from "@/lib/report-client-error";
 
 interface ServiceItem {
   id: string;
@@ -141,7 +142,8 @@ export function ServicesManager({
           setOverlay(null);
         }
       });
-    } catch {
+    } catch (e) {
+      reportClientError("createService", e);
       setError(m.errUnexpected);
       setBusy(false);
       setOverlay(null);
@@ -175,7 +177,8 @@ export function ServicesManager({
           setOverlay(null);
         }
       });
-    } catch {
+    } catch (e) {
+      reportClientError("createServices:bulk", e);
       setError(m.errUnexpected);
       setBusy(false);
       setOverlay(null);
@@ -204,7 +207,8 @@ export function ServicesManager({
         setOverlay(null);
         router.refresh();
       });
-    } catch {
+    } catch (e) {
+      reportClientError("updateService", e);
       setError(m.errUnexpected);
       setBusy(false);
       setOverlay(null);
@@ -223,7 +227,8 @@ export function ServicesManager({
         setServices(prev);
         setError(result.error);
       }
-    } catch {
+    } catch (e) {
+      reportClientError("deleteService", e);
       setServices(prev);
       setError(m.errDeleteFailed);
     } finally {
