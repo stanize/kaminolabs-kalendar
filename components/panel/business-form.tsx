@@ -306,7 +306,7 @@ export function BusinessForm({
     <div className="flex flex-col gap-7">
       <SaveOverlay state={overlay} savingLabel={f.saving} successLabel={f.saved} />
 
-      {initial && <LogoUploader initialLogoUrl={initial.logoUrl} slug={initial.slug} />}
+      {initial && <LogoUploader initialLogoUrl={initial.logoUrl} slug={initial.slug} slugStatus={initial.slugStatus} />}
 
       {/* Name */}
       <Field
@@ -557,7 +557,11 @@ function SlugStatusBadge({ status, f }: { status: SlugStatus; f: BusinessDiction
 // fields, so there's no reason to delay it or bundle it into the primary
 // save action. Only rendered once a business exists (see call site) since
 // uploadBusinessLogo needs a business.id to attach the logo to.
-function LogoUploader({ initialLogoUrl, slug }: { initialLogoUrl: string | null; slug: string }) {
+function LogoUploader({
+  initialLogoUrl, slug, slugStatus,
+}: {
+  initialLogoUrl: string | null; slug: string; slugStatus: SlugStatus;
+}) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [logoUrl, setLogoUrl] = useState(initialLogoUrl);
@@ -645,16 +649,26 @@ function LogoUploader({ initialLogoUrl, slug }: { initialLogoUrl: string | null;
             >
               {uploading ? "Subiendo…" : logoUrl ? "Cambiar logo" : "Subir logo"}
             </Btn>
-            <Link
-              href={bookingPath(slug)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1 text-[12.5px] font-medium text-ink-soft hover:text-brand"
-              title="Abre tu página de reservas real en una pestaña nueva"
-            >
-              <Icon name="externalLink" size={13} />
-              Vista previa
-            </Link>
+            {slugStatus === "active" ? (
+              <Link
+                href={bookingPath(slug)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 text-[12.5px] font-medium text-ink-soft hover:text-brand"
+                title="Abre tu página de reservas real en una pestaña nueva"
+              >
+                <Icon name="externalLink" size={13} />
+                Vista previa
+              </Link>
+            ) : (
+              <span
+                className="flex items-center gap-1 text-[12.5px] font-medium text-ink-soft opacity-50"
+                title="Tu enlace de reservas debe confirmarse primero antes de poder verlo"
+              >
+                <Icon name="externalLink" size={13} />
+                Vista previa
+              </span>
+            )}
             {logoUrl && (
               <button
                 type="button"
@@ -677,6 +691,13 @@ function LogoUploader({ initialLogoUrl, slug }: { initialLogoUrl: string | null;
       </div>
 
       {error && <p className="text-[12.5px] text-error">{error}</p>}
+      {slugStatus !== "active" && (
+        <p className="text-[12px] text-ink-soft">
+          {slugStatus === "rejected"
+            ? "Tu enlace de reservas fue rechazado — la vista previa no está disponible hasta que se corrija."
+            : "Tu enlace de reservas está pendiente de confirmación — la vista previa estará disponible en cuanto se apruebe."}
+        </p>
+      )}
     </div>
   );
 }
