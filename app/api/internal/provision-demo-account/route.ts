@@ -108,9 +108,6 @@ export async function POST(request: Request) {
   if (existingUser) {
     userId = existingUser.id;
   } else {
-    // requireEmailVerification is false project-wide, so this account is
-    // immediately usable — no verification-gate bypass needed, same as any
-    // real email/password sign-up.
     try {
       const signUpResult = await auth.api.signUpEmail({
         body: { email: input.email, password: input.password, name: input.ownerName },
@@ -121,6 +118,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: `Could not create user: ${message}` }, { status: 400 });
     }
   }
+
+  // Demo accounts skip email verification — nobody actually checks that
+  // inbox. This is separate from Better Auth's own requireEmailVerification
+  // setting (which only gates sign-up itself and is already false
+  // project-wide); app/panel/layout.tsx has its own independent gate that
+  // blocks the panel behind a "confirm your email" overlay purely based on
+  // this emailVerified column, for BOTH email/password and Google sign-ups.
+  // Setting it directly here — rather than special-casing is_demo inside
+  // that gate — keeps the gate itself untouched and identical for every
+  // real clinic; only account creation differs for demos, same as the rest
+  // of this endpoint's design.
+  await supabase.from("user").update({ emailVerified: true }).eq("id", userId);
 
   // 2) Business row — same slug logic as saveBusinessSettings's CREATE path.
   const baseSlug = sanitizeSlug(suggestSlug(input.business.name));
