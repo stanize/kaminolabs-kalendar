@@ -282,7 +282,7 @@ function ConfirmAuthModal({
   const am = dict.authModal;
   const af = dict.authForm;
   const w = dict.wizard;
-  type AuthView = "start" | "login" | "register" | "guest" | "roleConfirm";
+  type AuthView = "start" | "login" | "register" | "guest" | "roleConfirm" | "pendingVerification";
   const [view, setView] = useState<AuthView>("start");
   const [email, setEmail]               = useState("");
   const [password, setPassword]         = useState("");
@@ -306,7 +306,19 @@ function ConfirmAuthModal({
     });
     setBusy(false);
     if (!res.ok) { onError(res.error); return; }
-    onDone(res.status === "confirmed" ? "confirmed" : "pendingVerification");
+    if (res.status === "confirmed") {
+      onDone("confirmed");
+      return;
+    }
+    // Booking exists and holds the slot (see submitBooking), but the
+    // account isn't verified yet — stay INSIDE this still-open modal
+    // instead of advancing the wizard's outer step to "done". Jumping to
+    // "done" showed a 3/3-complete progress bar and a "Hacer otra reserva"
+    // button, which visually contradicted "you still need to confirm your
+    // email" — this view keeps step 3 ("Confirmación") looking like what
+    // it is: in progress, not finished.
+    setLocalError(null);
+    setView("pendingVerification");
   }
 
   async function completeProvision() {
@@ -465,7 +477,7 @@ function ConfirmAuthModal({
             price, date, time, clinic, address all together under one
             "Confirmar reserva" heading) rather than showing this compact
             recap AND a second details box, which looked disjointed. */}
-        {!patient && (
+        {(!patient || view === "pendingVerification") && (
           <AppointmentRecap
             title={w.recapTitle}
             serviceName={serviceName}
@@ -479,7 +491,23 @@ function ConfirmAuthModal({
         {/* Already authenticated — one merged appointment-details list
             (service, price, date, time, provider, clinic, address) under a
             single "Confirmar reserva" heading, then notes + confirm. */}
-        {patient ? (
+        {/* pendingVerification takes priority over `patient` below — by the
+            time submitAuthenticated sets this view, the outer `patient`
+            state is already truthy (onPatientChange fires before the
+            submit), so without this leading check the merged "Confirmar
+            reserva" section would render instead and this view would be
+            unreachable. */}
+        {view === "pendingVerification" ? (
+          <div className="py-2 text-center">
+            <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-full bg-surface-2 text-ink-soft">
+              <Icon name="mail" size={24} />
+            </div>
+            <h2 className="mb-1.5 text-[17px]">{w.doneTitlePendingVerification}</h2>
+            <p className="mx-auto max-w-[340px] text-[13.5px] text-ink-soft">
+              {w.doneBodyPendingVerification}
+            </p>
+          </div>
+        ) : patient ? (
           <Section title={am.confirmTitle}>
             <dl className="mb-5 flex flex-col gap-2.5 rounded-xl bg-surface-2 px-4 py-4 text-left">
               <div className="flex items-start justify-between gap-3">
