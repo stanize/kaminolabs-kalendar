@@ -53,7 +53,17 @@ export function BookingDetailModal({
   const isDirty = result !== initialResult || payment !== booking.paymentStatus;
 
   const isFuture = new Date(booking.startIso) > new Date();
-  const isAwaitingConfirmation = booking.status === "pending_confirmation";
+  // Only a GUEST booking's pending_confirmation is something the owner
+  // should confirm/cancel — a patient's own pending_confirmation (created
+  // because their email/password sign-up wasn't verified yet) resolves
+  // itself automatically the moment they verify (see finalizeVerifiedPatientBookings
+  // in lib/actions/patient.ts). Showing Confirmar here would let an owner
+  // click through and force-confirm an unverified account's booking,
+  // defeating the whole point of gating it. clientStatus is already
+  // patient_id-derived (see lib/booking/client-status.ts) — a guest booking
+  // is 'guest_unconfirmed'/'guest_confirmed', a patient-linked one is
+  // 'first_time'/'returning', so this is a free, zero-schema-change signal.
+  const isAwaitingConfirmation = booking.status === "pending_confirmation" && booking.clientStatus === "guest_unconfirmed";
   const hasRealEmail = booking.clientEmail && !booking.clientEmail.startsWith("sin-email+");
 
   const dateTimeLabel = new Intl.DateTimeFormat(intlLocale, {

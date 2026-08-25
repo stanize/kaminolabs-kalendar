@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth-session";
 import { getUserRoles, assignRole } from "@/lib/roles/data";
 import { createClient } from "@/lib/supabase/server";
 import { PatientRoleGate } from "@/components/auth/patient-role-gate";
+import { PatientEmailVerificationGate } from "@/components/patient/patient-email-verification-gate";
 
 export default async function PatientLayout({ children }: { children: ReactNode }) {
   const session = await getSession();
@@ -35,5 +36,19 @@ export default async function PatientLayout({ children }: { children: ReactNode 
       .upsert({ user_id: userId }, { onConflict: "user_id" });
   }
 
-  return <>{children}</>;
+  // Portal-wide email-verification gate (patient-portal.md's system-wide
+  // requirement) — mirrors app/panel/layout.tsx's clinic-owner gate exactly.
+  // Google sign-ups arrive with emailVerified already true and never see
+  // this. Rendered as an overlay (children still mount behind it) rather
+  // than a hard redirect, same pattern as the owner gate.
+  const needsVerification = session.user.emailVerified === false;
+
+  return (
+    <>
+      {children}
+      {needsVerification && (
+        <PatientEmailVerificationGate email={session.user.email} />
+      )}
+    </>
+  );
 }

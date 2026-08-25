@@ -95,7 +95,7 @@ export function BookingWizard({
   const [providerId, setProviderId] = useState<string | null>(null);
   const [slot, setSlot] = useState<SlotDTO | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [doneAsGuest, setDoneAsGuest] = useState(false);
+  const [doneKind, setDoneKind] = useState<"guest" | "confirmed" | "pendingVerification">("confirmed");
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   function reset() {
@@ -198,16 +198,16 @@ export function BookingWizard({
 
       {step === "done" && (
         <div className="py-4 text-center">
-          <div className={`mx-auto mb-4 grid h-14 w-14 place-items-center rounded-full ${doneAsGuest ? "bg-surface-2 text-ink-soft" : "bg-brand-weak text-brand"}`}>
-            {doneAsGuest
+          <div className={`mx-auto mb-4 grid h-14 w-14 place-items-center rounded-full ${doneKind !== "confirmed" ? "bg-surface-2 text-ink-soft" : "bg-brand-weak text-brand"}`}>
+            {doneKind !== "confirmed"
               ? <Icon name="mail" size={24} />
               : <Icon name="check" size={26} strokeWidth={2.5} />}
           </div>
           <h2 className="mb-1.5 text-[20px]">
-            {doneAsGuest ? w.doneTitleGuest : w.doneTitle}
+            {doneKind === "guest" ? w.doneTitleGuest : doneKind === "pendingVerification" ? w.doneTitlePendingVerification : w.doneTitle}
           </h2>
           <p className="mx-auto mb-5 max-w-[360px] text-[14px] text-ink-soft">
-            {doneAsGuest ? w.doneBodyGuest : w.doneBody}
+            {doneKind === "guest" ? w.doneBodyGuest : doneKind === "pendingVerification" ? w.doneBodyPendingVerification : w.doneBody}
           </p>
 
           {service && slot && (
@@ -255,7 +255,7 @@ export function BookingWizard({
           onPatientChange={onPatientChange}
           onError={setError}
           onClose={() => setConfirmOpen(false)}
-          onDone={(asGuest) => { setConfirmOpen(false); setDoneAsGuest(asGuest); setStep("done"); }}
+          onDone={(kind) => { setConfirmOpen(false); setDoneKind(kind); setStep("done"); }}
         />
       )}
     </div>
@@ -277,7 +277,7 @@ function ConfirmAuthModal({
   onPatientChange: (p: PatientInfo | null) => void;
   onError: (e: string | null) => void;
   onClose: () => void;
-  onDone: (asGuest: boolean) => void;
+  onDone: (kind: "guest" | "confirmed" | "pendingVerification") => void;
 }) {
   const am = dict.authModal;
   const af = dict.authForm;
@@ -306,7 +306,7 @@ function ConfirmAuthModal({
     });
     setBusy(false);
     if (!res.ok) { onError(res.error); return; }
-    onDone(false); // authenticated — not a guest
+    onDone(res.status === "confirmed" ? "confirmed" : "pendingVerification");
   }
 
   async function completeProvision() {
@@ -386,7 +386,15 @@ function ConfirmAuthModal({
     setBusy(true);
     try {
       const result = await withTimeout(
-        authClient.signUp.email({ name: name.trim(), email: email.trim(), password, callbackURL: window.location.href }),
+        // callbackURL points at the patient dashboard (not back to this
+        // booking page) — PatientBookingFinalizer mounted there is what
+        // actually promotes the pending booking to confirmed once they
+        // click the link, and the dashboard immediately shows it in
+        // Próximas. Reloading THIS page instead would lose the wizard's
+        // in-memory step/selection state anyway (a fresh page load resets
+        // to step "service"), so there'd be nothing meaningful to resume
+        // here even if we redirected back to it.
+        authClient.signUp.email({ name: name.trim(), email: email.trim(), password, callbackURL: "/patient" }),
         12000, "Tiempo agotado."
       );
       if (result.error) {
@@ -424,7 +432,7 @@ function ConfirmAuthModal({
     });
     setBusy(false);
     if (!res.ok) { setLocalError(res.error); return; }
-    onDone(true);
+    onDone("guest");
   }
 
   function handleClose() {

@@ -5,6 +5,9 @@ import { createClient } from "@/lib/supabase/server";
 import { assignRole, getUserRoles } from "@/lib/roles/data";
 import { requireSession } from "@/lib/auth-session";
 import { notifyCancellation, notifyCancellationRequested } from "@/lib/actions/booking";
+import { sendEmail, bookingConfirmEmailHtml, formatBookingWhen, EMAIL_LOCALE } from "@/lib/email";
+import { formatBusinessAddress } from "@/lib/business/data";
+import { buildBookingIcsBase64 } from "@/lib/booking/ics";
 
 export type ProvisionResult =
   | { ok: true; patientId: string }
@@ -293,3 +296,122 @@ export const cancelBookingAsPatient = async (
   revalidatePath("/patient/bookings");
   return { ok: true, requested: false };
 };
+
+// ── Email-verification gate (patient-portal.md's system-wide requirement) ──
+
+/**
+ * Promotes any of the caller's own pending_confirmation bookings (at any
+ * business) to confirmed, the moment their email becomes verified. Called
+ * client-side once per patient-portal page load — a no-op after the first
+ * time (nothing left to promote), so it's safe/cheap to call unconditionally
+ * rather than needing a precise "just verified" signal from the callbackURL
+ * redirect. This is what makes the register-while-booking flow "no loss":
+ * the booking was already created (slot held) at pending_confirmation the
+ * moment they registered with an unverified email; this just flips it live
+ * once they click their confirmation link — no reselecting anything.
+ *
+ * Deliberately does NOT touch guest bookings (patient_id null) — those stay
+ * on the existing owner-review pending path, unrelated to this gate.
+ */
+export async function finalizeVerifiedPatientBookings(): Promise<{ confirmedCount: number }> {
+  let session;
+  try {
+    session = await requireSession();
+  } catch {
+    return { confirmedCount: 0 };
+  }
+  if (session.user.emailVerified !== true) return { confirmedCount: 0 };
+
+  const supabase = await createClient();
+
+  const { data: patient } = await supabase
+    .from("kalendar_patients")
+    .select("id")
+    .eq("user_id", session.user.id)
+    .maybeSingle();
+  if (!patient) return { confirmedCount: 0 };
+
+  const { data: pendingBookings } = await supabase
+    .from("kalendar_bookings")
+    .select("id, business_id, team_member_id, service_name, service_duration_min, starts_at, client_name, client_email, guest_locale")
+    .eq("patient_id", patient.id)
+    .eq("status", "pending_confirmation");
+
+  if (!pendingBookings || pendingBookings.length === 0) return { confirmedCount: 0 };
+
+  let confirmedCount = 0;
+  for (const booking of pendingBookings) {
+    const { error } = await supabase
+      .from("kalendar_bookings")
+      .update({ status: "confirmed", pending_expiry_at: null })
+      .eq("id", booking.id)
+      .eq("status", "pending_confirmation"); // guard against races (e.g. expiry sweep)
+
+    if (error) continue;
+    confirmedCount++;
+
+    // Best-effort confirmation receipt — mirrors submitBooking's confirmed
+    // branch. A send failure here shouldn't block the booking itself; the
+    // portal already shows it as confirmed regardless of email delivery.
+    try {
+      const { data: business } = await supabase
+        .from("kalendar_businesses")
+        .select("name, brand_color, address_street, address_number, address_additional, city, address_postal_code, address_province, address_country")
+        .eq("id", booking.business_id)
+        .maybeSingle();
+      if (!business) continue;
+
+      let providerName: string | null = null;
+      if (booking.team_member_id) {
+        const { data: member } = await supabase
+          .from("kalendar_team_members")
+          .select("name")
+          .eq("id", booking.team_member_id)
+          .maybeSingle();
+        providerName = member?.name ?? null;
+      }
+
+      const base = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/+$/, "");
+      const whenLabel = formatBookingWhen(booking.starts_at, EMAIL_LOCALE);
+      const ics = buildBookingIcsBase64({
+        uid: booking.id,
+        summary: `${booking.service_name} - ${business.name}`,
+        location: formatBusinessAddress(business),
+        startIso: booking.starts_at,
+        durationMin: booking.service_duration_min,
+      });
+
+      await sendEmail({
+        to: booking.client_email,
+        subject:
+          EMAIL_LOCALE === "en"
+            ? `Booking confirmed · ${business.name}`
+            : `Cita confirmada · ${business.name}`,
+        html: bookingConfirmEmailHtml({
+          clientName: booking.client_name,
+          businessName: business.name,
+          serviceName: booking.service_name,
+          whenLabel,
+          providerName,
+          confirmUrl: `${base}/patient/bookings`,
+          cancelUrl: `${base}/patient/bookings`,
+          manageUrl: `${base}/patient/bookings`,
+          locale: EMAIL_LOCALE,
+          isConfirmed: true,
+          hasIcsAttachment: true,
+          brandColor: business.brand_color,
+        }),
+        attachments: [{ filename: "cita-kalendar.ics", content: ics }],
+      });
+    } catch {
+      // Silent — booking is already confirmed regardless of email delivery.
+    }
+  }
+
+  if (confirmedCount > 0) {
+    revalidatePath("/patient");
+    revalidatePath("/patient/bookings");
+  }
+
+  return { confirmedCount };
+}

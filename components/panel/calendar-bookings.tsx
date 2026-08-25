@@ -542,7 +542,10 @@ export function CalendarBookings({
                     </div>
                   </div>
 
-                  {b.status === "pending_confirmation" && (
+                  {/* Same guest-only restriction as booking-detail-modal.tsx
+                      — a patient-verification-pending booking resolves
+                      itself, owner shouldn't be able to force-confirm it. */}
+                  {b.status === "pending_confirmation" && b.clientStatus === "guest_unconfirmed" && (
                     <div
                       className="flex shrink-0 items-center gap-1 pl-[82px] sm:pl-0"
                       onClick={(e) => e.stopPropagation()}

@@ -1,6 +1,7 @@
 "use server";
 
 import { randomBytes } from "crypto";
+import { getSession } from "@/lib/auth-session";
 import { createClient } from "@/lib/supabase/server";
 import { getPublicBookingData, getTakenIntervals } from "@/lib/booking/data";
 import { buildBookingIcsBase64 } from "@/lib/booking/ics";
@@ -191,7 +192,7 @@ export async function getAvailableSlots(input: {
 
 // ── Submit a booking ───────────────────────────────────────────────────────
 export type SubmitResult =
-  | { ok: true; token: string }
+  | { ok: true; token: string; status: "confirmed" | "pending_confirmation" }
   // errorDetail carries the raw Postgres error for diagnostic callers (the
   // admin appointment-generator tool). The public wizard never reads it —
   // only `error` (the localized, user-safe message) is shown there.
@@ -268,24 +269,65 @@ export async function submitBooking(input: {
   }
 
   const token = randomBytes(24).toString("base64url");
-  const isAuthenticated = !!input.patientId;
+
+  // Re-derive patientId/emailVerified from the actual session rather than
+  // fully trusting the client-passed patientId — previously this action
+  // accepted any patientId string as-is, which meant a malicious client
+  // could create a "confirmed, no-review-needed" booking under someone
+  // else's patient identity just by passing their id. Now the caller must
+  // actually BE that patient's own session for it to count as authenticated
+  // at all; otherwise this falls back to the guest path below (name/email
+  // typed into the form, pending_confirmation, owner reviews it).
+  let verifiedPatientId: string | null = null;
+  let emailVerified = false;
+  if (input.patientId) {
+    const session = await getSession();
+    if (session?.user?.id) {
+      const { data: patientRow } = await supabase
+        .from("kalendar_patients")
+        .select("id, user_id")
+        .eq("id", input.patientId)
+        .maybeSingle();
+      if (patientRow && patientRow.user_id === session.user.id) {
+        verifiedPatientId = input.patientId;
+        emailVerified = session.user.emailVerified === true;
+      }
+    }
+  }
+  const isAuthenticated = !!verifiedPatientId;
 
   // client-linking-on-booking (clinic-clients-page.md) — best-effort: a
   // failure here should never block the booking itself (clinic_client_id
   // is nullable, degrades gracefully — same as before this existed).
   const clinicClientId = await resolveClinicClientId({
     businessId: data.business.id,
-    patientId: input.patientId ?? null,
+    patientId: verifiedPatientId,
     name,
     email,
     phone: phone || null,
   }).catch(() => null);
 
-  // Authenticated patients: confirmed immediately, no expiry window.
-  // Guests: pending_confirmation, clinic has 24h to confirm.
-  // statusOverride (admin tooling only) takes precedence over the
-  // patientId-derived default when provided.
-  const bookingStatus = input.statusOverride ?? (isAuthenticated ? "confirmed" : "pending_confirmation");
+  // Authenticated + verified patients (or Google sign-ups, which arrive
+  // pre-verified): confirmed immediately, no expiry window — unchanged from
+  // before this step existed.
+  //
+  // Authenticated but UNVERIFIED patients (email/password sign-up that
+  // hasn't clicked their confirmation link yet): treated like a guest —
+  // pending_confirmation, same 24h expiry window — instead of trusting an
+  // unverified email/password account enough to skip review. This closes
+  // the gap where a bad actor could self-register with a throwaway email
+  // and get instantly-confirmed bookings with zero verification. The slot
+  // is still held immediately either way (same as any pending_confirmation
+  // booking), and the moment they click their verification link,
+  // finalizeVerifiedPatientBookings (lib/actions/patient.ts) promotes this
+  // exact booking to 'confirmed' automatically — no reselecting, no data
+  // loss, they just pick up where they left off.
+  //
+  // Unauthenticated (guest): pending_confirmation as before, clinic reviews.
+  //
+  // statusOverride (admin tooling only) takes precedence over all of the above.
+  const bookingStatus =
+    input.statusOverride ?? (isAuthenticated && emailVerified ? "confirmed" : "pending_confirmation");
   const pendingExpiryAt =
     bookingStatus === "confirmed"
       ? null
@@ -295,7 +337,7 @@ export async function submitBooking(input: {
     business_id: data.business.id,
     service_id: service.id,
     team_member_id: teamMemberId,
-    patient_id: input.patientId ?? null,
+    patient_id: verifiedPatientId,
     clinic_client_id: clinicClientId,
     service_name: service.name,
     service_duration_min: service.duration_min,
@@ -395,7 +437,7 @@ export async function submitBooking(input: {
     notes: notes || null,
   });
 
-  return { ok: true, token };
+  return { ok: true, token, status: bookingStatus };
 }
 
 // ── Confirm a pending booking via tokenized email link ─────────────────────
