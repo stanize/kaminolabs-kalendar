@@ -477,7 +477,7 @@ function ConfirmAuthModal({
             price, date, time, clinic, address all together under one
             "Confirmar reserva" heading) rather than showing this compact
             recap AND a second details box, which looked disjointed. */}
-        {(!patient || view === "pendingVerification") && (
+        {!patient && (
           <AppointmentRecap
             title={w.recapTitle}
             serviceName={serviceName}
