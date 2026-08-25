@@ -98,8 +98,58 @@ export async function sendEmail({ to, subject, html, attachments }: SendEmailInp
 export function verificationEmailHtml(
   url: string,
   locale: "es" | "en" = "es",
-  audience: "clinic" | "patient" = "clinic"
+  audience: "clinic" | "patient" = "clinic",
+  // When set (a patient registered mid-booking with an unverified email —
+  // see lib/actions/booking.ts / booking-wizard.tsx), this single email
+  // covers BOTH account verification and the booking recap, instead of
+  // sending two separate emails (welcome + "under review"). submitBooking
+  // skips its own "under review" email for this exact case to avoid the
+  // duplicate.
+  booking?: { serviceName: string; whenLabel: string; businessName: string } | null
 ): string {
+  if (booking) {
+    const t =
+      locale === "en"
+        ? {
+            header: booking.businessName,
+            heading: "Almost there — confirm your email",
+            intro: `We've saved your slot at <strong>${escapeHtml(booking.businessName)}</strong>. Confirm your email and your appointment will be confirmed automatically — no further steps.`,
+            service: "Service", when: "When",
+            button: "Confirm email & booking",
+            fallback: "If the button doesn't work, copy and paste this link into your browser:",
+            ignore: "If you didn't create this account, you can ignore this message.",
+            footer: "Kalendar · Booking software for your clinic",
+          }
+        : {
+            header: booking.businessName,
+            heading: "Ya casi está — confirma tu email",
+            intro: `Hemos guardado tu hora en <strong>${escapeHtml(booking.businessName)}</strong>. Confirma tu email y tu cita quedará confirmada automáticamente — sin ningún paso más.`,
+            service: "Servicio", when: "Cuándo",
+            button: "Confirmar email y reserva",
+            fallback: "Si el botón no funciona, copia y pega este enlace en tu navegador:",
+            ignore: "Si no has creado esta cuenta, puedes ignorar este mensaje.",
+            footer: "Kalendar · Reservas y agenda para tu clínica",
+          };
+
+    const rows = [
+      { label: t.service, value: booking.serviceName, icon: "⭐" },
+      { label: t.when, value: booking.whenLabel, icon: "🕐" },
+    ];
+
+    const body = `
+      <h1 style="font-size:19px;margin:0 0 12px;">${t.heading}</h1>
+      <p style="font-size:15px;line-height:1.6;margin:0 0 18px;">${t.intro}</p>
+      ${emailInfoBox(rows)}
+      ${emailButton(t.button, url)}
+      <p style="font-size:12.5px;line-height:1.6;color:#94a3b8;margin:20px 0 0;">
+        ${t.fallback}<br />
+        <a href="${url}" style="color:#0d9488;word-break:break-all;">${url}</a>
+      </p>
+      <p style="font-size:12.5px;line-height:1.6;color:#94a3b8;margin:12px 0 0;">${t.ignore}</p>`;
+
+    return emailShell(body, t.footer, "Kalendar");
+  }
+
   const t =
     locale === "en"
       ? {

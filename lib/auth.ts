@@ -80,20 +80,42 @@ export const auth = betterAuth({
       // /bookings/...), and Better Auth embeds it as a query param on `url`,
       // so we read it back out to pick the right copy instead of always
       // showing clinic-oriented "automate your clinic" language to patients.
+      //
+      // When registering mid-booking (booking-wizard.tsx's handleRegister),
+      // the callbackURL additionally carries booking details as its own
+      // query params (bookingService/bookingWhen/bookingBusiness) — reading
+      // those out here lets this ONE email cover both "confirm your
+      // account" and "here's your booking" instead of sending two separate
+      // emails (this one + submitBooking's "under review" email, which
+      // skips itself for this exact case — see lib/actions/booking.ts).
       let audience: "clinic" | "patient" = "clinic";
+      let booking: { serviceName: string; whenLabel: string; businessName: string } | null = null;
       try {
-        const callback = new URL(url).searchParams.get("callbackURL") ?? "";
-        if (callback && !callback.includes("/panel")) audience = "patient";
+        const callbackRaw = new URL(url).searchParams.get("callbackURL") ?? "";
+        if (callbackRaw && !callbackRaw.includes("/panel")) audience = "patient";
+        if (callbackRaw) {
+          // callbackRaw is itself a URL (possibly relative) with its own
+          // query string — parse against a dummy base to read those params
+          // regardless of whether it's absolute or relative.
+          const callbackParams = new URL(callbackRaw, "https://kalendar.kaminolabs.dev").searchParams;
+          const serviceName = callbackParams.get("bookingService");
+          const whenLabel = callbackParams.get("bookingWhen");
+          const businessName = callbackParams.get("bookingBusiness");
+          if (serviceName && whenLabel && businessName) {
+            booking = { serviceName, whenLabel, businessName };
+          }
+        }
       } catch {
-        // Malformed url — fall back to the clinic copy rather than guessing.
+        // Malformed url — fall back to the plain welcome copy rather than guessing.
       }
       await sendEmail({
         to: user.email,
-        subject:
-          locale === "en"
+        subject: booking
+          ? (locale === "en" ? `Confirm your email & booking · ${booking.businessName}` : `Confirma tu email y tu reserva · ${booking.businessName}`)
+          : locale === "en"
             ? "Welcome to Kalendar! Confirm your email"
             : "¡Bienvenido a Kalendar! Confirma tu email",
-        html: verificationEmailHtml(url, locale, audience),
+        html: verificationEmailHtml(url, locale, audience, booking),
       });
     },
   },

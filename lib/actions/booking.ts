@@ -404,8 +404,17 @@ export async function submitBooking(input: {
       }),
       attachments: [{ filename: "cita-kalendar.ics", content: ics }],
     });
+  } else if (isAuthenticated) {
+    // Authenticated but unverified (patient email/password sign-up,
+    // registered mid-booking): no separate email here. Better Auth's
+    // sendVerificationEmail hook already fired client-side, before this
+    // action even runs, sending ONE combined "confirm your email + here's
+    // your booking" email (lib/auth.ts reads booking details out of the
+    // signUp callbackURL — see booking-wizard.tsx's handleRegister).
+    // Sending a second "under review" email here would be a confusing,
+    // redundant duplicate of the same information.
   } else {
-    // Guest booking: send "under review" email — clinic has 24h to confirm.
+    // True guest booking: send "under review" email — clinic has 24h to confirm.
     await sendEmail({
       to: email,
       subject:

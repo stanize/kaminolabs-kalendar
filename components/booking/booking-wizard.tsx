@@ -397,16 +397,31 @@ function ConfirmAuthModal({
     if (password !== confirmPassword) { setLocalError("Las contraseñas no coinciden."); return; }
     setBusy(true);
     try {
+      // callbackURL points at the patient dashboard (not back to this
+      // booking page) — PatientBookingFinalizer mounted there is what
+      // actually promotes the pending booking to confirmed once they
+      // click the link, and the dashboard immediately shows it in
+      // Próximas. Reloading THIS page instead would lose the wizard's
+      // in-memory step/selection state anyway (a fresh page load resets
+      // to step "service"), so there'd be nothing meaningful to resume
+      // here even if we redirected back to it.
+      //
+      // Booking details are carried as query params on this same
+      // callbackURL — lib/auth.ts's sendVerificationEmail hook reads them
+      // back out to send ONE combined "confirm your email + here's your
+      // booking" email instead of two separate emails (this one +
+      // submitBooking's "under review" email, which skips itself when it
+      // detects this exact case).
+      const callbackParams = new URLSearchParams({
+        bookingService: serviceName,
+        bookingWhen: formatFullDateTime(slot.startIso, locale),
+        bookingBusiness: businessName,
+      });
       const result = await withTimeout(
-        // callbackURL points at the patient dashboard (not back to this
-        // booking page) — PatientBookingFinalizer mounted there is what
-        // actually promotes the pending booking to confirmed once they
-        // click the link, and the dashboard immediately shows it in
-        // Próximas. Reloading THIS page instead would lose the wizard's
-        // in-memory step/selection state anyway (a fresh page load resets
-        // to step "service"), so there'd be nothing meaningful to resume
-        // here even if we redirected back to it.
-        authClient.signUp.email({ name: name.trim(), email: email.trim(), password, callbackURL: "/patient" }),
+        authClient.signUp.email({
+          name: name.trim(), email: email.trim(), password,
+          callbackURL: `/patient?${callbackParams.toString()}`,
+        }),
         12000, "Tiempo agotado."
       );
       if (result.error) {
