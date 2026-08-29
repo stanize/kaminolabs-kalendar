@@ -59,3 +59,21 @@ h1, h2, h3 {
 select {
   font-family: inherit;
 }
+
+/* EKG/pulse-line loading animation (app/panel/loading.tsx and similar
+   loading states) — draws the heartbeat path in a continuous loop via
+   stroke-dashoffset. Brand teal, not the dark "clinical tech" styling from
+   the reference spec — kept in Kalendar's existing light theme. */
+@keyframes ekg-pulse-draw {
+  0% {
+    stroke-dashoffset: 300;
+  }
+  60%, 100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+.ekg-pulse-line {
+  stroke-dasharray: 300;
+  animation: ekg-pulse-draw 1.6s ease-in-out infinite;
+}

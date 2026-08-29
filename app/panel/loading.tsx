@@ -1,4 +1,5 @@
 import { Logo } from "@/components/ui/logo";
+import { EkgLoader } from "@/components/ui/ekg-loader";
 
 /**
  * Next.js renders this automatically (App Router's loading.tsx convention)
@@ -12,9 +13,9 @@ import { Logo } from "@/components/ui/logo";
 export default function PanelLoading() {
   return (
     <div className="grid min-h-dvh place-items-center bg-surface-2">
-      <div className="flex flex-col items-center gap-4">
+      <div className="flex flex-col items-center gap-3">
         <Logo size={28} showText={false} />
-        <div className="h-6 w-6 animate-spin rounded-full border-2 border-line border-t-brand" />
+        <EkgLoader />
       </div>
     </div>
   );
