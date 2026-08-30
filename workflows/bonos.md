@@ -21,11 +21,12 @@ Criteria:
 ## Step: session-deduction-on-payment
 Status: not_started
 Criteria:
-- Depends on calendar-management-past.md's mark-payment step adding a payment_method field (cash/card/bono)
-- When an owner marks a booking as paid with method = "bono", one session is deducted (sessions_used += 1) from the client's bono — scoped to the same client_id as the booking's clinic_client_id
-- OPEN QUESTION: if a client has more than one active bono with remaining sessions, which one gets decremented? Options: oldest-purchased-first (matches typical "use it up before it expires" expectation), or the owner is shown a picker to choose which bono to apply it to when marking payment. Needs a decision before building — oldest-first is the simpler default if no strong preference
-- If the client has NO active bono with remaining sessions but "bono" is selected as payment method anyway, this needs a clear error/block at the point of marking payment (can't deduct from nothing) rather than silently succeeding or creating a negative-sessions state
-- OPEN QUESTION: reversing a payment-method change away from "bono" after the fact — does it restore the deducted session? Not yet decided (also flagged in calendar-management-past.md's mark-payment step). Simplest default: no automatic restoration, correcting a mistake is a manual fix via the Bonos page itself — but confirm this is acceptable before building
+- Depends on calendar-management-past.md's mark-payment step adding a payment_method field (cash/card/bono, plus which specific bono if applicable — see UI behavior below)
+- DECIDED — payment method selector UI: only appears once the owner sets a booking's status to paid, not shown at all beforehand (opens inline next to the paid toggle, not a separate step). Options are Cash, Card, and — if the client (via the booking's clinic_client_id) has one or more active bonos with sessions remaining — one distinct option per bono (not a single generic "Bono" entry), labeled so the clinic can tell them apart (e.g. bono type name + remaining count, "Bono 10 sesiones (3 restantes)"). If the client has no active bono, only Cash/Card show — no bono option appears at all.
+- DECIDED — default selection: if the client has at least one active bono, the OLDEST one (earliest purchased_at) is pre-selected in the dropdown by default. The clinic can override and pick Cash, Card, or a different bono instead — nothing is silently auto-applied without the dropdown being visible and editable.
+- Confirming payment with a bono option selected deducts one session (sessions_used += 1) from that specific bono row — scoped correctly regardless of whether it was the defaulted oldest one or a manually-chosen different one
+- If a client has NO active bono with remaining sessions, the bono option(s) simply don't appear in the dropdown (per the UI behavior above) — this naturally prevents the "selected bono but none exist" error case from the earlier draft of this step, no separate validation/error state needed
+- OPEN QUESTION (still unresolved): reversing a payment-method change away from a bono after the fact — does it restore the deducted session? Not yet decided (also flagged in calendar-management-past.md's mark-payment step). Simplest default: no automatic restoration, correcting a mistake is a manual fix via the Bonos page itself — confirm this is acceptable before building
 
 ## Step: client-page-bono-summary
 Status: not_started
@@ -42,4 +43,4 @@ Criteria:
 
 ## Notes / Deviations
 - Page structure decision: one Bonos page with tabs (Tipos de bono / Bonos vendidos, usage folded into the second tab rather than a separate third tab unless it gets busy) — mirrors the existing Clientes/Cancelaciones tab pattern in calendar-bookings.tsx, chosen for consistency rather than introducing a new UI pattern.
-- Two open questions block session-deduction-on-payment specifically (which bono to decrement when multiple are active, whether reversing a bono payment restores the session) — resolve both before starting that step, since they shape the mark-payment UI too (a picker adds a step to that modal that a simple oldest-first default wouldn't need).
+- Which-bono-to-decrement question (session-deduction-on-payment) is RESOLVED: oldest-purchased bono defaults in a per-bono dropdown shown only after marking paid, clinic can override. Payment-method-reversal question remains open — resolve before starting that step, since it's the one remaining thing that could complicate the mark-payment UI's edit path.
