@@ -1,4 +1,3 @@
-import { Logo } from "@/components/ui/logo";
 import { EkgLoader } from "@/components/ui/ekg-loader";
 
 /**
@@ -13,10 +12,7 @@ import { EkgLoader } from "@/components/ui/ekg-loader";
 export default function PanelLoading() {
   return (
     <div className="grid min-h-dvh place-items-center bg-surface-2">
-      <div className="flex flex-col items-center gap-3">
-        <Logo size={28} showText={false} />
-        <EkgLoader />
-      </div>
+      <EkgLoader />
     </div>
   );
 }
