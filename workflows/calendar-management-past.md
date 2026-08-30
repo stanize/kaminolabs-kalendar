@@ -25,6 +25,7 @@ Criteria:
 - Payment status change is scoped to the calling business
 - NOT BUILT: when marking a booking paid, the owner must also select a payment method — cash, card, or (if the client has any active bono) one option per active bono, individually labeled. The selector only appears once the paid toggle is switched on — not shown at all while unpaid — and opens inline next to that toggle. If the client has an active bono, the oldest one defaults as pre-selected; the clinic can override to cash, card, or a different bono. kalendar_bookings needs a new payment_method column (text, nullable, meaningful only when payment_status = 'paid') plus a reference to which specific bono was used when applicable (FK to kalendar_bono_purchases, nullable) — see bonos.md's session-deduction-on-payment step for full detail
 - Selecting a bono option deducts one session from that specific bono automatically — see bonos.md
+- DECIDED: once a booking's payment_method is set to a bono, that field locks in this modal — cash <-> card stays freely editable anytime, but switching away from a bono is blocked here with a message pointing to the Bonos page instead. This is deliberate, not a bug — see bonos.md's bono-session-reversal step for where that correction actually happens
 - Switching an already-paid booking's method after the fact (e.g. correcting a mistaken cash/bono selection) needs a defined behavior — does changing away from "bono" restore the deducted session? Not yet decided, flagged in bonos.md too
 
 ## Step: past-appointment-editing

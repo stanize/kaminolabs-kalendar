@@ -26,7 +26,16 @@ Criteria:
 - DECIDED — default selection: if the client has at least one active bono, the OLDEST one (earliest purchased_at) is pre-selected in the dropdown by default. The clinic can override and pick Cash, Card, or a different bono instead — nothing is silently auto-applied without the dropdown being visible and editable.
 - Confirming payment with a bono option selected deducts one session (sessions_used += 1) from that specific bono row — scoped correctly regardless of whether it was the defaulted oldest one or a manually-chosen different one
 - If a client has NO active bono with remaining sessions, the bono option(s) simply don't appear in the dropdown (per the UI behavior above) — this naturally prevents the "selected bono but none exist" error case from the earlier draft of this step, no separate validation/error state needed
-- OPEN QUESTION (still unresolved): reversing a payment-method change away from a bono after the fact — does it restore the deducted session? Not yet decided (also flagged in calendar-management-past.md's mark-payment step). Simplest default: no automatic restoration, correcting a mistake is a manual fix via the Bonos page itself — confirm this is acceptable before building
+- DECIDED — payment-method correction after the fact: cash <-> card remains freely editable anytime from the booking detail modal, no restrictions. But once a booking's payment method is set to a bono, that field LOCKS in the booking detail modal — the clinic cannot switch it directly back to cash/card from the calendar. Attempting to shows a message directing them to the Bonos page instead. This keeps bono-balance-affecting reversal logic in exactly one place (the Bonos page, see bono-session-reversal below) rather than two entry points needing to stay in sync.
+
+## Step: bono-session-reversal
+Status: not_started
+Criteria:
+- Depends on bono-purchase-recording (the bono itself) and session-deduction-on-payment (the thing being reversed)
+- On the Bonos page, opening a specific sold bono (from "Bonos vendidos") shows its usage history — each session consumed, linked back to the booking it came from
+- From this usage history, the clinic can select a specific used session and switch it to cash or card — this is the ONLY place a bono-consumed session can be reversed (the booking detail modal's payment method field is locked once set to a bono, per mark-payment's UI behavior)
+- Switching a used session away from a bono: restores the session to the bono (sessions_used -= 1) AND updates the linked booking's payment_method to the chosen cash/card value — both happen atomically, not as two separate edits that could get out of sync
+- This does NOT support switching a cash/card-paid booking TO a bono after the fact — only reversing an existing bono usage. Confirm with Arun whether that's an acceptable limitation or whether cash/card -> bono retroactively is also needed (not currently in scope, flagged for confirmation)
 
 ## Step: client-page-bono-summary
 Status: not_started
@@ -43,4 +52,4 @@ Criteria:
 
 ## Notes / Deviations
 - Page structure decision: one Bonos page with tabs (Tipos de bono / Bonos vendidos, usage folded into the second tab rather than a separate third tab unless it gets busy) — mirrors the existing Clientes/Cancelaciones tab pattern in calendar-bookings.tsx, chosen for consistency rather than introducing a new UI pattern.
-- Which-bono-to-decrement question (session-deduction-on-payment) is RESOLVED: oldest-purchased bono defaults in a per-bono dropdown shown only after marking paid, clinic can override. Payment-method-reversal question remains open — resolve before starting that step, since it's the one remaining thing that could complicate the mark-payment UI's edit path.
+- Both design questions from earlier drafts of this workflow are now RESOLVED: which bono to decrement defaults to oldest with clinic override (session-deduction-on-payment), and reversing a bono payment is handled exclusively via the Bonos page's usage history (bono-session-reversal), not from the booking detail modal — that field locks once set to a bono, cash/card stay freely editable. This workflow's design is now considered settled; remaining steps are ready to build against, pending only the one flagged confirmation in bono-session-reversal (whether cash/card -> bono retroactively is needed).
