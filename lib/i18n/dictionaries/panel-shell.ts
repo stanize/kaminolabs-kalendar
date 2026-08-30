@@ -18,6 +18,7 @@ export interface PanelShellDictionary {
     home: string;
     calendar: string;
     clients: string;
+    bonos: string;
     business: string;
     services: string;
     team: string;
@@ -84,6 +85,7 @@ const es: PanelShellDictionary = {
     home: "Inicio",
     calendar: "Calendario",
     clients: "Clientes",
+    bonos: "Bonos",
     business: "Negocio",
     services: "Servicios",
     team: "Equipo",
@@ -150,6 +152,7 @@ const en: PanelShellDictionary = {
     home: "Home",
     calendar: "Calendar",
     clients: "Clients",
+    bonos: "Bonos",
     business: "Business",
     services: "Services",
     team: "Team",
