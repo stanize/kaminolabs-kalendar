@@ -18,11 +18,14 @@ Criteria:
 - Setting an outcome moves the chip from "past-unreviewed" (rose) to "past-reviewed" (slate) styling
 
 ## Step: mark-payment
-Status: done
+Status: in_progress
 Criteria:
 - Booking detail modal lets the owner independently set payment status: paid or unpaid
 - Payment status is independent of outcome (e.g. a no-show can still be marked paid; a completed session can be pending payment)
 - Payment status change is scoped to the calling business
+- NOT BUILT: when marking a booking paid, the owner must also select a payment method — cash, card, or bono. kalendar_bookings.payment_status currently has no method field at all (just unpaid/paid), needs a new payment_method column (text, nullable, CHECK in ('cash', 'card', 'bono'), only meaningful when payment_status = 'paid')
+- NOT BUILT: selecting "bono" as the payment method triggers automatic session deduction — see bonos.md's session-deduction-on-payment step for the full mechanic (which bono gets picked if a client has more than one active, what happens if they have none, etc.)
+- Switching an already-paid booking's method after the fact (e.g. correcting a mistaken cash/bono selection) needs a defined behavior — does changing away from "bono" restore the deducted session? Not yet decided, flagged in bonos.md too
 
 ## Step: past-appointment-editing
 Status: unclear
