@@ -40,11 +40,12 @@ Criteria:
 - Switching a used session away from a bono: restores the session to the bono (sessions_used -= 1) AND updates the linked booking's payment_method to the chosen cash/card value — both happen atomically, not as two separate edits that could get out of sync
 
 ## Step: client-page-bono-summary
-Status: not_started
+Status: done
 Criteria:
 - Depends on clinic-clients-page.md's client-detail-view existing
 - Client 360 view shows the client's active bonos (bono type name, sessions remaining / sessions total) alongside the existing appointment history and counters
 - Fully-used-up bonos are shown too (e.g. in a collapsed/past section) rather than disappearing once exhausted, for the clinic's own reference
+- IMPLEMENTATION: lib/bonos/data.ts's getBonosForClient() returns ALL of a client's bonos (active + exhausted), newest-purchase-first. Rendered as a new "Bonos" card on the client detail page, placed between Contacto and Próximas citas (Arun's placement call). Each row shows bono type name, "{used}/{total} usadas", purchase date, and an "Agotado" badge once sessions_used >= sessions_total — no collapsing, exhausted bonos are shown plainly alongside active ones.
 
 ## Step: bono-usage-report
 Status: not_started
