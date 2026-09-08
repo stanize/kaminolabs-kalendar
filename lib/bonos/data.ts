@@ -39,6 +39,55 @@ export async function getActiveBonoTypesForBusiness(userId: string): Promise<Bon
   return (await getBonoTypesForBusiness(userId)).filter((t) => t.active);
 }
 
+export interface ClientActiveBono {
+  id: string;
+  bonoTypeName: string;
+  sessionsRemaining: number;
+}
+
+/**
+ * A single client's bonos that still have sessions remaining — feeds the
+ * payment-method dropdown in the booking-detail modal
+ * (session-deduction-on-payment). Ordered oldest-purchased first, since the
+ * oldest active bono is the DECIDED default selection in that dropdown; the
+ * caller doesn't need to re-sort. Bonos with sessions_used >= sessions_total
+ * are excluded entirely — a fully-used bono is never offered as a payment
+ * option, matching the "bono option(s) simply don't appear" UI behavior.
+ * Scoped by business AND client — never trust a client_id alone.
+ */
+export async function getActiveBonosForClient(
+  userId: string,
+  clientId: string
+): Promise<ClientActiveBono[]> {
+  const business = await getBusinessForUser(userId);
+  if (!business || !clientId) return [];
+
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("kalendar_bono_purchases")
+    .select("id, sessions_total, sessions_used, purchased_at, kalendar_bono_types ( name )")
+    .eq("business_id", business.id)
+    .eq("client_id", clientId)
+    .order("purchased_at", { ascending: true });
+
+  return ((data as {
+    id: string;
+    sessions_total: number;
+    sessions_used: number;
+    purchased_at: string;
+    kalendar_bono_types: { name: string } | { name: string }[] | null;
+  }[] | null) ?? [])
+    .filter((r) => r.sessions_used < r.sessions_total)
+    .map((r) => {
+      const bonoType = Array.isArray(r.kalendar_bono_types) ? r.kalendar_bono_types[0] : r.kalendar_bono_types;
+      return {
+        id: r.id,
+        bonoTypeName: bonoType?.name ?? "Bono",
+        sessionsRemaining: r.sessions_total - r.sessions_used,
+      };
+    });
+}
+
 export interface SoldBono {
   id: string;
   clientId: string;

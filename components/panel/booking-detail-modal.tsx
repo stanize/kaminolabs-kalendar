@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import { Btn } from "@/components/ui/button";
 import {
@@ -10,7 +10,10 @@ import {
   reviewCancellationRequest,
   type BookingResultStatus,
   type BookingPaymentStatus,
+  type BookingPaymentMethod,
 } from "@/lib/actions/booking-owner";
+import { getActiveBonosForClientAction } from "@/lib/actions/bonos";
+import type { ClientActiveBono } from "@/lib/bonos/data";
 import type { CalendarDictionary } from "@/lib/i18n/dictionaries/calendar";
 import { CLIENT_STATUS_LABEL, CLIENT_STATUS_BADGE_CLASS, type WeekBookingVM } from "@/components/panel/calendar-grid-view";
 
@@ -50,7 +53,72 @@ export function BookingDetailModal({
       : null;
   const [result, setResult] = useState<BookingResultStatus | null>(initialResult);
   const [payment, setPayment] = useState<BookingPaymentStatus>(booking.paymentStatus);
-  const isDirty = result !== initialResult || payment !== booking.paymentStatus;
+
+  // ── Payment method (session-deduction-on-payment, bonos.md) ──────────────
+  // "" = not chosen yet, "cash" / "card", or `bono:<purchaseId>`. Derived
+  // from the booking's CURRENT saved method — this is also what "locked"
+  // compares against, since the lock is about the value already saved on
+  // this booking, not whatever the owner is mid-editing.
+  const initialMethod: string =
+    booking.paymentMethod === "cash"
+      ? "cash"
+      : booking.paymentMethod === "card"
+        ? "card"
+        : booking.paymentMethod === "bono" && booking.bonoPurchaseId
+          ? `bono:${booking.bonoPurchaseId}`
+          : "";
+  // Switching AWAY from an already-applied bono (to cash, card, or a
+  // different bono) can only happen from the Bonos page — see
+  // session-deduction-on-payment. Switching INTO a bono, or between
+  // cash/card, stays freely editable here.
+  const locked = booking.paymentMethod === "bono" && !!booking.bonoPurchaseId;
+
+  const [methodChoice, setMethodChoice] = useState<string>(initialMethod);
+  const [methodTouched, setMethodTouched] = useState(false);
+  const [activeBonos, setActiveBonos] = useState<ClientActiveBono[] | null>(null);
+  const [bonosLoading, setBonosLoading] = useState(false);
+
+  // Fetched lazily — only once payment is actually toggled to "paid" (or
+  // was already paid on open), never for the common unpaid case, and only
+  // once per modal open.
+  useEffect(() => {
+    if (payment !== "paid" || !booking.clinicClientId || activeBonos !== null || bonosLoading) return;
+    let cancelled = false;
+    async function loadBonos(clientId: string) {
+      setBonosLoading(true);
+      const bonos = await getActiveBonosForClientAction({ clientId });
+      if (cancelled) return;
+      setActiveBonos(bonos);
+      setBonosLoading(false);
+    }
+    loadBonos(booking.clinicClientId);
+    return () => {
+      cancelled = true;
+    };
+  }, [payment, booking.clinicClientId, activeBonos, bonosLoading]);
+
+  // DECIDED default: if the client has an active bono, the OLDEST one
+  // (activeBonos is already ordered oldest-first) is pre-selected — but
+  // only when the owner hasn't chosen anything yet (fresh "mark as paid",
+  // not re-opening an already cash/card/bono-paid booking) and hasn't
+  // manually touched the dropdown themselves. Derived rather than synced
+  // via an effect, since it's a pure function of already-known state.
+  const effectiveMethodChoice =
+    methodTouched || initialMethod !== "" || locked
+      ? methodChoice
+      : activeBonos === null
+        ? ""
+        : activeBonos.length > 0
+          ? `bono:${activeBonos[0].id}`
+          : "cash";
+
+  const isDirty =
+    result !== initialResult ||
+    payment !== booking.paymentStatus ||
+    (payment === "paid" && effectiveMethodChoice !== initialMethod);
+  // Can't save a "paid" state until a method is actually resolved (covers
+  // the brief window while activeBonos is still loading).
+  const methodReady = payment !== "paid" || effectiveMethodChoice !== "";
 
   const isFuture = new Date(booking.startIso) > new Date();
   // Only a GUEST booking's pending_confirmation is something the owner
@@ -105,8 +173,14 @@ export function BookingDetailModal({
     if (!result) return;
     setBusy(true);
     setError(null);
+    let paymentMethod: BookingPaymentMethod | undefined;
+    if (payment === "paid") {
+      paymentMethod = effectiveMethodChoice.startsWith("bono:")
+        ? { bonoPurchaseId: effectiveMethodChoice.slice("bono:".length) }
+        : (effectiveMethodChoice as "cash" | "card");
+    }
     const res = await updateBookingResult(
-      { bookingId: booking.id, status: result, paymentStatus: payment },
+      { bookingId: booking.id, status: result, paymentStatus: payment, paymentMethod },
       dict.errors
     );
     setBusy(false);
@@ -252,12 +326,45 @@ export function BookingDetailModal({
                 <ChoiceBtn active={payment === "paid"} onClick={() => setPayment("paid")} label={d.paymentPaid} />
                 <ChoiceBtn active={payment === "unpaid"} onClick={() => setPayment("unpaid")} label={d.paymentPending} />
               </div>
+              {payment === "paid" && (
+                <div className="mt-2.5">
+                  <p className="mb-1.5 text-[12px] font-bold uppercase tracking-[.05em] text-ink-soft">
+                    {d.paymentMethodLabel}
+                  </p>
+                  {locked ? (
+                    <p className="rounded-lg border border-line bg-surface-2/50 px-3 py-2 text-[12.5px] text-ink-soft">
+                      {d.paymentMethodLockedNote}
+                    </p>
+                  ) : (
+                    <select
+                      value={effectiveMethodChoice}
+                      disabled={bonosLoading}
+                      onChange={(e) => {
+                        setMethodTouched(true);
+                        setMethodChoice(e.target.value);
+                      }}
+                      className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[13px] text-ink disabled:opacity-60"
+                    >
+                      {effectiveMethodChoice === "" && <option value="" disabled>{"…"}</option>}
+                      <option value="cash">{d.paymentMethodCash}</option>
+                      <option value="card">{d.paymentMethodCard}</option>
+                      {(activeBonos ?? []).map((b) => (
+                        <option key={b.id} value={`bono:${b.id}`}>
+                          {d.paymentMethodBonoTemplate
+                            .replace("{bonoName}", b.bonoTypeName)
+                            .replace("{n}", String(b.sessionsRemaining))}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              )}
             </div>
             <div className="flex justify-end gap-2">
               <Btn variant="ghost" onClick={onClose} disabled={busy}>
                 {d.dismissButton}
               </Btn>
-              <Btn onClick={handleSaveResult} disabled={busy || !result || !isDirty}>
+              <Btn onClick={handleSaveResult} disabled={busy || !result || !isDirty || !methodReady}>
                 {busy ? d.saving : d.saveButton}
               </Btn>
             </div>

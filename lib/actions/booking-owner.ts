@@ -232,17 +232,30 @@ export const confirmBookingAsOwner = authedAction(
 export type BookingResultStatus = "completed" | "no_show" | "cancelled";
 export type BookingPaymentStatus = "unpaid" | "paid";
 
+// "cash" | "card" | a specific kalendar_bono_purchases.id — the dropdown
+// in the booking-detail modal only ever sends one of these three shapes.
+// A plain "bono" literal is never sent from the client; which bono is
+// implicit in the id itself (see session-deduction-on-payment).
+export type BookingPaymentMethod = "cash" | "card" | { bonoPurchaseId: string };
+
 /** The translation slice updateBookingResult needs for its own error messages. */
 export interface UpdateBookingResultDict {
   errNoBusiness: string;
   errNotFound: string;
   errUpdateFailed: string;
+  errPaymentMethodRequired: string; // marking paid without picking cash/card/bono
+  errBonoLocked: string; // trying to switch AWAY from an already-applied bono here
+  errBonoNotFound: string; // chosen bono doesn't belong to this client/business, or is exhausted
 }
 
 const RESULT_FALLBACK: UpdateBookingResultDict = {
   errNoBusiness: "No hay negocio.",
   errNotFound: "Reserva no encontrada.",
   errUpdateFailed: "No se pudo actualizar la cita.",
+  errPaymentMethodRequired: "Elige cómo se ha pagado (efectivo, tarjeta o bono).",
+  errBonoLocked:
+    "Este pago ya está aplicado a un bono. Para cambiarlo, ve a la página de Bonos.",
+  errBonoNotFound: "El bono elegido ya no está disponible.",
 };
 
 /**
@@ -263,7 +276,14 @@ const RESULT_FALLBACK: UpdateBookingResultDict = {
 export const updateBookingResult = authedAction(
   async (
     session,
-    input: { bookingId: string; status: BookingResultStatus; paymentStatus: BookingPaymentStatus },
+    input: {
+      bookingId: string;
+      status: BookingResultStatus;
+      paymentStatus: BookingPaymentStatus;
+      // Required when paymentStatus is "paid", ignored otherwise (the
+      // modal never sends a method for an "unpaid" save).
+      paymentMethod?: BookingPaymentMethod;
+    },
     dict?: Partial<UpdateBookingResultDict>
   ): Promise<OwnerBookingResult> => {
     const t = { ...RESULT_FALLBACK, ...dict };
@@ -275,16 +295,93 @@ export const updateBookingResult = authedAction(
 
     const { data: booking } = await supabase
       .from("kalendar_bookings")
-      .select("id, status, clinic_client_id, starts_at")
+      .select("id, status, clinic_client_id, starts_at, payment_method, bono_purchase_id")
       .eq("id", input.bookingId)
       .eq("business_id", business.id)
       .maybeSingle();
 
     if (!booking) return { ok: false, error: t.errNotFound };
 
+    // ── Resolve the new payment_method/bono_purchase_id, enforcing the
+    // one-directional lock (session-deduction-on-payment, bonos.md):
+    // switching INTO a bono is always allowed; switching AWAY from the
+    // bono currently applied to this booking (to cash, card, or a
+    // DIFFERENT bono) is only allowed from the Bonos page's usage
+    // history, never from here.
+    let newPaymentMethod: "cash" | "card" | "bono" | null = null;
+    let newBonoPurchaseId: string | null = null;
+    let bonoToDeduct: string | null = null; // set only when a fresh deduction is needed
+
+    if (input.paymentStatus === "paid") {
+      if (!input.paymentMethod) return { ok: false, error: t.errPaymentMethodRequired };
+
+      const wasOnBono = booking.payment_method === "bono" && !!booking.bono_purchase_id;
+      const requestedBonoId =
+        typeof input.paymentMethod === "object" ? input.paymentMethod.bonoPurchaseId : null;
+
+      if (wasOnBono && booking.bono_purchase_id !== requestedBonoId) {
+        // Covers bono -> cash, bono -> card, AND bono X -> bono Y — any
+        // change away from the specific bono already applied here.
+        return { ok: false, error: t.errBonoLocked };
+      }
+
+      if (requestedBonoId) {
+        newPaymentMethod = "bono";
+        newBonoPurchaseId = requestedBonoId;
+        if (!wasOnBono) {
+          // First time this booking is being pointed at a bono — deduct.
+          // (wasOnBono && same id => re-saving the same value, no-op.)
+          bonoToDeduct = requestedBonoId;
+        }
+      } else {
+        newPaymentMethod = input.paymentMethod as "cash" | "card";
+        newBonoPurchaseId = null;
+      }
+    }
+    // paymentStatus === "unpaid": newPaymentMethod/newBonoPurchaseId stay
+    // null. Note this also means flipping a bono-paid booking back to
+    // unpaid clears the bono link without restoring the session — that
+    // correction path is bono-session-reversal's job (Bonos page), not
+    // this action's; flagging as a known gap rather than guessing at it.
+
+    if (bonoToDeduct) {
+      // Deduct BEFORE writing the booking row: if this fails we return an
+      // error and the booking stays exactly as it was. If the booking
+      // write below then fails, the bono is left over-deducted by one —
+      // a real but narrow inconsistency window (no cross-table
+      // transaction available here); recoverable manually via the Bonos
+      // page. Scoped by business_id via the client-list join implicitly
+      // (client_id was already validated business-scoped when the bono
+      // options were fetched), but re-check ownership + remaining
+      // capacity here too — never trust a bono id from the client alone.
+      const { data: bono } = await supabase
+        .from("kalendar_bono_purchases")
+        .select("id, sessions_total, sessions_used")
+        .eq("id", bonoToDeduct)
+        .eq("business_id", business.id)
+        .maybeSingle();
+
+      if (!bono || bono.sessions_used >= bono.sessions_total) {
+        return { ok: false, error: t.errBonoNotFound };
+      }
+
+      const { error: deductError } = await supabase
+        .from("kalendar_bono_purchases")
+        .update({ sessions_used: bono.sessions_used + 1 })
+        .eq("id", bonoToDeduct)
+        .eq("business_id", business.id);
+
+      if (deductError) return { ok: false, error: t.errUpdateFailed };
+    }
+
     const { error } = await supabase
       .from("kalendar_bookings")
-      .update({ status: input.status, payment_status: input.paymentStatus })
+      .update({
+        status: input.status,
+        payment_status: input.paymentStatus,
+        payment_method: newPaymentMethod,
+        bono_purchase_id: newBonoPurchaseId,
+      })
       .eq("id", input.bookingId)
       .eq("business_id", business.id);
 
@@ -308,6 +405,10 @@ export const updateBookingResult = authedAction(
 
     revalidatePath("/panel/calendar");
     revalidatePath("/panel");
+    if (bonoToDeduct) {
+      revalidatePath("/panel/bonos");
+      if (booking.clinic_client_id) revalidatePath(`/panel/clients/${booking.clinic_client_id}`);
+    }
     return { ok: true };
   }
 );

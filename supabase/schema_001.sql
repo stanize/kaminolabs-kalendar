@@ -658,6 +658,19 @@ create table public.kalendar_bookings (
   payment_status       text                  not null default 'unpaid' check (
     payment_status in ('unpaid', 'paid')
   ),
+  -- How a 'paid' booking was paid. NULL unless payment_status = 'paid'.
+  -- Selector only appears in the booking-detail modal once the owner flips
+  -- payment_status to paid (bonos.md's session-deduction-on-payment).
+  payment_method       text                  check (
+    payment_method in ('cash', 'card', 'bono')
+  ),
+  -- Which specific sold bono this booking's session was deducted from, only
+  -- when payment_method = 'bono'. ON DELETE SET NULL rather than cascade —
+  -- a deleted purchase record (shouldn't normally happen) must not silently
+  -- delete booking history. The one-directional lock (switching AWAY from a
+  -- bono is only allowed via the Bonos page's usage history, never here) is
+  -- enforced in application code, not by a DB constraint.
+  bono_purchase_id     uuid                  references public.kalendar_bono_purchases (id) on delete set null,
   client_name          text                  not null,
   client_email         text                  not null,
   client_phone         text,

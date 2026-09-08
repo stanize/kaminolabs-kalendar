@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { authedAction } from "@/lib/auth-action";
 import { createClient } from "@/lib/supabase/server";
 import { getBusinessForUser } from "@/lib/business/data";
+import { getActiveBonosForClient, type ClientActiveBono } from "@/lib/bonos/data";
 
 export interface BonoActionDict {
   errNoBusiness: string;
@@ -218,5 +219,22 @@ export const recordBonoPurchase = authedAction(
     revalidatePath("/panel/bonos");
     revalidatePath(`/panel/clients/${input.clientId}`);
     return { ok: true, purchaseId: created.id };
+  }
+);
+
+// ── Client active bonos (session-deduction-on-payment) ──────────────────────
+
+/**
+ * A single client's still-usable bonos, for the booking-detail modal's
+ * payment-method dropdown. Business-scoping happens inside
+ * getActiveBonosForClient itself; this wrapper just makes it callable from
+ * a client component. Returns [] (not an error) if the business can't be
+ * resolved or the client has none — the modal treats an empty list as "no
+ * bono option to offer", not a failure.
+ */
+export const getActiveBonosForClientAction = authedAction(
+  async (session, input: { clientId: string }): Promise<ClientActiveBono[]> => {
+    if (!input.clientId) return [];
+    return getActiveBonosForClient(session.user.id, input.clientId);
   }
 );

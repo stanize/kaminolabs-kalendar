@@ -43,6 +43,9 @@ export interface CalendarDictionary {
     errCannotCancel: string;
     errCancelFailed: string;
     errUpdateFailed: string; // updateBookingResult
+    errPaymentMethodRequired: string; // updateBookingResult — marking paid without a method
+    errBonoLocked: string; // updateBookingResult — switching away from an applied bono
+    errBonoNotFound: string; // updateBookingResult — chosen bono unavailable
   };
   week: {
     prevLabel: string; // aria-label for the "previous" nav button — same button for day/week/month
@@ -110,6 +113,11 @@ export interface CalendarDictionary {
     paymentLabel: string; // "Pago"
     paymentPaid: string;
     paymentPending: string;
+    paymentMethodLabel: string; // "Método de pago" — inline selector shown once paymentPaid is chosen
+    paymentMethodCash: string;
+    paymentMethodCard: string;
+    paymentMethodBonoTemplate: string; // "{bonoName} ({n} restantes)" — one option per active bono
+    paymentMethodLockedNote: string; // shown instead of the selector once a bono is already applied
     saveButton: string;
     saving: string;
   };
@@ -159,6 +167,9 @@ const es: CalendarDictionary = {
     errCannotCancel: "Esta reserva ya no se puede cancelar.",
     errCancelFailed: "No se pudo cancelar la reserva.",
     errUpdateFailed: "No se pudo actualizar la cita.",
+    errPaymentMethodRequired: "Elige cómo se ha pagado (efectivo, tarjeta o bono).",
+    errBonoLocked: "Este pago ya está aplicado a un bono. Para cambiarlo, ve a la página de Bonos.",
+    errBonoNotFound: "El bono elegido ya no está disponible.",
   },
   week: {
     prevLabel: "Anterior",
@@ -225,6 +236,11 @@ const es: CalendarDictionary = {
     paymentLabel: "Pago",
     paymentPaid: "Pagado",
     paymentPending: "Pendiente",
+    paymentMethodLabel: "Método de pago",
+    paymentMethodCash: "Efectivo",
+    paymentMethodCard: "Tarjeta",
+    paymentMethodBonoTemplate: "{bonoName} ({n} restantes)",
+    paymentMethodLockedNote: "Este pago ya está aplicado a un bono. Para cambiarlo, ve a la página de Bonos.",
     saveButton: "Guardar",
     saving: "Guardando…",
   },
@@ -273,6 +289,9 @@ const en: CalendarDictionary = {
     errCannotCancel: "This booking can no longer be cancelled.",
     errCancelFailed: "Couldn't cancel the booking.",
     errUpdateFailed: "Couldn't update the appointment.",
+    errPaymentMethodRequired: "Choose how it was paid (cash, card, or a bono).",
+    errBonoLocked: "This payment is already applied to a bono. To change it, go to the Bonos page.",
+    errBonoNotFound: "The chosen bono is no longer available.",
   },
   week: {
     prevLabel: "Previous",
@@ -339,6 +358,11 @@ const en: CalendarDictionary = {
     paymentLabel: "Payment",
     paymentPaid: "Paid",
     paymentPending: "Pending",
+    paymentMethodLabel: "Payment method",
+    paymentMethodCash: "Cash",
+    paymentMethodCard: "Card",
+    paymentMethodBonoTemplate: "{bonoName} ({n} left)",
+    paymentMethodLockedNote: "This payment is already applied to a bono. To change it, go to the Bonos page.",
     saveButton: "Save",
     saving: "Saving…",
   },

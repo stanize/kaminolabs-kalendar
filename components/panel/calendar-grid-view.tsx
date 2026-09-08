@@ -67,6 +67,9 @@ export interface WeekBookingVM {
   durationMin: number;
   status: "pending_confirmation" | "confirmed" | "cancelled" | "completed" | "no_show";
   paymentStatus: "unpaid" | "paid";
+  paymentMethod: "cash" | "card" | "bono" | null;
+  bonoPurchaseId: string | null;
+  clinicClientId: string | null;
   clientName: string;
   clientEmail: string;
   clientPhone: string | null;
