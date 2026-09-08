@@ -18,15 +18,15 @@ Criteria:
 - Setting an outcome moves the chip from "past-unreviewed" (rose) to "past-reviewed" (slate) styling
 
 ## Step: mark-payment
-Status: in_progress
+Status: done
 Criteria:
 - Booking detail modal lets the owner independently set payment status: paid or unpaid
 - Payment status is independent of outcome (e.g. a no-show can still be marked paid; a completed session can be pending payment)
 - Payment status change is scoped to the calling business
-- NOT BUILT: when marking a booking paid, the owner must also select a payment method — cash, card, or (if the client has any active bono) one option per active bono, individually labeled. The selector only appears once the paid toggle is switched on — not shown at all while unpaid — and opens inline next to that toggle. If the client has an active bono, the oldest one defaults as pre-selected; the clinic can override to cash, card, or a different bono. kalendar_bookings needs a new payment_method column (text, nullable, meaningful only when payment_status = 'paid') plus a reference to which specific bono was used when applicable (FK to kalendar_bono_purchases, nullable) — see bonos.md's session-deduction-on-payment step for full detail
+- When marking a booking paid, the owner must also select a payment method — cash, card, or (if the client has any active bono) one option per active bono, individually labeled. The selector only appears once the paid toggle is switched on — not shown at all while unpaid — and opens inline next to that toggle. If the client has an active bono, the oldest one defaults as pre-selected; the clinic can override to cash, card, or a different bono. kalendar_bookings has a payment_method column (text, nullable, meaningful only when payment_status = 'paid') plus bono_purchase_id (FK to kalendar_bono_purchases, nullable) — see bonos.md's session-deduction-on-payment step for full detail
 - Selecting a bono option deducts one session from that specific bono automatically — see bonos.md
-- DECIDED: the payment-method lock is one-directional. Switching INTO a bono (from cash, from card, or first-time selection) is always allowed in this modal, anytime, including retroactively on an old booking — deducts a session normally, per bonos.md. Switching AWAY from a bono (bono -> cash, bono -> card) is what's blocked here — attempting shows a message pointing to the Bonos page instead. This is deliberate, not a bug — see bonos.md's bono-session-reversal step for where that specific correction happens
-- Switching an already-paid booking's method after the fact (e.g. correcting a mistaken cash/bono selection) needs a defined behavior — does changing away from "bono" restore the deducted session? Not yet decided, flagged in bonos.md too
+- DONE: the payment-method lock is one-directional. Switching INTO a bono (from cash, from card, or first-time selection) is always allowed in this modal, anytime, including retroactively on an old booking — deducts a session normally, per bonos.md. Switching AWAY from a bono (bono -> cash, bono -> card, or bono -> a different bono) is what's blocked here — attempting shows a message pointing to the Bonos page instead.
+- KNOWN GAP: switching an already-paid booking's method after the fact by flipping it back to unpaid clears the payment_method/bono_purchase_id link but does NOT restore a deducted session — that correction is bono-session-reversal's job (Bonos page), still not_started. Same gap noted in bonos.md.
 
 ## Step: past-appointment-editing
 Status: unclear

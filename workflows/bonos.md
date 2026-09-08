@@ -3,7 +3,7 @@
 Lets a clinic sell prepaid bundles of sessions at a discount (e.g. 10 physio sessions for less than 10x the single-session price) — a common pattern in Spanish clinics/salons. One dedicated page, tabbed: clinic configures the bono types they offer, sells/records a bono purchase against a specific client, and a usage view shows remaining/used sessions per sold bono. Ties into calendar-management-past.md's mark-payment step, since selecting "bono" as a payment method is what triggers automatic session deduction.
 
 ## Step: bono-types-schema-and-config
-Status: not_started
+Status: done
 Criteria:
 - New table kalendar_bono_types: id, business_id (FK, cascade), name (e.g. "Bono 10 sesiones"), session_count (integer, > 0), price (numeric, the discounted bundle price), active (boolean, so old bono types can be retired without deleting history), created_at
 - "Tipos de bono" tab on the new Bonos page (clinic-configurable, scoped to the caller's business) — create/edit/deactivate bono types, similar in spirit to servicios-setup's catalog management
@@ -11,7 +11,7 @@ Criteria:
 - Session count is a plain integer — no per-service restriction assumed for MVP (a bono is generic sessions, not tied to one specific service) unless Arun decides that's needed
 
 ## Step: bono-purchase-recording
-Status: not_started
+Status: done
 Criteria:
 - New table kalendar_bono_purchases: id, business_id (FK), client_id (FK to kalendar_clients, required — a bono is always tied to a specific client, never anonymous), bono_type_id (FK to kalendar_bono_types), sessions_total (snapshot of session_count at purchase time — independent of the bono type's own value changing later), sessions_used (integer, default 0), price_paid (snapshot of price at purchase time, in case the clinic later changes the bono type's price), purchased_at, created_at
 - "Bonos vendidos" tab lets the owner record a sale: pick a client (existing client picker, same as manual-appointment-creation's), pick a bono type, confirm — no real payment processing, this just records that a sale happened (matches the explicit "we don't want any actual payment processing" scoping)
@@ -19,7 +19,7 @@ Criteria:
 - A client can have multiple active (not-yet-fully-used) bonos at once — no restriction against this, since a real clinic client might buy a second bundle before finishing the first
 
 ## Step: session-deduction-on-payment
-Status: not_started
+Status: done
 Criteria:
 - Depends on calendar-management-past.md's mark-payment step adding a payment_method field (cash/card/bono, plus which specific bono if applicable — see UI behavior below)
 - DECIDED — payment method selector UI: only appears once the owner sets a booking's status to paid, not shown at all beforehand (opens inline next to the paid toggle, not a separate step). Options are Cash, Card, and — if the client (via the booking's clinic_client_id) has one or more active bonos with sessions remaining — one distinct option per bono (not a single generic "Bono" entry), labeled so the clinic can tell them apart (e.g. bono type name + remaining count, "Bono 10 sesiones (3 restantes)"). If the client has no active bono, only Cash/Card show — no bono option appears at all.
@@ -27,6 +27,9 @@ Criteria:
 - Confirming payment with a bono option selected deducts one session (sessions_used += 1) from that specific bono row — scoped correctly regardless of whether it was the defaulted oldest one or a manually-chosen different one
 - If a client has NO active bono with remaining sessions, the bono option(s) simply don't appear in the dropdown (per the UI behavior above) — this naturally prevents the "selected bono but none exist" error case from the earlier draft of this step, no separate validation/error state needed
 - DECIDED — payment-method correction after the fact, lock is ONE-DIRECTIONAL: switching INTO a bono (from cash, from card, or picking a bono for the first time) is always allowed from the booking detail modal, anytime — this triggers the normal deduction per session-deduction-on-payment above, no restriction on when it happens relative to when the booking occurred. Switching AWAY from a bono (bono -> cash, bono -> card) is what LOCKS in this modal — the clinic cannot do that switch here. Attempting to shows a message directing them to the Bonos page instead. This keeps bono-balance-reducing reversal logic in exactly one place (the Bonos page, see bono-session-reversal below) while still allowing the balance-consuming direction freely, since consuming a session is straightforward but reversing one needs the fuller context (which specific usage record) that only the Bonos page's per-bono history naturally provides.
+- IMPLEMENTATION: kalendar_bookings gained payment_method (text, nullable, check in cash/card/bono) and bono_purchase_id (uuid, nullable, FK to kalendar_bono_purchases on delete set null) — both in schema_001.sql and standalone supabase/schema_subset_003.sql. lib/bonos/data.ts's getActiveBonosForClient() feeds the dropdown (oldest-first, excludes fully-used bonos). lib/actions/booking-owner.ts's updateBookingResult now takes an optional paymentMethod and enforces the lock server-side (never trusts the client alone): the lock compares the booking's CURRENTLY SAVED bono_purchase_id against the requested one — any change away from that specific bono (to cash, card, OR a different bono) is rejected with errBonoLocked. This last part (bono X -> bono Y counting as "switching away from X") is Claude's interpretation filling a gap the workflow doc didn't explicitly resolve — flagging in case Arun wants different behavior. components/panel/booking-detail-modal.tsx renders the dropdown (or a locked note) once payment is toggled to paid, fetching active bonos lazily via getActiveBonosForClientAction.
+- KNOWN GAP (not built): flipping an already bono-paid booking back to "unpaid" clears the payment_method/bono_purchase_id link but does NOT restore the deducted session — that reversal only exists via bono-session-reversal (Bonos page), which is still not_started. Flagging so this doesn't get assumed as handled.
+- KNOWN LIMITATION (not built): the bono deduction and the booking's payment_status/payment_method update are two separate Supabase calls (deduct first, then update the booking) — there is no cross-table transaction, so a failure between the two steps could leave a bono over-deducted by one session relative to what the booking shows. Narrow window, recoverable manually; a proper fix would be a Postgres RPC wrapping both writes atomically.
 
 ## Step: bono-session-reversal
 Status: not_started
