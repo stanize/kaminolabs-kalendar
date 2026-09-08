@@ -48,10 +48,11 @@ Criteria:
 - IMPLEMENTATION: lib/bonos/data.ts's getBonosForClient() returns ALL of a client's bonos (active + exhausted), newest-purchase-first. Rendered as a new "Bonos" card on the client detail page, placed between Contacto and Próximas citas (Arun's placement call). Each row shows bono type name, "{used}/{total} usadas", purchase date, and an "Agotado" badge once sessions_used >= sessions_total — no collapsing, exhausted bonos are shown plainly alongside active ones.
 
 ## Step: bono-usage-report
-Status: not_started
+Status: done
 Criteria:
 - A view (could be a third tab on the Bonos page, or a filtered view within "Bonos vendidos" rather than a fully separate page) showing all sold bonos across the business — filterable/sortable by remaining sessions (e.g. surface ones close to running out) and by client
 - Not scoped as a full analytics/reports page (that's reports-page in post-mvp-menu-items.md, unrelated and still not_started) — this is specifically usage tracking for bonos, nothing broader
+- IMPLEMENTATION: folded into the existing "Bonos vendidos" tab (per the Notes/Deviations decision below), not a new tab. Client-side filter-by-name input, and a sort control ("Más recientes" default / "Menos sesiones restantes"). Each row gets an "Agotado" badge once exhausted, or an amber "Última sesión" badge when exactly one session remains — the low-remaining surfacing the criteria asked for. Purely client-side over the already-loaded business-wide list, no new fetch.
 
 ## Notes / Deviations
 - Page structure decision: one Bonos page with tabs (Tipos de bono / Bonos vendidos, usage folded into the second tab rather than a separate third tab unless it gets busy) — mirrors the existing Clientes/Cancelaciones tab pattern in calendar-bookings.tsx, chosen for consistency rather than introducing a new UI pattern.
