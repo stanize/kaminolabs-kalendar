@@ -36,6 +36,10 @@ export interface ClientsDictionary {
     saving: string;
     saved: string;
     cancel: string;
+    bonosTitle: string; // "Bonos" — client-page-bono-summary
+    emptyBonos: string;
+    bonoRemainingTemplate: string; // "{used}/{total} usadas" under each bono row
+    bonoExhaustedBadge: string; // badge shown once sessionsUsed >= sessionsTotal
     notesTitle: string;
     notesPlaceholder: string;
     addNote: string;
@@ -95,6 +99,10 @@ const es: ClientsDictionary = {
     saving: "Guardando…",
     saved: "Guardado.",
     cancel: "Cancelar",
+    bonosTitle: "Bonos",
+    emptyBonos: "Este cliente no tiene bonos.",
+    bonoRemainingTemplate: "{used}/{total} usadas",
+    bonoExhaustedBadge: "Agotado",
     notesTitle: "Notas privadas",
     notesPlaceholder: "Escribe una nota sobre este cliente...",
     addNote: "Añadir nota",
@@ -154,6 +162,10 @@ const en: ClientsDictionary = {
     saving: "Saving…",
     saved: "Saved.",
     cancel: "Cancel",
+    bonosTitle: "Bonos",
+    emptyBonos: "This client has no bonos.",
+    bonoRemainingTemplate: "{used}/{total} used",
+    bonoExhaustedBadge: "Exhausted",
     notesTitle: "Private notes",
     notesPlaceholder: "Write a note about this client...",
     addNote: "Add note",

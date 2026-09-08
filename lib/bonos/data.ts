@@ -149,3 +149,52 @@ export async function getSoldBonosForBusiness(userId: string): Promise<SoldBono[
     };
   });
 }
+
+export interface ClientBonoSummary {
+  id: string;
+  bonoTypeName: string | null; // null if the bono type was later deleted
+  sessionsTotal: number;
+  sessionsUsed: number;
+  pricePaid: number;
+  purchasedAt: string;
+}
+
+/**
+ * ALL of one client's bonos — active and fully-used alike — for the
+ * client-detail page's "Bonos" summary (client-page-bono-summary,
+ * bonos.md). Newest purchase first, since this is a history view rather
+ * than the payment-modal's "which one to spend next" ordering used by
+ * getActiveBonosForClient. Scoped by business AND client, same as
+ * getActiveBonosForClient — never trust a client_id alone.
+ */
+export async function getBonosForClient(userId: string, clientId: string): Promise<ClientBonoSummary[]> {
+  const business = await getBusinessForUser(userId);
+  if (!business || !clientId) return [];
+
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("kalendar_bono_purchases")
+    .select("id, sessions_total, sessions_used, price_paid, purchased_at, kalendar_bono_types ( name )")
+    .eq("business_id", business.id)
+    .eq("client_id", clientId)
+    .order("purchased_at", { ascending: false });
+
+  return ((data as {
+    id: string;
+    sessions_total: number;
+    sessions_used: number;
+    price_paid: number;
+    purchased_at: string;
+    kalendar_bono_types: { name: string } | { name: string }[] | null;
+  }[] | null) ?? []).map((r) => {
+    const bonoType = Array.isArray(r.kalendar_bono_types) ? r.kalendar_bono_types[0] : r.kalendar_bono_types;
+    return {
+      id: r.id,
+      bonoTypeName: bonoType?.name ?? null,
+      sessionsTotal: r.sessions_total,
+      sessionsUsed: r.sessions_used,
+      pricePaid: Number(r.price_paid),
+      purchasedAt: r.purchased_at,
+    };
+  });
+}

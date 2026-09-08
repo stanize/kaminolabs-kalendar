@@ -11,6 +11,7 @@ import {
 } from "@/lib/actions/clients";
 import { reportClientError } from "@/lib/report-client-error";
 import type { ClientDetail, ClientNote, ClientBookingSummary } from "@/lib/clients/data";
+import type { ClientBonoSummary } from "@/lib/bonos/data";
 import type { ClientsDictionary } from "@/lib/i18n/dictionaries/clients";
 import type { Locale } from "@/lib/i18n/config";
 
@@ -18,10 +19,11 @@ const inputClass =
   "w-full rounded-lg border border-line bg-surface px-3 py-2 text-[14px] text-ink outline-none focus:border-brand";
 
 export function ClientDetailView({
-  client, initialNotes, dict, locale,
+  client, initialNotes, bonos, dict, locale,
 }: {
   client: ClientDetail;
   initialNotes: ClientNote[];
+  bonos: ClientBonoSummary[];
   dict: ClientsDictionary;
   locale: Locale;
 }) {
@@ -38,6 +40,7 @@ export function ClientDetailView({
 
       <StatsCard client={client} dict={dict} locale={locale} />
       <ContactCard client={client} dict={dict} />
+      <BonosCard bonos={bonos} dict={dict} locale={locale} />
 
       <BookingListCard
         title={d.upcomingTitle}
@@ -179,6 +182,43 @@ function Row({ label, value }: { label: string; value: string }) {
     <div className="flex items-center justify-between gap-3">
       <dt className="text-ink-soft">{label}</dt>
       <dd className="font-medium text-ink">{value}</dd>
+    </div>
+  );
+}
+
+function BonosCard({ bonos, dict, locale }: { bonos: ClientBonoSummary[]; dict: ClientsDictionary; locale: Locale }) {
+  const d = dict.detail;
+  return (
+    <div className="rounded-2xl border border-line bg-surface p-5">
+      <p className="mb-3 text-[12px] font-bold uppercase tracking-[.04em] text-ink-soft">{d.bonosTitle}</p>
+      {bonos.length === 0 ? (
+        <p className="text-[13px] text-ink-soft">{d.emptyBonos}</p>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {bonos.map((b) => {
+            const exhausted = b.sessionsUsed >= b.sessionsTotal;
+            return (
+              <div key={b.id} className="flex items-center justify-between gap-3 rounded-xl border border-line px-3 py-2.5">
+                <div className="min-w-0">
+                  <p className="truncate text-[13.5px] font-semibold text-ink">{b.bonoTypeName ?? "—"}</p>
+                  <p className="text-[12px] text-ink-soft">
+                    {d.bonoRemainingTemplate
+                      .replace("{used}", String(b.sessionsUsed))
+                      .replace("{total}", String(b.sessionsTotal))}
+                    {" · "}
+                    {formatDate(b.purchasedAt, locale)}
+                  </p>
+                </div>
+                {exhausted && (
+                  <span className="shrink-0 rounded-full border border-line bg-surface-2 px-2.5 py-0.5 text-[11px] font-semibold text-ink-soft">
+                    {d.bonoExhaustedBadge}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
