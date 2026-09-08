@@ -266,6 +266,25 @@ function SoldBonosTab({
   const t = dict.sold;
   const [sold, setSold] = useState(initialSoldBonos);
   const [selling, setSelling] = useState(false);
+  const [filter, setFilter] = useState("");
+  const [sortBy, setSortBy] = useState<"recent" | "remaining">("recent");
+
+  // bono-usage-report: filter by client name, and sort by fewest sessions
+  // remaining first to surface bonos close to running out — folded into
+  // this existing tab per the workflow's Notes/Deviations decision, not a
+  // separate page/tab. Purely client-side over the already-loaded list;
+  // no new fetch, since "Bonos vendidos" is business-wide already.
+  const visible = sold
+    .filter((s) => s.clientName.toLowerCase().includes(filter.trim().toLowerCase()))
+    .slice()
+    .sort((a, b) => {
+      if (sortBy === "remaining") {
+        const remA = a.sessionsTotal - a.sessionsUsed;
+        const remB = b.sessionsTotal - b.sessionsUsed;
+        if (remA !== remB) return remA - remB;
+      }
+      return new Date(b.purchasedAt).getTime() - new Date(a.purchasedAt).getTime();
+    });
 
   return (
     <div className="flex flex-col gap-3">
@@ -278,20 +297,60 @@ function SoldBonosTab({
           <p className="mt-1 text-[13px] text-ink-soft">{t.emptySubtitle}</p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-line bg-surface">
-          {sold.map((s, i) => (
-            <div key={s.id} className={`flex items-center gap-3 px-4 py-3.5 ${i > 0 ? "border-t border-line" : ""}`}>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-[14px] font-semibold text-ink">{s.clientName}</p>
-                <p className="truncate text-[12.5px] text-ink-soft">
-                  {s.bonoTypeName ?? "—"} · {t.remaining.replace("{used}", String(s.sessionsUsed)).replace("{total}", String(s.sessionsTotal))}
-                </p>
-                <p className="text-[11.5px] text-ink-soft">{t.purchasedOn.replace("{date}", formatDate(s.purchasedAt, locale))}</p>
-              </div>
-              <p className="shrink-0 text-[13.5px] font-semibold text-ink">{s.pricePaid.toFixed(2)} €</p>
+        <>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <input
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              placeholder={t.filterPlaceholder}
+              className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[13px] text-ink outline-none focus:border-brand sm:max-w-[220px]"
+            />
+            <div className="flex items-center gap-2">
+              <label className="text-[12px] font-medium text-ink-soft">{t.sortLabel}</label>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as "recent" | "remaining")}
+                className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[13px] text-ink"
+              >
+                <option value="recent">{t.sortRecent}</option>
+                <option value="remaining">{t.sortRemaining}</option>
+              </select>
             </div>
-          ))}
-        </div>
+          </div>
+
+          {visible.length === 0 ? (
+            <p className="px-1 text-[13px] text-ink-soft">{t.noResults}</p>
+          ) : (
+            <div className="overflow-hidden rounded-xl border border-line bg-surface">
+              {visible.map((s, i) => {
+                const remaining = s.sessionsTotal - s.sessionsUsed;
+                const exhausted = remaining <= 0;
+                const lowRemaining = !exhausted && remaining === 1;
+                return (
+                  <div key={s.id} className={`flex items-center gap-3 px-4 py-3.5 ${i > 0 ? "border-t border-line" : ""}`}>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[14px] font-semibold text-ink">{s.clientName}</p>
+                      <p className="truncate text-[12.5px] text-ink-soft">
+                        {s.bonoTypeName ?? "—"} · {t.remaining.replace("{used}", String(s.sessionsUsed)).replace("{total}", String(s.sessionsTotal))}
+                      </p>
+                      <p className="text-[11.5px] text-ink-soft">{t.purchasedOn.replace("{date}", formatDate(s.purchasedAt, locale))}</p>
+                    </div>
+                    {exhausted ? (
+                      <span className="shrink-0 rounded-full border border-line bg-surface-2 px-2.5 py-0.5 text-[11px] font-semibold text-ink-soft">
+                        {t.exhaustedBadge}
+                      </span>
+                    ) : lowRemaining ? (
+                      <span className="shrink-0 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700">
+                        {t.lowRemainingBadge}
+                      </span>
+                    ) : null}
+                    <p className="shrink-0 text-[13.5px] font-semibold text-ink">{s.pricePaid.toFixed(2)} €</p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
       )}
 
       {selling ? (

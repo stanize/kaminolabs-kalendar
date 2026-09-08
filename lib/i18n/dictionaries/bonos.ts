@@ -40,6 +40,13 @@ export interface BonosDictionary {
     remaining: string;
     purchasedOn: string;
     noActiveBonoTypes: string;
+    filterPlaceholder: string; // client-name filter, bono-usage-report
+    sortLabel: string;
+    sortRecent: string;
+    sortRemaining: string; // "fewest sessions remaining first" — surfaces bonos close to running out
+    lowRemainingBadge: string; // shown when 1 session remains and not yet exhausted
+    exhaustedBadge: string;
+    noResults: string; // filter matched nothing
   };
   errors: {
     errNoBusiness: string;
@@ -88,6 +95,13 @@ const es: BonosDictionary = {
     remaining: "{used}/{total} sesiones usadas",
     purchasedOn: "Vendido el {date}",
     noActiveBonoTypes: "No hay tipos de bono activos. Crea uno primero en la pestaña Tipos de bono.",
+    filterPlaceholder: "Filtrar por cliente...",
+    sortLabel: "Ordenar",
+    sortRecent: "Más recientes",
+    sortRemaining: "Menos sesiones restantes",
+    lowRemainingBadge: "Última sesión",
+    exhaustedBadge: "Agotado",
+    noResults: "Ningún bono coincide con el filtro.",
   },
   errors: {
     errNoBusiness: "No hay negocio.",
@@ -136,6 +150,13 @@ const en: BonosDictionary = {
     remaining: "{used}/{total} sessions used",
     purchasedOn: "Sold on {date}",
     noActiveBonoTypes: "No active bono types. Create one first in the Bono types tab.",
+    filterPlaceholder: "Filter by client...",
+    sortLabel: "Sort",
+    sortRecent: "Most recent",
+    sortRemaining: "Fewest sessions left",
+    lowRemainingBadge: "Last session",
+    exhaustedBadge: "Exhausted",
+    noResults: "No bonos match the filter.",
   },
   errors: {
     errNoBusiness: "No business found.",
