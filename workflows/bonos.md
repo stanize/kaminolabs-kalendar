@@ -32,12 +32,13 @@ Criteria:
 - KNOWN LIMITATION (not built): the bono deduction and the booking's payment_status/payment_method update are two separate Supabase calls (deduct first, then update the booking) — there is no cross-table transaction, so a failure between the two steps could leave a bono over-deducted by one session relative to what the booking shows. Narrow window, recoverable manually; a proper fix would be a Postgres RPC wrapping both writes atomically.
 
 ## Step: bono-session-reversal
-Status: not_started
+Status: done
 Criteria:
 - Depends on bono-purchase-recording (the bono itself) and session-deduction-on-payment (the thing being reversed)
 - On the Bonos page, opening a specific sold bono (from "Bonos vendidos") shows its usage history — each session consumed, linked back to the booking it came from
 - From this usage history, the clinic can select a specific used session and switch it to cash or card — this is the ONLY place a bono-consumed session can be reversed (the booking detail modal only locks the bono-to-cash/card direction, per mark-payment's UI behavior; cash/card-to-bono remains freely available there)
 - Switching a used session away from a bono: restores the session to the bono (sessions_used -= 1) AND updates the linked booking's payment_method to the chosen cash/card value — both happen atomically, not as two separate edits that could get out of sync
+- IMPLEMENTATION: "Ver historial" link on each sold-bono row (Bonos vendidos tab) expands to show that bono's consumed sessions (lib/bonos/data.ts's getBonoUsageHistory — bookings still pointing at this bono, i.e. payment_method='bono' AND bono_purchase_id=this bono; a reversed session naturally drops off the list since reversal clears both fields). Each session row has "Cambiar a efectivo" / "Cambiar a tarjeta" buttons, gated behind a confirm dialog. Atomicity requirement met via a new Postgres function, public.reverse_bono_session(booking_id, business_id, new_payment_method) — in both schema_001.sql and standalone schema_subset_004.sql — which does the sessions_used decrement and the booking's payment_method/bono_purchase_id update inside one function body/transaction, called via supabase.rpc() from reverseBonoSessionAction. This is the first RPC-based mutation in the codebase (everything else uses sequential .from() calls) — chosen specifically because this is the one step in the whole bonos feature where the workflow doc explicitly required atomicity.
 
 ## Step: client-page-bono-summary
 Status: done
