@@ -860,6 +860,59 @@ alter table public.kalendar_user_preferences enable row level security;
 create policy "User preferences: all"
   on public.kalendar_user_preferences for all using (true) with check (true);
 
+-- ----------------------------------------------------------------------------
+-- reverse_bono_session (bono-session-reversal, workflows/bonos.md)
+-- Atomically undoes a booking's bono-paid deduction: restores one session
+-- to the bono (sessions_used -= 1, floored at 0) AND switches the booking's
+-- payment_method to the chosen cash/card value, clearing bono_purchase_id.
+-- Both writes happen in one function body / implicit transaction so they
+-- can never drift apart (the one place in this feature where atomicity
+-- across kalendar_bono_purchases and kalendar_bookings is required — the
+-- forward deduction in updateBookingResult is intentionally NOT atomic,
+-- see that action's comments). Only reverses a booking that is currently
+-- payment_method = 'bono' and scoped to the caller's business; raises
+-- otherwise so the app layer surfaces a clear error rather than silently
+-- no-op'ing.
+-- ----------------------------------------------------------------------------
+create or replace function public.reverse_bono_session(
+  p_booking_id uuid,
+  p_business_id uuid,
+  p_new_payment_method text
+)
+returns void
+language plpgsql
+as $$
+declare
+  v_bono_id uuid;
+begin
+  if p_new_payment_method not in ('cash', 'card') then
+    raise exception 'reverse_bono_session: p_new_payment_method must be cash or card';
+  end if;
+
+  select bono_purchase_id into v_bono_id
+  from public.kalendar_bookings
+  where id = p_booking_id
+    and business_id = p_business_id
+    and payment_method = 'bono'
+    and bono_purchase_id is not null;
+
+  if v_bono_id is null then
+    raise exception 'reverse_bono_session: booking not found, not bono-paid, or business mismatch';
+  end if;
+
+  update public.kalendar_bono_purchases
+  set sessions_used = greatest(sessions_used - 1, 0)
+  where id = v_bono_id
+    and business_id = p_business_id;
+
+  update public.kalendar_bookings
+  set payment_method = p_new_payment_method,
+      bono_purchase_id = null
+  where id = p_booking_id
+    and business_id = p_business_id;
+end;
+$$;
+
 -- ============================================================================
 -- End of schema.
 -- ============================================================================

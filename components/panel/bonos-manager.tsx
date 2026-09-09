@@ -9,10 +9,12 @@ import {
   updateBonoType,
   setBonoTypeActive,
   recordBonoPurchase,
+  getBonoUsageHistoryAction,
+  reverseBonoSessionAction,
 } from "@/lib/actions/bonos";
 import { searchClients, type ClientSearchResult } from "@/lib/actions/clients";
 import { reportClientError } from "@/lib/report-client-error";
-import type { BonoType, SoldBono } from "@/lib/bonos/data";
+import type { BonoType, SoldBono, BonoUsageSession } from "@/lib/bonos/data";
 import type { BonosDictionary } from "@/lib/i18n/dictionaries/bonos";
 import type { Locale } from "@/lib/i18n/config";
 
@@ -322,32 +324,20 @@ function SoldBonosTab({
             <p className="px-1 text-[13px] text-ink-soft">{t.noResults}</p>
           ) : (
             <div className="overflow-hidden rounded-xl border border-line bg-surface">
-              {visible.map((s, i) => {
-                const remaining = s.sessionsTotal - s.sessionsUsed;
-                const exhausted = remaining <= 0;
-                const lowRemaining = !exhausted && remaining === 1;
-                return (
-                  <div key={s.id} className={`flex items-center gap-3 px-4 py-3.5 ${i > 0 ? "border-t border-line" : ""}`}>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-[14px] font-semibold text-ink">{s.clientName}</p>
-                      <p className="truncate text-[12.5px] text-ink-soft">
-                        {s.bonoTypeName ?? "—"} · {t.remaining.replace("{used}", String(s.sessionsUsed)).replace("{total}", String(s.sessionsTotal))}
-                      </p>
-                      <p className="text-[11.5px] text-ink-soft">{t.purchasedOn.replace("{date}", formatDate(s.purchasedAt, locale))}</p>
-                    </div>
-                    {exhausted ? (
-                      <span className="shrink-0 rounded-full border border-line bg-surface-2 px-2.5 py-0.5 text-[11px] font-semibold text-ink-soft">
-                        {t.exhaustedBadge}
-                      </span>
-                    ) : lowRemaining ? (
-                      <span className="shrink-0 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700">
-                        {t.lowRemainingBadge}
-                      </span>
-                    ) : null}
-                    <p className="shrink-0 text-[13.5px] font-semibold text-ink">{s.pricePaid.toFixed(2)} €</p>
-                  </div>
-                );
-              })}
+              {visible.map((s, i) => (
+                <SoldBonoRow
+                  key={s.id}
+                  bono={s}
+                  bordered={i > 0}
+                  dict={dict}
+                  locale={locale}
+                  onSessionReversed={(bonoId) =>
+                    setSold((list) =>
+                      list.map((x) => (x.id === bonoId ? { ...x, sessionsUsed: Math.max(x.sessionsUsed - 1, 0) } : x))
+                    )
+                  }
+                />
+              ))}
             </div>
           )}
         </>
@@ -368,6 +358,136 @@ function SoldBonosTab({
         <Btn variant="outline" size="sm" onClick={() => setSelling(true)}>
           <Icon name="plus" size={14} /> {t.sellNew}
         </Btn>
+      )}
+    </div>
+  );
+}
+
+function SoldBonoRow({
+  bono, bordered, dict, locale, onSessionReversed,
+}: {
+  bono: SoldBono;
+  bordered: boolean;
+  dict: BonosDictionary;
+  locale: Locale;
+  onSessionReversed: (bonoId: string) => void;
+}) {
+  const t = dict.sold;
+  const remaining = bono.sessionsTotal - bono.sessionsUsed;
+  const exhausted = remaining <= 0;
+  const lowRemaining = !exhausted && remaining === 1;
+
+  const [expanded, setExpanded] = useState(false);
+  const [history, setHistory] = useState<BonoUsageSession[] | null>(null);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [reversingId, setReversingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function toggleExpanded() {
+    setError(null);
+    const next = !expanded;
+    setExpanded(next);
+    if (next && history === null) {
+      setLoadingHistory(true);
+      const rows = await getBonoUsageHistoryAction({ bonoPurchaseId: bono.id });
+      setHistory(rows);
+      setLoadingHistory(false);
+    }
+  }
+
+  async function handleReverse(bookingId: string, newPaymentMethod: "cash" | "card") {
+    if (!window.confirm(t.confirmReverse)) return;
+    setError(null);
+    setReversingId(bookingId);
+    try {
+      const result = await reverseBonoSessionAction(
+        { bookingId, newPaymentMethod, clientId: bono.clientId },
+        dict.errors
+      );
+      if (!result.ok) {
+        setError(result.error || t.reverseFailed);
+        setReversingId(null);
+        return;
+      }
+      setHistory((prev) => (prev ? prev.filter((h) => h.bookingId !== bookingId) : prev));
+      onSessionReversed(bono.id);
+      setReversingId(null);
+    } catch (e) {
+      reportClientError("reverseBonoSessionAction", e);
+      setError(t.reverseFailed);
+      setReversingId(null);
+    }
+  }
+
+  return (
+    <div className={bordered ? "border-t border-line" : ""}>
+      <div className="flex items-center gap-3 px-4 py-3.5">
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[14px] font-semibold text-ink">{bono.clientName}</p>
+          <p className="truncate text-[12.5px] text-ink-soft">
+            {bono.bonoTypeName ?? "—"} · {t.remaining.replace("{used}", String(bono.sessionsUsed)).replace("{total}", String(bono.sessionsTotal))}
+          </p>
+          <p className="text-[11.5px] text-ink-soft">{t.purchasedOn.replace("{date}", formatDate(bono.purchasedAt, locale))}</p>
+        </div>
+        {exhausted ? (
+          <span className="shrink-0 rounded-full border border-line bg-surface-2 px-2.5 py-0.5 text-[11px] font-semibold text-ink-soft">
+            {t.exhaustedBadge}
+          </span>
+        ) : lowRemaining ? (
+          <span className="shrink-0 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700">
+            {t.lowRemainingBadge}
+          </span>
+        ) : null}
+        <p className="shrink-0 text-[13.5px] font-semibold text-ink">{bono.pricePaid.toFixed(2)} €</p>
+        <button
+          type="button"
+          onClick={toggleExpanded}
+          className="shrink-0 text-[12px] font-medium text-brand hover:underline"
+        >
+          {expanded ? t.hideHistory : t.viewHistory}
+        </button>
+      </div>
+
+      {expanded && (
+        <div className="border-t border-line bg-surface-2/40 px-4 py-3">
+          <p className="mb-2 text-[11.5px] font-bold uppercase tracking-[.04em] text-ink-soft">{t.historyTitle}</p>
+          {error && <p className="mb-2 text-[12px] text-error">{error}</p>}
+          {loadingHistory ? (
+            <p className="text-[12.5px] text-ink-soft">…</p>
+          ) : !history || history.length === 0 ? (
+            <p className="text-[12.5px] text-ink-soft">{t.historyEmpty}</p>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {history.map((h) => (
+                <div key={h.bookingId} className="flex items-center justify-between gap-3 rounded-lg border border-line bg-surface px-3 py-2">
+                  <div className="min-w-0">
+                    <p className="truncate text-[13px] font-medium text-ink">{h.serviceName}</p>
+                    <p className="text-[11.5px] text-ink-soft">{formatDate(h.startsAt, locale)}</p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={reversingId === h.bookingId}
+                      onClick={() => handleReverse(h.bookingId, "cash")}
+                      className="text-[11.5px] font-medium text-ink-soft hover:text-ink disabled:opacity-50"
+                    >
+                      {reversingId === h.bookingId ? t.reversing : t.reverseToCash}
+                    </button>
+                    <span className="text-line">·</span>
+                    <button
+                      type="button"
+                      disabled={reversingId === h.bookingId}
+                      onClick={() => handleReverse(h.bookingId, "card")}
+                      className="text-[11.5px] font-medium text-ink-soft hover:text-ink disabled:opacity-50"
+                    >
+                      {reversingId === h.bookingId ? t.reversing : t.reverseToCard}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

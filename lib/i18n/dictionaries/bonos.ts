@@ -47,6 +47,15 @@ export interface BonosDictionary {
     lowRemainingBadge: string; // shown when 1 session remains and not yet exhausted
     exhaustedBadge: string;
     noResults: string; // filter matched nothing
+    viewHistory: string; // "Ver historial" — expands a sold bono's usage history
+    hideHistory: string;
+    historyTitle: string;
+    historyEmpty: string; // no sessions consumed yet from this bono
+    reverseToCash: string; // button in a used-session row
+    reverseToCard: string;
+    reversing: string;
+    confirmReverse: string; // window.confirm text before an irreversible-feeling switch
+    reverseFailed: string;
   };
   errors: {
     errNoBusiness: string;
@@ -102,6 +111,15 @@ const es: BonosDictionary = {
     lowRemainingBadge: "Última sesión",
     exhaustedBadge: "Agotado",
     noResults: "Ningún bono coincide con el filtro.",
+    viewHistory: "Ver historial",
+    hideHistory: "Ocultar historial",
+    historyTitle: "Sesiones consumidas",
+    historyEmpty: "Todavía no se ha usado ninguna sesión de este bono.",
+    reverseToCash: "Cambiar a efectivo",
+    reverseToCard: "Cambiar a tarjeta",
+    reversing: "Revirtiendo…",
+    confirmReverse: "Esto devolverá la sesión al bono y cambiará el método de pago de la cita. ¿Continuar?",
+    reverseFailed: "No se pudo revertir la sesión. Puede que ya se haya cambiado.",
   },
   errors: {
     errNoBusiness: "No hay negocio.",
@@ -157,6 +175,15 @@ const en: BonosDictionary = {
     lowRemainingBadge: "Last session",
     exhaustedBadge: "Exhausted",
     noResults: "No bonos match the filter.",
+    viewHistory: "View history",
+    hideHistory: "Hide history",
+    historyTitle: "Sessions used",
+    historyEmpty: "No sessions have been used from this bono yet.",
+    reverseToCash: "Switch to cash",
+    reverseToCard: "Switch to card",
+    reversing: "Reversing…",
+    confirmReverse: "This will return the session to the bono and change the appointment's payment method. Continue?",
+    reverseFailed: "Couldn't reverse the session. It may have already changed.",
   },
   errors: {
     errNoBusiness: "No business found.",

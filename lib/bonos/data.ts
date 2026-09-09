@@ -198,3 +198,35 @@ export async function getBonosForClient(userId: string, clientId: string): Promi
     };
   });
 }
+
+export interface BonoUsageSession {
+  bookingId: string;
+  serviceName: string;
+  startsAt: string;
+  status: "pending_confirmation" | "confirmed" | "cancelled" | "completed" | "no_show";
+}
+
+/**
+ * The bookings currently consuming a specific bono's sessions — i.e. every
+ * booking with bono_purchase_id = this bono and payment_method still
+ * 'bono' (a reversed one clears both fields, so it naturally drops out of
+ * this list on its own — no separate "already reversed" filter needed).
+ * Most recent first. Feeds bono-session-reversal's usage-history view.
+ */
+export async function getBonoUsageHistory(userId: string, bonoPurchaseId: string): Promise<BonoUsageSession[]> {
+  const business = await getBusinessForUser(userId);
+  if (!business || !bonoPurchaseId) return [];
+
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("kalendar_bookings")
+    .select("id, service_name, starts_at, status")
+    .eq("business_id", business.id)
+    .eq("bono_purchase_id", bonoPurchaseId)
+    .eq("payment_method", "bono")
+    .order("starts_at", { ascending: false });
+
+  return ((data as { id: string; service_name: string; starts_at: string; status: BonoUsageSession["status"] }[] | null) ?? []).map(
+    (r) => ({ bookingId: r.id, serviceName: r.service_name, startsAt: r.starts_at, status: r.status })
+  );
+}

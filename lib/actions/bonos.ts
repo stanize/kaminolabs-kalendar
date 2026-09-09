@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { authedAction } from "@/lib/auth-action";
 import { createClient } from "@/lib/supabase/server";
 import { getBusinessForUser } from "@/lib/business/data";
-import { getActiveBonosForClient, type ClientActiveBono } from "@/lib/bonos/data";
+import { getActiveBonosForClient, getBonoUsageHistory, type ClientActiveBono, type BonoUsageSession } from "@/lib/bonos/data";
 
 export interface BonoActionDict {
   errNoBusiness: string;
@@ -16,6 +16,7 @@ export interface BonoActionDict {
   errClientRequired: string;
   errBonoTypeRequired: string;
   errBonoTypeInactive: string;
+  errReverseFailed: string; // reverse_bono_session RPC failed or booking no longer bono-paid
 }
 
 const FALLBACK: BonoActionDict = {
@@ -28,6 +29,7 @@ const FALLBACK: BonoActionDict = {
   errClientRequired: "Elige un cliente.",
   errBonoTypeRequired: "Elige un tipo de bono.",
   errBonoTypeInactive: "Este tipo de bono ya no está disponible.",
+  errReverseFailed: "No se pudo revertir la sesión. Puede que ya se haya cambiado.",
 };
 
 // ── Bono types (bono-types-schema-and-config) ───────────────────────────────
@@ -236,5 +238,56 @@ export const getActiveBonosForClientAction = authedAction(
   async (session, input: { clientId: string }): Promise<ClientActiveBono[]> => {
     if (!input.clientId) return [];
     return getActiveBonosForClient(session.user.id, input.clientId);
+  }
+);
+
+// ── Bono session reversal (bono-session-reversal) ────────────────────────────
+
+/**
+ * The bookings currently consuming a specific bono's sessions, for the
+ * usage-history view under "Bonos vendidos". Business-scoping happens
+ * inside getBonoUsageHistory itself.
+ */
+export const getBonoUsageHistoryAction = authedAction(
+  async (session, input: { bonoPurchaseId: string }): Promise<BonoUsageSession[]> => {
+    if (!input.bonoPurchaseId) return [];
+    return getBonoUsageHistory(session.user.id, input.bonoPurchaseId);
+  }
+);
+
+/**
+ * The ONLY place a bono-consumed session can be reversed (the booking
+ * detail modal only allows switching INTO a bono, never away from one —
+ * see updateBookingResult). Restores the session to the bono and switches
+ * the booking's payment_method to cash/card via the reverse_bono_session
+ * Postgres function, which does both writes atomically in one transaction
+ * — unlike the forward deduction path, atomicity here is required per the
+ * workflow spec, since a partial reversal would silently over-restore or
+ * leave the booking pointing at a bono that no longer reflects it.
+ */
+export const reverseBonoSessionAction = authedAction(
+  async (
+    session,
+    input: { bookingId: string; newPaymentMethod: "cash" | "card"; clientId?: string },
+    dict?: Partial<BonoActionDict>
+  ): Promise<{ ok: true } | { ok: false; error: string }> => {
+    const t = { ...FALLBACK, ...dict };
+
+    const business = await getBusinessForUser(session.user.id);
+    if (!business) return { ok: false, error: t.errNoBusiness };
+
+    const supabase = await createClient();
+    const { error } = await supabase.rpc("reverse_bono_session", {
+      p_booking_id: input.bookingId,
+      p_business_id: business.id,
+      p_new_payment_method: input.newPaymentMethod,
+    });
+
+    if (error) return { ok: false, error: t.errReverseFailed };
+
+    revalidatePath("/panel/bonos");
+    revalidatePath("/panel/calendar");
+    if (input.clientId) revalidatePath(`/panel/clients/${input.clientId}`);
+    return { ok: true };
   }
 );
