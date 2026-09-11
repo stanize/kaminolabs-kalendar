@@ -42,13 +42,68 @@ Criteria:
 - Guest receives confirmation email in their locale (guest_locale) subject to EMAIL_LOCALE pin
 - Owner receives new-booking notification email
 
-## Step: pending-confirmation-review
-Status: done
+## Step: guest-immediate-confirm-with-clinic-followup
+Status: not_started
 Criteria:
-- Guest bookings requiring owner review land in pending_confirmation status
-- Owner-side review UI is the "Clientes" tab in panel calendar (renamed/redesigned from the old "Pendientes" tab — filterable by client status, not just confirmation-pending; see calendar-management-upcoming.md's pending-guest-requests step for full detail), lists them sorted by start time
-- confirmBookingAsOwner transitions pending_confirmation -> confirmed and emails guest
-- A separate cron sweep expires (not confirms) stale pending bookings
+- DECISION (supersedes the old pending-confirmation-review step below, which
+  is now REMOVED — see "Superseded" note at the bottom of this step): Arun
+  decided to drop the 24h guest auto-expiry system entirely. A guest booking
+  is now `confirmed` immediately on submit if the slot is available — same
+  as an authenticated/verified patient booking. No more `pending_confirmation`
+  status for guests, no more `pending_expiry_at` deadline, no more
+  confirm-by-email-token flow.
+- Rationale (Arun): auto-cancelling a guest's appointment because they
+  didn't click an email link within 24h was causing lost bookings for no
+  real benefit — better to hold the slot and let the clinic proactively
+  reach out to unfamiliar guests to reduce no-shows, rather than silently
+  killing the reservation.
+- REMOVE (dead code once built): app/bookings/confirm/[token]/route.ts
+  (confirm-by-link page), app/api/cron/sweep-expired-bookings/route.ts (and
+  its vercel.json cron entry), CountdownBadge (components/panel/
+  calendar-bookings.tsx), the confirmBookingAsOwner pending->confirmed
+  transition path, bookingCancelledClientHtml/bookingCancelledOwnerHtml's
+  byExpiry email variant, pending_expiry_at column usage (submitBooking no
+  longer sets it — leave the column in schema for now, don't drop it, in
+  case of historic rows/rollback).
+- NEW: a `clinic_reviewed_at` timestamp column on kalendar_bookings
+  (nullable, default null) — mirrors the existing
+  `cancellation_requested_at` pattern (calendar-management-upcoming.md's
+  cancellation-requests step): a flag layered on top of `status` rather
+  than a new status value, since the booking is genuinely confirmed/slot-
+  held either way. Set only by an explicit clinic action (a "Contacted /
+  Confirmed" button — exact label TBD), never automatically.
+- The highlight/flag described below clears the moment clinic_reviewed_at
+  is set — it does NOT re-derive from clientStatus alone, since
+  clientStatus (guest_confirmed) stays true for the booking's whole
+  lifetime and would never let the clinic mark it as handled.
+- Guest-vs-patient distinction for surfacing this (unaffected by this
+  change): still comes from `clientStatus` (lib/booking/client-status.ts) —
+  patient_id null = guest. Note `guest_unconfirmed` becomes DEAD going
+  forward (pending_confirmation no longer occurs for guests) — every guest
+  booking is `guest_confirmed` from creation. OPEN QUESTION: worth
+  simplifying the ClientStatus type to drop guest_unconfirmed once the old
+  path is fully removed, or leave it for now in case statusOverride/admin
+  tooling still produces a pending_confirmation guest row? Decide at
+  implementation time, not blocking this design.
+- Calendar grid view (calendar-grid-view.tsx, day/week views): guest
+  bookings get a visible marker (dot/badge — exact styling TBD at build
+  time, amber_500 already used elsewhere for guest-adjacent cases so a
+  distinct color, not that Model Bank installation, may read better) shown
+  whenever clientStatus === guest_confirmed AND clinic_reviewed_at is
+  null. Marker's tooltip/label should read approximately "Guest booking —
+  no clinic follow-up yet" (copy TBD) to make clear WHY it's flagged, since
+  the guest booking is already confirmed and this isn't asking the clinic
+  to approve anything, just to reach out.
+- Guest bookings remain visible/highlighted this way indefinitely until
+  clinic_reviewed_at is set — no automatic expiry of the highlight itself
+  (only the old pending_confirmation status expired; this flag doesn't).
+- Superseded: the OLD "Clientes" tab redesign (calendar-management-
+  upcoming.md's pending-guest-requests step) needs updating to match — see
+  that file, its Criteria there currently describes the now-removed
+  countdown/expiry behavior and needs a rewrite alongside this step's
+  implementation, not left half-stale. Also extend that tab's date range:
+  Arun wants it to show BOTH upcoming and past guest bookings (full guest
+  history for no-show tracking), not upcoming-only as it currently is.
 
 ## Step: cancellation
 Status: done

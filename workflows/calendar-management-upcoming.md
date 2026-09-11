@@ -12,8 +12,26 @@ Criteria:
 - Upcoming bookings only show active statuses (pending_confirmation, confirmed) — cancelled/past-cancelled stay hidden going forward
 
 ## Step: pending-guest-requests
-Status: done
+Status: not_started
 Criteria:
+- STALE — SUPERSEDED, needs rebuild. The Criteria below describe the OLD
+  behavior (kept here for reference only) and no longer match the target
+  design once guest-immediate-confirm-with-clinic-followup
+  (public-booking.md) is built. Full new design lives in that step — this
+  entry is the pointer, don't re-derive the design here, read it there.
+- Summary of what changes: "Clientes" tab keeps its role as the
+  separate-from-the-grid list surfacing guest/attention-worthy bookings,
+  but (a) its guest_unconfirmed filter/countdown becomes dead — guests are
+  confirmed on arrival now, no expiry — replaced by a filter on the new
+  clinic_reviewed_at flag being unset, (b) the tab's date scope extends to
+  include PAST guest bookings too, not upcoming-only, per Arun's explicit
+  decision (full guest history for no-show tracking), (c) the action
+  available per-row changes from "confirm/cancel this pending booking" to
+  "mark as contacted/reviewed" (sets clinic_reviewed_at, doesn't change
+  booking status at all since it's already confirmed).
+- first_time and returning filter chips are unaffected by this change —
+  only the guest_unconfirmed-related pieces above are superseded.
+- --- OLD (superseded) Criteria, for reference only ---
 - RENAMED/REDESIGNED: the old "Pendientes" (awaiting-confirmation-only) tab was replaced by a "Clientes" tab, per Arun's decision — the real question a clinic wants answered at a glance isn't "which bookings need my confirmation" but "which reservations need a closer look, based on who's booking" (guest bookings and first-time patients warrant more scrutiny than a returning registered client)
 - "Clientes" tab exists, separate from the day/week/month grid (calendar-bookings.tsx) — a flat row list (no day grouping, no calendar grid)
 - Filterable by clientStatus (guest_unconfirmed, first_time), sorted by start time (not expiry) — "returning" isn't offered as its own filter chip since it's the no-action-needed segment, but still visible under "Todos"
