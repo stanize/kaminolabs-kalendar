@@ -36,19 +36,19 @@ export function BonosManager({
   dict: BonosDictionary;
   locale: Locale;
 }) {
-  const [tab, setTab] = useState<"types" | "sold">("types");
+  const [tab, setTab] = useState<"types" | "sold">("sold");
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex gap-2">
-        <TabBtn active={tab === "types"} onClick={() => setTab("types")} label={dict.tabs.types} />
         <TabBtn active={tab === "sold"} onClick={() => setTab("sold")} label={dict.tabs.sold} />
+        <TabBtn active={tab === "types"} onClick={() => setTab("types")} label={dict.tabs.types} />
       </div>
 
-      {tab === "types" ? (
-        <BonoTypesTab initialBonoTypes={initialBonoTypes} dict={dict} />
-      ) : (
+      {tab === "sold" ? (
         <SoldBonosTab activeBonoTypes={activeBonoTypes} initialSoldBonos={initialSoldBonos} dict={dict} locale={locale} />
+      ) : (
+        <BonoTypesTab initialBonoTypes={initialBonoTypes} dict={dict} />
       )}
     </div>
   );
