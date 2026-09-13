@@ -28,6 +28,7 @@ export interface OwnerBooking {
   pending_expiry_at: string | null;
   guest_locale: string | null;
   cancellation_requested_at: string | null;
+  clinic_reviewed_at: string | null;
 }
 
 export interface OwnerBookingWithProvider extends OwnerBooking {
@@ -36,7 +37,7 @@ export interface OwnerBookingWithProvider extends OwnerBooking {
 }
 
 const BOOKING_COLUMNS =
-  "id, service_name, service_duration_min, service_price, team_member_id, patient_id, starts_at, ends_at, status, client_name, client_email, client_phone, pending_expiry_at, guest_locale, cancellation_requested_at";
+  "id, service_name, service_duration_min, service_price, team_member_id, patient_id, starts_at, ends_at, status, client_name, client_email, client_phone, pending_expiry_at, guest_locale, cancellation_requested_at, clinic_reviewed_at";
 
 /**
  * Bookings for the owner's business, scoped by userId via the owning business.
@@ -58,6 +59,45 @@ export async function getUpcomingBookings(userId: string): Promise<OwnerBookingW
       .eq("business_id", business.id)
       .in("status", ["pending_confirmation", "confirmed"])
       .gte("starts_at", nowIso)
+      .order("starts_at", { ascending: true }),
+    supabase
+      .from("kalendar_team_members")
+      .select("id, name")
+      .eq("business_id", business.id),
+  ]);
+
+  const memberName = new Map(
+    ((membersRes.data as { id: string; name: string }[] | null) ?? []).map((m) => [m.id, m.name])
+  );
+
+  const withProvider = ((bookingsRes.data as OwnerBooking[] | null) ?? []).map((b) => ({
+    ...b,
+    provider_name: b.team_member_id ? memberName.get(b.team_member_id) ?? null : null,
+  }));
+  return attachClientStatus(business.id, withProvider);
+}
+
+/**
+ * Bookings for the Clientes tab (calendar-bookings.tsx) — like
+ * getUpcomingBookings, but WITHOUT the starts_at >= now floor. Per Arun's
+ * decision (guest-immediate-confirm-with-clinic-followup,
+ * public-booking.md), this tab shows full guest history — including past
+ * bookings — for no-show tracking, not just what's still upcoming. Still
+ * excludes cancelled bookings (noise, not actionable) and is otherwise the
+ * same shape/status filter as getUpcomingBookings, just unbounded on time.
+ */
+export async function getClientRowBookings(userId: string): Promise<OwnerBookingWithProvider[]> {
+  const business = await getBusinessForUser(userId);
+  if (!business) return [];
+
+  const supabase = await createClient();
+
+  const [bookingsRes, membersRes] = await Promise.all([
+    supabase
+      .from("kalendar_bookings")
+      .select(BOOKING_COLUMNS)
+      .eq("business_id", business.id)
+      .in("status", ["pending_confirmation", "confirmed", "completed", "no_show"])
       .order("starts_at", { ascending: true }),
     supabase
       .from("kalendar_team_members")
@@ -116,6 +156,10 @@ export interface WeekViewBooking {
   lastReminderError: string | null;
   cancellationRequestedAt: string | null;
   clientStatus: ClientStatus;
+  // NULL = clinic hasn't marked this guest booking as contacted/reviewed yet
+  // (see kalendar_bookings.clinic_reviewed_at). Only meaningful for
+  // clientStatus === "guest_confirmed" — see CalendarGridView's marker gate.
+  clinicReviewedAt: string | null;
 }
 
 export interface WeekViewService {
@@ -177,7 +221,7 @@ export async function getWeekCalendarData(
     supabase
       .from("kalendar_bookings")
       .select(
-        "id, service_id, service_name, service_duration_min, starts_at, ends_at, status, payment_status, payment_method, bono_purchase_id, clinic_client_id, client_name, client_email, client_phone, notes, team_member_id, patient_id, pending_expiry_at, guest_locale, reminder_send_failed, last_reminder_error, cancellation_requested_at"
+        "id, service_id, service_name, service_duration_min, starts_at, ends_at, status, payment_status, payment_method, bono_purchase_id, clinic_client_id, client_name, client_email, client_phone, notes, team_member_id, patient_id, pending_expiry_at, guest_locale, reminder_send_failed, last_reminder_error, cancellation_requested_at, clinic_reviewed_at"
       )
       .eq("business_id", business.id)
       .gte("starts_at", weekStartIso)
@@ -216,6 +260,7 @@ export async function getWeekCalendarData(
           reminder_send_failed: boolean | null;
           last_reminder_error: string | null;
           cancellation_requested_at: string | null;
+          clinic_reviewed_at: string | null;
         }[]
       | null) ?? [];
 
@@ -244,6 +289,7 @@ export async function getWeekCalendarData(
     lastReminderError: b.last_reminder_error,
     cancellationRequestedAt: b.cancellation_requested_at,
     clientStatus: b.clientStatus,
+    clinicReviewedAt: b.clinic_reviewed_at,
   }));
 
   return {

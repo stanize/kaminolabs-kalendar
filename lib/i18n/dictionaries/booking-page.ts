@@ -35,7 +35,7 @@ export interface BookingPageDictionary {
     signInButton: string; // "Ya soy cliente, inicia sesión"
     or: string;
     continueAsGuest: string;
-    guestNote: string; // "Si continúas como invitado, la clínica revisará tu solicitud en un plazo de 24 horas."
+    guestNote: string; // "Tu reserva quedará confirmada al momento, sin necesidad de crear una cuenta."
     confirmTitle: string; // "Confirmar reserva" (already-authenticated view)
     confirmButton: string;
     confirming: string;
@@ -152,7 +152,7 @@ const es: BookingPageDictionary = {
     signInButton: "Ya soy cliente, inicia sesión",
     or: "o",
     continueAsGuest: "Continuar como invitado",
-    guestNote: "Si continúas como invitado, la clínica revisará tu solicitud en un plazo de 24 horas.",
+    guestNote: "Tu reserva quedará confirmada al momento, sin necesidad de crear una cuenta.",
     confirmTitle: "Confirmar reserva",
     confirmButton: "Confirmar reserva",
     confirming: "Reservando…",
@@ -204,8 +204,8 @@ const es: BookingPageDictionary = {
     booking: "Reservando…",
     doneTitle: "¡Reserva confirmada!",
     doneBody: "Tu reserva está confirmada. Te esperamos.",
-    doneTitleGuest: "Solicitud enviada",
-    doneBodyGuest: "La clínica revisará tu solicitud en las próximas 24 horas. Te enviaremos un email cuando sea confirmada.",
+    doneTitleGuest: "¡Reserva confirmada!",
+    doneBodyGuest: "Tu reserva está confirmada. Te hemos enviado un email con los detalles.",
     doneTitlePendingVerification: "Ya casi está — confirma tu email",
     doneBodyPendingVerification: "Revisa tu email para confirmar la reserva.",
     doneFieldDate: "Fecha y hora",
@@ -262,7 +262,7 @@ const en: BookingPageDictionary = {
     signInButton: "Already a customer? Sign in",
     or: "or",
     continueAsGuest: "Continue as guest",
-    guestNote: "If you continue as a guest, the clinic will review your request within 24 hours.",
+    guestNote: "Your booking will be confirmed instantly, no account needed.",
     confirmTitle: "Confirm booking",
     confirmButton: "Confirm booking",
     confirming: "Booking…",
@@ -314,8 +314,8 @@ const en: BookingPageDictionary = {
     booking: "Booking…",
     doneTitle: "Booking confirmed!",
     doneBody: "Your booking is confirmed. See you soon.",
-    doneTitleGuest: "Request sent",
-    doneBodyGuest: "The clinic will review your request within 24 hours. We'll send you an email once it's confirmed.",
+    doneTitleGuest: "Booking confirmed!",
+    doneBodyGuest: "Your booking is confirmed. We've sent you an email with the details.",
     doneTitlePendingVerification: "Almost finished — confirm your email",
     doneBodyPendingVerification: "Check your email to confirm the reservation.",
     doneFieldDate: "Date and time",

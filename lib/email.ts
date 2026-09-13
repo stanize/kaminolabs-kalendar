@@ -275,77 +275,16 @@ export function ownerBookingNotificationHtml(input: {
     ${emailButton("Ver en mi calendario", panelUrl)}`;
   return emailShell(body, "Kalendar · Reservas y agenda para tu clínica", "Kalendar");
 }
-/**
- * Email sent to a GUEST (no account) immediately after they submit a booking.
- * Tells them their request was received and is under clinic review (24h window).
- * GUEST-facing — localized to guest_locale.
- */
-export function bookingUnderReviewEmailHtml(input: {
-  clientName: string;
-  businessName: string;
-  serviceName: string;
-  whenLabel: string;
-  providerName?: string | null;
-  cancelUrl: string;
-  locale?: "es" | "en";
-  brandColor?: string | null;
-}): string {
-  const { clientName, businessName, serviceName, whenLabel, providerName, cancelUrl, brandColor } = input;
-  const locale = input.locale ?? "es";
-  const t =
-    locale === "en"
-      ? {
-          title:        "Booking request received",
-          badge:        "Under review",
-          greeting:     clientName ? `Hi ${escapeHtml(clientName)},` : "Hi,",
-          intro:        `We've received your booking request at <strong>${escapeHtml(businessName)}</strong>. The clinic will confirm it shortly.`,
-          note:         "You'll receive a confirmation email once it's approved.",
-          service:      "Service",
-          when:         "When",
-          professional: "Professional",
-          manage:       "Manage my request",
-          footer:       "Kalendar · Online booking for your clinic",
-        }
-      : {
-          title:        "Solicitud de cita recibida",
-          badge:        "En revisión",
-          greeting:     clientName ? `Hola ${escapeHtml(clientName)},` : "Hola,",
-          intro:        `Hemos recibido tu solicitud de cita en <strong>${escapeHtml(businessName)}</strong>. La clínica la confirmará en breve.`,
-          note:         "Recibirás un email de confirmación en cuanto sea aprobada.",
-          service:      "Servicio",
-          when:         "Cuándo",
-          professional: "Profesional",
-          manage:       "Gestionar mi solicitud",
-          footer:       "Kalendar · Reservas online para tu clínica",
-        };
-  const rows = [
-    { icon: ROW_ICON.service, label: t.service, value: serviceName },
-    { icon: ROW_ICON.when, label: t.when, value: whenLabel },
-    ...(providerName ? [{ icon: ROW_ICON.professional, label: t.professional, value: providerName }] : []),
-  ];
-  const body = `
-    <h1 style="font-size:19px;margin:0 0 12px;">${t.title}</h1>
-    ${emailBadge(t.badge, "info")}
-    <p style="font-size:15px;line-height:1.6;margin:0 0 6px;">${t.greeting}</p>
-    <p style="font-size:15px;line-height:1.6;margin:0 0 18px;">${t.intro}</p>
-    ${emailInfoBox(rows)}
-    <p style="font-size:13px;line-height:1.6;color:#64748b;margin:0 0 16px;">${t.note}</p>
-    ${emailButton(t.manage, cancelUrl, brandColor)}`;
-  return emailShell(body, t.footer, businessName, brandColor);
-}
-
 export function bookingCancelledClientHtml(input: {
   clientName: string;
   businessName: string;
   serviceName: string;
   whenLabel: string;
   byOwner: boolean;
-  byExpiry?: boolean;
   locale?: "es" | "en";
   brandColor?: string | null;
 }): string {
   const { clientName, businessName, serviceName, whenLabel, byOwner, brandColor } = input;
-  const byExpiry = input.byExpiry ?? false;
   const locale = input.locale ?? "es";
   const t =
     locale === "en"
@@ -354,7 +293,6 @@ export function bookingCancelledClientHtml(input: {
           greeting: clientName ? `Hi ${escapeHtml(clientName)},` : "Hi,",
           reasonByOwner:  `Your booking at <strong>${escapeHtml(businessName)}</strong> has been cancelled by the business.`,
           reasonByGuest:  `Your booking at <strong>${escapeHtml(businessName)}</strong> has been cancelled.`,
-          reasonByExpiry: `Your booking request at <strong>${escapeHtml(businessName)}</strong> was not confirmed in time and has been automatically cancelled.`,
           service: "Service",
           when: "When",
         }
@@ -363,11 +301,10 @@ export function bookingCancelledClientHtml(input: {
           greeting: clientName ? `Hola ${escapeHtml(clientName)},` : "Hola,",
           reasonByOwner:  `Tu cita en <strong>${escapeHtml(businessName)}</strong> ha sido cancelada por el negocio.`,
           reasonByGuest:  `Tu cita en <strong>${escapeHtml(businessName)}</strong> ha sido cancelada.`,
-          reasonByExpiry: `Tu solicitud de cita en <strong>${escapeHtml(businessName)}</strong> no fue confirmada a tiempo y ha sido cancelada automáticamente.`,
           service: "Servicio",
           when: "Cuándo",
         };
-  const reason = byExpiry ? t.reasonByExpiry : byOwner ? t.reasonByOwner : t.reasonByGuest;
+  const reason = byOwner ? t.reasonByOwner : t.reasonByGuest;
   const footer = locale === "en" ? "Kalendar · Online booking for your clinic" : "Kalendar · Reservas online para tu clínica";
   const body = `
     <h1 style="font-size:19px;margin:0 0 12px;">${t.title}</h1>

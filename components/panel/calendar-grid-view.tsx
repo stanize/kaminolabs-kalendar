@@ -86,6 +86,13 @@ export interface WeekBookingVM {
   // See lib/booking/client-status.ts — how much the clinic should
   // double-check this reservation, independent of `status` above.
   clientStatus: ClientStatusValue;
+  // NULL = clinic hasn't marked this guest booking as contacted/reviewed
+  // yet (kalendar_bookings.clinic_reviewed_at). Only meaningful when
+  // clientStatus === "guest_confirmed" — gates the week-grid dot marker
+  // below, cleared only by an explicit clinic action, never derived from
+  // clientStatus alone (that stays "guest_confirmed" for the booking's
+  // whole lifetime).
+  clinicReviewedAt: string | null;
 }
 
 export interface WeekServiceVM {
@@ -451,10 +458,22 @@ function DayProviderColumn({
                 {b.reminderSendFailed && (
                   <span title="Recordatorio no enviado" className="mr-1 text-amber-600">⚠</span>
                 )}
-                <span
-                  title={CLIENT_STATUS_LABEL[b.clientStatus]}
-                  className={`mr-1 inline-block h-[7px] w-[7px] rounded-full align-middle ${CLIENT_STATUS_DOT_CLASS[b.clientStatus]}`}
-                />
+                {/* guest_confirmed's dot is specifically a "needs clinic
+                    follow-up" flag (guest-immediate-confirm-with-clinic-
+                    followup, public-booking.md) — it clears once
+                    clinicReviewedAt is set, unlike the other statuses'
+                    dots, which are a standing scrutiny-level indicator and
+                    always show. */}
+                {(b.clientStatus !== "guest_confirmed" || !b.clinicReviewedAt) && (
+                  <span
+                    title={
+                      b.clientStatus === "guest_confirmed"
+                        ? "Invitado — sin seguimiento del negocio"
+                        : CLIENT_STATUS_LABEL[b.clientStatus]
+                    }
+                    className={`mr-1 inline-block h-[7px] w-[7px] rounded-full align-middle ${CLIENT_STATUS_DOT_CLASS[b.clientStatus]}`}
+                  />
+                )}
                 {b.serviceName}
               </div>
               <div className="truncate opacity-90">{timeLabel(b.startIso)} · {b.clientName}</div>

@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { requireSession } from "@/lib/auth-session";
 import { getBusinessForUser } from "@/lib/business/data";
 import {
-  getUpcomingBookings,
+  getClientRowBookings,
   getPendingCancellationRequests,
   getWeekCalendarData,
   getDefaultCalendarWeekBounds,
@@ -26,7 +26,7 @@ export default async function CalendarPage() {
   const { weekStartIso, weekEndIso } = await getDefaultCalendarWeekBounds(session.user.id);
 
   const [bookings, cancellationRequests, weekData, hoyStats, weekStats] = await Promise.all([
-    getUpcomingBookings(session.user.id),
+    getClientRowBookings(session.user.id),
     getPendingCancellationRequests(session.user.id),
     getWeekCalendarData(session.user.id, weekStartIso, weekEndIso),
     getHoyWidgetStats(session.user.id),
@@ -77,6 +77,7 @@ export default async function CalendarPage() {
           guestLocale: (b.guest_locale ?? "es") as "es" | "en",
           cancellationRequestedAt: b.cancellation_requested_at,
           clientStatus: b.clientStatus,
+          clinicReviewedAt: b.clinic_reviewed_at,
         }))}
         cancellationRequests={cancellationRequests.map((b) => ({
           id: b.id,
@@ -92,6 +93,7 @@ export default async function CalendarPage() {
           guestLocale: (b.guest_locale ?? "es") as "es" | "en",
           cancellationRequestedAt: b.cancellation_requested_at,
           clientStatus: b.clientStatus,
+          clinicReviewedAt: b.clinic_reviewed_at,
         }))}
         weekMembers={(weekData?.members ?? []).map((m) => ({ id: m.id, name: m.name, isOwner: m.isOwner }))}
         weekHoursByDay={weekData?.hoursByDay ?? {}}
@@ -121,6 +123,7 @@ export default async function CalendarPage() {
           lastReminderError: b.lastReminderError,
           cancellationRequestedAt: b.cancellationRequestedAt,
           clientStatus: b.clientStatus,
+          clinicReviewedAt: b.clinicReviewedAt,
         }))}
         weekStartIso={weekStartIso}
       />

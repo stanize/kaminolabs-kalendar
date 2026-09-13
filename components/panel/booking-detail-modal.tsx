@@ -6,6 +6,7 @@ import { Btn } from "@/components/ui/button";
 import {
   cancelBookingAsOwner,
   confirmBookingAsOwner,
+  markBookingReviewedAsOwner,
   updateBookingResult,
   reviewCancellationRequest,
   type BookingResultStatus,
@@ -132,6 +133,14 @@ export function BookingDetailModal({
   // is 'guest_unconfirmed'/'guest_confirmed', a patient-linked one is
   // 'first_time'/'returning', so this is a free, zero-schema-change signal.
   const isAwaitingConfirmation = booking.status === "pending_confirmation" && booking.clientStatus === "guest_unconfirmed";
+  // The "mark as contacted/reviewed" action — distinct from
+  // isAwaitingConfirmation above: this booking is ALREADY confirmed (guest-
+  // immediate-confirm-with-clinic-followup), clinic_reviewed_at is purely a
+  // standing follow-up flag, not a confirmation gate. Available regardless
+  // of past/future (isFuture), since the Clientes tab now surfaces guest
+  // history too — a clinic should be able to mark a past no-show contact
+  // just as easily as an upcoming one.
+  const needsReview = booking.clientStatus === "guest_confirmed" && !booking.clinicReviewedAt;
   const hasRealEmail = booking.clientEmail && !booking.clientEmail.startsWith("sin-email+");
 
   const dateTimeLabel = new Intl.DateTimeFormat(intlLocale, {
@@ -152,6 +161,16 @@ export function BookingDetailModal({
     setBusy(true);
     setError(null);
     const res = await confirmBookingAsOwner(booking.id, dict.errors);
+    setBusy(false);
+    if (!res.ok) { setError(res.error); return; }
+    onUpdated();
+    onClose();
+  };
+
+  const handleMarkReviewed = async () => {
+    setBusy(true);
+    setError(null);
+    const res = await markBookingReviewedAsOwner(booking.id, dict.errors);
     setBusy(false);
     if (!res.ok) { setError(res.error); return; }
     onUpdated();
@@ -283,6 +302,23 @@ export function BookingDetailModal({
                 Denegar
               </button>
             </div>
+          </div>
+        )}
+
+        {needsReview && (
+          <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-sky-200 bg-sky-50 px-3.5 py-3">
+            <p className="flex items-center gap-1.5 text-[13px] font-semibold text-sky-800">
+              <Icon name="bell" size={14} className="shrink-0" />
+              Invitado sin seguimiento — aún no contactado por la clínica
+            </p>
+            <button
+              type="button"
+              onClick={handleMarkReviewed}
+              disabled={busy}
+              className="shrink-0 rounded-lg bg-sky-600 px-3 py-1.5 text-[12.5px] font-semibold text-white transition-colors hover:brightness-95 disabled:opacity-60"
+            >
+              {busy ? dict.manager.markingReviewed : dict.manager.markReviewed}
+            </button>
           </div>
         )}
 

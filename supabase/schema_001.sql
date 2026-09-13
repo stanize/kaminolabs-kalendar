@@ -612,19 +612,34 @@ create policy "Bono purchases: write"
 --
 -- Two booking paths coexist:
 --
---   Authenticated patient (patient_id IS NOT NULL):
---     • Booked while signed in as a patient.
+--   Authenticated + verified patient (patient_id IS NOT NULL):
+--     • Booked while signed in as a patient with a verified email (or a
+--       Google sign-up, pre-verified).
 --     • Status starts as 'confirmed' immediately — no clinic review needed.
 --     • confirm_token is still generated but never emailed.
 --     • pending_expiry_at is NULL (no expiry — already confirmed).
 --
 --   Guest (patient_id IS NULL):
 --     • Booked without an account.
---     • Status starts as 'pending_confirmation'.
---     • Clinic has a 24h window (pending_expiry_at = created_at + 24h) to
---       confirm. A cron sweep auto-cancels and emails the guest if ignored.
---     • When the clinic confirms, a confirmation email is sent to the guest.
---     • confirm_token is kept in schema for safety but no longer emailed.
+--     • Status starts as 'confirmed' immediately, same as an authenticated
+--       patient — the slot is held, no clinic approval gates it (changed
+--       2026-09, guest-immediate-confirm-with-clinic-followup,
+--       public-booking.md; previously guests were 'pending_confirmation'
+--       with a 24h auto-expiry, since dropped as it was silently losing
+--       real bookings for no real benefit).
+--     • clinic_reviewed_at (below) lets the clinic flag once they've
+--       proactively reached out to an unfamiliar guest — purely informational,
+--       never changes `status`.
+--     • confirm_token is kept in schema for safety but no longer emailed
+--       (the confirm-by-link flow it powered was removed with the above).
+--
+--   Authenticated but UNVERIFIED patient (patient_id IS NOT NULL, email/
+--   password sign-up pending verification) is the one remaining path that
+--   still starts 'pending_confirmation' with a pending_expiry_at window —
+--   unaffected by the guest change above, see submitBooking in
+--   lib/actions/booking.ts. Promoted to 'confirmed' automatically the
+--   moment the account verifies (finalizeVerifiedPatientBookings,
+--   lib/actions/patient.ts), never via a cron sweep (removed, see below).
 --
 -- Service details are SNAPSHOT onto the row so bookings survive service edits.
 -- Times are stored as timestamptz (UTC); business timezone is Europe/Madrid.
@@ -714,6 +729,15 @@ create table public.kalendar_bookings (
   -- (set back to null) on either approve (status also becomes 'cancelled')
   -- or deny (status unchanged) — never left set after a decision.
   cancellation_requested_at timestamptz,
+  -- Set by an explicit clinic action ("Contacted / Confirmed" button, panel
+  -- calendar) once they've proactively reached out to a guest booking that
+  -- hasn't been reviewed yet. NULL = not yet reviewed. A flag layered on
+  -- top of `status` rather than a status value of its own, since the
+  -- booking is genuinely confirmed/slot-held either way — mirrors the
+  -- cancellation_requested_at pattern above. Never set automatically, never
+  -- re-derived from clientStatus (see lib/booking/client-status.ts's
+  -- guest_confirmed, which stays true for the booking's whole lifetime).
+  clinic_reviewed_at   timestamptz,
   created_at           timestamptz           not null default now(),
   updated_at           timestamptz           not null default now()
 );

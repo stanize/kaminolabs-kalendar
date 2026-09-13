@@ -198,8 +198,13 @@ export function BookingWizard({
 
       {step === "done" && (
         <div className="py-4 text-center">
-          <div className={`mx-auto mb-4 grid h-14 w-14 place-items-center rounded-full ${doneKind !== "confirmed" ? "bg-surface-2 text-ink-soft" : "bg-brand-weak text-brand"}`}>
-            {doneKind !== "confirmed"
+          {/* "guest" is now genuinely confirmed too (guest-immediate-
+              confirm-with-clinic-followup, public-booking.md) — only
+              "pendingVerification" (unverified-account booking, still
+              awaiting the guest's own email click) gets the muted
+              "check your email" treatment now. */}
+          <div className={`mx-auto mb-4 grid h-14 w-14 place-items-center rounded-full ${doneKind === "pendingVerification" ? "bg-surface-2 text-ink-soft" : "bg-brand-weak text-brand"}`}>
+            {doneKind === "pendingVerification"
               ? <Icon name="mail" size={24} />
               : <Icon name="check" size={26} strokeWidth={2.5} />}
           </div>

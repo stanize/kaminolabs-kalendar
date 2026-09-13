@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { Btn } from "@/components/ui/button";
-import { cancelBookingAsOwner, confirmBookingAsOwner, fetchWeekBookings, reviewCancellationRequest } from "@/lib/actions/booking-owner";
+import { cancelBookingAsOwner, confirmBookingAsOwner, markBookingReviewedAsOwner, fetchWeekBookings, reviewCancellationRequest } from "@/lib/actions/booking-owner";
 import { reportClientError } from "@/lib/report-client-error";
 import { CalendarHeader, type CalendarViewMode } from "@/components/panel/calendar-header";
 import {
@@ -50,6 +50,7 @@ interface BookingVM {
   guestLocale: "es" | "en";
   cancellationRequestedAt: string | null;
   clientStatus: ClientStatusValue;
+  clinicReviewedAt: string | null;
 }
 
 const TZ = "Europe/Madrid";
@@ -104,6 +105,7 @@ function toWeekBookingVM(b: BookingVM): WeekBookingVM {
     lastReminderError: null,
     cancellationRequestedAt: b.cancellationRequestedAt,
     clientStatus: b.clientStatus,
+    clinicReviewedAt: b.clinicReviewedAt,
   };
 }
 
@@ -345,8 +347,24 @@ export function CalendarBookings({
     }
   }, [list, dict.errors, m.errCancelFailed, router]);
 
-  const handleReviewRequest = useCallback(async (id: string, decision: "approve" | "deny") => {
+  const handleMarkReviewed = useCallback(async (id: string) => {
     setError(null);
+    setBusyId(id);
+    const prev = list;
+    setList((l) => l.map((b) => (b.id === id ? { ...b, clinicReviewedAt: new Date().toISOString() } : b)));
+    try {
+      const res = await markBookingReviewedAsOwner(id, dict.errors);
+      if (!res.ok) { setList(prev); setError(res.error); }
+    } catch (e) {
+      reportClientError("markBookingReviewedAsOwner", e);
+      setList(prev); setError(m.errCancelFailed);
+    } finally {
+      setBusyId(null);
+      router.refresh();
+    }
+  }, [list, dict.errors, m.errCancelFailed, router]);
+
+  const handleReviewRequest = useCallback(async (id: string, decision: "approve" | "deny") => {
     setBusyId(id);
     const prevCancellationList = cancellationList;
     const prevList = list;
@@ -566,6 +584,25 @@ export function CalendarBookings({
                         className="rounded-lg px-2.5 py-1.5 text-[12.5px] font-medium text-ink-soft hover:bg-error-weak hover:text-error disabled:opacity-50"
                       >
                         {m.cancel}
+                      </button>
+                    </div>
+                  )}
+
+                  {/* guest_confirmed row (already-confirmed guest, not yet
+                      contacted by the clinic) — different action than
+                      guest_unconfirmed above: no status change, just the
+                      follow-up flag. */}
+                  {b.clientStatus === "guest_confirmed" && !b.clinicReviewedAt && (
+                    <div
+                      className="flex shrink-0 items-center gap-1 pl-[82px] sm:pl-0"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <button
+                        onClick={() => handleMarkReviewed(b.id)}
+                        disabled={busyId === b.id}
+                        className="rounded-lg px-2.5 py-1.5 text-[12.5px] font-semibold text-sky-700 hover:bg-sky-50 disabled:opacity-50"
+                      >
+                        {busyId === b.id ? m.markingReviewed : m.markReviewed}
                       </button>
                     </div>
                   )}

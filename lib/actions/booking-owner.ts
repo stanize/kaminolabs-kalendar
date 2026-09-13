@@ -24,6 +24,7 @@ export interface BookingOwnerActionDict {
   errNotFound: string;
   errCannotCancel: string;
   errCancelFailed: string;
+  errUpdateFailed: string; // markBookingReviewedAsOwner
 }
 
 const FALLBACK: BookingOwnerActionDict = {
@@ -31,6 +32,7 @@ const FALLBACK: BookingOwnerActionDict = {
   errNotFound: "Reserva no encontrada.",
   errCannotCancel: "Esta reserva ya no se puede cancelar.",
   errCancelFailed: "No se pudo cancelar la reserva.",
+  errUpdateFailed: "No se pudo actualizar la reserva.",
 };
 
 /**
@@ -222,6 +224,44 @@ export const confirmBookingAsOwner = authedAction(
       }),
       attachments: [{ filename: "cita-kalendar.ics", content: ics }],
     });
+
+    revalidatePath("/panel/calendar");
+    revalidatePath("/panel");
+    return { ok: true };
+  }
+);
+
+/**
+ * Marks a guest booking as "contacted / reviewed" by the clinic — sets
+ * clinic_reviewed_at (guest-immediate-confirm-with-clinic-followup,
+ * public-booking.md). Does NOT touch `status`: the booking is already
+ * confirmed either way, this is purely a clinic-side follow-up flag that
+ * the Clientes-tab list and week-grid marker read to know a guest no
+ * longer needs attention. No dedicated error dict entry beyond
+ * errUpdateFailed — this action can only fail on a not-found/not-yours
+ * booking or a DB error, both covered by the existing messages. Scoped to
+ * the caller's business.
+ */
+export const markBookingReviewedAsOwner = authedAction(
+  async (
+    session,
+    bookingId: string,
+    dict?: Partial<BookingOwnerActionDict>
+  ): Promise<OwnerBookingResult> => {
+    const t = { ...FALLBACK, ...dict };
+
+    const business = await getBusinessForUser(session.user.id);
+    if (!business) return { ok: false, error: t.errNoBusiness };
+
+    const supabase = await createClient();
+
+    const { error } = await supabase
+      .from("kalendar_bookings")
+      .update({ clinic_reviewed_at: new Date().toISOString() })
+      .eq("id", bookingId)
+      .eq("business_id", business.id);
+
+    if (error) return { ok: false, error: t.errUpdateFailed };
 
     revalidatePath("/panel/calendar");
     revalidatePath("/panel");

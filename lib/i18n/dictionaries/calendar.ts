@@ -28,6 +28,8 @@ export interface CalendarDictionary {
     cancel: string;
     confirm: string;
     confirming: string;
+    markReviewed: string; // "Contactado / Confirmado" button on a guest_confirmed row
+    markingReviewed: string;
     approveCancellation: string;
     denyCancellation: string;
     reviewing: string;
@@ -153,6 +155,8 @@ const es: CalendarDictionary = {
     cancel: "Cancelar",
     confirm: "Confirmar",
     confirming: "Confirmando…",
+    markReviewed: "Contactado / Confirmado",
+    markingReviewed: "Guardando…",
     approveCancellation: "Aprobar",
     denyCancellation: "Denegar",
     reviewing: "Guardando…",
@@ -275,6 +279,8 @@ const en: CalendarDictionary = {
     cancel: "Cancel",
     confirm: "Confirm",
     confirming: "Confirming…",
+    markReviewed: "Contacted / Confirmed",
+    markingReviewed: "Saving…",
     approveCancellation: "Approve",
     denyCancellation: "Deny",
     reviewing: "Saving…",

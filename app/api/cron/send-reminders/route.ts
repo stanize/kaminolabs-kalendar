@@ -11,11 +11,19 @@ import {
 } from "@/lib/email";
 
 /**
- * Cron endpoint — runs every 15 minutes via GitHub Actions
- * (.github/workflows/reminders-cron.yml), same pattern as
- * sweep-expired-bookings. Sends the 24h-before and 1h-before reminder emails
- * for CONFIRMED bookings only (pending_confirmation bookings have their own
- * expiry/sweep flow and never get reminders).
+ * Cron endpoint — primary scheduler is Supabase pg_cron (job
+ * "send-appointment-reminders", every 15 min); .github/workflows/
+ * reminders-cron.yml is kept as a manual-only fallback. Sends the
+ * 24h-before and 1h-before reminder emails for CONFIRMED bookings only.
+ * Guest bookings are confirmed immediately on submit (no more
+ * pending_confirmation/expiry window for guests — the old sweep-expired-
+ * bookings cron this comment used to reference was removed with that
+ * change, see public-booking.md's guest-immediate-confirm-with-clinic-
+ * followup). The one remaining pending_confirmation path — an
+ * authenticated-but-unverified patient — is promoted to confirmed
+ * automatically on email verification (finalizeVerifiedPatientBookings,
+ * lib/actions/patient.ts), not by any cron, so it never reaches this
+ * reminders flow while still pending.
  *
  * Idempotency: reminder_24h_sent_at / reminder_1h_sent_at are NULL until a
  * send succeeds, and are only set AFTER the send succeeds — so a crash
