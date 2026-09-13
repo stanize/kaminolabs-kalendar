@@ -42,10 +42,10 @@ Criteria:
 - History is searchable (e.g. by client name)
 
 ## Step: client-session-history
-Status: not_started
+Status: done
 Criteria:
-- SUPERSEDED BY clinic-clients-page.md — this step's criteria (client-linking-on-booking, denormalized-counters-updated) now live there in more detail, since the clinic clients page is the actual place a per-client history would surface. Kept here as a pointer rather than removed, since this step originated from a calendar-management-past.md discussion.
+- SUPERSEDED BY clinic-clients-page.md — this step's criteria (client-linking-on-booking, denormalized-counters-updated) now live there in more detail, since the clinic clients page is the actual place a per-client history would surface. Kept here as a pointer rather than removed, since this step originated from a calendar-management-past.md discussion. Both superseding steps shipped 2026-08-25 and are marked done there — this pointer is marked done to match, not tracked independently.
 
 ## Notes / Deviations
-- updateBookingResult's own code comment flags that it does NOT yet update kalendar_clients' denormalized session counters (total_sessions/completed_count/etc.) because clinic_client_id isn't populated by any write path yet — this is the direct cause of the client-session-history step being not_started, not a separate unrelated gap.
+- RESOLVED (2026-08-25, see clinic-clients-page.md): updateBookingResult now DOES update kalendar_clients' denormalized session counters (total_sessions/completed_count/etc.) — the code comment this note used to reference (and clinic_client_id not being populated by any write path) is no longer accurate; both client-linking-on-booking and denormalized-counters-updated are done.
 - There is no dedicated "past" tab or route today — past appointments are only reachable by viewing the day/week/month grid and scrolling/paging backward, or by opening a chip that happens to be in the past. Confirm with Arun whether a dedicated history view is wanted, or whether grid-backward-navigation is considered sufficient by design.

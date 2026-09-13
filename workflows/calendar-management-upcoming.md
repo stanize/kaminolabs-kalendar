@@ -12,32 +12,43 @@ Criteria:
 - Upcoming bookings only show active statuses (pending_confirmation, confirmed) — cancelled/past-cancelled stay hidden going forward
 
 ## Step: pending-guest-requests
-Status: not_started
+Status: done
 Criteria:
-- STALE — SUPERSEDED, needs rebuild. The Criteria below describe the OLD
-  behavior (kept here for reference only) and no longer match the target
-  design once guest-immediate-confirm-with-clinic-followup
-  (public-booking.md) is built. Full new design lives in that step — this
-  entry is the pointer, don't re-derive the design here, read it there.
-- Summary of what changes: "Clientes" tab keeps its role as the
-  separate-from-the-grid list surfacing guest/attention-worthy bookings,
-  but (a) its guest_unconfirmed filter/countdown becomes dead — guests are
-  confirmed on arrival now, no expiry — replaced by a filter on the new
-  clinic_reviewed_at flag being unset, (b) the tab's date scope extends to
-  include PAST guest bookings too, not upcoming-only, per Arun's explicit
-  decision (full guest history for no-show tracking), (c) the action
-  available per-row changes from "confirm/cancel this pending booking" to
-  "mark as contacted/reviewed" (sets clinic_reviewed_at, doesn't change
-  booking status at all since it's already confirmed).
-- first_time and returning filter chips are unaffected by this change —
-  only the guest_unconfirmed-related pieces above are superseded.
-- --- OLD (superseded) Criteria, for reference only ---
 - RENAMED/REDESIGNED: the old "Pendientes" (awaiting-confirmation-only) tab was replaced by a "Clientes" tab, per Arun's decision — the real question a clinic wants answered at a glance isn't "which bookings need my confirmation" but "which reservations need a closer look, based on who's booking" (guest bookings and first-time patients warrant more scrutiny than a returning registered client)
 - "Clientes" tab exists, separate from the day/week/month grid (calendar-bookings.tsx) — a flat row list (no day grouping, no calendar grid)
-- Filterable by clientStatus (guest_unconfirmed, first_time), sorted by start time (not expiry) — "returning" isn't offered as its own filter chip since it's the no-action-needed segment, but still visible under "Todos"
-- Live countdown badge (CountdownBadge) still shown per-row for guest_unconfirmed bookings with a pendingExpiryAt, re-renders every 60s, turns urgent under 2h remaining
-- Underlying data/logic unchanged from the old Pendientes tab: confirmBookingAsOwner still transitions pending_confirmation -> confirmed, clears pending_expiry_at, emails guest a confirmation receipt with ICS attachment — this was a UI reframing of the same status/action, not a backend change
-- A guest booking not confirmed before its expiry is still auto-expired by the reminders/cron sweep (not confirmed) — see appointment-reminders workflow
+- ARCHITECTURE CHANGE (2026-09, part of public-booking.md's
+  guest-immediate-confirm-with-clinic-followup): guests are confirmed on
+  arrival now (no more pending_confirmation/24h-expiry for the normal
+  flow — see that step for the full rationale/history), so this tab's
+  design changed to match:
+  - Data source: getClientRowBookings (lib/booking/owner-data.ts) —
+    WITHOUT the starts_at >= now floor that getUpcomingBookings has, so
+    this tab shows full guest history (past AND upcoming), not
+    upcoming-only, per Arun's explicit decision for no-show tracking.
+    Still excludes cancelled bookings. This is a genuine change from the
+    tab's original upcoming-only scope.
+  - Filter chips unchanged in shape — clientStatus-based (guest_unconfirmed,
+    guest_confirmed, first_time now all offered as chips; "returning"
+    still isn't its own chip, visible under "Todos" only) — but
+    guest_unconfirmed is now the RARE case (only reachable via admin
+    tooling's statusOverride, not the real public wizard); guest_confirmed
+    is the common guest case now.
+  - Per-row action is clientStatus-dependent, not one uniform "confirm/
+    cancel": a guest_unconfirmed row (rare, statusOverride-only) still
+    shows Confirm/Cancel buttons + CountdownBadge, functionally unchanged
+    from before. A guest_confirmed row with clinicReviewedAt still null
+    shows a single "mark reviewed" action instead (handleMarkReviewed ->
+    markBookingReviewedAsOwner, lib/actions/booking-owner.ts) — sets
+    clinic_reviewed_at, does NOT touch booking status (already confirmed).
+    A guest_confirmed row that's already been reviewed shows no action at
+    all, just the badge.
+  - first_time and returning rows: unaffected by any of the above, no
+    action button either way (informational only, as before).
+- Reference commits: 159c05a, 6d13019 (stanize/kaminolabs-kalendar,
+  2026-09-13) — same commits as public-booking.md's
+  guest-immediate-confirm-with-clinic-followup, which is where the full
+  design/rationale lives; this entry documents the Clientes-tab-specific
+  implementation detail only, not the broader decision.
 
 ## Step: manual-appointment-creation
 Status: done

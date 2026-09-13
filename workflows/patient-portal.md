@@ -65,6 +65,15 @@ Criteria:
 - Contact email is deliberately NOT editable here — confirmed intentional (getPatientProfile / updatePatientProfile comments), separate from the login account's Better Auth email
 - Name requires at least 1 character (errNameRequired); phone is optional and stored as null if blank
 
+## Step: email-verification-gate
+Status: done
+Criteria:
+- MISSING FROM THIS FILE until now despite being built 2026-08-25 (commit f3bc9e3) — a distinct gate from clinic-onboarding.md's own email-verification-gate step (that one is components/panel/email-verification-gate.tsx, for the CLINIC-OWNER panel; this one is components/patient/patient-email-verification-gate.tsx, for the patient portal — separate components, separate gates, same pattern).
+- A portal-wide blocking overlay (PatientEmailVerificationGate) shown to an authenticated-but-unverified patient across the whole protected patient area (app/patient/(protected)/layout.tsx) — not just one page.
+- Auto-detects verification: polls the session every 5s (authClient.getSession with disableCookieCache) and, once emailVerified flips true, refreshes and reloads automatically — the patient doesn't need to manually navigate back after clicking the email link.
+- Includes a resend-verification-email action with a cooldown, and a manual "ya verifiqué" recheck path (notYet/checking state) for cases the poll hasn't caught yet.
+- ORIGINAL coupling to booking status (2026-08-25, f3bc9e3): an unverified email/password registration made mid-booking held that booking as pending_confirmation, auto-confirmed on verify via finalizeVerifiedPatientBookings. SUPERSEDED (2026-09-13, public-booking.md's guest-immediate-confirm-with-clinic-followup, commit 6d13019): that booking-status coupling was removed — a first booking made mid-sign-up is confirmed immediately now, same as anyone else's. finalizeVerifiedPatientBookings no longer exists. What's UNCHANGED and still exactly as built here: this gate itself still blocks portal ACCESS (viewing/rebooking) for an unverified account — the gate protects ongoing portal use, not the one-shot booking action, which is why removing the booking-side coupling required no changes here.
+
 ## Notes / Deviations
 - User-visible copy across public-booking, patient-portal, and panel-shell was changed from "Paciente"/"patient" to "Cliente"/"client" — code identifiers, routes, roles, and table names (kalendar_patients, patient_id, etc.) were deliberately left unchanged, only display text. Not a defined step anywhere; flagging here since it touches this workflow's UI.
 - A shared PatientHeader component (components/patient/patient-header.tsx) now provides consistent nav (Inicio / Perfil / Todas las reservas / Cerrar sesión) across all three protected pages — this wasn't a criterion in any step but is worth capturing since it's a meaningful piece of the portal's shape. Deliberately excludes a generic "book an appointment" link since there's no clinic directory to send a patient to (booking-again is per-booking, scoped to that booking's clinic, via a "Pedir nueva cita" button).
