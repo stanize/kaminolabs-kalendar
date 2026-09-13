@@ -16,7 +16,7 @@ export interface BonoActionDict {
   errClientRequired: string;
   errBonoTypeRequired: string;
   errBonoTypeInactive: string;
-  errReverseFailed: string; // reverse_bono_session RPC failed or booking no longer bono-paid
+  errReverseFailed: string; // reversal update failed, or booking no longer bono-paid / wrong business
 }
 
 const FALLBACK: BonoActionDict = {
@@ -258,12 +258,13 @@ export const getBonoUsageHistoryAction = authedAction(
 /**
  * The ONLY place a bono-consumed session can be reversed (the booking
  * detail modal only allows switching INTO a bono, never away from one —
- * see updateBookingResult). Restores the session to the bono and switches
- * the booking's payment_method to cash/card via the reverse_bono_session
- * Postgres function, which does both writes atomically in one transaction
- * — unlike the forward deduction path, atomicity here is required per the
- * workflow spec, since a partial reversal would silently over-restore or
- * leave the booking pointing at a bono that no longer reflects it.
+ * see updateBookingResult). A plain update on kalendar_bookings; the
+ * session restoration itself now happens automatically via the
+ * sync_bono_session_usage trigger (schema_001.sql, 2026-09) reacting to
+ * bono_purchase_id being cleared — this action no longer needs its own
+ * dedicated reverse_bono_session Postgres function (removed) to get
+ * atomicity, since the trigger IS the atomic, single source of truth for
+ * every write path now, not just this one.
  */
 export const reverseBonoSessionAction = authedAction(
   async (
@@ -277,13 +278,21 @@ export const reverseBonoSessionAction = authedAction(
     if (!business) return { ok: false, error: t.errNoBusiness };
 
     const supabase = await createClient();
-    const { error } = await supabase.rpc("reverse_bono_session", {
-      p_booking_id: input.bookingId,
-      p_business_id: business.id,
-      p_new_payment_method: input.newPaymentMethod,
-    });
+    const { error, count } = await supabase
+      .from("kalendar_bookings")
+      .update(
+        { payment_method: input.newPaymentMethod, bono_purchase_id: null },
+        { count: "exact" }
+      )
+      .eq("id", input.bookingId)
+      .eq("business_id", business.id)
+      .eq("payment_method", "bono")
+      .not("bono_purchase_id", "is", null);
 
-    if (error) return { ok: false, error: t.errReverseFailed };
+    // count === 0 (no error, but no row matched) means the booking wasn't
+    // actually bono-paid / didn't belong to this business — same failure
+    // reverse_bono_session used to raise an exception for.
+    if (error || !count) return { ok: false, error: t.errReverseFailed };
 
     revalidatePath("/panel/bonos");
     revalidatePath("/panel/calendar");

@@ -885,57 +885,72 @@ create policy "User preferences: all"
   on public.kalendar_user_preferences for all using (true) with check (true);
 
 -- ----------------------------------------------------------------------------
--- reverse_bono_session (bono-session-reversal, workflows/bonos.md)
--- Atomically undoes a booking's bono-paid deduction: restores one session
--- to the bono (sessions_used -= 1, floored at 0) AND switches the booking's
--- payment_method to the chosen cash/card value, clearing bono_purchase_id.
--- Both writes happen in one function body / implicit transaction so they
--- can never drift apart (the one place in this feature where atomicity
--- across kalendar_bono_purchases and kalendar_bookings is required — the
--- forward deduction in updateBookingResult is intentionally NOT atomic,
--- see that action's comments). Only reverses a booking that is currently
--- payment_method = 'bono' and scoped to the caller's business; raises
--- otherwise so the app layer surfaces a clear error rather than silently
--- no-op'ing.
+-- sync_bono_session_usage (bono-session-deduction, workflows/bonos.md)
+-- Replaces the old split design: an app-driven, non-atomic forward
+-- deduction in updateBookingResult (lib/actions/booking-owner.ts) PLUS a
+-- separate reverse_bono_session function only the Bonos-page reversal flow
+-- called. This single trigger now keeps kalendar_bono_purchases.
+-- sessions_used in sync with kalendar_bookings.payment_method/
+-- bono_purchase_id automatically, for EVERY write that touches those
+-- columns — regardless of which code path wrote it, now or in the future
+-- (multi-team/scale motivation, 2026-09: correctness should not depend on
+-- every caller remembering to update both tables themselves).
+--
+-- Symmetric and idempotent per row: on each INSERT/UPDATE, first restores
+-- the OLD bono's session if the row is leaving it (no-op if it isn't, or
+-- if re-saving the same bono id), then deducts the NEW bono's session if
+-- the row is newly entering one (no-op if it isn't, or if unchanged) —
+-- so a direct bono-A -> bono-B switch in one write is handled correctly
+-- too, even though no app UI exposes that today.
+--
+-- Deducting raises (aborting the whole write, both tables roll back
+-- together) if the bono doesn't belong to the booking's business or is
+-- already fully used — this is now the ONLY place session capacity is
+-- enforced, replacing updateBookingResult's own precheck (kept there only
+-- as a friendly-error-message precheck, not for correctness — see its
+-- comments).
 -- ----------------------------------------------------------------------------
-create or replace function public.reverse_bono_session(
-  p_booking_id uuid,
-  p_business_id uuid,
-  p_new_payment_method text
-)
-returns void
-language plpgsql
-as $$
+create or replace function public.sync_bono_session_usage()
+returns trigger language plpgsql as $$
 declare
-  v_bono_id uuid;
+  old_bono_id uuid := null;
+  new_bono_id uuid := null;
 begin
-  if p_new_payment_method not in ('cash', 'card') then
-    raise exception 'reverse_bono_session: p_new_payment_method must be cash or card';
+  if tg_op = 'UPDATE' then
+    if old.payment_method = 'bono' then
+      old_bono_id := old.bono_purchase_id;
+    end if;
   end if;
 
-  select bono_purchase_id into v_bono_id
-  from public.kalendar_bookings
-  where id = p_booking_id
-    and business_id = p_business_id
-    and payment_method = 'bono'
-    and bono_purchase_id is not null;
-
-  if v_bono_id is null then
-    raise exception 'reverse_bono_session: booking not found, not bono-paid, or business mismatch';
+  if new.payment_method = 'bono' then
+    new_bono_id := new.bono_purchase_id;
   end if;
 
-  update public.kalendar_bono_purchases
-  set sessions_used = greatest(sessions_used - 1, 0)
-  where id = v_bono_id
-    and business_id = p_business_id;
+  if old_bono_id is not null and old_bono_id is distinct from new_bono_id then
+    update public.kalendar_bono_purchases
+    set sessions_used = greatest(sessions_used - 1, 0)
+    where id = old_bono_id;
+  end if;
 
-  update public.kalendar_bookings
-  set payment_method = p_new_payment_method,
-      bono_purchase_id = null
-  where id = p_booking_id
-    and business_id = p_business_id;
+  if new_bono_id is not null and new_bono_id is distinct from old_bono_id then
+    update public.kalendar_bono_purchases
+    set sessions_used = sessions_used + 1
+    where id = new_bono_id
+      and business_id = new.business_id
+      and sessions_used < sessions_total;
+
+    if not found then
+      raise exception 'sync_bono_session_usage: bono % not found, wrong business, or already fully used', new_bono_id;
+    end if;
+  end if;
+
+  return new;
 end;
 $$;
+
+create trigger kalendar_bookings_sync_bono_session
+  after insert or update of payment_method, bono_purchase_id on public.kalendar_bookings
+  for each row execute function public.sync_bono_session_usage();
 
 -- ============================================================================
 -- End of schema.

@@ -347,7 +347,13 @@ export const updateBookingResult = authedAction(
     // switching INTO a bono is always allowed; switching AWAY from the
     // bono currently applied to this booking (to cash, card, or a
     // DIFFERENT bono) is only allowed from the Bonos page's usage
-    // history, never from here.
+    // history, never from here. This is a deliberate-action UX gate only
+    // now (2026-09) — the underlying session bookkeeping stays correct
+    // either way regardless of which write path clears bono_purchase_id
+    // (sync_bono_session_usage trigger, schema_001.sql), so this block
+    // exists purely to require going through the dedicated reversal flow
+    // rather than an easy accidental click here, not as a data-integrity
+    // mechanism.
     let newPaymentMethod: "cash" | "card" | "bono" | null = null;
     let newBonoPurchaseId: string | null = null;
     let bonoToDeduct: string | null = null; // set only when a fresh deduction is needed
@@ -379,21 +385,25 @@ export const updateBookingResult = authedAction(
       }
     }
     // paymentStatus === "unpaid": newPaymentMethod/newBonoPurchaseId stay
-    // null. Note this also means flipping a bono-paid booking back to
-    // unpaid clears the bono link without restoring the session — that
-    // correction path is bono-session-reversal's job (Bonos page), not
-    // this action's; flagging as a known gap rather than guessing at it.
+    // null. Flipping a bono-paid booking back to unpaid now correctly
+    // restores the session too — previously a known gap (this path
+    // cleared the bono link with no restoration at all), closed for free
+    // by moving the bookkeeping into sync_bono_session_usage (schema_001.sql
+    // trigger, 2026-09): it reacts to bono_purchase_id being cleared
+    // regardless of which write path did it, this one included.
 
     if (bonoToDeduct) {
-      // Deduct BEFORE writing the booking row: if this fails we return an
-      // error and the booking stays exactly as it was. If the booking
-      // write below then fails, the bono is left over-deducted by one —
-      // a real but narrow inconsistency window (no cross-table
-      // transaction available here); recoverable manually via the Bonos
-      // page. Scoped by business_id via the client-list join implicitly
-      // (client_id was already validated business-scoped when the bono
-      // options were fetched), but re-check ownership + remaining
-      // capacity here too — never trust a bono id from the client alone.
+      // The actual deduction/capacity-ceiling enforcement now lives
+      // entirely in the sync_bono_session_usage trigger (schema_001.sql),
+      // which fires on the kalendar_bookings write below and is the real,
+      // atomic source of truth — correct regardless of which code path
+      // writes payment_method/bono_purchase_id, now or in the future. This
+      // precheck exists ONLY to surface a friendlier error message before
+      // attempting the write; if a race means the trigger's own check
+      // catches something this precheck missed, that surfaces as a plain
+      // errUpdateFailed below instead — a narrower, more generic message,
+      // but still correctly blocks the booking write (and the trigger's
+      // capacity check itself is genuinely atomic, unlike this precheck).
       const { data: bono } = await supabase
         .from("kalendar_bono_purchases")
         .select("id, sessions_total, sessions_used")
@@ -404,14 +414,6 @@ export const updateBookingResult = authedAction(
       if (!bono || bono.sessions_used >= bono.sessions_total) {
         return { ok: false, error: t.errBonoNotFound };
       }
-
-      const { error: deductError } = await supabase
-        .from("kalendar_bono_purchases")
-        .update({ sessions_used: bono.sessions_used + 1 })
-        .eq("id", bonoToDeduct)
-        .eq("business_id", business.id);
-
-      if (deductError) return { ok: false, error: t.errUpdateFailed };
     }
 
     const { error } = await supabase
@@ -425,6 +427,10 @@ export const updateBookingResult = authedAction(
       .eq("id", input.bookingId)
       .eq("business_id", business.id);
 
+    // Covers both a plain DB error AND the sync_bono_session_usage trigger
+    // raising (capacity exceeded in the narrow race the precheck above
+    // didn't catch, or a wrong-business bono id) — either way this write
+    // didn't happen, booking is unchanged, safe to just report failure.
     if (error) return { ok: false, error: t.errUpdateFailed };
 
     if (booking.clinic_client_id) {
