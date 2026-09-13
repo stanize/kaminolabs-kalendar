@@ -3,6 +3,7 @@ import Link from "next/link";
 import { requireSession } from "@/lib/auth-session";
 import { getPatientProfile } from "@/lib/actions/patient";
 import { getPatientBookings } from "@/lib/booking/patient-data";
+import { getBonosForPatient } from "@/lib/bonos/data";
 import { Icon } from "@/components/ui/icon";
 import { DashboardUpcomingList } from "@/components/patient/dashboard-upcoming-list";
 import { PatientHeader } from "@/components/patient/patient-header";
@@ -19,6 +20,15 @@ function formatWhen(iso: string): string {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
+  }).format(new Date(iso));
+}
+
+function formatDate(iso: string): string {
+  return new Intl.DateTimeFormat("es-ES", {
+    timeZone: TZ,
+    day: "numeric",
+    month: "short",
+    year: "numeric",
   }).format(new Date(iso));
 }
 
@@ -43,6 +53,7 @@ export default async function PatientDashboardPage() {
   if (!profile) redirect("/patient/login");
 
   const allBookings = await getPatientBookings(profile.id);
+  const bonos = await getBonosForPatient(profile.id);
   const now = new Date();
 
   const upcoming = allBookings.filter(
@@ -73,6 +84,42 @@ export default async function PatientDashboardPage() {
 
           <DashboardUpcomingList bookings={upcoming} />
         </section>
+
+        {/* Bonos — view-only, cross-clinic (patient-bono-view, bonos.md) */}
+        {bonos.length > 0 && (
+          <section className="mb-8">
+            <h2 className="mb-3 text-[13px] font-bold uppercase tracking-[.04em] text-ink-soft">
+              Mis bonos
+            </h2>
+            <div className="flex flex-col gap-2">
+              {bonos.map((b) => {
+                const exhausted = b.sessionsUsed >= b.sessionsTotal;
+                return (
+                  <div
+                    key={b.id}
+                    className="flex items-center gap-3 rounded-xl border border-line bg-surface px-4 py-3.5"
+                  >
+                    <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-surface-2 text-ink-soft">
+                      <Icon name="creditCard" size={18} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[14px] font-semibold text-ink">{b.bonoTypeName ?? "—"}</p>
+                      <p className="truncate text-[12.5px] text-ink-soft capitalize">
+                        {b.businessName} · {b.sessionsUsed}/{b.sessionsTotal} usadas
+                      </p>
+                      <p className="text-[11.5px] text-ink-soft">Comprado el {formatDate(b.purchasedAt)}</p>
+                    </div>
+                    {exhausted && (
+                      <span className="shrink-0 rounded-full border border-line bg-surface-2 px-2.5 py-0.5 text-[11px] font-semibold text-ink-soft">
+                        Agotado
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
 
         {/* Past (last 3) */}
         {past.length > 0 && (

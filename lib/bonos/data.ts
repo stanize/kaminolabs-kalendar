@@ -230,3 +230,71 @@ export async function getBonoUsageHistory(userId: string, bonoPurchaseId: string
     (r) => ({ bookingId: r.id, serviceName: r.service_name, startsAt: r.starts_at, status: r.status })
   );
 }
+
+export interface PatientBono {
+  id: string;
+  businessName: string;
+  bonoTypeName: string | null;
+  sessionsTotal: number;
+  sessionsUsed: number;
+  purchasedAt: string;
+}
+
+/**
+ * ALL bonos for a patient, across every clinic they're a client at
+ * (patient-bono-view, bonos.md) — a patient can have a kalendar_clients
+ * row, and therefore bonos, at multiple businesses. Mirrors
+ * getPatientBookings' (lib/booking/patient-data.ts) cross-business
+ * pattern: scoped strictly by patient_id from the caller's own session,
+ * never a client_id or business_id supplied by the request. View-only —
+ * there is no corresponding write action; purchases and reversals stay
+ * clinic-initiated (bono-purchase-recording, bono-session-reversal).
+ *
+ * Two queries rather than a single nested-relation filter
+ * (.eq("kalendar_clients.patient_id", ...)) — PostgREST supports that
+ * syntax, but nothing else in this codebase relies on it, so this stays
+ * consistent with the more explicit two-step pattern used elsewhere.
+ * Most recent purchase first, active and exhausted bonos both included —
+ * same display shape as the clinic-side client-page-bono-summary.
+ */
+export async function getBonosForPatient(patientId: string): Promise<PatientBono[]> {
+  const supabase = await createClient();
+
+  const { data: clientRows } = await supabase
+    .from("kalendar_clients")
+    .select("id, kalendar_businesses ( name )")
+    .eq("patient_id", patientId);
+
+  if (!clientRows || clientRows.length === 0) return [];
+
+  const businessNameByClientId = new Map<string, string>();
+  for (const c of clientRows as { id: string; kalendar_businesses: { name: string } | { name: string }[] | null }[]) {
+    const biz = Array.isArray(c.kalendar_businesses) ? c.kalendar_businesses[0] : c.kalendar_businesses;
+    businessNameByClientId.set(c.id, biz?.name ?? "");
+  }
+
+  const { data: bonoRows } = await supabase
+    .from("kalendar_bono_purchases")
+    .select("id, client_id, sessions_total, sessions_used, purchased_at, kalendar_bono_types ( name )")
+    .in("client_id", Array.from(businessNameByClientId.keys()))
+    .order("purchased_at", { ascending: false });
+
+  return ((bonoRows as {
+    id: string;
+    client_id: string;
+    sessions_total: number;
+    sessions_used: number;
+    purchased_at: string;
+    kalendar_bono_types: { name: string } | { name: string }[] | null;
+  }[] | null) ?? []).map((r) => {
+    const bonoType = Array.isArray(r.kalendar_bono_types) ? r.kalendar_bono_types[0] : r.kalendar_bono_types;
+    return {
+      id: r.id,
+      businessName: businessNameByClientId.get(r.client_id) ?? "",
+      bonoTypeName: bonoType?.name ?? null,
+      sessionsTotal: r.sessions_total,
+      sessionsUsed: r.sessions_used,
+      purchasedAt: r.purchased_at,
+    };
+  });
+}
