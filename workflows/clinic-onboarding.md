@@ -41,6 +41,7 @@ Criteria:
 - Address captured as split fields (street, postal code, city, province) with postal-code autofill (lib/business/postal-codes.ts, silent-miss — convenience, not required)
 - Phone captured as country code (+34 default, lib/business/phone-country-codes.ts) + number, separate fields
 - Contact email field editable and separate from login email
+- Logo upload (added 2026-08-24, previously undocumented despite shipping — commits c2da193, f4fda35, 8998c21, ee2ad0c, dbbbf31): LogoUploader (business-form.tsx) uploads to a `business-logos` Supabase Storage bucket via uploadBusinessLogo (lib/actions/business.ts), 2MB limit matching the bucket's own file_size_limit. Stored as `logo_url` on kalendar_businesses (nullable). Old logo file is best-effort deleted from storage on replace or removal — not fatal if that cleanup fails, the URL swap/clear is what matters. Rendered on both the panel business form and the public booking page (app/bookings/[slug]/page.tsx), sized to fit rather than cropped into a fixed square — deliberate, since many real clinic logos are wide wordmarks, not icons. No logo uploaded: falls back to business name + address text only (no placeholder square). Placement: logo uploader sits below the slug field, with a "Vista previa" link next to it that opens the live public booking page in a new tab — disabled/greyed while the slug is still pending_review (can't preview a page that isn't reachable yet).
 
 ## Step: servicios-setup
 Status: done
