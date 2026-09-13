@@ -134,8 +134,25 @@ separately if needed: `delete from storage.objects where bucket_id = 'support-at
 ## Migrations
 
 - `schema_001.sql` — single consolidated schema, destructive (drops and
-  recreates all `kalendar_*` tables). No incremental migration files — when the
-  schema changes, edit this file and re-run it.
+  recreates all `kalendar_*` tables). Remains the source of truth for a
+  full from-scratch rebuild — every schema change is folded into this
+  file, in its normal place, even when a `schema_subset_*.sql` file (below)
+  is also created for the same change.
+- `schema_subset_NNN.sql` — for a schema change against the **live** database
+  (real data, can't be dropped/recreated): create a new standalone
+  `supabase/schema_subset_NNN.sql` file, `NNN` = next sequential number
+  after the highest existing one (check `ls supabase/` — don't trust a
+  remembered count). Contains ONLY the new ALTERs/CREATEs for that one
+  change — never a DROP of an existing table with real rows. Non-cumulative
+  and standalone: each file assumes `schema_001.sql` and all earlier
+  `schema_subset_*.sql` files already ran, and running it again is safe
+  (`add column if not exists`, `create or replace function`, etc.). Header
+  comment states which workflow step it's for and confirms it doesn't touch
+  unrelated tables. The exact same DDL is ALSO folded into `schema_001.sql`
+  (previous bullet) so the two never drift apart. See `schema_subset_002.sql`–
+  `schema_subset_004.sql` for the pattern. Arun runs these against the live
+  DB himself (via the Supabase SQL editor); Claude creates the file but
+  doesn't execute destructive/live DDL directly.
 - `schema_better_auth_001.sql` — single consolidated schema for Better Auth's `user`/`session`/`account`/`verification` tables.
 - **Migration order matters**: run `schema_better_auth_001.sql` FIRST (creates `user`/`session`/`account`/`verification`), THEN run `schema_001.sql` — the Kalendar tables have cascade FKs to `public."user"(id)` and will fail if `user` does not yet exist.
 - `supabase/seed_snapshot.sql` — separate, non-destructive snapshot/restore mechanism (not part of either reset script by design, so it survives both). Currently covers `user`, `account`, `user_roles`, `kalendar_businesses` — lets a dev-phase full reset be undone for tables considered "settled" without redoing onboarding by hand. A table is added here only once its shape stabilizes; still-iterating tables are deliberately left out.
