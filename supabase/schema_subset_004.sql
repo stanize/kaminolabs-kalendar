@@ -1,6 +1,12 @@
 -- ============================================================================
 -- schema_subset_004.sql — bonos.md (bono-session-reversal)
 --
+-- SUPERSEDED by schema_subset_006.sql (2026-09) — reverse_bono_session,
+-- created here, was dropped there in favor of the sync_bono_session_usage
+-- trigger. Kept only as history; do not run this on its own expecting it
+-- to still be the active design. Harmless either way — _006's DROP FUNCTION
+-- IF EXISTS covers whether this ran or not.
+--
 -- STANDALONE INCREMENT — NOT cumulative with any other schema_subset_*.sql
 -- file. Assumes supabase/schema_001.sql (and schema_subset_002.sql,
 -- schema_subset_003.sql) have already been run against this database.
