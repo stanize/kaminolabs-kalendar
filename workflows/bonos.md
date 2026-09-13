@@ -55,6 +55,15 @@ Criteria:
 - Fully-used-up bonos are shown too (e.g. in a collapsed/past section) rather than disappearing once exhausted, for the clinic's own reference
 - IMPLEMENTATION: lib/bonos/data.ts's getBonosForClient() returns ALL of a client's bonos (active + exhausted), newest-purchase-first. Rendered as a new "Bonos" card on the client detail page, placed between Contacto and Próximas citas (Arun's placement call). Each row shows bono type name, "{used}/{total} usadas", purchase date, and an "Agotado" badge once sessions_used >= sessions_total — no collapsing, exhausted bonos are shown plainly alongside active ones.
 
+## Step: patient-bono-view
+Status: not_started
+Criteria:
+- DECISION (Arun): patients should be able to see their own bonos and usage from the patient portal — VIEW ONLY. No self-service actions here (no buying a bono, no requesting a reversal, no editing anything) — purchase and reversal both stay exclusively clinic-initiated (bono-purchase-recording, bono-session-reversal), same as today. This step is purely a read surface.
+- Data scope: a patient can have a kalendar_clients row (and therefore bonos) at MULTIPLE clinics — the patient portal already spans clinics (see patient-portal.md's intro and getPatientBookings' cross-business pattern in lib/booking/patient-data.ts). This view should follow that same pattern: fetch across all of the patient's kalendar_clients rows (join on patient_id, not a single business), and label each bono with which clinic it belongs to — a bono bought at one clinic is meaningless without that context, and showing only one business's bonos would silently hide the rest.
+- Mirrors the already-decided clinic-side display shape (client-page-bono-summary) for consistency: show bono type name, "{used}/{total}" sessions, purchase date, and an "Agotado" badge once exhausted — active and fully-used bonos both shown, not hidden once exhausted, same rationale as the clinic side (patient's own reference).
+- PLACEMENT (Claude's assumption, flagging for Arun to confirm/redirect): a "Mis bonos" section on the patient dashboard home (app/patient/(protected)/page.tsx), alongside the existing upcoming-bookings section — not a separate dedicated page, since a view-only summary list doesn't need its own route the way full-booking-history did. Open to a dedicated /patient/bonos page instead if the list is expected to get long or Arun wants it separated out.
+- IMPLEMENTATION (not yet built): a new getBonosForPatient(patientId) in lib/bonos/data.ts (or lib/booking/patient-data.ts, matching wherever the convention lands) — joins kalendar_clients (patient_id = caller) -> kalendar_bono_purchases, across businesses, returning business name alongside each bono the same way getPatientBookings already does for bookings. Scoped strictly to the caller's own patient_id via session, same security pattern as every other patient-portal query — never accepts a client_id or patient_id from the request.
+
 ## Step: bono-usage-report
 Status: done
 Criteria:
