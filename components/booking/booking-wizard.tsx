@@ -95,7 +95,7 @@ export function BookingWizard({
   const [providerId, setProviderId] = useState<string | null>(null);
   const [slot, setSlot] = useState<SlotDTO | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [doneKind, setDoneKind] = useState<"guest" | "confirmed" | "pendingVerification">("confirmed");
+  const [doneKind, setDoneKind] = useState<"guest" | "confirmed">("confirmed");
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   function reset() {
@@ -198,21 +198,18 @@ export function BookingWizard({
 
       {step === "done" && (
         <div className="py-4 text-center">
-          {/* "guest" is now genuinely confirmed too (guest-immediate-
-              confirm-with-clinic-followup, public-booking.md) — only
-              "pendingVerification" (unverified-account booking, still
-              awaiting the guest's own email click) gets the muted
-              "check your email" treatment now. */}
-          <div className={`mx-auto mb-4 grid h-14 w-14 place-items-center rounded-full ${doneKind === "pendingVerification" ? "bg-surface-2 text-ink-soft" : "bg-brand-weak text-brand"}`}>
-            {doneKind === "pendingVerification"
-              ? <Icon name="mail" size={24} />
-              : <Icon name="check" size={26} strokeWidth={2.5} />}
+          {/* "guest" and "confirmed" both mean genuinely confirmed now
+              (guest-immediate-confirm-with-clinic-followup, extended
+              2026-09 to also cover the sign-up-mid-booking case) — always
+              the brand checkmark, no muted/pending variant left. */}
+          <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-full bg-brand-weak text-brand">
+            <Icon name="check" size={26} strokeWidth={2.5} />
           </div>
           <h2 className="mb-1.5 text-[20px]">
-            {doneKind === "guest" ? w.doneTitleGuest : doneKind === "pendingVerification" ? w.doneTitlePendingVerification : w.doneTitle}
+            {doneKind === "guest" ? w.doneTitleGuest : w.doneTitle}
           </h2>
           <p className="mx-auto mb-5 max-w-[360px] text-[14px] text-ink-soft">
-            {doneKind === "guest" ? w.doneBodyGuest : doneKind === "pendingVerification" ? w.doneBodyPendingVerification : w.doneBody}
+            {doneKind === "guest" ? w.doneBodyGuest : w.doneBody}
           </p>
 
           {service && slot && (
@@ -282,12 +279,12 @@ function ConfirmAuthModal({
   onPatientChange: (p: PatientInfo | null) => void;
   onError: (e: string | null) => void;
   onClose: () => void;
-  onDone: (kind: "guest" | "confirmed" | "pendingVerification") => void;
+  onDone: (kind: "guest" | "confirmed") => void;
 }) {
   const am = dict.authModal;
   const af = dict.authForm;
   const w = dict.wizard;
-  type AuthView = "start" | "login" | "register" | "guest" | "roleConfirm" | "pendingVerification";
+  type AuthView = "start" | "login" | "register" | "guest" | "roleConfirm";
   const [view, setView] = useState<AuthView>("start");
   const [email, setEmail]               = useState("");
   const [password, setPassword]         = useState("");
@@ -311,19 +308,12 @@ function ConfirmAuthModal({
     });
     setBusy(false);
     if (!res.ok) { onError(res.error); return; }
-    if (res.status === "confirmed") {
-      onDone("confirmed");
-      return;
-    }
-    // Booking exists and holds the slot (see submitBooking), but the
-    // account isn't verified yet — stay INSIDE this still-open modal
-    // instead of advancing the wizard's outer step to "done". Jumping to
-    // "done" showed a 3/3-complete progress bar and a "Hacer otra reserva"
-    // button, which visually contradicted "you still need to confirm your
-    // email" — this view keeps step 3 ("Confirmación") looking like what
-    // it is: in progress, not finished.
-    setLocalError(null);
-    setView("pendingVerification");
+    // Always "confirmed" now (guest-immediate-confirm-with-clinic-followup,
+    // extended 2026-09 to cover the sign-up-mid-booking case too — see
+    // submitBooking's bookingStatus derivation) — this fires the same way
+    // whether p is an already-logged-in patient or one that just registered
+    // via handleRegister/completeProvision below, unverified or not.
+    onDone("confirmed");
   }
 
   async function completeProvision() {
@@ -403,20 +393,22 @@ function ConfirmAuthModal({
     setBusy(true);
     try {
       // callbackURL points at the patient dashboard (not back to this
-      // booking page) — PatientBookingFinalizer mounted there is what
-      // actually promotes the pending booking to confirmed once they
-      // click the link, and the dashboard immediately shows it in
-      // Próximas. Reloading THIS page instead would lose the wizard's
-      // in-memory step/selection state anyway (a fresh page load resets
-      // to step "service"), so there'd be nothing meaningful to resume
-      // here even if we redirected back to it.
+      // booking page) — the booking itself is already submitted and
+      // confirmed by the time they land there (completeProvision ->
+      // submitAuthenticated, called from afterAuth() below, right after
+      // signUp.email resolves) — this redirect is purely about the email
+      // VERIFICATION step, unrelated to the booking's own status now.
+      // Reloading THIS page instead would lose the wizard's in-memory
+      // step/selection state anyway (a fresh page load resets to step
+      // "service"), so there'd be nothing meaningful to resume here even
+      // if we redirected back to it.
       //
       // Booking details are carried as query params on this same
       // callbackURL — lib/auth.ts's sendVerificationEmail hook reads them
       // back out to send ONE combined "confirm your email + here's your
       // booking" email instead of two separate emails (this one +
-      // submitBooking's "under review" email, which skips itself when it
-      // detects this exact case).
+      // submitBooking's own confirmation receipt, which skips itself when
+      // it detects this exact case).
       const callbackParams = new URLSearchParams({
         bookingService: serviceName,
         bookingWhen: formatFullDateTime(slot.startIso, locale),
@@ -511,23 +503,7 @@ function ConfirmAuthModal({
         {/* Already authenticated — one merged appointment-details list
             (service, price, date, time, provider, clinic, address) under a
             single "Confirmar reserva" heading, then notes + confirm. */}
-        {/* pendingVerification takes priority over `patient` below — by the
-            time submitAuthenticated sets this view, the outer `patient`
-            state is already truthy (onPatientChange fires before the
-            submit), so without this leading check the merged "Confirmar
-            reserva" section would render instead and this view would be
-            unreachable. */}
-        {view === "pendingVerification" ? (
-          <div className="py-2 text-center">
-            <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-full bg-surface-2 text-ink-soft">
-              <Icon name="mail" size={24} />
-            </div>
-            <h2 className="mb-1.5 text-[17px]">{w.doneTitlePendingVerification}</h2>
-            <p className="mx-auto max-w-[340px] text-[13.5px] text-ink-soft">
-              {w.doneBodyPendingVerification}
-            </p>
-          </div>
-        ) : patient ? (
+        {patient ? (
           <Section title={am.confirmTitle}>
             <dl className="mb-5 flex flex-col gap-2.5 rounded-xl bg-surface-2 px-4 py-4 text-left">
               <div className="flex items-start justify-between gap-3">

@@ -15,15 +15,13 @@ import {
  * "send-appointment-reminders", every 15 min); .github/workflows/
  * reminders-cron.yml is kept as a manual-only fallback. Sends the
  * 24h-before and 1h-before reminder emails for CONFIRMED bookings only.
- * Guest bookings are confirmed immediately on submit (no more
- * pending_confirmation/expiry window for guests — the old sweep-expired-
- * bookings cron this comment used to reference was removed with that
- * change, see public-booking.md's guest-immediate-confirm-with-clinic-
- * followup). The one remaining pending_confirmation path — an
- * authenticated-but-unverified patient — is promoted to confirmed
- * automatically on email verification (finalizeVerifiedPatientBookings,
- * lib/actions/patient.ts), not by any cron, so it never reaches this
- * reminders flow while still pending.
+ * Every normal-flow booking is confirmed immediately now (guest,
+ * sign-up-mid-booking, or an already-verified patient — 2026-09,
+ * guest-immediate-confirm-with-clinic-followup, see submitBooking in
+ * lib/actions/booking.ts), so pending_confirmation essentially never
+ * happens through the normal app flow anymore — only admin tooling's
+ * statusOverride escape hatch can still produce one, and it never reaches
+ * this reminders flow while pending.
  *
  * Idempotency: reminder_24h_sent_at / reminder_1h_sent_at are NULL until a
  * send succeeds, and are only set AFTER the send succeeds — so a crash

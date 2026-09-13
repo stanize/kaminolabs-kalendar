@@ -122,16 +122,17 @@ export function BookingDetailModal({
   const methodReady = payment !== "paid" || effectiveMethodChoice !== "";
 
   const isFuture = new Date(booking.startIso) > new Date();
-  // Only a GUEST booking's pending_confirmation is something the owner
-  // should confirm/cancel — a patient's own pending_confirmation (created
-  // because their email/password sign-up wasn't verified yet) resolves
-  // itself automatically the moment they verify (see finalizeVerifiedPatientBookings
-  // in lib/actions/patient.ts). Showing Confirmar here would let an owner
-  // click through and force-confirm an unverified account's booking,
-  // defeating the whole point of gating it. clientStatus is already
-  // patient_id-derived (see lib/booking/client-status.ts) — a guest booking
-  // is 'guest_unconfirmed'/'guest_confirmed', a patient-linked one is
-  // 'first_time'/'returning', so this is a free, zero-schema-change signal.
+  // Only a GUEST booking can still be pending_confirmation in the normal
+  // flow now (2026-09: a patient's own booking, even one made mid-sign-up
+  // with an unverified email, is confirmed immediately — see submitBooking,
+  // lib/actions/booking.ts. finalizeVerifiedPatientBookings, which used to
+  // promote an unverified patient's pending booking on verify, was removed
+  // with it — there's nothing left for it to do). A guest_unconfirmed row
+  // is now reachable only via admin tooling's statusOverride escape hatch.
+  // clientStatus is patient_id-derived (see lib/booking/client-status.ts) —
+  // a guest booking is 'guest_unconfirmed'/'guest_confirmed', a
+  // patient-linked one is 'first_time'/'returning', so this is a free,
+  // zero-schema-change signal.
   const isAwaitingConfirmation = booking.status === "pending_confirmation" && booking.clientStatus === "guest_unconfirmed";
   // The "mark as contacted/reviewed" action — distinct from
   // isAwaitingConfirmation above: this booking is ALREADY confirmed (guest-

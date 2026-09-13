@@ -272,11 +272,10 @@ export async function submitBooking(input: {
   // Re-derive patientId/emailVerified from the actual session rather than
   // fully trusting the client-passed patientId — previously this action
   // accepted any patientId string as-is, which meant a malicious client
-  // could create a "confirmed, no-review-needed" booking under someone
-  // else's patient identity just by passing their id. Now the caller must
-  // actually BE that patient's own session for it to count as authenticated
-  // at all; otherwise this falls back to the guest path below (name/email
-  // typed into the form, pending_confirmation, owner reviews it).
+  // could create a booking under someone else's patient identity just by
+  // passing their id. Now the caller must actually BE that patient's own
+  // session for it to count as authenticated at all; otherwise this falls
+  // back to the guest path below (name/email typed into the form).
   let verifiedPatientId: string | null = null;
   let emailVerified = false;
   if (input.patientId) {
@@ -306,41 +305,45 @@ export async function submitBooking(input: {
     phone: phone || null,
   }).catch(() => null);
 
-  // Authenticated + verified patients (or Google sign-ups, which arrive
-  // pre-verified): confirmed immediately, no expiry window — unchanged from
-  // before this step existed.
+  // Every normal-flow booking is confirmed immediately, no review/expiry
+  // window — guest, authenticated + verified, AND (as of 2026-09,
+  // guest-immediate-confirm-with-clinic-followup extended to cover this
+  // case too) authenticated-but-UNVERIFIED patients booking mid-sign-up
+  // all get the exact same treatment now. The email-verification gate
+  // lives entirely on the ACCOUNT side instead (app/patient/(protected)/
+  // layout.tsx's PatientEmailVerificationGate) — an unverified patient's
+  // very first booking (made inline during sign-up) goes through same as
+  // anyone else's, but they can't re-login and use the portal (view/book
+  // again) until they verify. That split is deliberate: the booking is a
+  // one-shot action tied to a slot that needs holding NOW, the portal
+  // gate is what actually protects against a throwaway-email account
+  // getting ongoing unverified access.
   //
-  // Unauthenticated (guest): ALSO confirmed immediately as of 2026-09
-  // (guest-immediate-confirm-with-clinic-followup) — the old 24h
-  // auto-expiry/confirm-by-link flow was dropped (it was silently losing
-  // real bookings for no real benefit). The slot is held the same way an
-  // authenticated booking's is; the clinic instead gets a standing,
-  // non-expiring flag (clinic_reviewed_at) to proactively follow up with
-  // unfamiliar guests — see calendar-grid-view.tsx / calendar-bookings.tsx.
+  // finalizeVerifiedPatientBookings (lib/actions/patient.ts) — the
+  // "promote a pending booking to confirmed on verify" step this
+  // subsumed — was removed (2026-09) along with its
+  // PatientBookingFinalizer mount point: there's no pending booking left
+  // for it to promote through the normal flow anymore.
   //
-  // Authenticated but UNVERIFIED patients (email/password sign-up that
-  // hasn't clicked their confirmation link yet) are the ONE remaining path
-  // that still gets pending_confirmation + a 24h expiry window — instead of
-  // trusting an unverified email/password account enough to skip review.
-  // This closes the gap where a bad actor could self-register with a
-  // throwaway email and get instantly-confirmed bookings with zero
-  // verification. The slot is still held immediately either way (same as
-  // any pending_confirmation booking), and the moment they click their
-  // verification link, finalizeVerifiedPatientBookings
-  // (lib/actions/patient.ts) promotes this exact booking to 'confirmed'
-  // automatically — no reselecting, no data loss, they just pick up where
-  // they left off. (No cron sweep exists anymore for this window either —
-  // an unverified account that never confirms just leaves the booking
-  // pending indefinitely; a narrow, accepted edge case, not the common
-  // guest path this used to also cover.)
-  //
-  // statusOverride (admin tooling only, e.g. the appointment generator)
-  // takes precedence over all of the above — it's the one way a
-  // pending_confirmation, patient_id-null (guest-shaped) row can still be
-  // produced, which is why lib/booking/client-status.ts's guest_unconfirmed
-  // branch and its related UI are kept rather than deleted.
-  const bookingStatus =
-    input.statusOverride ?? (!isAuthenticated || emailVerified ? "confirmed" : "pending_confirmation");
+  // statusOverride (admin tooling only, e.g. the appointment generator) is
+  // the one remaining way a pending_confirmation row can still be
+  // produced — which is why lib/booking/client-status.ts's
+  // guest_unconfirmed branch and its related UI are kept rather than
+  // deleted, even though the normal flow can no longer reach it.
+  const bookingStatus = input.statusOverride ?? "confirmed";
+  // Whether THIS action should send its own "booking confirmed" receipt
+  // email. True for everyone EXCEPT an authenticated-but-unverified
+  // patient: that one case's email is already fully covered by Better
+  // Auth's sendVerificationEmail hook, which fired moments earlier
+  // (booking-wizard.tsx's handleRegister -> signUp.email, BEFORE this
+  // action even runs) and sends ONE combined "confirm your email + here's
+  // your booking" email by reading the same booking details back out of
+  // its callbackURL (see lib/auth.ts). Sending a second, separate
+  // confirmation email here would be a confusing, redundant duplicate —
+  // this is the ONLY thing that distinguishes an unverified patient's
+  // booking from anyone else's now; the booking itself is confirmed and
+  // the slot held identically either way.
+  const shouldSendOwnConfirmEmail = !isAuthenticated || emailVerified;
   const pendingExpiryAt =
     bookingStatus === "confirmed"
       ? null
@@ -382,9 +385,14 @@ export async function submitBooking(input: {
     : null;
   const whenLabel = formatBookingWhen(start.toISOString(), EMAIL_LOCALE);
 
-  if (bookingStatus === "confirmed") {
-    // Authenticated patient OR guest: booking is already confirmed either
-    // way now (see bookingStatus derivation above). Send a receipt email.
+  if (bookingStatus === "confirmed" && shouldSendOwnConfirmEmail) {
+    // Guest, or authenticated + already-verified patient — send a receipt
+    // email. (An authenticated-but-unverified patient is confirmed too,
+    // but skips this — see shouldSendOwnConfirmEmail above.) manageUrl
+    // differs: only an authenticated patient actually HAS an account to
+    // log into — a true guest gets sent to the same token-based
+    // cancel/manage page a guest booking always used, not a login screen
+    // they have no credentials for.
     const ics = buildBookingIcsBase64({
       uid: token,
       summary: `${service.name} - ${data.business.name}`,
@@ -404,13 +412,13 @@ export async function submitBooking(input: {
         serviceName: service.name,
         whenLabel,
         providerName,
-        // Authenticated bookings are already confirmed — no confirm link needed.
-        // We pass the cancel URL only so the template can show it.
-        confirmUrl: cancelUrl, // unused in the authenticated template variant
+        // Already confirmed either way — no confirm link needed. We pass
+        // the cancel URL only so the template can show it.
+        confirmUrl: cancelUrl, // unused in the confirmed template variant
         cancelUrl,
-        // "Gestionar mi cita" sends an authenticated patient to their portal
-        // (they have an account), not straight to the guest cancel page.
-        manageUrl: `${base}/patient/login?redirectTo=${encodeURIComponent("/patient/bookings")}`,
+        manageUrl: isAuthenticated
+          ? `${base}/patient/login?redirectTo=${encodeURIComponent("/patient/bookings")}`
+          : cancelUrl,
         locale: EMAIL_LOCALE,
         isConfirmed: true,
         hasIcsAttachment: true,
@@ -418,23 +426,18 @@ export async function submitBooking(input: {
       }),
       attachments: [{ filename: "cita-kalendar.ics", content: ics }],
     });
-  } else {
-    // The only way to reach here now is an authenticated-but-unverified
-    // patient (bookingStatus === "pending_confirmation" requires
-    // isAuthenticated && !emailVerified — see the derivation above; a true
-    // guest is always "confirmed"). No separate email here: Better Auth's
-    // sendVerificationEmail hook already fired client-side, before this
-    // action even runs, sending ONE combined "confirm your email + here's
-    // your booking" email (lib/auth.ts reads booking details out of the
-    // signUp callbackURL — see booking-wizard.tsx's handleRegister). Sending
-    // a second email here would be a confusing, redundant duplicate.
-    //
-    // The rare exception is admin tooling's statusOverride producing a
-    // guest-shaped (patient_id null) pending_confirmation row — that path
-    // also gets no email, same as before this refactor it would have (the
-    // old "under review" email this used to send here, bookingUnderReview
-    // EmailHtml, no longer exists — real guests never reach this branch).
+  } else if (bookingStatus !== "confirmed") {
+    // The only way to reach here is admin tooling's statusOverride forcing
+    // pending_confirmation on a guest-shaped (patient_id null) row — every
+    // normal-flow booking (guest, unverified-patient, or verified-patient)
+    // is "confirmed" now (see the derivation above). No email here, same
+    // as before this refactor: the old "under review" email this used to
+    // send, bookingUnderReviewEmailHtml, no longer exists — real guests
+    // never reach this branch.
   }
+  // (bookingStatus === "confirmed" && !shouldSendOwnConfirmEmail: the
+  // authenticated-but-unverified case — deliberately no email at all here,
+  // see shouldSendOwnConfirmEmail's comment above.)
 
   // Notify the clinic owner of the new booking (Spanish, regardless of guest locale).
   await notifyOwnerOfBooking({

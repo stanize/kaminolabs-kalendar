@@ -6,7 +6,6 @@ import { getPatientBookings } from "@/lib/booking/patient-data";
 import { Icon } from "@/components/ui/icon";
 import { DashboardUpcomingList } from "@/components/patient/dashboard-upcoming-list";
 import { PatientHeader } from "@/components/patient/patient-header";
-import { PatientBookingFinalizer } from "@/components/patient/patient-booking-finalizer";
 import { bookingPath } from "@/lib/business/booking-url";
 
 const TZ = "Europe/Madrid";
@@ -59,7 +58,6 @@ export default async function PatientDashboardPage() {
     <div className="min-h-dvh bg-surface-2">
       {/* Top bar */}
       <PatientHeader current="home" email={session.user.email} />
-      <PatientBookingFinalizer />
 
       <div className="mx-auto max-w-[680px] px-4 py-6 sm:px-8 sm:py-8">
         <div className="mb-6">

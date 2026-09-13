@@ -89,8 +89,6 @@ export interface BookingPageDictionary {
     doneBody: string;       // authenticated: "Tu reserva está confirmada..."
     doneTitleGuest: string; // guest: "Solicitud enviada"
     doneBodyGuest: string;  // guest: "La clínica revisará tu solicitud..."
-    doneTitlePendingVerification: string; // unverified-email patient
-    doneBodyPendingVerification: string;
     doneFieldDate: string;
     doneFieldClinic: string;
     doneFieldAddress: string;
@@ -206,8 +204,6 @@ const es: BookingPageDictionary = {
     doneBody: "Tu reserva está confirmada. Te esperamos.",
     doneTitleGuest: "¡Reserva confirmada!",
     doneBodyGuest: "Tu reserva está confirmada. Te hemos enviado un email con los detalles.",
-    doneTitlePendingVerification: "Ya casi está — confirma tu email",
-    doneBodyPendingVerification: "Revisa tu email para confirmar la reserva.",
     doneFieldDate: "Fecha y hora",
     doneFieldClinic: "Clínica",
     doneFieldAddress: "Dirección",
@@ -316,8 +312,6 @@ const en: BookingPageDictionary = {
     doneBody: "Your booking is confirmed. See you soon.",
     doneTitleGuest: "Booking confirmed!",
     doneBodyGuest: "Your booking is confirmed. We've sent you an email with the details.",
-    doneTitlePendingVerification: "Almost finished — confirm your email",
-    doneBodyPendingVerification: "Check your email to confirm the reservation.",
     doneFieldDate: "Date and time",
     doneFieldClinic: "Clinic",
     doneFieldAddress: "Address",
