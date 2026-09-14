@@ -14,8 +14,10 @@ Criteria:
 ## Step: terms-of-service-page
 Status: not_started
 Criteria:
-- Not yet scoped as a distinct requirement from privacy-policy-page — confirm with Arun whether ToS is needed for MVP or can follow later; not currently blocking in the way GDPR/privacy is (privacy policy is a stricter legal requirement given real patient data)
+- UPDATED (2026-09-14, docs/reviews/2026-09-14-review.md — "Recommended next 3" #1 groups this with privacy-policy-page as one combined go-live blocker, not a separate lower-priority item): the earlier "confirm with Arun whether ToS is needed for MVP" question is effectively answered by a second independent review reaching the same conclusion unprompted — treat as needed alongside the privacy policy, not deferred. Still worth a quick explicit confirm from Arun before starting the legal-review clock, but default to "yes, needed" rather than blocking on that confirm.
+- Same publish/link requirements as privacy-policy-page (public route, linked from sign-up + footer/landing page) — likely reasonable to scope as one combined legal-review engagement and one combined page/route rather than two separate efforts, given they'll probably be drafted together, but that's an implementation choice to confirm at build time, not a design requirement here.
 
 ## Notes / Deviations
 - This gap was surfaced by an independent code review session explicitly checking MVP readiness without reference to these workflow files — worth treating as a genuinely fresh finding rather than something previously tracked and missed.
+- CORROBORATED (2026-09-14, docs/reviews/2026-09-14-review.md): a second independent review reached the same conclusion — flagged in both the 2026-07-26 and 2026-09-14 reviews as a blind spot that "still hasn't moved." Called out there as the single item to treat as a hard blocker before a real clinic sends real patients through the booking flow, given the product now handles physiotherapy (health-adjacent) patient data under GDPR.
 - Legal review lead time makes this different from the other MVP-blocking items (subscription-billing.md's calendar-aligned-billing/trial-period-mechanism/feature-gating) — those are pure engineering work Arun can time-box directly; this one depends on an external review Arun doesn't fully control the timeline of, so starting it early matters more than usual.

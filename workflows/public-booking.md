@@ -124,6 +124,41 @@ Criteria:
   (unverified) booking also confirms immediately"), both
   stanize/kaminolabs-kalendar, 2026-09-13.
 
+## Step: booking-abuse-protection
+Status: not_started
+Criteria:
+- SURFACED (2026-09-14, docs/reviews/2026-09-14-review.md — "Recommended
+  next 3" #2): no captcha, honeypot, or rate limiting exists anywhere in
+  submitBooking today. Flagged as MORE urgent than it would otherwise be
+  specifically BECAUSE of guest-immediate-confirm-with-clinic-followup
+  above — a spammed/scraped slug now gets junk bookings CONFIRMED
+  immediately and mixed straight into a clinic's real calendar and real
+  patient data, with no pending-review window to catch it before it lands.
+  That review window existing was an accidental abuse-mitigation side
+  effect of the old 24h design that nobody had named explicitly until it
+  was gone.
+- PHASE 1 (cheap, do first): a honeypot field in the booking wizard's
+  final step — an input invisible to real users (off-screen/opacity-0, not
+  display:none or type=hidden, since basic bots specifically check for
+  those and skip them) but visible to naive form-filling bots. submitBooking
+  rejects silently (pretend-success from the bot's point of view, so it
+  doesn't learn to look elsewhere) if the field is non-empty. Zero user-
+  facing friction for real guests — no puzzle, no click, nothing to see.
+- PHASE 2 (escalate only if Phase 1 proves insufficient): Cloudflare
+  Turnstile on the wizard's final step — invisible/managed mode preferred
+  over a visible challenge, to keep friction low for real guests. Only
+  worth building once actual junk volume is observed post-Phase-1, not
+  preemptively — per the review, "cheap, and now more urgent" was about
+  the honeypot specifically, not a recommendation to build both at once.
+- Basic rate limiting on submitBooking by IP and/or by (business_id, IP)
+  is a reasonable Phase 1 companion to the honeypot — worth scoping
+  alongside it rather than as a separate later step, since both are cheap
+  and address the same underlying gap.
+- Out of scope for this step (not part of the review's recommendation,
+  noted so a future pass doesn't assume it's covered): CAPTCHA/bot
+  protection on clinic sign-up or patient portal sign-up — those aren't
+  the public, no-auth surface the review is concerned about here.
+
 ## Step: cancellation
 Status: done
 Criteria:
