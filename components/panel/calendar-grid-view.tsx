@@ -327,8 +327,14 @@ export function CalendarGridView({
 }
 
 /**
- * Chip color for a booking — time is the primary axis:
- * - Not past (upcoming or happening now): teal-50 bg / teal-900 text /
+ * Chip color for a booking:
+ * - Not past AND needs a clinic action (guest_unconfirmed — awaiting
+ *   confirm/cancel — or guest_confirmed not yet marked reviewed — awaiting
+ *   the "Contactado / Confirmado" follow-up) — amber-50 bg / amber-900
+ *   text / amber-500 left border, so it stands out as something to act on
+ *   at a glance, not just via the small dot.
+ * - Not past and no clinic action needed (returning/first-time patients,
+ *   or a guest already marked reviewed): teal-50 bg / teal-900 text /
  *   teal-600 left border — fresh, active, primary appointment.
  * - Past and not yet reviewed (still pending_confirmation/confirmed):
  *   rose-50 bg / rose-900 text / rose-500 left border — a clear but not
@@ -338,8 +344,20 @@ export function CalendarGridView({
  *   easy to scan past, done.
  * Always clickable regardless of state — past appointments can be revised.
  */
-export function chipClasses(status: WeekBookingVM["status"], isPast: boolean): string {
-  if (!isPast) return "bg-teal-50 text-teal-900 border-l-4 border-teal-600";
+export function chipClasses(
+  status: WeekBookingVM["status"],
+  isPast: boolean,
+  clientStatus: ClientStatusValue,
+  clinicReviewedAt: string | null
+): string {
+  if (!isPast) {
+    const needsClinicAction =
+      clientStatus === "guest_unconfirmed" ||
+      (clientStatus === "guest_confirmed" && !clinicReviewedAt);
+    return needsClinicAction
+      ? "bg-amber-50 text-amber-900 border-l-4 border-amber-500"
+      : "bg-teal-50 text-teal-900 border-l-4 border-teal-600";
+  }
   const isReviewed = status === "completed" || status === "no_show" || status === "cancelled";
   return isReviewed
     ? "bg-slate-100 text-slate-500 border-l-4 border-slate-300"
@@ -448,7 +466,7 @@ function DayProviderColumn({
             <div
               key={b.id}
               onClick={(e) => { e.stopPropagation(); onBookingClick(b); }}
-              className={`absolute left-0.5 right-0.5 cursor-pointer overflow-hidden rounded-md px-1.5 py-[3px] text-[10.5px] leading-[1.2] ${chipClasses(b.status, isPast)}`}
+              className={`absolute left-0.5 right-0.5 cursor-pointer overflow-hidden rounded-md px-1.5 py-[3px] text-[10.5px] leading-[1.2] ${chipClasses(b.status, isPast, b.clientStatus, b.clinicReviewedAt)}`}
               style={{ top, height }}
             >
               <div className="truncate">
