@@ -16,7 +16,7 @@ import {
 import { getActiveBonosForClientAction } from "@/lib/actions/bonos";
 import type { ClientActiveBono } from "@/lib/bonos/data";
 import type { CalendarDictionary } from "@/lib/i18n/dictionaries/calendar";
-import { CLIENT_STATUS_LABEL, CLIENT_STATUS_BADGE_CLASS, type WeekBookingVM } from "@/components/panel/calendar-grid-view";
+import { CLIENT_STATUS_LABEL, CLIENT_STATUS_BADGE_CLASS, needsClinicFollowUp, type WeekBookingVM } from "@/components/panel/calendar-grid-view";
 
 const TZ = "Europe/Madrid";
 
@@ -140,8 +140,10 @@ export function BookingDetailModal({
   // standing follow-up flag, not a confirmation gate. Available regardless
   // of past/future (isFuture), since the Clientes tab now surfaces guest
   // history too — a clinic should be able to mark a past no-show contact
-  // just as easily as an upcoming one.
-  const needsReview = booking.clientStatus === "guest_confirmed" && !booking.clinicReviewedAt;
+  // just as easily as an upcoming one. Also applies to first_time patient
+  // bookings (2026-09) — a first-time patient is confirmed immediately
+  // too, but is still someone the clinic hasn't met, same as a guest.
+  const needsReview = needsClinicFollowUp(booking.clientStatus, booking.clinicReviewedAt) && booking.clientStatus !== "guest_unconfirmed";
   const hasRealEmail = booking.clientEmail && !booking.clientEmail.startsWith("sin-email+");
 
   const dateTimeLabel = new Intl.DateTimeFormat(intlLocale, {
@@ -310,7 +312,9 @@ export function BookingDetailModal({
           <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-sky-200 bg-sky-50 px-3.5 py-3">
             <p className="flex items-center gap-1.5 text-[13px] font-semibold text-sky-800">
               <Icon name="bell" size={14} className="shrink-0" />
-              Invitado sin seguimiento — aún no contactado por la clínica
+              {booking.clientStatus === "first_time"
+                ? "Primera vez — sin seguimiento aún por la clínica"
+                : "Invitado sin seguimiento — aún no contactado por la clínica"}
             </p>
             <button
               type="button"

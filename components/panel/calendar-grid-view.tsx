@@ -58,6 +58,32 @@ export const CLIENT_STATUS_BADGE_CLASS: Record<ClientStatusValue, string> = {
   returning: "bg-emerald-50 text-emerald-800 border-emerald-200",
 };
 
+/**
+ * Whether a booking still needs a clinic action/follow-up — the single
+ * definition shared by the week/month grid's amber chip color, the dot
+ * marker's visibility, the booking-detail-modal's follow-up banner, and
+ * the Clientes-tab row's action button, so they can never drift apart.
+ *
+ * - guest_unconfirmed: always true (regardless of clinicReviewedAt — it
+ *   has its own separate confirm/cancel action, not the "Contactado /
+ *   Confirmado" one).
+ * - guest_confirmed OR first_time: true only while clinicReviewedAt is
+ *   null. A first-time patient's booking is confirmed immediately just
+ *   like a guest's (same account, so no identity risk — but it's still
+ *   someone the clinic hasn't met before), so it gets the exact same
+ *   standing follow-up flag and "Contactado / Confirmado" treatment a
+ *   guest booking does (2026-09).
+ * - returning: never — an existing, known client needs no follow-up.
+ */
+export function needsClinicFollowUp(
+  clientStatus: ClientStatusValue,
+  clinicReviewedAt: string | null
+): boolean {
+  if (clientStatus === "guest_unconfirmed") return true;
+  if (clientStatus === "guest_confirmed" || clientStatus === "first_time") return !clinicReviewedAt;
+  return false;
+}
+
 export interface WeekBookingVM {
   id: string;
   serviceId: string | null;
@@ -328,14 +354,13 @@ export function CalendarGridView({
 
 /**
  * Chip color for a booking:
- * - Not past AND needs a clinic action (guest_unconfirmed — awaiting
- *   confirm/cancel — or guest_confirmed not yet marked reviewed — awaiting
- *   the "Contactado / Confirmado" follow-up) — amber-50 bg / amber-900
- *   text / amber-500 left border, so it stands out as something to act on
- *   at a glance, not just via the small dot.
- * - Not past and no clinic action needed (returning/first-time patients,
- *   or a guest already marked reviewed): teal-50 bg / teal-900 text /
- *   teal-600 left border — fresh, active, primary appointment.
+ * - Not past AND needs a clinic action (see needsClinicFollowUp) — amber-50
+ *   bg / amber-900 text / amber-500 left border, so it stands out across
+ *   the whole chip, not just via the small dot.
+ * - Not past and no clinic action needed (a returning client, or a
+ *   guest/first-time booking already marked reviewed): teal-50 bg /
+ *   teal-900 text / teal-600 left border — fresh, active, primary
+ *   appointment.
  * - Past and not yet reviewed (still pending_confirmation/confirmed):
  *   rose-50 bg / rose-900 text / rose-500 left border — a clear but not
  *   "heavy" alert that it needs review.
@@ -351,10 +376,7 @@ export function chipClasses(
   clinicReviewedAt: string | null
 ): string {
   if (!isPast) {
-    const needsClinicAction =
-      clientStatus === "guest_unconfirmed" ||
-      (clientStatus === "guest_confirmed" && !clinicReviewedAt);
-    return needsClinicAction
+    return needsClinicFollowUp(clientStatus, clinicReviewedAt)
       ? "bg-amber-50 text-amber-900 border-l-4 border-amber-500"
       : "bg-teal-50 text-teal-900 border-l-4 border-teal-600";
   }
@@ -476,22 +498,22 @@ function DayProviderColumn({
                 {b.reminderSendFailed && (
                   <span title="Recordatorio no enviado" className="mr-1 text-amber-600">⚠</span>
                 )}
-                {/* guest_confirmed's dot is specifically a "needs clinic
-                    follow-up" flag (guest-immediate-confirm-with-clinic-
-                    followup, public-booking.md) — it clears once
-                    clinicReviewedAt is set, unlike the other statuses'
-                    dots, which are a standing scrutiny-level indicator and
-                    always show. */}
-                {(b.clientStatus !== "guest_confirmed" || !b.clinicReviewedAt) && (
+                {/* Dot mirrors needsClinicFollowUp for guest_confirmed/
+                    first_time (clears once clinicReviewedAt is set) —
+                    other statuses' dots are a standing scrutiny-level
+                    indicator and always show. */}
+                {(b.clientStatus !== "guest_confirmed" && b.clientStatus !== "first_time") || !b.clinicReviewedAt ? (
                   <span
                     title={
                       b.clientStatus === "guest_confirmed"
                         ? "Invitado — sin seguimiento del negocio"
+                        : b.clientStatus === "first_time"
+                        ? "Primera vez — sin seguimiento del negocio"
                         : CLIENT_STATUS_LABEL[b.clientStatus]
                     }
                     className={`mr-1 inline-block h-[7px] w-[7px] rounded-full align-middle ${CLIENT_STATUS_DOT_CLASS[b.clientStatus]}`}
                   />
-                )}
+                ) : null}
                 {b.serviceName}
               </div>
               <div className="truncate opacity-90">{timeLabel(b.startIso)} · {b.clientName}</div>

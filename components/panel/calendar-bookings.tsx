@@ -17,6 +17,7 @@ import {
   type ClientStatusValue,
   CLIENT_STATUS_LABEL,
   CLIENT_STATUS_BADGE_CLASS,
+  needsClinicFollowUp,
 } from "@/components/panel/calendar-grid-view";
 import { CalendarMonthView } from "@/components/panel/calendar-month-view";
 import { BookingDetailModal } from "@/components/panel/booking-detail-modal";
@@ -292,8 +293,8 @@ export function CalendarBookings({
   // attention; "returning" isn't offered as a filter chip since that's the
   // no-action-needed segment — it's still visible under "Todos" though.
   const [clientFilter, setClientFilter] = useState<"all" | ClientStatusValue>("all");
-  const needsAttentionCount = list.filter(
-    (b) => b.clientStatus === "guest_unconfirmed" || b.clientStatus === "first_time"
+  const needsAttentionCount = list.filter((b) =>
+    needsClinicFollowUp(b.clientStatus, b.clinicReviewedAt)
   ).length;
 
   const clientRows = [...list]
@@ -588,11 +589,13 @@ export function CalendarBookings({
                     </div>
                   )}
 
-                  {/* guest_confirmed row (already-confirmed guest, not yet
-                      contacted by the clinic) — different action than
+                  {/* guest_confirmed OR first_time row not yet contacted
+                      by the clinic (2026-09: first_time treated the same
+                      as guest_confirmed — confirmed already, someone the
+                      clinic hasn't met) — different action than
                       guest_unconfirmed above: no status change, just the
                       follow-up flag. */}
-                  {b.clientStatus === "guest_confirmed" && !b.clinicReviewedAt && (
+                  {(b.clientStatus === "guest_confirmed" || b.clientStatus === "first_time") && !b.clinicReviewedAt && (
                     <div
                       className="flex shrink-0 items-center gap-1 pl-[82px] sm:pl-0"
                       onClick={(e) => e.stopPropagation()}

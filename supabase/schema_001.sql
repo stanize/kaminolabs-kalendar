@@ -730,13 +730,16 @@ create table public.kalendar_bookings (
   -- or deny (status unchanged) — never left set after a decision.
   cancellation_requested_at timestamptz,
   -- Set by an explicit clinic action ("Contacted / Confirmed" button, panel
-  -- calendar) once they've proactively reached out to a guest booking that
-  -- hasn't been reviewed yet. NULL = not yet reviewed. A flag layered on
-  -- top of `status` rather than a status value of its own, since the
-  -- booking is genuinely confirmed/slot-held either way — mirrors the
-  -- cancellation_requested_at pattern above. Never set automatically, never
-  -- re-derived from clientStatus (see lib/booking/client-status.ts's
-  -- guest_confirmed, which stays true for the booking's whole lifetime).
+  -- calendar) once they've proactively reached out to a guest OR first-time
+  -- patient booking that hasn't been reviewed yet (2026-09: first-time
+  -- patients treated the same as guests here — already confirmed, but
+  -- still someone the clinic hasn't met). NULL = not yet reviewed. A flag
+  -- layered on top of `status` rather than a status value of its own,
+  -- since the booking is genuinely confirmed/slot-held either way —
+  -- mirrors the cancellation_requested_at pattern above. Never set
+  -- automatically, never re-derived from clientStatus (see
+  -- lib/booking/client-status.ts's guest_confirmed/first_time, which stay
+  -- true for the booking's whole lifetime regardless of this flag).
   clinic_reviewed_at   timestamptz,
   created_at           timestamptz           not null default now(),
   updated_at           timestamptz           not null default now()
