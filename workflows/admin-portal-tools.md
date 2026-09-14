@@ -58,5 +58,40 @@ Criteria:
 - OPEN QUESTION (needs a design call before building): how the tool determines which schema file is "latest/unfrozen" — a naming convention (always run the highest-numbered schema_NNN.sql) vs. an explicit marker (e.g. a comment header in the file, or a config value) it reads. Not decided yet.
 - Depends on: schema_001.sql actually being frozen, and schema_002.sql existing — not buildable until both are true
 
+## Step: incident-contact-path
+Status: not_started
+Criteria:
+- SURFACED (2026-09-14, docs/reviews/2026-09-14-review.md, section 5
+  "Blind spots not currently tracked" — not one of the ranked "next 3,"
+  but explicitly named). Direct quote: "the support ticket form exists
+  for Arun to see tickets, but there's nothing for 'the booking page is
+  down' urgency."
+- The gap is specifically about URGENCY mismatch, not absence of a support
+  channel — lib/actions/support.ts's submitSupportTicket already exists
+  and works fine for normal issues. Two things make it the wrong tool for
+  a genuine outage:
+  - It requires an authenticated session (submitSupportTicket returns
+    early if no session) — if the outage is bad enough that a clinic
+    owner can't log in either, they have no path to reach Arun through
+    the product at all.
+  - Even when login works, a ticket sitting in a queue Arun checks
+    periodically is the wrong response time for "my booking page is down
+    right now and a patient is standing in front of me."
+- Candidate approaches, not decided — needs a call with Arun before
+  building, this is a starting menu not a spec:
+  - A status page (even a trivial static one) with a direct emergency
+    contact (email/WhatsApp/phone) that doesn't require being logged in
+    — lowest build cost, matches how most small SaaS tools handle this.
+  - A dedicated "urgent" flag on the existing support ticket that (when
+    set) triggers something faster than the normal queue — e.g. an SMS/
+    push to Arun — but doesn't solve the "can't log in" case above on its
+    own.
+  - Both together: logged-out emergency contact for total outages, urgent
+    flag on the existing ticket form for degraded-but-reachable cases.
+- Realistic for a single-founder operation (Arun, not a support team) —
+  don't over-scope this into a full incident-management process; the
+  actual need per the review is "a real human can be reached fast when
+  something's badly broken," not a formal SLA/status-page product.
+
 ## Notes / Deviations
 - All admin portal pages are worth spot-checking for the same mobile-table pattern as schema-reset-tool, since this may not be an isolated instance (e.g. customer-overview and orphaned-bookings likely also render tabular data) — flagging for a future pass rather than assuming it's fixed by fixing schema-reset alone.
