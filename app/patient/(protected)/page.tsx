@@ -1,13 +1,12 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { requireSession } from "@/lib/auth-session";
-import { getPatientProfile } from "@/lib/actions/patient";
+import { getPatientProfile, claimGuestHistoryIfEligible } from "@/lib/actions/patient";
 import { getPatientBookings } from "@/lib/booking/patient-data";
 import { getBonosForPatient } from "@/lib/bonos/data";
 import { Icon } from "@/components/ui/icon";
 import { DashboardUpcomingList } from "@/components/patient/dashboard-upcoming-list";
 import { PatientHeader } from "@/components/patient/patient-header";
-import { ClaimGuestHistory } from "@/components/patient/claim-guest-history";
 import { bookingPath } from "@/lib/business/booking-url";
 
 const TZ = "Europe/Madrid";
@@ -53,6 +52,26 @@ export default async function PatientDashboardPage() {
   const profile = await getPatientProfile();
   if (!profile) redirect("/patient/login");
 
+  // Runs inline, server-side, BEFORE the bookings fetch below — so if this
+  // links anything, the very first render already reflects it. Originally
+  // a client-side useEffect (mirroring the old, now-removed
+  // PatientBookingFinalizer's pattern), which caused a real flash: the
+  // page would render once with the pre-claim (sometimes empty) list,
+  // then a moment later refresh once the claim resolved client-side and
+  // found a match. claimGuestHistoryIfEligible has no browser-only
+  // dependency, so there was never a reason it needed to run client-side
+  // at all — doing it here instead removes the flash entirely rather than
+  // just replacing it with a "checking..." loading state. Already a cheap
+  // no-op after the first real check (kalendar_patients.claim_checked_at),
+  // so safe to call unconditionally on every load. Wrapped defensively —
+  // this should never be able to throw (see its own comments), but a
+  // failure here must never take down the whole dashboard.
+  try {
+    await claimGuestHistoryIfEligible();
+  } catch {
+    // Best-effort — see comment above.
+  }
+
   const allBookings = await getPatientBookings(profile.id);
   const bonos = await getBonosForPatient(profile.id);
   const now = new Date();
@@ -70,7 +89,6 @@ export default async function PatientDashboardPage() {
     <div className="min-h-dvh bg-surface-2">
       {/* Top bar */}
       <PatientHeader current="home" email={session.user.email} />
-      <ClaimGuestHistory />
 
       <div className="mx-auto max-w-[680px] px-4 py-6 sm:px-8 sm:py-8">
         <div className="mb-6">

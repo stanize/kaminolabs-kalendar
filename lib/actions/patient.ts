@@ -298,9 +298,14 @@ export const cancelBookingAsPatient = async (
 // ── One-time "claim existing guest/walk-in history" check ──────────────────
 
 /**
- * Called once per page load from the patient dashboard
- * (components/patient/claim-guest-history.tsx). A cheap no-op in the
- * overwhelming common case — most calls short-circuit on the
+ * Called inline, server-side, at the top of the patient dashboard page
+ * (app/patient/(protected)/page.tsx) — BEFORE that page fetches bookings,
+ * so if this links anything, the very first render already reflects it.
+ * Not a client component/useEffect: this has no browser-only dependency,
+ * so running it server-side avoids a real flash a client-side version
+ * had (page renders once with the pre-claim list, then refreshes a moment
+ * later) — see that page's comment for the full story. A cheap no-op in
+ * the overwhelming common case — most calls short-circuit on the
  * emailVerified or claim_checked_at check below without touching
  * kalendar_clients/kalendar_bookings at all.
  *
