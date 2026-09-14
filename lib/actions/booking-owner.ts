@@ -687,6 +687,17 @@ export const createBookingAsOwner = authedAction(
       ends_at: end.toISOString(),
       status: "confirmed",
       pending_expiry_at: null,
+      // Staff typed this booking in themselves (walk-in/phone) — that IS
+      // the clinic's contact with this client, so it should never show the
+      // "Invitado sin seguimiento — aún no contactado" follow-up banner a
+      // real anonymous public-booking guest gets (needsClinicFollowUp,
+      // calendar-grid-view.tsx). patient_id is still null here (this
+      // client has no patient account), which on its own would classify
+      // as clientStatus 'guest_confirmed' — same bucket as a genuine
+      // guest — so this is set at creation time specifically to opt out
+      // of that follow-up flag for this one insert path. Bug found and
+      // fixed 2026-09: Arun caught it by testing a walk-in booking.
+      clinic_reviewed_at: new Date().toISOString(),
       client_name: name,
       client_email: email || `sin-email+${token}@kaminolabs.dev`,
       client_phone: (input.clientPhone ?? "").trim() || null,
