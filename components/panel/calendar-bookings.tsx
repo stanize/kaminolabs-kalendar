@@ -16,7 +16,8 @@ import {
   type TimeRangeVM,
   type ClientStatusValue,
   CLIENT_STATUS_LABEL,
-  CLIENT_STATUS_BADGE_CLASS,
+  clientStatusLabel,
+  clientStatusBadgeClass,
   needsClinicFollowUp,
 } from "@/components/panel/calendar-grid-view";
 import { CalendarMonthView } from "@/components/panel/calendar-month-view";
@@ -549,8 +550,8 @@ export function CalendarBookings({
                     <div className="min-w-0 flex-1">
                       <p className="flex flex-wrap items-center gap-1.5 text-[14px] font-semibold text-ink">
                         <span className="truncate">{b.serviceName}</span>
-                        <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${CLIENT_STATUS_BADGE_CLASS[b.clientStatus]}`}>
-                          {CLIENT_STATUS_LABEL[b.clientStatus]}
+                        <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${clientStatusBadgeClass(b.clientStatus, b.clinicReviewedAt)}`}>
+                          {clientStatusLabel(b.clientStatus, b.clinicReviewedAt)}
                         </span>
                         {b.pendingExpiryAt && b.clientStatus === "guest_unconfirmed" && (
                           <CountdownBadge expiryIso={b.pendingExpiryAt} m={m} />

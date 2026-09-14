@@ -37,13 +37,29 @@ export interface WeekMemberVM {
 // pulling in that file's server-only createClient import.
 export type ClientStatusValue = "guest_unconfirmed" | "guest_confirmed" | "first_time" | "returning";
 
+// Base/category labels — used for filter-chip text (a category name, not
+// tied to any single booking) and as the fallback for clientStatusLabel()
+// below. "confirmado" does NOT appear here for guest_confirmed/first_time
+// on purpose (2026-09): it used to mean "the booking itself is confirmed",
+// which is true for EVERY guest/first-time booking now (they all confirm
+// immediately on submit — see public-booking's gotchas), making the old
+// static "Invitado · confirmado"/"primera vez" labels misleading — a
+// clinic reading them could think a booking still needing their attention
+// had already been handled. "confirmado" now means the CLINIC has
+// confirmed/contacted them (clinicReviewedAt) instead — see
+// clientStatusLabel(), which is what every per-booking badge should call.
 export const CLIENT_STATUS_LABEL: Record<ClientStatusValue, string> = {
   guest_unconfirmed: "Invitado · sin confirmar",
-  guest_confirmed: "Invitado · confirmado",
-  first_time: "Cliente registrado · primera vez",
+  guest_confirmed: "Invitado",
+  first_time: "Paciente",
   returning: "Cliente registrado · recurrente",
 };
 
+// Base/category dot+badge colors — same "not tied to one booking" caveat
+// as CLIENT_STATUS_LABEL above; used for filter-chip dots. Per-booking
+// dot/badge rendering should call clientStatusDotClass()/
+// clientStatusBadgeClass() below instead, which turn amber while a
+// specific booking still needs a clinic action.
 export const CLIENT_STATUS_DOT_CLASS: Record<ClientStatusValue, string> = {
   guest_unconfirmed: "bg-amber-500",
   guest_confirmed: "bg-sky-500",
@@ -61,8 +77,9 @@ export const CLIENT_STATUS_BADGE_CLASS: Record<ClientStatusValue, string> = {
 /**
  * Whether a booking still needs a clinic action/follow-up — the single
  * definition shared by the week/month grid's amber chip color, the dot
- * marker's visibility, the booking-detail-modal's follow-up banner, and
- * the Clientes-tab row's action button, so they can never drift apart.
+ * marker's visibility/color, the per-booking label/badge color below, the
+ * booking-detail-modal's follow-up banner, and the Clientes-tab row's
+ * action button, so they can never drift apart.
  *
  * - guest_unconfirmed: always true (regardless of clinicReviewedAt — it
  *   has its own separate confirm/cancel action, not the "Contactado /
@@ -82,6 +99,46 @@ export function needsClinicFollowUp(
   if (clientStatus === "guest_unconfirmed") return true;
   if (clientStatus === "guest_confirmed" || clientStatus === "first_time") return !clinicReviewedAt;
   return false;
+}
+
+/**
+ * Per-BOOKING display label (badges in booking-detail-modal.tsx and the
+ * Clientes-tab row, and the grid dot's tooltip) — unlike CLIENT_STATUS_LABEL
+ * above, this reflects clinicReviewedAt: "Invitado"/"Paciente" alone while
+ * still needing a clinic action, "· confirmado" appended only once the
+ * clinic has actually contacted/confirmed them. guest_unconfirmed and
+ * returning are unaffected by clinicReviewedAt — always their base label.
+ */
+export function clientStatusLabel(
+  clientStatus: ClientStatusValue,
+  clinicReviewedAt: string | null
+): string {
+  if ((clientStatus === "guest_confirmed" || clientStatus === "first_time") && clinicReviewedAt) {
+    return `${CLIENT_STATUS_LABEL[clientStatus]} · confirmado`;
+  }
+  return CLIENT_STATUS_LABEL[clientStatus];
+}
+
+/** Per-booking badge color — amber while needsClinicFollowUp, else the base category color (once reviewed, or for guest_unconfirmed/returning which don't vary). */
+export function clientStatusBadgeClass(
+  clientStatus: ClientStatusValue,
+  clinicReviewedAt: string | null
+): string {
+  if (needsClinicFollowUp(clientStatus, clinicReviewedAt) && clientStatus !== "guest_unconfirmed") {
+    return "bg-amber-50 text-amber-800 border-amber-200";
+  }
+  return CLIENT_STATUS_BADGE_CLASS[clientStatus];
+}
+
+/** Per-booking dot color — same amber-while-unreviewed rule as clientStatusBadgeClass above. */
+export function clientStatusDotClass(
+  clientStatus: ClientStatusValue,
+  clinicReviewedAt: string | null
+): string {
+  if (needsClinicFollowUp(clientStatus, clinicReviewedAt) && clientStatus !== "guest_unconfirmed") {
+    return "bg-amber-500";
+  }
+  return CLIENT_STATUS_DOT_CLASS[clientStatus];
 }
 
 export interface WeekBookingVM {
@@ -501,17 +558,13 @@ function DayProviderColumn({
                 {/* Dot mirrors needsClinicFollowUp for guest_confirmed/
                     first_time (clears once clinicReviewedAt is set) —
                     other statuses' dots are a standing scrutiny-level
-                    indicator and always show. */}
+                    indicator and always show. Color and tooltip both come
+                    from the same per-booking functions the badge/chip use,
+                    so this never drifts from them. */}
                 {(b.clientStatus !== "guest_confirmed" && b.clientStatus !== "first_time") || !b.clinicReviewedAt ? (
                   <span
-                    title={
-                      b.clientStatus === "guest_confirmed"
-                        ? "Invitado — sin seguimiento del negocio"
-                        : b.clientStatus === "first_time"
-                        ? "Primera vez — sin seguimiento del negocio"
-                        : CLIENT_STATUS_LABEL[b.clientStatus]
-                    }
-                    className={`mr-1 inline-block h-[7px] w-[7px] rounded-full align-middle ${CLIENT_STATUS_DOT_CLASS[b.clientStatus]}`}
+                    title={clientStatusLabel(b.clientStatus, b.clinicReviewedAt)}
+                    className={`mr-1 inline-block h-[7px] w-[7px] rounded-full align-middle ${clientStatusDotClass(b.clientStatus, b.clinicReviewedAt)}`}
                   />
                 ) : null}
                 {b.serviceName}
