@@ -29,6 +29,76 @@ Criteria:
 - Clinic role assignment happens idempotently on every panel visit (app/panel/layout.tsx)
 - Patient-only accounts are redirected to /patient instead of being auto-granted clinic
 - RoleUpgradeGate exists for role-conflict resolution
+- SUPERSEDED IN PART (2026-09-14): the self-service confirm-gate design
+  described above (RoleUpgradeGate/PatientRoleGate letting a user opt
+  into adding a second role themselves) is being replaced — see
+  no-self-service-dual-role-accounts below for the new design. This step
+  stays marked done because everything it originally shipped did work as
+  described; it's the design itself that changed, not a bug in what was
+  built.
+
+## Step: no-self-service-dual-role-accounts
+Status: not_started
+Criteria:
+- DECISION (Arun, 2026-09-14): the same email must never carry both
+  clinic and patient roles via self-service. Today, landing on the
+  "wrong" portal offers a Yes/No confirm ("add this role too?") — that
+  self-service path is being REMOVED entirely. Going forward: landing on
+  the wrong portal with an existing single-role account shows an
+  informational message stating which account type they already have,
+  auto-redirects (or offers a single button) to THEIR portal, and says
+  to contact support if they genuinely want both. No Yes option, no
+  role-adding UI at all on any of the four surfaces below — just
+  redirect + message. Only Arun, via a support ticket, manually grants a
+  second role from the admin side. This is a deliberate simplification —
+  dual-role accounts become a rare, human-approved exception rather than
+  a one-click self-service option.
+- FOUR surfaces currently implement the old self-service confirm pattern
+  and all four need the same rework (verified against actual code
+  2026-09-14, not assumed from memory):
+  1. app/panel/layout.tsx + components/panel/role-upgrade-gate.tsx
+     (RoleUpgradeGate) — patient-only account lands on /panel.
+     checkClinicRoleConflict (lib/actions/role-upgrade.ts) currently
+     gates showing this; confirmClinicRoleAdd is the self-service grant
+     to remove.
+  2. app/patient/(protected)/layout.tsx + components/auth/patient-role-gate.tsx
+     (PatientRoleGate) — non-patient-role account (e.g. clinic) lands in
+     the patient portal's protected area. Currently calls provisionPatient
+     directly on "Yes" with no separate conflict-check function (the
+     layout's own `roles.length > 0` check is what triggers showing the
+     gate) — that Yes path is what needs removing.
+  3. components/auth/patient-login-form.tsx's roleConfirm view — same
+     pattern, but at the moment of signing in/up directly at /patient/login
+     rather than landing on an already-authenticated protected page.
+     Uses checkPatientRoleConflict + provisionPatient, same functions as
+     surface 4 below.
+  4. components/booking/booking-wizard.tsx's ConfirmAuthModal (its own
+     internal roleConfirm AuthView state) — the guest booking wizard's
+     inline sign-in/sign-up step hits the exact same conflict check
+     mid-booking. Needs the same treatment — and specifically needs to
+     still let the booking itself complete as a GUEST booking (not block
+     the appointment) when the person is blocked from adding the patient
+     role, since the booking doesn't strictly require the patient role to
+     succeed.
+- checkPatientRoleConflict / checkClinicRoleConflict (the two functions
+  computing `needsConfirm`) likely still have a role to play even in the
+  new design — repurposed from "should I show a Yes/No prompt" to "should
+  I show the new redirect-with-message screen instead of silently
+  provisioning" — the underlying role-conflict DETECTION doesn't change,
+  only what the UI does once a conflict is detected. provisionPatient and
+  confirmClinicRoleAdd (the actual role-granting functions) become
+  either unreachable from these four self-service surfaces or removed
+  outright — TBD at implementation time whether to delete them or keep
+  them as the function an eventual admin-side tool calls.
+- DEPENDENCY, not yet resolved: admin-portal-tools.md's admin-users step
+  covers the admin allowlist (who can access /admin), not granting a
+  second role to a regular clinic/patient user. Fulfilling "contact
+  support" tickets needs SOME way for Arun to actually grant the second
+  role — doesn't need to be a polished admin UI tool for v1 (a manual
+  Supabase row insert into user_roles would work fine), but worth Arun
+  confirming whether that's sufficient or whether a proper admin tool is
+  wanted. Not scoping that decision here — flagging so it isn't assumed
+  solved by this step alone.
 
 ## Step: negocio-setup
 Status: done
