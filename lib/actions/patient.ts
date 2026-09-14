@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { assignRole, getUserRoles } from "@/lib/roles/data";
 import { requireSession } from "@/lib/auth-session";
 import { notifyCancellation, notifyCancellationRequested } from "@/lib/actions/booking";
+import { claimExistingClientHistory } from "@/lib/booking/patient-claim";
 
 export type ProvisionResult =
   | { ok: true; patientId: string }
@@ -293,3 +294,63 @@ export const cancelBookingAsPatient = async (
   revalidatePath("/patient/bookings");
   return { ok: true, requested: false };
 };
+
+// ── One-time "claim existing guest/walk-in history" check ──────────────────
+
+/**
+ * Called once per page load from the patient dashboard
+ * (components/patient/claim-guest-history.tsx). A cheap no-op in the
+ * overwhelming common case — most calls short-circuit on the
+ * emailVerified or claim_checked_at check below without touching
+ * kalendar_clients/kalendar_bookings at all.
+ *
+ * Why this can't just live inside provisionPatient(): that function runs
+ * IMMEDIATELY after sign-up, before the account is verified (both signup
+ * paths — mid-booking registration and standalone /patient/login — call it
+ * synchronously right after Better Auth's signUp.email resolves, well
+ * before the user has clicked anything in their inbox). Matching by an
+ * unverified email would let someone claim a stranger's booking history
+ * just by typing their email address at signup — the same reason
+ * findVerifiedPatientIdByEmail (patient-claim.ts) requires verification
+ * too. So this has to be a separate check that runs once verification
+ * has actually happened — which, for the common "click the link in the
+ * email" path, lands the user directly on the dashboard with a
+ * newly-verified session, never touching provisionPatient() again. This
+ * function is that landing hook.
+ *
+ * claim_checked_at (kalendar_patients) makes repeat calls on later page
+ * loads free — set once, regardless of whether anything was found, so we
+ * never re-run the search again for this patient.
+ */
+export async function claimGuestHistoryIfEligible(): Promise<{ linked: boolean }> {
+  let session;
+  try {
+    session = await requireSession();
+  } catch {
+    return { linked: false };
+  }
+  if (session.user.emailVerified !== true) return { linked: false };
+
+  const supabase = await createClient();
+  const { data: patient } = await supabase
+    .from("kalendar_patients")
+    .select("id, claim_checked_at")
+    .eq("user_id", session.user.id)
+    .maybeSingle();
+
+  if (!patient || patient.claim_checked_at) return { linked: false };
+
+  const result = await claimExistingClientHistory(patient.id, session.user.email);
+
+  await supabase
+    .from("kalendar_patients")
+    .update({ claim_checked_at: new Date().toISOString() })
+    .eq("id", patient.id);
+
+  if (result.bookingsLinked > 0) {
+    revalidatePath("/patient");
+    revalidatePath("/patient/bookings");
+    return { linked: true };
+  }
+  return { linked: false };
+}

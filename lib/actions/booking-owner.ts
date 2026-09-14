@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getBusinessForUser } from "@/lib/business/data";
 import { notifyCancellation, notifyCancellationRequestDenied } from "@/lib/actions/booking";
 import { getWeekBookings, type WeekViewBooking } from "@/lib/booking/owner-data";
+import { findVerifiedPatientIdByEmail, claimExistingClientHistory } from "@/lib/booking/patient-claim";
 import { buildBookingIcsBase64 } from "@/lib/booking/ics";
 import { formatBusinessAddress } from "@/lib/business/data";
 import {
@@ -647,6 +648,17 @@ export const createBookingAsOwner = authedAction(
     // without scoping it), or create a new kalendar_clients row from the
     // entered details. Best-effort — a linking failure never blocks the
     // booking itself, same rationale as the guest path in submitBooking.
+    //
+    // "Unify guests and patients" (2026-09): if the typed email matches an
+    // existing VERIFIED patient account, link this booking (and the
+    // underlying kalendar_clients row) to that patient directly, instead
+    // of always creating a guest-shaped booking regardless of who the
+    // person actually is — see patient-claim.ts for why this only ever
+    // matches a verified email. Best-effort like the rest of this
+    // section: a lookup failure just falls back to the existing
+    // guest-shaped behavior, never blocks the booking.
+    const matchedPatientId = email ? await findVerifiedPatientIdByEmail(email) : null;
+
     let clinicClientId: string | null = null;
     if (input.clinicClientId) {
       const { data: pickedClient } = await supabase
@@ -656,13 +668,23 @@ export const createBookingAsOwner = authedAction(
         .eq("business_id", business.id)
         .maybeSingle();
       clinicClientId = pickedClient?.id ?? null;
+      // The picked row might predate a patient account that now exists
+      // (or simply never got linked) — bring it up to date rather than
+      // leaving it stale just because it already existed.
+      if (clinicClientId && matchedPatientId) {
+        await supabase
+          .from("kalendar_clients")
+          .update({ patient_id: matchedPatientId })
+          .eq("id", clinicClientId)
+          .is("patient_id", null);
+      }
     }
     if (!clinicClientId) {
       const { data: createdClient } = await supabase
         .from("kalendar_clients")
         .insert({
           business_id: business.id,
-          patient_id: null,
+          patient_id: matchedPatientId,
           name,
           email: email || null,
           phone: (input.clientPhone ?? "").trim() || null,
@@ -672,13 +694,21 @@ export const createBookingAsOwner = authedAction(
       clinicClientId = createdClient?.id ?? null;
     }
 
+    // Sweep up any of this person's OTHER pre-existing history too (other
+    // businesses, or a different kalendar_clients row at THIS business
+    // under the same email) — not just the one row touched above. Same
+    // best-effort rationale; never blocks the booking.
+    if (matchedPatientId) {
+      await claimExistingClientHistory(matchedPatientId, email);
+    }
+
     const token = randomBytes(24).toString("base64url");
 
     const { error } = await supabase.from("kalendar_bookings").insert({
       business_id: business.id,
       service_id: service.id,
       team_member_id: member.id,
-      patient_id: null,
+      patient_id: matchedPatientId,
       clinic_client_id: clinicClientId,
       service_name: service.name,
       service_duration_min: service.duration_min,
@@ -691,12 +721,12 @@ export const createBookingAsOwner = authedAction(
       // the clinic's contact with this client, so it should never show the
       // "Invitado sin seguimiento — aún no contactado" follow-up banner a
       // real anonymous public-booking guest gets (needsClinicFollowUp,
-      // calendar-grid-view.tsx). patient_id is still null here (this
-      // client has no patient account), which on its own would classify
-      // as clientStatus 'guest_confirmed' — same bucket as a genuine
-      // guest — so this is set at creation time specifically to opt out
-      // of that follow-up flag for this one insert path. Bug found and
-      // fixed 2026-09: Arun caught it by testing a walk-in booking.
+      // calendar-grid-view.tsx). Set unconditionally regardless of
+      // matchedPatientId above — harmless for 'returning' (which never
+      // needs follow-up anyway) and still correct for a newly-matched
+      // 'first_time' patient (staff meeting them IS the contact there
+      // too). Bug found and fixed 2026-09: Arun caught it by testing a
+      // walk-in booking.
       clinic_reviewed_at: new Date().toISOString(),
       client_name: name,
       client_email: email || `sin-email+${token}@kaminolabs.dev`,

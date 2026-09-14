@@ -92,10 +92,30 @@ create table public.kalendar_patients (
   phone         text,
   name          text,
   contact_email text,
+  -- Set once (never re-attempted after) the one-time "claim existing guest/
+  -- walk-in history" check has run for this patient — see
+  -- claimExistingClientHistory / claimGuestHistoryIfEligible,
+  -- lib/booking/patient-claim.ts + lib/actions/patient.ts (2026-09).
+  -- NULL = not yet checked (still unverified, or verified but not yet
+  -- landed on the dashboard to trigger it). The check itself only ever
+  -- runs once the account's email is verified — see that file's comments
+  -- for why (an unverified email can't be trusted to search/link another
+  -- person's existing booking history by).
+  claim_checked_at timestamptz,
   created_at    timestamptz not null default now()
 );
 
 create index kalendar_patients_user_id_idx on public.kalendar_patients (user_id);
+
+-- Supports findVerifiedPatientIdByEmail's lookup (lib/booking/patient-claim.ts,
+-- used by createBookingAsOwner when staff types in a client's email) —
+-- added here rather than in schema_better_auth_001.sql since it's app-level
+-- query infrastructure, not something Better Auth itself needs; safe to add
+-- to a Better-Auth-managed table (an index, unlike a column, never
+-- conflicts with what Better Auth expects to find there). Same "helps when
+-- the planner can use it, harmless either way" caveat as
+-- kalendar_clients_unlinked_email_idx above.
+create index user_email_lower_idx on public."user" (lower(email));
 
 alter table public.kalendar_patients enable row level security;
 
@@ -467,9 +487,31 @@ create policy "Team: write"
 -- kalendar_clients
 -- A clinic's own record of a person they've booked, one row per
 -- (business, client) — NEVER shared across businesses, even if the same
--- person books with two different clinics on Kalendar. patient_id is an
--- optional soft link to a portal login (kalendar_patients); it carries no
--- special behavior today, just a future hook.
+-- person books with two different clinics on Kalendar. patient_id is a
+-- soft link to a portal login (kalendar_patients) — NULL means this client
+-- is guest/walk-in-only, no known registered account. Populated
+-- automatically now (2026-09, previously "just a future hook", never set):
+--   • The moment a guest/walk-in registers a patient account with a
+--     matching (verified) email, EVERY kalendar_clients row across EVERY
+--     business with that email gets linked — see
+--     claimExistingClientHistory, lib/booking/patient-claim.ts. Nothing
+--     about the booking rows themselves needs to move: every booking
+--     already points at its kalendar_clients row via clinic_client_id, so
+--     the moment patient_id is set here, all of that client's history at
+--     this business is retroactively "theirs" with zero data migration —
+--     AND that function also backfills kalendar_bookings.patient_id
+--     directly for every one of their past bookings, so existing code
+--     that keys off the booking's own patient_id (the patient portal's
+--     "my bookings" list, clientStatus's returning-client detection) picks
+--     it up for free too, with no separate code path needed.
+--   • Same matching also runs the other direction: when clinic staff
+--     manually creates a booking (createBookingAsOwner,
+--     lib/actions/booking-owner.ts) and the email they type matches an
+--     existing VERIFIED patient account, the new booking links patient_id
+--     directly at creation instead of always being guest-shaped.
+-- Both directions require the TARGET account's email to be verified —
+-- linking by an unverified/self-reported email would let someone claim a
+-- stranger's booking history just by typing their email address.
 --
 -- Guest bookings (public wizard) always create a new row here — no lookup/
 -- dedupe by email or phone, by design. Manual bookings (owner, via the panel)
@@ -501,6 +543,15 @@ create table public.kalendar_clients (
 
 create index kalendar_clients_business_id_idx on public.kalendar_clients (business_id);
 create index kalendar_clients_patient_id_idx  on public.kalendar_clients (patient_id) where patient_id is not null;
+-- Supports claimExistingClientHistory's global (cross-business, by design —
+-- see table comment) search for unlinked rows matching a newly-verified
+-- email. Partial since it only needs rows that are BOTH still-unlinked AND
+-- have an email — keeps the index small regardless of total table size.
+-- lower() matches how the app queries it (case-insensitive, escaped ilike
+-- with no real wildcards left — see escapeLikePattern, patient-claim.ts);
+-- not a guarantee Postgres's planner always picks this index for ilike
+-- specifically, but harmless to have either way, and it helps when it can.
+create index kalendar_clients_unlinked_email_idx on public.kalendar_clients (lower(email)) where patient_id is null and email is not null;
 
 alter table public.kalendar_clients enable row level security;
 
