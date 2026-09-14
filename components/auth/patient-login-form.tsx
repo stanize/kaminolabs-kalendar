@@ -387,9 +387,11 @@ export function PatientLoginForm({
 
       <p className="text-center text-[12px] leading-[1.5] text-ink-soft">
         {L.termsPrefix}{" "}
-        <a href="#" className="underline hover:text-ink">{L.terms}</a>{" "}
+        {/* Same new-tab rationale as signup-form.tsx — this can appear
+            mid-registration too. */}
+        <Link href="/legal/terms" target="_blank" rel="noopener noreferrer" className="underline hover:text-ink">{L.terms}</Link>{" "}
         {L.termsAnd}{" "}
-        <a href="#" className="underline hover:text-ink">{L.privacy}</a>{" "}
+        <Link href="/legal/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:text-ink">{L.privacy}</Link>{" "}
         {L.termsSuffix}
       </p>
 

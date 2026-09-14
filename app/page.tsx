@@ -119,9 +119,17 @@ export default async function LandingPage() {
       <footer className="border-t border-line px-5 py-8 sm:px-8">
         <div className="mx-auto flex max-w-[1180px] flex-col items-center justify-between gap-3 sm:flex-row">
           <span className="text-[13px] text-ink-soft">{h.footerTagline}</span>
-          <span className="text-[13px] text-ink-soft">
-            © {new Date().getFullYear()} KaminoLabs. {h.footerRights}
-          </span>
+          <div className="flex items-center gap-5">
+            <Link href="/legal/privacy" className="text-[13px] text-ink-soft transition-colors hover:text-ink">
+              {h.footerPrivacy}
+            </Link>
+            <Link href="/legal/terms" className="text-[13px] text-ink-soft transition-colors hover:text-ink">
+              {h.footerTerms}
+            </Link>
+            <span className="text-[13px] text-ink-soft">
+              © {new Date().getFullYear()} KaminoLabs. {h.footerRights}
+            </span>
+          </div>
         </div>
       </footer>
     </div>

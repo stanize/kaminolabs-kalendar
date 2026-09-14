@@ -63,7 +63,20 @@ export interface BookingPageDictionary {
     createFreeLink: string; // "Crear una gratis"
     haveAccount: string; // "¿Ya tienes cuenta?"
     signInLink: string; // "Inicia sesión"
-    termsNote: string; // "Al continuar aceptas los términos y la política de privacidad de Kalendar."
+    // Split into pieces (not one termsNote string) so "términos"/"privacidad"
+    // can each link to their own page — matches the same pattern
+    // signup-form.tsx/patient-login-form.tsx already use. Rendered as
+    // "{prefix} {termsLink} {termsAnd} {privacyLink}{termsSuffix}" — note
+    // NO space before termsSuffix in that render; each locale's suffix
+    // supplies its own leading space if it needs one (Spanish does, " de
+    // Kalendar."; English doesn't, just ".") so both read naturally
+    // without hardcoding either language's punctuation/spacing rules into
+    // the shared JSX.
+    termsPrefix: string; // "Al continuar aceptas los"
+    termsLink: string; // "términos"
+    termsAnd: string; // "y la"
+    privacyLink: string; // "política de privacidad"
+    termsSuffix: string; // " de Kalendar." (leading space — see above)
   };
   wizard: {
     back: string;
@@ -178,7 +191,13 @@ const es: BookingPageDictionary = {
     createFreeLink: "Crear una gratis",
     haveAccount: "¿Ya tienes cuenta?",
     signInLink: "Inicia sesión",
-    termsNote: "Al continuar aceptas los términos y la política de privacidad de Kalendar.",
+    termsPrefix: "Al continuar aceptas los",
+    termsLink: "términos",
+    termsAnd: "y la",
+    privacyLink: "política de privacidad",
+    // No leading space in JSX before this one (see booking-wizard.tsx's
+    // render) — supplies its own, since English's needs none (just ".").
+    termsSuffix: " de Kalendar.",
   },
   wizard: {
     back: "Atrás",
@@ -286,7 +305,11 @@ const en: BookingPageDictionary = {
     createFreeLink: "Create one for free",
     haveAccount: "Already have an account?",
     signInLink: "Sign in",
-    termsNote: "By continuing you accept Kalendar's terms and privacy policy.",
+    termsPrefix: "By continuing you accept Kalendar's",
+    termsLink: "terms",
+    termsAnd: "and",
+    privacyLink: "privacy policy",
+    termsSuffix: ".",
   },
   wizard: {
     back: "Back",

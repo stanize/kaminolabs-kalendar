@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import Link from "next/link";
 import { Icon } from "@/components/ui/icon";
 import { Logo } from "@/components/ui/logo";
 import { Btn } from "@/components/ui/button";
@@ -714,7 +715,17 @@ function ConfirmAuthModal({
 
             {localError && <p className="mt-3 text-[13px] text-error">{localError}</p>}
 
-            <p className="mt-3 text-center text-[12px] text-ink-soft">{af.termsNote}</p>
+            <p className="mt-3 text-center text-[12px] text-ink-soft">
+              {af.termsPrefix}{" "}
+              {/* New tab, not the same one — this can appear mid-booking,
+                  before the reservation is submitted; navigating away in
+                  the same tab would lose the selected slot/typed details. */}
+              <Link href="/legal/terms" target="_blank" rel="noopener noreferrer" className="underline hover:text-ink">{af.termsLink}</Link>{" "}
+              {af.termsAnd}{" "}
+              {/* No {" "} before termsSuffix here — see the dict's own
+                  comment (booking-page.ts) for why. */}
+              <Link href="/legal/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:text-ink">{af.privacyLink}</Link>{af.termsSuffix}
+            </p>
 
             <p className="mt-3 text-center text-[13px] text-ink-soft">
               {af.haveAccount}{" "}

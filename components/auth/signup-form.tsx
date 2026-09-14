@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { authClient, navigateWithFallback } from "@/lib/auth-client";
 import { reportClientError } from "@/lib/report-client-error";
 import type { PublicDictionary } from "@/lib/i18n/dictionaries/public";
@@ -188,9 +189,11 @@ export function SignupForm({
 
       <p className="text-center text-[11.5px] leading-[1.5] text-ink-soft">
         {dict.termsPrefix}{" "}
-        <a href="#" className="underline hover:text-ink">{dict.terms}</a>{" "}
+        {/* Opens in a new tab, not the same one — clicking away mid-signup
+            would otherwise lose whatever's already typed in this form. */}
+        <Link href="/legal/terms" target="_blank" rel="noopener noreferrer" className="underline hover:text-ink">{dict.terms}</Link>{" "}
         {dict.termsAnd}{" "}
-        <a href="#" className="underline hover:text-ink">{dict.privacy}</a>{" "}
+        <Link href="/legal/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:text-ink">{dict.privacy}</Link>{" "}
         {dict.termsSuffix}
       </p>
     </div>

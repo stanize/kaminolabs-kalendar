@@ -41,6 +41,8 @@ export interface PublicDictionary {
     ctaButton: string;
     footerTagline: string;
     footerRights: string;
+    footerPrivacy: string;
+    footerTerms: string;
     // Decorative booking-page preview cards on the home page.
     previewYourBusiness: string;
     previewDefaultTagline: string;
@@ -149,6 +151,8 @@ const es: PublicDictionary = {
     ctaButton: "Empezar gratis",
     footerTagline: "Kalendar — de KaminoLabs",
     footerRights: "Todos los derechos reservados.",
+    footerPrivacy: "Privacidad",
+    footerTerms: "Términos",
     previewYourBusiness: "Tu negocio",
     previewDefaultTagline: "Reserva tu cita online",
     previewChooseService: "Elige un servicio",
@@ -253,6 +257,8 @@ const en: PublicDictionary = {
     ctaButton: "Start for free",
     footerTagline: "Kalendar — by KaminoLabs",
     footerRights: "All rights reserved.",
+    footerPrivacy: "Privacy",
+    footerTerms: "Terms",
     previewYourBusiness: "Your business",
     previewDefaultTagline: "Book your appointment online",
     previewChooseService: "Choose a service",
