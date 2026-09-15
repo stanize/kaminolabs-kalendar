@@ -22,6 +22,49 @@ Status: done
 Criteria:
 - /admin/users exists — manages the admin allowlist
 
+## Step: manual-role-grant-tool
+Status: not_started
+Criteria:
+- DEPENDENCY of clinic-onboarding.md's no-self-service-dual-role-accounts
+  step — that step removes the self-service "add the other role too?"
+  confirm gates and replaces them with "contact support." This step is
+  the other half: what Arun actually does once that ticket arrives. Without
+  this, "contact support" is a promise with no way to fulfil it.
+- NOT VERIFIED AGAINST ACTUAL ADMIN-REPO CODE (flagging explicitly, unlike
+  this file's other done steps): stanize/kaminolabs-kalendar-admin wasn't
+  cloned for this design pass — no PAT was provided for it this session.
+  What follows is a reasonable design given the schema and the pattern of
+  the other done admin tools in this file, not a verified read of the
+  admin repo's actual current structure. Worth a quick sanity check
+  against the real admin codebase before building, same as any other step.
+- Data model (verified against THIS repo's schema_001.sql, which the
+  admin app reads/writes against): user_roles is a simple composite-key
+  table (user_id, role) with role constrained to 'clinic' | 'patient' —
+  granting a second role is just inserting one row. No new schema needed.
+- NOTE: schema_001.sql's own comment on user_roles is now stale — it
+  currently says a user who enters via both paths over time "accumulates
+  both roles... never in conflict," describing the OLD self-service
+  design this step's sibling is removing. Worth updating that comment
+  when the code change actually lands (in this repo, not the admin one),
+  so it doesn't mislead whoever reads the schema next.
+- Minimum viable version: on the existing /admin/customers page (or
+  wherever an admin already looks up a specific user/business), a way to
+  look up a user by email and see their current role(s), plus a button to
+  add the missing one. Given the low expected volume (a manual, human-
+  approved exception per Arun's own framing in the decision this
+  supports), this doesn't need to be more sophisticated than that for v1
+  — no bulk actions, no self-service anything, just a lookup + one button
+  for Arun's own use.
+- Should log SOMETHING (even just a console.error-style audit line, per
+  this app's existing lightweight logging pattern elsewhere) noting which
+  admin granted which role to which user and when — not for compliance
+  reasons at this scale, just so a "wait, why does this account have both
+  roles" question is answerable later without having to remember.
+- Out of scope for this step: revoking a role (removing dual-role access
+  once granted) — not asked for, and the decision this supports is about
+  preventing accidental self-service ADDITION, not about an offboarding
+  flow. Revisit only if a real need for revocation comes up.
+
 ## Step: subscriptions-lookup-tool
 Status: not_started
 Criteria:

@@ -90,15 +90,13 @@ Criteria:
   either unreachable from these four self-service surfaces or removed
   outright — TBD at implementation time whether to delete them or keep
   them as the function an eventual admin-side tool calls.
-- DEPENDENCY, not yet resolved: admin-portal-tools.md's admin-users step
-  covers the admin allowlist (who can access /admin), not granting a
-  second role to a regular clinic/patient user. Fulfilling "contact
-  support" tickets needs SOME way for Arun to actually grant the second
-  role — doesn't need to be a polished admin UI tool for v1 (a manual
-  Supabase row insert into user_roles would work fine), but worth Arun
-  confirming whether that's sufficient or whether a proper admin tool is
-  wanted. Not scoping that decision here — flagging so it isn't assumed
-  solved by this step alone.
+- DEPENDENCY: admin-portal-tools.md's admin-users step covers the admin
+  allowlist (who can access /admin), not granting a second role to a
+  regular clinic/patient user — that's tracked separately as
+  admin-portal-tools.md's manual-role-grant-tool step, added specifically
+  to support this decision. Fulfilling "contact support" tickets isn't
+  possible until that step is built too — the two are a matched pair,
+  neither one alone delivers the full "contact support" promise.
 
 ## Step: negocio-setup
 Status: done
