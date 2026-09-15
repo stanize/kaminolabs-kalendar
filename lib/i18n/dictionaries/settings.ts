@@ -16,6 +16,11 @@ export interface SettingsDictionary {
     title: string;
     body: string;
   };
+  legal: {
+    title: string;
+    privacy: string;
+    terms: string;
+  };
 }
 
 const es: SettingsDictionary = {
@@ -34,6 +39,11 @@ const es: SettingsDictionary = {
     title: "Próximamente",
     body: "Esta sección todavía no está disponible.",
   },
+  legal: {
+    title: "Legal",
+    privacy: "Política de privacidad",
+    terms: "Términos de servicio",
+  },
 };
 
 const en: SettingsDictionary = {
@@ -51,6 +61,11 @@ const en: SettingsDictionary = {
   placeholder: {
     title: "Coming soon",
     body: "This section isn't available yet.",
+  },
+  legal: {
+    title: "Legal",
+    privacy: "Privacy Policy",
+    terms: "Terms of Service",
   },
 };
 
