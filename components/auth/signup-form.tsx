@@ -191,9 +191,9 @@ export function SignupForm({
         {dict.termsPrefix}{" "}
         {/* Opens in a new tab, not the same one — clicking away mid-signup
             would otherwise lose whatever's already typed in this form. */}
-        <Link href="/legal/terms" target="_blank" rel="noopener noreferrer" className="underline hover:text-ink">{dict.terms}</Link>{" "}
+        <Link href="/legal/terms?returnTo=%2Fsignup" target="_blank" rel="noopener noreferrer" className="underline hover:text-ink">{dict.terms}</Link>{" "}
         {dict.termsAnd}{" "}
-        <Link href="/legal/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:text-ink">{dict.privacy}</Link>{" "}
+        <Link href="/legal/privacy?returnTo=%2Fsignup" target="_blank" rel="noopener noreferrer" className="underline hover:text-ink">{dict.privacy}</Link>{" "}
         {dict.termsSuffix}
       </p>
     </div>

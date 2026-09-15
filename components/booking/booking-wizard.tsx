@@ -12,6 +12,7 @@ import { reportClientError } from "@/lib/report-client-error";
 import type { DayId } from "@/lib/onboarding/types";
 import type { Locale } from "@/lib/i18n/config";
 import { getBookingPageDictionary, type BookingPageDictionary } from "@/lib/i18n/dictionaries/booking-page";
+import { bookingPath } from "@/lib/business/booking-url";
 import type { PatientInfo } from "@/components/booking/booking-page-shell";
 
 interface Service { id: string; name: string; duration_min: number; price: number; }
@@ -719,12 +720,18 @@ function ConfirmAuthModal({
               {af.termsPrefix}{" "}
               {/* New tab, not the same one — this can appear mid-booking,
                   before the reservation is submitted; navigating away in
-                  the same tab would lose the selected slot/typed details. */}
-              <Link href="/legal/terms" target="_blank" rel="noopener noreferrer" className="underline hover:text-ink">{af.termsLink}</Link>{" "}
+                  the same tab would lose the selected slot/typed details.
+                  returnTo carries this exact booking page's path (per-
+                  business, via bookingPath(slug) — the single source of
+                  truth for this URL shape) so the legal page's own "back"
+                  link in that new tab returns here, not to the generic
+                  marketing landing page (bug found 2026-09 by Arun
+                  testing: it always went to "/" regardless of origin). */}
+              <Link href={`/legal/terms?returnTo=${encodeURIComponent(bookingPath(slug))}`} target="_blank" rel="noopener noreferrer" className="underline hover:text-ink">{af.termsLink}</Link>{" "}
               {af.termsAnd}{" "}
               {/* No {" "} before termsSuffix here — see the dict's own
                   comment (booking-page.ts) for why. */}
-              <Link href="/legal/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:text-ink">{af.privacyLink}</Link>{af.termsSuffix}
+              <Link href={`/legal/privacy?returnTo=${encodeURIComponent(bookingPath(slug))}`} target="_blank" rel="noopener noreferrer" className="underline hover:text-ink">{af.privacyLink}</Link>{af.termsSuffix}
             </p>
 
             <p className="mt-3 text-center text-[13px] text-ink-soft">

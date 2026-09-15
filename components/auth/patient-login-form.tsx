@@ -389,9 +389,9 @@ export function PatientLoginForm({
         {L.termsPrefix}{" "}
         {/* Same new-tab rationale as signup-form.tsx — this can appear
             mid-registration too. */}
-        <Link href="/legal/terms" target="_blank" rel="noopener noreferrer" className="underline hover:text-ink">{L.terms}</Link>{" "}
+        <Link href="/legal/terms?returnTo=%2Fpatient%2Flogin" target="_blank" rel="noopener noreferrer" className="underline hover:text-ink">{L.terms}</Link>{" "}
         {L.termsAnd}{" "}
-        <Link href="/legal/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:text-ink">{L.privacy}</Link>{" "}
+        <Link href="/legal/privacy?returnTo=%2Fpatient%2Flogin" target="_blank" rel="noopener noreferrer" className="underline hover:text-ink">{L.privacy}</Link>{" "}
         {L.termsSuffix}
       </p>
 
