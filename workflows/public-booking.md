@@ -150,10 +150,50 @@ Criteria:
   worth building once actual junk volume is observed post-Phase-1, not
   preemptively — per the review, "cheap, and now more urgent" was about
   the honeypot specifically, not a recommendation to build both at once.
+- RATE LIMITING — design finalized (2026-09-14, Arun): 5 submissions per
+  IP per day, PER ENDPOINT (a separate counter per endpoint, not one
+  shared budget across all three — a burst on one doesn't eat into the
+  others). Applies to THREE endpoints, only one of which is this file's
+  own concern:
+  - submitBooking (this step, the guest booking wizard) — the one this
+    step actually builds.
+  - Patient signup (authClient.signUp.email calls in
+    patient-login-form.tsx / booking-wizard.tsx's ConfirmAuthModal) —
+    tracked in patient-portal.md, not here, since it's a distinct auth
+    surface from booking itself even though one of the two call sites
+    happens to live inside the booking wizard component.
+  - Clinic signup (app/signup + SignupForm) — tracked in
+    clinic-onboarding.md.
+  All three should share the SAME underlying mechanism/table (see below)
+  even though each gets its own independent counter — build it once,
+  reuse it three times, not three separate implementations.
+- IMPLEMENTATION for the shared rate-limit mechanism: a Postgres table in
+  Supabase (e.g. kalendar_rate_limit_hits: endpoint text, ip_key text,
+  day date, count int, composite primary key on the three) rather than
+  an in-memory counter — in-memory doesn't work on Vercel's serverless
+  functions, which don't share memory across invocations, and a Postgres
+  table needs no new external dependency (Supabase's already open on
+  every request). "Per day" buckets on a plain date column, not a rolling
+  24h window — simpler to reason about and query. No Redis/Upstash for
+  this phase; revisit only if request volume makes per-request Postgres
+  writes a real cost, which is not expected at Kalendar's current scale.
+- On exceeding the limit: a real, visible error — NOT the honeypot's
+  silent-success trick. Message tells the person to contact support or
+  try again later. Rationale for the different treatment from the
+  honeypot: a legitimate person hitting this (flaky network, accidental
+  double-submit, browser back-button retry) is a plausible trigger here
+  in a way it isn't for a hidden field only a bot would ever touch — they
+  deserve to know why it didn't go through, not be told a fake "success"
+  that leaves them wondering why the clinic never got their booking.
 - Basic rate limiting on submitBooking by IP and/or by (business_id, IP)
   is a reasonable Phase 1 companion to the honeypot — worth scoping
   alongside it rather than as a separate later step, since both are cheap
   and address the same underlying gap.
+- SUPERSEDED: the note below about clinic/patient sign-up being
+  out-of-scope no longer holds — see the rate-limiting bullet above,
+  which now explicitly covers both, per Arun's 2026-09-14 decision to
+  give every account-creating endpoint its own counter on the same shared
+  mechanism. Kept the original line for history rather than deleting it.
 - Out of scope for this step (not part of the review's recommendation,
   noted so a future pass doesn't assume it's covered): CAPTCHA/bot
   protection on clinic sign-up or patient portal sign-up — those aren't

@@ -98,6 +98,27 @@ Criteria:
   possible until that step is built too — the two are a matched pair,
   neither one alone delivers the full "contact support" promise.
 
+## Step: signup-rate-limiting
+Status: not_started
+Criteria:
+- Part of the same 2026-09-14 rate-limiting decision as public-booking.md's
+  booking-abuse-protection step — see that step for the full mechanism
+  design (Postgres-backed kalendar_rate_limit_hits table, per-day
+  buckets, no Redis/in-memory). This step covers clinic signup
+  specifically: app/signup/page.tsx + components/auth/signup-form.tsx.
+- Limit: 5 signups per IP per day, independent from submitBooking's own
+  5/day counter and from patient signup's — three separate budgets, per
+  Arun's explicit "each endpoint gets its own counter" decision.
+- On exceeding: real, visible error (not silent) — same reasoning as
+  booking-abuse-protection and patient-portal.md's signup-rate-limiting:
+  a person legitimately retrying a failed signup is a plausible trigger,
+  unlike a honeypot field. Message: contact support or try again later.
+- No honeypot equivalent decided for this endpoint yet — the review that
+  originated this whole thread was specifically about submitBooking; a
+  honeypot field on the signup forms wasn't discussed. Not assumed in
+  scope here, flagging so it isn't silently skipped OR silently added
+  without a decision.
+
 ## Step: negocio-setup
 Status: done
 Criteria:

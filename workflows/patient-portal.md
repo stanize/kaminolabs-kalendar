@@ -74,6 +74,33 @@ Criteria:
 - Includes a resend-verification-email action with a cooldown, and a manual "ya verifiqué" recheck path (notYet/checking state) for cases the poll hasn't caught yet.
 - ORIGINAL coupling to booking status (2026-08-25, f3bc9e3): an unverified email/password registration made mid-booking held that booking as pending_confirmation, auto-confirmed on verify via finalizeVerifiedPatientBookings. SUPERSEDED (2026-09-13, public-booking.md's guest-immediate-confirm-with-clinic-followup, commit 6d13019): that booking-status coupling was removed — a first booking made mid-sign-up is confirmed immediately now, same as anyone else's. finalizeVerifiedPatientBookings no longer exists. What's UNCHANGED and still exactly as built here: this gate itself still blocks portal ACCESS (viewing/rebooking) for an unverified account — the gate protects ongoing portal use, not the one-shot booking action, which is why removing the booking-side coupling required no changes here.
 
+## Step: signup-rate-limiting
+Status: not_started
+Criteria:
+- Part of the same 2026-09-14 rate-limiting decision as public-booking.md's
+  booking-abuse-protection step — see that step for the full mechanism
+  design (Postgres-backed kalendar_rate_limit_hits table, per-day
+  buckets, no Redis/in-memory). This step covers patient signup
+  specifically: authClient.signUp.email calls in
+  components/auth/patient-login-form.tsx (the standalone /patient/login
+  form) AND components/booking/booking-wizard.tsx's ConfirmAuthModal (the
+  guest wizard's inline sign-up) — both are patient-account creation, both
+  share the SAME counter (keyed on endpoint="patient-signup" or
+  equivalent, not split further by which of the two components the call
+  came from).
+- Limit: 5 signups per IP per day, independent from submitBooking's own
+  5/day counter and from clinic signup's — three separate budgets, per
+  Arun's explicit "each endpoint gets its own counter" decision.
+- On exceeding: real, visible error (not silent) — same reasoning as
+  booking-abuse-protection: a person legitimately retrying a failed
+  signup is a plausible trigger, unlike a honeypot field. Message: contact
+  support or try again later.
+- No honeypot equivalent decided for this endpoint yet — the review that
+  originated this whole thread was specifically about submitBooking; a
+  honeypot field on the signup forms wasn't discussed. Not assumed in
+  scope here, flagging so it isn't silently skipped OR silently added
+  without a decision.
+
 ## Notes / Deviations
 - User-visible copy across public-booking, patient-portal, and panel-shell was changed from "Paciente"/"patient" to "Cliente"/"client" — code identifiers, routes, roles, and table names (kalendar_patients, patient_id, etc.) were deliberately left unchanged, only display text. Not a defined step anywhere; flagging here since it touches this workflow's UI.
 - A shared PatientHeader component (components/patient/patient-header.tsx) now provides consistent nav (Inicio / Perfil / Todas las reservas / Cerrar sesión) across all three protected pages — this wasn't a criterion in any step but is worth capturing since it's a meaningful piece of the portal's shape. Deliberately excludes a generic "book an appointment" link since there's no clinic directory to send a patient to (booking-again is per-booking, scoped to that booking's clinic, via a "Pedir nueva cita" button).
