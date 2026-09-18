@@ -26,6 +26,16 @@ change. That opt-out is per-session/per-request, not a standing change to
 this default — the next session goes back to full automation unless told
 otherwise again.
 
+**Workflow-file status after coding (2026-09-18):** when a `workflows/*.md`
+step's code just got implemented and merged in the same session, do NOT
+mark that step's `Status:` as `done`. Nothing in this repo runs the app or
+clicks through it during a coding session, so "done" should mean verified
+working, not just "code merged." Use `in_progress` instead, with a
+criteria line noting the code is implemented (and typechecked/linted) but
+pending manual/live testing. Only flip to `done` once that testing has
+actually happened — reported by Arun, or done live in a session that has
+a running app.
+
 ## Project Overview
 Kalendar is a SaaS online booking platform targeting Spanish-market professionals (psychologists, nutritionists, physiotherapists, beauty centers, fitness trainers, coaches, tutors, etc.).
 
