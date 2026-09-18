@@ -3,8 +3,17 @@
 Sales strategy: Arun researches a prospective clinic's public website, builds out a fully-populated demo account himself (their real business name, team, services), shows it to them, and — if they like it — sends a special signup link + code that migrates the demo into their own real account under their own email.
 
 ## Step: demo-account-creation
-Status: not_started
+Status: in_progress
 Criteria:
+- PENDING TESTING (2026-09-18, verified against code): fully built —
+  app/api/internal/provision-demo-account/route.ts (secret-gated internal
+  endpoint) creates a real Better Auth user with emailVerified: true,
+  inserts kalendar_businesses with is_demo/demo_created_at/demo_source_url
+  (supabase/schema_001.sql:263+), and populates team members, services,
+  and hours. Matches nearly all criteria below (account creation, full
+  population, is_demo distinguishing flag, no booking data populated). No
+  admin-UI caller or evidence of real use found yet, so `in_progress`
+  (pending testing) not `done`.
 - Arun can create a clinic account through the normal sign-up flow using a dummy/internal email he controls, then populate it fully (Negocio, Servicios, Equipo, Disponibilidad) using data researched from the prospect's real public website
 - Demo accounts are somehow distinguishable from real clinic accounts internally (e.g. a is_demo flag or a naming convention on the dummy email) — needed so demo-account-lifecycle (below) and admin-account-cleanup.md's monthly sweep don't collide (a demo account is intentional, not abandoned, and must not be treated as a stray unconfirmed account)
 - No booking/calendar activity is populated in the demo unless deliberately intended to migrate forward — see account-migration-execution's scope question below

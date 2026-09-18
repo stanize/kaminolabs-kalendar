@@ -6,7 +6,8 @@ Sidebar nav links (components/panel/sidebar.tsx) that exist today but have no re
 Status: done
 Criteria:
 - Every sidebar.tsx NAV_ITEMS route checked against app/panel/ for a real page vs. missing vs. placeholder-only
-- Result: /panel — real (panel home). /panel/calendar — real. /panel/clients — MISSING, tracked separately in clinic-clients-page.md, not here (it's an MVP priority, not post-MVP). /panel/business — real. /panel/services — real. /panel/team — real. /panel/availability — real. /panel/settings — real. /panel/support — real.
+- Result: /panel — real (panel home). /panel/calendar — real. /panel/clients — MISSING, tracked separately in clinic-clients-page.md, not here (it's an MVP priority, not post-MVP). /panel/business — real. /panel/services — real. /panel/team — real. /panel/availability — real. /panel/settings — real. /panel/support — real. /panel/bonos — real.
+- STALENESS NOTE (2026-09-18): /panel/bonos was added to the sidebar after this audit was written and wasn't retroactively added to the Result line above until now — the audit's own criterion ("every NAV_ITEMS route checked") wasn't literally true against current sidebar contents until this update. No new post-MVP gap found, this was a doc-only gap.
 - Remaining items below are the actual post-MVP list: nav links pointing at either a missing route or a placeholder-only page
 
 ## Step: payments-page
