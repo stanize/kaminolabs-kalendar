@@ -1,35 +1,24 @@
 "use client";
 
-import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Logo } from "@/components/ui/logo";
-import { confirmClinicRoleAdd } from "@/lib/actions/role-upgrade";
 import type { PanelShellDictionary } from "@/lib/i18n/dictionaries/panel-shell";
 
 type RoleUpgradeDict = PanelShellDictionary["roleUpgrade"];
 
 /**
  * Shown instead of the panel when a signed-in user holds the 'patient' role
- * but not 'clinic' yet. Mirrors the confirm-before-cross-role-add prompt in
- * the booking wizard's ConfirmAuthModal, for the opposite direction — never
- * silently promote a patient account to clinic just because it landed here.
+ * but not 'clinic' yet. Per the 2026-09-14 no-self-service-dual-role-accounts
+ * decision (workflows/clinic-onboarding.md), this account is NEVER silently
+ * (or self-service) promoted to clinic just because it landed here — there's
+ * no "add this role too" option any more, only a redirect back to the
+ * account's actual portal. A second role is granted only by Arun, manually,
+ * from a support ticket (admin-portal-tools.md's manual-role-grant-tool).
  */
 export function RoleUpgradeGate({ dict }: { dict: RoleUpgradeDict }) {
   const router = useRouter();
-  const [busy, setBusy] = useState(false);
 
-  async function handleYes() {
-    setBusy(true);
-    const res = await confirmClinicRoleAdd();
-    if (res.ok) {
-      router.refresh();
-    } else {
-      setBusy(false);
-    }
-  }
-
-  function handleNo() {
-    setBusy(true);
+  function handleGoToAccount() {
     router.push("/patient");
   }
 
@@ -45,19 +34,10 @@ export function RoleUpgradeGate({ dict }: { dict: RoleUpgradeDict }) {
         <div className="mt-6 flex flex-col gap-2.5">
           <button
             type="button"
-            onClick={handleYes}
-            disabled={busy}
-            className="w-full rounded-xl bg-brand px-5 py-3.5 text-[15px] font-semibold text-white transition-all hover:bg-brand/90 disabled:cursor-wait disabled:opacity-60"
+            onClick={handleGoToAccount}
+            className="w-full rounded-xl bg-brand px-5 py-3.5 text-[15px] font-semibold text-white transition-all hover:bg-brand/90"
           >
-            {dict.yes}
-          </button>
-          <button
-            type="button"
-            onClick={handleNo}
-            disabled={busy}
-            className="w-full rounded-xl border border-line bg-surface px-5 py-3 text-[14px] font-semibold text-ink transition-all hover:border-brand-line disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {dict.no}
+            {dict.action}
           </button>
         </div>
       </div>

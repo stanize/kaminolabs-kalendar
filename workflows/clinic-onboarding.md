@@ -38,8 +38,31 @@ Criteria:
   built.
 
 ## Step: no-self-service-dual-role-accounts
-Status: not_started
+Status: done
 Criteria:
+- IMPLEMENTED (2026-09-18): all four surfaces reworked as designed below —
+  Yes/No self-service confirm replaced with an informational message +
+  single redirect action. checkPatientRoleConflict/checkClinicRoleConflict
+  (detection) untouched; provisionPatient/confirmClinicRoleAdd (the actual
+  grant functions) kept in place per the TBD note below (now unreachable
+  from these four surfaces, available for admin-portal-tools.md's
+  manual-role-grant-tool once that's built) rather than deleted.
+  - Surface 1 (RoleUpgradeGate): dict's yes/no replaced with a single
+    `action` field; button redirects to /patient, no role grant.
+  - Surface 2 (PatientRoleGate): same pattern, inline labels (component had
+    no dict before, still doesn't); button redirects to /panel.
+  - Surface 3 (patient-login-form.tsx roleConfirm view): Yes/No replaced
+    with a single "go to my panel" action (router.push("/panel"), no
+    sign-out — conflict here always means the account holds the other role,
+    since only clinic/patient exist today).
+  - Surface 4 (booking-wizard.tsx ConfirmAuthModal roleConfirm view):
+    Yes/No replaced with a single "continue as guest" action — signs out
+    of the conflicting account and drops into the guest-details view
+    (pre-filled from whatever they'd typed), so the booking still
+    completes without the patient role, per the original criteria below.
+- NOT built as part of this pass: admin-portal-tools.md's
+  manual-role-grant-tool (the "contact support" fulfillment side) — still
+  tracked there as its own not_started step, unchanged dependency.
 - DECISION (Arun, 2026-09-14): the same email must never carry both
   clinic and patient roles via self-service. Today, landing on the
   "wrong" portal offers a Yes/No confirm ("add this role too?") — that

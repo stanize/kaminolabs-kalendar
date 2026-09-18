@@ -1,42 +1,30 @@
 "use client";
 
-import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { authClient } from "@/lib/auth-client";
 import { Logo } from "@/components/ui/logo";
-import { provisionPatient } from "@/lib/actions/patient";
 
 const LABELS = {
-  title: "Un momento",
-  body: "Esta cuenta ya existe con otro tipo de acceso. Continuar añadirá el rol de cliente a tu cuenta. ¿Quieres continuar?",
-  yes: "Sí, continuar",
-  no: "No, cerrar sesión",
+  title: "Esta cuenta ya existe con otro tipo de acceso",
+  body: "No es posible añadir el acceso de cliente a esta cuenta por tu cuenta. Si necesitas ambos tipos de acceso, contacta con soporte.",
+  action: "Ir a mi panel",
 };
 
 /**
  * Shown instead of the patient portal when a signed-in user holds some OTHER
- * role but not 'patient' yet. Mirrors RoleUpgradeGate (components/panel/) for
- * the opposite direction — never silently promote an account to patient just
- * because it landed on /patient (e.g. a clinic owner clicking a stray link).
+ * role but not 'patient' yet (e.g. a clinic owner clicking a stray /patient
+ * link). Per the 2026-09-14 no-self-service-dual-role-accounts decision
+ * (workflows/clinic-onboarding.md), this account is NEVER silently or
+ * self-service promoted to patient — there's no "add this role too" option
+ * any more, only a redirect back to the account's actual portal (/panel,
+ * the only other role today). A second role is granted only by Arun,
+ * manually, from a support ticket (admin-portal-tools.md's
+ * manual-role-grant-tool).
  */
 export function PatientRoleGate() {
   const router = useRouter();
-  const [busy, setBusy] = useState(false);
 
-  async function handleYes() {
-    setBusy(true);
-    const res = await provisionPatient();
-    if (res.ok) {
-      router.refresh();
-    } else {
-      setBusy(false);
-    }
-  }
-
-  async function handleNo() {
-    setBusy(true);
-    await authClient.signOut();
-    router.push("/patient/login");
+  function handleGoToPanel() {
+    router.push("/panel");
   }
 
   return (
@@ -51,19 +39,10 @@ export function PatientRoleGate() {
         <div className="mt-6 flex flex-col gap-2.5">
           <button
             type="button"
-            onClick={handleYes}
-            disabled={busy}
-            className="w-full rounded-xl bg-brand px-5 py-3.5 text-[15px] font-semibold text-white transition-all hover:bg-brand/90 disabled:cursor-wait disabled:opacity-60"
+            onClick={handleGoToPanel}
+            className="w-full rounded-xl bg-brand px-5 py-3.5 text-[15px] font-semibold text-white transition-all hover:bg-brand/90"
           >
-            {LABELS.yes}
-          </button>
-          <button
-            type="button"
-            onClick={handleNo}
-            disabled={busy}
-            className="w-full rounded-xl border border-line bg-surface px-5 py-3 text-[14px] font-semibold text-ink transition-all hover:border-brand-line disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {LABELS.no}
+            {LABELS.action}
           </button>
         </div>
       </div>

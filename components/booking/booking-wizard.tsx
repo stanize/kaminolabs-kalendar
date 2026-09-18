@@ -346,13 +346,19 @@ function ConfirmAuthModal({
     await completeProvision();
   }
 
-  async function declineRoleAdd() {
+  // Only path out of the roleConfirm view now — no self-service role add
+  // (2026-09-14 decision, workflows/clinic-onboarding.md). The booking
+  // doesn't strictly need the patient role to succeed, so let it complete
+  // as a guest booking instead: sign out of the conflicting account and
+  // drop straight into the guest-details view, pre-filled with whatever
+  // name/email they'd already typed.
+  async function continueAsGuest() {
     setBusy(true);
     await authClient.signOut();
     onPatientChange(null);
     setBusy(false);
     setLocalError(null);
-    setView("start");
+    setView("guest");
   }
 
   async function handleGoogle() {
@@ -643,13 +649,9 @@ function ConfirmAuthModal({
             </div>
             <p className="mb-5 text-[14px] text-ink-soft">{am.roleConfirmBody}</p>
             <div className="flex flex-col gap-2">
-              <button type="button" onClick={completeProvision} disabled={busy}
+              <button type="button" onClick={continueAsGuest} disabled={busy}
                 className="w-full rounded-full bg-brand px-4 py-3.5 text-[14.5px] font-semibold text-white transition-all hover:opacity-90 disabled:opacity-60">
-                {busy ? am.confirming : am.roleConfirmYes}
-              </button>
-              <button type="button" onClick={declineRoleAdd} disabled={busy}
-                className="w-full rounded-full border border-line px-4 py-3.5 text-[14.5px] font-semibold text-ink transition-all hover:border-brand-line hover:bg-brand-weak">
-                {am.roleConfirmNo}
+                {am.roleConfirmAction}
               </button>
             </div>
             {localError && <p className="mt-3 text-[13px] text-error">{localError}</p>}
