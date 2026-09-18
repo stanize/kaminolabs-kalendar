@@ -38,8 +38,13 @@ Criteria:
   built.
 
 ## Step: no-self-service-dual-role-accounts
-Status: done
+Status: in_progress
 Criteria:
+- PENDING TESTING (2026-09-18): code implemented and typechecked/linted
+  clean, but not yet exercised in a running app — don't flip to `done`
+  until Arun (or a session with a live environment) has actually clicked
+  through all four surfaces below and confirmed the redirects/guest-booking
+  fallback behave as designed.
 - IMPLEMENTED (2026-09-18): all four surfaces reworked as designed below —
   Yes/No self-service confirm replaced with an informational message +
   single redirect action. checkPatientRoleConflict/checkClinicRoleConflict
