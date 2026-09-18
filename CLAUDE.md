@@ -12,6 +12,20 @@
 >
 > Keep this file and `MODULES.md` in sync via `RESYNC.md`.
 
+## Working Mode — Default to Full Automation
+
+Arun works solo on this repo. **Default behavior for any Claude session
+touching this repo: commit, push, open a PR, and merge it — end to end,
+without pausing for approval.** This applies to workflow-file edits,
+code changes, docs, everything. Do not stop to ask "should I push this?"
+or "should I merge this?" — just do it.
+
+The only exception is when Arun says, *in that session*, that he wants to
+review before merge or doesn't want the automation for that particular
+change. That opt-out is per-session/per-request, not a standing change to
+this default — the next session goes back to full automation unless told
+otherwise again.
+
 ## Project Overview
 Kalendar is a SaaS online booking platform targeting Spanish-market professionals (psychologists, nutritionists, physiotherapists, beauty centers, fitness trainers, coaches, tutors, etc.).
 
