@@ -75,8 +75,7 @@ export interface PanelShellDictionary {
   roleUpgrade: {
     title: string;
     body: string;
-    yes: string;
-    no: string;
+    action: string;
   };
 }
 
@@ -140,10 +139,9 @@ const es: PanelShellDictionary = {
     signOut: "Cerrar sesión",
   },
   roleUpgrade: {
-    title: "Un momento",
-    body: "Esta cuenta ya existe como cuenta de cliente. Continuar añadirá el rol de clínica a tu cuenta. ¿Quieres continuar?",
-    yes: "Sí, continuar",
-    no: "No, volver a mi cuenta de cliente",
+    title: "Esta cuenta ya existe como cuenta de cliente",
+    body: "No es posible añadir el acceso de clínica a esta cuenta por tu cuenta. Si necesitas ambos tipos de acceso, contacta con soporte.",
+    action: "Ir a mi cuenta de cliente",
   },
 };
 
@@ -207,10 +205,9 @@ const en: PanelShellDictionary = {
     signOut: "Sign out",
   },
   roleUpgrade: {
-    title: "One moment",
-    body: "This account already exists as a client account. Continuing will add the clinic role to your account. Do you want to continue?",
-    yes: "Yes, continue",
-    no: "No, go back to my client account",
+    title: "This account already exists as a client account",
+    body: "You can't add clinic access to this account yourself. If you need both types of access, contact support.",
+    action: "Go to my client account",
   },
 };
 

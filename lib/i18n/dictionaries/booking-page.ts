@@ -40,9 +40,8 @@ export interface BookingPageDictionary {
     confirmButton: string;
     confirming: string;
     roleConfirmTitle: string;
-    roleConfirmBody: string; // "Iniciar sesión añadirá el rol de cliente a tu cuenta. ¿Continuar?"
-    roleConfirmYes: string;
-    roleConfirmNo: string;
+    roleConfirmBody: string; // informational — no self-service role add, explains the guest option + support
+    roleConfirmAction: string; // single button: continue this booking as a guest
   };
   authForm: {
     loginTitle: string; // "Bienvenido de nuevo"
@@ -167,10 +166,9 @@ const es: BookingPageDictionary = {
     confirmTitle: "Confirmar reserva",
     confirmButton: "Confirmar reserva",
     confirming: "Reservando…",
-    roleConfirmTitle: "Un momento",
-    roleConfirmBody: "Esta cuenta ya existe con otro tipo de acceso. Continuar añadirá el rol de cliente a tu cuenta. ¿Quieres continuar?",
-    roleConfirmYes: "Sí, continuar",
-    roleConfirmNo: "No, cancelar",
+    roleConfirmTitle: "Esta cuenta ya existe con otro tipo de acceso",
+    roleConfirmBody: "No es posible añadir el acceso de cliente a esta cuenta por tu cuenta. Puedes continuar esta reserva como invitado, sin necesidad de crear una cuenta. Si necesitas ambos tipos de acceso, contacta con soporte.",
+    roleConfirmAction: "Continuar como invitado",
   },
   authForm: {
     loginTitle: "Inicia sesión en Kalendar",
@@ -281,10 +279,9 @@ const en: BookingPageDictionary = {
     confirmTitle: "Confirm booking",
     confirmButton: "Confirm booking",
     confirming: "Booking…",
-    roleConfirmTitle: "One moment",
-    roleConfirmBody: "This account already exists with a different type of access. Continuing will add the client role to your account. Do you want to continue?",
-    roleConfirmYes: "Yes, continue",
-    roleConfirmNo: "No, cancel",
+    roleConfirmTitle: "This account already exists with a different type of access",
+    roleConfirmBody: "You can't add client access to this account yourself. You can continue this booking as a guest, no account needed. If you need both types of access, contact support.",
+    roleConfirmAction: "Continue as guest",
   },
   authForm: {
     loginTitle: "Sign in to Kalendar",

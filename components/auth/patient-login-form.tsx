@@ -72,8 +72,7 @@ interface PatientLabels {
   errUnexpected: string;
   roleConfirmTitle: string;
   roleConfirmBody: string;
-  roleConfirmYes: string;
-  roleConfirmNo: string;
+  roleConfirmAction: string;
   termsPrefix: string;
   terms: string;
   termsAnd: string;
@@ -112,10 +111,9 @@ const DEFAULT_LABELS: PatientLabels = {
   errGeneric: "Ocurrió un error. Inténtalo de nuevo.",
   errEmailExists: "Ya existe una cuenta con ese email.",
   errUnexpected: "Error inesperado. Inténtalo de nuevo.",
-  roleConfirmTitle: "Un momento",
-  roleConfirmBody: "Esta cuenta ya existe con otro tipo de acceso. Continuar añadirá el rol de cliente a tu cuenta. ¿Quieres continuar?",
-  roleConfirmYes: "Sí, continuar",
-  roleConfirmNo: "No, cancelar",
+  roleConfirmTitle: "Esta cuenta ya existe con otro tipo de acceso",
+  roleConfirmBody: "No es posible añadir el acceso de cliente a esta cuenta por tu cuenta. Si necesitas ambos tipos de acceso, contacta con soporte.",
+  roleConfirmAction: "Ir a mi panel",
   termsPrefix: "Al continuar aceptas los",
   terms: "términos",
   termsAnd: "y la",
@@ -178,12 +176,12 @@ export function PatientLoginForm({
     await completeProvision();
   }
 
-  async function declineRoleAdd() {
-    setLoading(true);
-    await authClient.signOut();
-    setLoading(false);
-    setError(null);
-    setView("picker");
+  // Only path out of the roleConfirm view now — no self-service role add
+  // (2026-09-14 decision, workflows/clinic-onboarding.md). This account
+  // already holds some other role (only "clinic" exists today besides
+  // "patient"), so send them to their actual portal, still signed in.
+  function goToOwnPortal() {
+    router.push("/panel");
   }
 
   async function handleGoogle() {
@@ -268,13 +266,9 @@ export function PatientLoginForm({
       <div className="flex flex-col gap-4">
         <h2 className="text-[16px] font-semibold text-ink">{L.roleConfirmTitle}</h2>
         <p className="text-[14px] text-ink-soft">{L.roleConfirmBody}</p>
-        <button type="button" onClick={completeProvision} disabled={loading}
+        <button type="button" onClick={goToOwnPortal} disabled={loading}
           className="w-full rounded-xl bg-brand px-5 py-3.5 text-[15px] font-semibold text-white transition-all hover:bg-brand/90 disabled:cursor-wait disabled:opacity-60">
-          {L.roleConfirmYes}
-        </button>
-        <button type="button" onClick={declineRoleAdd} disabled={loading}
-          className="w-full rounded-xl border border-line bg-surface px-5 py-3.5 text-[15px] font-semibold text-ink transition-all hover:border-brand-line disabled:cursor-wait disabled:opacity-60">
-          {L.roleConfirmNo}
+          {L.roleConfirmAction}
         </button>
         {error && (
           <p className="rounded-xl bg-error-weak px-3.5 py-2.5 text-[13px] font-medium text-error">{error}</p>
