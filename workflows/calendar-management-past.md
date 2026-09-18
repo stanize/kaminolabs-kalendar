@@ -26,13 +26,12 @@ Criteria:
 - When marking a booking paid, the owner must also select a payment method — cash, card, or (if the client has any active bono) one option per active bono, individually labeled. The selector only appears once the paid toggle is switched on — not shown at all while unpaid — and opens inline next to that toggle. If the client has an active bono, the oldest one defaults as pre-selected; the clinic can override to cash, card, or a different bono. kalendar_bookings has a payment_method column (text, nullable, meaningful only when payment_status = 'paid') plus bono_purchase_id (FK to kalendar_bono_purchases, nullable) — see bonos.md's session-deduction-on-payment step for full detail
 - Selecting a bono option deducts one session from that specific bono automatically — see bonos.md
 - DONE: the payment-method lock is one-directional. Switching INTO a bono (from cash, from card, or first-time selection) is always allowed in this modal, anytime, including retroactively on an old booking — deducts a session normally, per bonos.md. Switching AWAY from a bono (bono -> cash, bono -> card, or bono -> a different bono) is what's blocked here — attempting shows a message pointing to the Bonos page instead.
-- KNOWN GAP: switching an already-paid booking's method after the fact by flipping it back to unpaid clears the payment_method/bono_purchase_id link but does NOT restore a deducted session — that correction is bono-session-reversal's job (Bonos page), still not_started. Same gap noted in bonos.md.
+- RESOLVED (2026-09-18, verified against code — previously read "KNOWN GAP: switching an already-paid booking's method after the fact by flipping it back to unpaid clears the payment_method/bono_purchase_id link but does NOT restore a deducted session"): this was fixed by the sync_bono_session_usage trigger (supabase/schema_001.sql:942-1001, also lib/actions/booking-owner.ts:386-394) — any write that clears/changes bono_purchase_id now symmetrically restores the old bono's session, regardless of code path. No longer a gap.
 
 ## Step: past-appointment-editing
-Status: unclear
+Status: done
 Criteria:
-- Determine whether updateBookingAsOwner (or an equivalent) allows editing a past booking's details (client info, notes) after the fact, separately from outcome/payment
-- Determine whether time/service/provider can still be changed on a past booking, or only outcome+payment
+- VERIFIED (2026-09-18, against code): updateBookingAsOwner (lib/actions/booking-owner.ts:785-900) lets the owner edit an existing booking's service, provider, time, client name/email/phone, and notes with no guard against the booking being in the past — it only validates business ownership, service/provider existence, and slot-conflict. Both open questions resolve to "yes": editing works generally, and time/service/provider CAN be changed on a past booking, not just outcome/payment.
 
 ## Step: history-browsing
 Status: not_started

@@ -16,8 +16,17 @@ Access/plumbing and content are being built as two separate phases, deliberately
   - `components/booking/booking-wizard.tsx` — `af.termsNote` (~line 717), CONFIRMED (2026-09-14): unlike the two spots above, this is currently a single plain-text string with no embedded links at all (`"Al continuar aceptas los términos y la política de privacidad de Kalendar."` — no anchors). Needs the same split-into-linked-terms/privacy treatment as signup-form.tsx/patient-login-form.tsx, not just a link swap — a dict/JSX restructure, not a one-line href fix.
 
 ## Step: privacy-policy-page
-Status: not_started
+Status: in_progress
 Criteria:
+- PENDING TESTING (2026-09-18, verified against code): the shell/plumbing
+  half of this step is actually built — `app/legal/privacy/page.tsx` +
+  `content/legal/privacy.md` via the shared `LegalPage` component
+  (components/legal/legal-page.tsx), `react-markdown` is in package.json,
+  and all four link sites are wired (app/page.tsx, signup-form.tsx,
+  patient-login-form.tsx, booking-wizard.tsx). Content is still explicit
+  placeholder text ("este documento está en preparación... se publicará
+  próximamente") — the GDPR-reviewed real text hasn't been swapped in.
+  Not `done` until that content swap happens.
 - A public route exists (e.g. /privacy or /legal/privacy) with an actual privacy policy — currently there is no privacy/legal/terms route anywhere under /app
 - Content is legally reviewed for GDPR compliance (Spain/EU) — this is a legal-review task with its own lead time, not just a page to write; start the review clock independently of when the page itself gets coded
 - Covers what data is collected (clinic business data, patient/client contact info, booking data), why, retention, and who it's shared with (Stripe, Resend, Supabase as processors)
@@ -26,8 +35,12 @@ Criteria:
 - UPDATED (2026-09-14, design confirmed above): route is `/legal/privacy` specifically (not just "e.g." — settled). Build the route/shell + wire up all link sites NOW with placeholder content; the legally-reviewed text is a separate, later content swap into `content/legal/privacy.md` once Arun uploads it — don't block starting/shipping the shell on the review being done.
 
 ## Step: terms-of-service-page
-Status: not_started
+Status: in_progress
 Criteria:
+- PENDING TESTING (2026-09-18, verified against code): same as
+  privacy-policy-page above — `app/legal/terms/page.tsx` +
+  `content/legal/terms.md`, same `LegalPage` component, same link sites
+  wired. Shell built, real reviewed content still to be swapped in.
 - UPDATED (2026-09-14, docs/reviews/2026-09-14-review.md — "Recommended next 3" #1 groups this with privacy-policy-page as one combined go-live blocker, not a separate lower-priority item): the earlier "confirm with Arun whether ToS is needed for MVP" question is effectively answered by a second independent review reaching the same conclusion unprompted — treat as needed alongside the privacy policy, not deferred. Still worth a quick explicit confirm from Arun before starting the legal-review clock, but default to "yes, needed" rather than blocking on that confirm.
 - Same publish/link requirements as privacy-policy-page (public route, linked from sign-up + footer/landing page) — likely reasonable to scope as one combined legal-review engagement and one combined page/route rather than two separate efforts, given they'll probably be drafted together, but that's an implementation choice to confirm at build time, not a design requirement here.
 - UPDATED (2026-09-14, design confirmed above): route is `/legal/terms` specifically. Same shell-now/content-later split as privacy-policy-page — build + wire up now with placeholder content, content swap into `content/legal/terms.md` once reviewed text is uploaded. Shares the same `react-markdown` rendering approach — likely one shared layout/page-shape for both routes given the identical structure, an implementation detail to confirm at build time.
