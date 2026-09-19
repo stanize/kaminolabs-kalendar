@@ -15,7 +15,7 @@ type RoleUpgradeDict = PanelShellDictionary["roleUpgrade"];
  * account's actual portal. A second role is granted only by Arun, manually,
  * from a support ticket (admin-portal-tools.md's manual-role-grant-tool).
  */
-export function RoleUpgradeGate({ dict }: { dict: RoleUpgradeDict }) {
+export function RoleUpgradeGate({ dict, email }: { dict: RoleUpgradeDict; email: string }) {
   const router = useRouter();
 
   function handleGoToAccount() {
@@ -29,7 +29,14 @@ export function RoleUpgradeGate({ dict }: { dict: RoleUpgradeDict }) {
           <Logo showText={false} size={22} />
           <h2 className="text-[20px]">{dict.title}</h2>
         </div>
-        <p className="text-[14.5px] leading-relaxed text-ink-soft">{dict.body}</p>
+        {/* Names the exact account so the person can immediately tell
+            whether they typed/logged into the wrong email, rather than
+            just seeing a generic "this account already exists" message
+            with nothing to check it against (feedback from Arun testing
+            2026-09-19). */}
+        <p className="text-[14.5px] leading-relaxed text-ink-soft">
+          {dict.bodyPrefix} <span className="font-semibold text-ink">{email}</span> {dict.bodySuffix}
+        </p>
 
         <div className="mt-6 flex flex-col gap-2.5">
           <button

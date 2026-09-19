@@ -44,7 +44,7 @@ export default async function PanelLayout({ children }: { children: ReactNode })
   if (roles.includes("patient") && !roles.includes("clinic")) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-bg">
-        <RoleUpgradeGate dict={dict.roleUpgrade} />
+        <RoleUpgradeGate dict={dict.roleUpgrade} email={session.user.email} />
       </div>
     );
   }

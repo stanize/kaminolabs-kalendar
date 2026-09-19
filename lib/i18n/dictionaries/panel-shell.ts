@@ -74,7 +74,8 @@ export interface PanelShellDictionary {
   };
   roleUpgrade: {
     title: string;
-    body: string;
+    bodyPrefix: string;
+    bodySuffix: string;
     action: string;
   };
 }
@@ -140,7 +141,8 @@ const es: PanelShellDictionary = {
   },
   roleUpgrade: {
     title: "Esta cuenta ya existe como cuenta de cliente",
-    body: "No es posible añadir el acceso de clínica a esta cuenta por tu cuenta. Si necesitas ambos tipos de acceso, contacta con soporte.",
+    bodyPrefix: "La cuenta",
+    bodySuffix: "ya existe como cuenta de cliente. No es posible añadir el acceso de clínica a esta cuenta por tu cuenta. Si necesitas ambos tipos de acceso, contacta con soporte.",
     action: "Ir a mi cuenta de cliente",
   },
 };
@@ -206,7 +208,8 @@ const en: PanelShellDictionary = {
   },
   roleUpgrade: {
     title: "This account already exists as a client account",
-    body: "You can't add clinic access to this account yourself. If you need both types of access, contact support.",
+    bodyPrefix: "The account",
+    bodySuffix: "already exists as a client account. You can't add clinic access to it yourself. If you need both types of access, contact support.",
     action: "Go to my client account",
   },
 };

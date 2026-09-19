@@ -5,7 +5,8 @@ import { Logo } from "@/components/ui/logo";
 
 const LABELS = {
   title: "Esta cuenta ya existe con otro tipo de acceso",
-  body: "No es posible añadir el acceso de cliente a esta cuenta por tu cuenta. Si necesitas ambos tipos de acceso, contacta con soporte.",
+  bodyPrefix: "La cuenta",
+  bodySuffix: "ya existe con otro tipo de acceso. No es posible añadir el acceso de cliente a esta cuenta por tu cuenta. Si necesitas ambos tipos de acceso, contacta con soporte.",
   action: "Ir a mi panel",
 };
 
@@ -20,7 +21,7 @@ const LABELS = {
  * manually, from a support ticket (admin-portal-tools.md's
  * manual-role-grant-tool).
  */
-export function PatientRoleGate() {
+export function PatientRoleGate({ email }: { email: string }) {
   const router = useRouter();
 
   function handleGoToPanel() {
@@ -34,7 +35,12 @@ export function PatientRoleGate() {
           <Logo showText={false} size={22} />
           <h2 className="text-[20px]">{LABELS.title}</h2>
         </div>
-        <p className="text-[14.5px] leading-relaxed text-ink-soft">{LABELS.body}</p>
+        {/* Names the exact account so the person can immediately tell
+            whether they landed here with the wrong email (feedback from
+            Arun testing 2026-09-19). */}
+        <p className="text-[14.5px] leading-relaxed text-ink-soft">
+          {LABELS.bodyPrefix} <span className="font-semibold text-ink">{email}</span> {LABELS.bodySuffix}
+        </p>
 
         <div className="mt-6 flex flex-col gap-2.5">
           <button

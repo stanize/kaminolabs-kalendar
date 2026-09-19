@@ -71,7 +71,8 @@ interface PatientLabels {
   errEmailExists: string;
   errUnexpected: string;
   roleConfirmTitle: string;
-  roleConfirmBody: string;
+  roleConfirmBodyPrefix: string;
+  roleConfirmBodySuffix: string;
   roleConfirmAction: string;
   termsPrefix: string;
   terms: string;
@@ -112,7 +113,8 @@ const DEFAULT_LABELS: PatientLabels = {
   errEmailExists: "Ya existe una cuenta con ese email.",
   errUnexpected: "Error inesperado. Inténtalo de nuevo.",
   roleConfirmTitle: "Esta cuenta ya existe con otro tipo de acceso",
-  roleConfirmBody: "No es posible añadir el acceso de cliente a esta cuenta por tu cuenta. Si necesitas ambos tipos de acceso, contacta con soporte.",
+  roleConfirmBodyPrefix: "La cuenta",
+  roleConfirmBodySuffix: "ya existe con otro tipo de acceso. No es posible añadir el acceso de cliente a esta cuenta por tu cuenta. Si necesitas ambos tipos de acceso, contacta con soporte.",
   roleConfirmAction: "Ir a mi panel",
   termsPrefix: "Al continuar aceptas los",
   terms: "términos",
@@ -287,7 +289,12 @@ export function PatientLoginForm({
     return (
       <div className="flex flex-col gap-4">
         <h2 className="text-[16px] font-semibold text-ink">{L.roleConfirmTitle}</h2>
-        <p className="text-[14px] text-ink-soft">{L.roleConfirmBody}</p>
+        {/* Names the exact typed email so the person can immediately tell
+            whether it's the wrong one (feedback from Arun testing
+            2026-09-19). */}
+        <p className="text-[14px] text-ink-soft">
+          {L.roleConfirmBodyPrefix} <span className="font-semibold text-ink">{email}</span> {L.roleConfirmBodySuffix}
+        </p>
         <button type="button" onClick={goToOwnPortal} disabled={loading}
           className="w-full rounded-xl bg-brand px-5 py-3.5 text-[15px] font-semibold text-white transition-all hover:bg-brand/90 disabled:cursor-wait disabled:opacity-60">
           {L.roleConfirmAction}

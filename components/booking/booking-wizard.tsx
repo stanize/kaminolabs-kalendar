@@ -647,7 +647,12 @@ function ConfirmAuthModal({
               <Logo showText={false} size={18} />
               <h2 className="text-[16px] font-semibold text-ink">{am.roleConfirmTitle}</h2>
             </div>
-            <p className="mb-5 text-[14px] text-ink-soft">{am.roleConfirmBody}</p>
+            {/* Names the exact typed email so the person can immediately
+                tell whether it's the wrong one (feedback from Arun testing
+                2026-09-19). */}
+            <p className="mb-5 text-[14px] text-ink-soft">
+              {am.roleConfirmBodyPrefix} <span className="font-semibold text-ink">{email}</span> {am.roleConfirmBodySuffix}
+            </p>
             <div className="flex flex-col gap-2">
               <button type="button" onClick={continueAsGuest} disabled={busy}
                 className="w-full rounded-full bg-brand px-4 py-3.5 text-[14.5px] font-semibold text-white transition-all hover:opacity-90 disabled:opacity-60">

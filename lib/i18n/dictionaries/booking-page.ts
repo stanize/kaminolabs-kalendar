@@ -40,7 +40,8 @@ export interface BookingPageDictionary {
     confirmButton: string;
     confirming: string;
     roleConfirmTitle: string;
-    roleConfirmBody: string; // informational — no self-service role add, explains the guest option + support
+    roleConfirmBodyPrefix: string; // informational — no self-service role add, explains the guest option + support
+    roleConfirmBodySuffix: string;
     roleConfirmAction: string; // single button: continue this booking as a guest
   };
   authForm: {
@@ -167,7 +168,8 @@ const es: BookingPageDictionary = {
     confirmButton: "Confirmar reserva",
     confirming: "Reservando…",
     roleConfirmTitle: "Esta cuenta ya existe con otro tipo de acceso",
-    roleConfirmBody: "No es posible añadir el acceso de cliente a esta cuenta por tu cuenta. Puedes continuar esta reserva como invitado, sin necesidad de crear una cuenta. Si necesitas ambos tipos de acceso, contacta con soporte.",
+    roleConfirmBodyPrefix: "La cuenta",
+    roleConfirmBodySuffix: "ya existe con otro tipo de acceso. No es posible añadir el acceso de cliente a esta cuenta por tu cuenta. Puedes continuar esta reserva como invitado, sin necesidad de crear una cuenta. Si necesitas ambos tipos de acceso, contacta con soporte.",
     roleConfirmAction: "Continuar como invitado",
   },
   authForm: {
@@ -280,7 +282,8 @@ const en: BookingPageDictionary = {
     confirmButton: "Confirm booking",
     confirming: "Booking…",
     roleConfirmTitle: "This account already exists with a different type of access",
-    roleConfirmBody: "You can't add client access to this account yourself. You can continue this booking as a guest, no account needed. If you need both types of access, contact support.",
+    roleConfirmBodyPrefix: "The account",
+    roleConfirmBodySuffix: "already exists with a different type of access. You can't add client access to it yourself. You can continue this booking as a guest, no account needed. If you need both types of access, contact support.",
     roleConfirmAction: "Continue as guest",
   },
   authForm: {
