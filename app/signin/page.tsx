@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Logo } from "@/components/ui/logo";
 import { LoginForm } from "@/components/auth/login-form";
 import { getPublicServerDictionary } from "@/lib/i18n/server";
+import { getUserRoles } from "@/lib/roles/data";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { dict } = await getPublicServerDictionary();
@@ -13,11 +14,14 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function SigninPage() {
-  // Already logged in — go straight to panel
+  // Already logged in AS A CLINIC ACCOUNT — go straight to panel. A
+  // patient-only session must still reach this form (see app/signup/page.tsx
+  // for the full rationale — same bug, same fix, found 2026-09-19).
   try {
     const session = await auth.api.getSession({ headers: await headers() });
     if (session?.user?.id && session?.session?.id) {
-      redirect("/panel");
+      const roles = await getUserRoles(session.user.id);
+      if (roles.includes("clinic")) redirect("/panel");
     }
   } catch {
     // No session — show sign-in

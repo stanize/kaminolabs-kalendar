@@ -13,7 +13,7 @@ Criteria:
 - Landing-page hero email capture carries forward into the sign-up form (app/signup/page.tsx reads searchParams.email -> SignupForm initialEmail)
 - Client-side email format validation (EMAIL_FORMAT_RE) blocks obviously malformed input (missing @, no domain, no dot) before account creation
 - ACCEPTED BEHAVIOR (by design, not a bug): a syntactically valid but non-existent/undeliverable email (e.g. a typo'd domain) is still allowed to create an account. The user can simply sign up again with the correct email and verify that one. This does leave the first, unconfirmed account behind — cleanup of those is tracked separately in admin-account-cleanup.md, not as part of this step.
-- Already-signed-in visitors to /signup are redirected straight to /panel (server-side session check)
+- Already-signed-in-AS-CLINIC visitors to /signup are redirected straight to /panel (server-side session + role check). UPDATED (2026-09-19): this used to redirect on ANY session regardless of role — see the no-self-service-dual-role-accounts step below ("BUG FOUND + FIXED") for the full story and the symmetric /signin + /patient/login fix.
 
 ## Step: email-verification-gate
 Status: done
@@ -45,6 +45,19 @@ Criteria:
   until Arun (or a session with a live environment) has actually clicked
   through all four surfaces below and confirmed the redirects/guest-booking
   fallback behave as designed.
+- BUG FOUND + FIXED (2026-09-19, Arun testing): registering a new clinic
+  account while already holding an active PATIENT session (e.g. from
+  testing the patient portal earlier in the same browser) never reached
+  the sign-up form at all — app/signup/page.tsx's "already signed in"
+  check redirected on ANY session, regardless of role, straight into
+  Surface 1's block message instead of the expected email-verification
+  gate after registering. Fixed by making that pre-form redirect
+  role-aware (only redirects if the session already holds "clinic"), and
+  applied the same fix symmetrically to app/signin/page.tsx (requires
+  "clinic") and app/patient/login/page.tsx (requires "patient") — none of
+  the three pages should ever bounce a same-session-but-wrong-role visitor
+  away before they get a chance to actually attempt sign-up/sign-in.
+  Included in this step's still-pending-testing scope, not a separate step.
 - IMPLEMENTED (2026-09-18): all four surfaces reworked as designed below —
   Yes/No self-service confirm replaced with an informational message +
   single redirect action. checkPatientRoleConflict/checkClinicRoleConflict
