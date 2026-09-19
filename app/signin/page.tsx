@@ -17,11 +17,17 @@ export default async function SigninPage() {
   // Already logged in AS A CLINIC ACCOUNT — go straight to panel. A
   // patient-only session must still reach this form (see app/signup/page.tsx
   // for the full rationale — same bug, same fix, found 2026-09-19).
+  //
+  // hasConflictingSession: passed to LoginForm so it signs that session out
+  // before attempting a fresh sign-in — same rationale as SignupForm's
+  // signOutFirst.
+  let hasConflictingSession = false;
   try {
     const session = await auth.api.getSession({ headers: await headers() });
     if (session?.user?.id && session?.session?.id) {
       const roles = await getUserRoles(session.user.id);
       if (roles.includes("clinic")) redirect("/panel");
+      hasConflictingSession = true;
     }
   } catch {
     // No session — show sign-in
@@ -42,7 +48,7 @@ export default async function SigninPage() {
           <p className="text-[12.5px] text-ink-soft">{dict.signin.subtitle}</p>
         </div>
 
-        <LoginForm dict={dict.auth} />
+        <LoginForm dict={dict.auth} signOutFirst={hasConflictingSession} />
 
         <p className="mt-4 text-center text-[11.5px] text-ink-soft">
           {dict.signin.noAccount}{" "}

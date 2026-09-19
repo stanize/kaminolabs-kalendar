@@ -33,11 +33,16 @@ export default async function PatientLoginPage({
   // different email shouldn't get silently bounced into the
   // no-self-service-dual-role-accounts redirect before ever seeing the
   // patient login form.
+  // hasConflictingSession: passed to PatientAuthCard so it signs that
+  // session out before attempting a fresh sign-in/sign-up — same rationale
+  // as SignupForm's signOutFirst.
+  let hasConflictingSession = false;
   try {
     const session = await auth.api.getSession({ headers: await headers() });
     if (session?.user?.id) {
       const roles = await getUserRoles(session.user.id);
       if (roles.includes("patient")) redirect(redirectTo);
+      hasConflictingSession = true;
     }
   } catch {
     // No session — show login form.
@@ -46,7 +51,7 @@ export default async function PatientLoginPage({
   return (
     <div className="grid min-h-dvh items-start justify-items-center bg-surface-2 px-5 pb-12 pt-16 sm:pt-20">
       <div className="w-full max-w-[420px]">
-        <PatientAuthCard redirectTo={redirectTo} />
+        <PatientAuthCard redirectTo={redirectTo} signOutFirst={hasConflictingSession} />
 
         {backToBooking && (
           <Link

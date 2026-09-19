@@ -26,11 +26,22 @@ export default async function SignupPage({
   // one). Typing the same email they're already signed in with will just
   // hit Better Auth's normal "email already exists" error here, which is
   // more informative than a silent redirect.
+  //
+  // hasConflictingSession: true when a patient-only session is still active
+  // while this form renders. Passed down so SignupForm can sign it out
+  // BEFORE attempting signUp.email — leaving the old session cookie live
+  // underneath a freshly-submitted sign-up risks the new account somehow
+  // inheriting/getting confused with the old session (exact mechanism
+  // unconfirmed, but Arun hit /panel's role-conflict gate right after
+  // registering a genuinely brand-new email, 2026-09-19 — a clean sign-out
+  // first removes the ambiguity regardless of root cause).
+  let hasConflictingSession = false;
   try {
     const session = await auth.api.getSession({ headers: await headers() });
     if (session?.user?.id && session?.session?.id) {
       const roles = await getUserRoles(session.user.id);
       if (roles.includes("clinic")) redirect("/panel");
+      hasConflictingSession = true;
     }
   } catch {
     // No session — show the sign-up screen.
@@ -76,7 +87,7 @@ export default async function SignupPage({
 
         <div className="mx-auto w-full max-w-[380px]">
           <h2 className="mb-6 text-[20px] font-semibold">{dict.signup.title}</h2>
-          <SignupForm dict={dict.auth} initialEmail={emailParam ?? ""} />
+          <SignupForm dict={dict.auth} initialEmail={emailParam ?? ""} signOutFirst={hasConflictingSession} />
         </div>
       </div>
     </div>
