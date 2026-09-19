@@ -4,9 +4,9 @@ import { useRouter } from "next/navigation";
 import { Logo } from "@/components/ui/logo";
 
 const LABELS = {
-  title: "Esta cuenta ya existe con otro tipo de acceso",
+  title: "Esta cuenta ya existe como cuenta de clínica",
   bodyPrefix: "La cuenta",
-  bodySuffix: "ya existe con otro tipo de acceso. No es posible añadir el acceso de cliente a esta cuenta por tu cuenta. Si necesitas ambos tipos de acceso, contacta con soporte.",
+  bodySuffix: "ya existe como cuenta de clínica. No es posible añadir el acceso de cliente a esta cuenta por tu cuenta. Si necesitas ambos tipos de acceso, contacta con soporte.",
   action: "Ir a mi panel",
 };
 
