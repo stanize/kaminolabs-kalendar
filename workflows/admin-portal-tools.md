@@ -75,6 +75,17 @@ Criteria:
 Status: done
 Criteria:
 - /admin/appointment-gen exists, marked dev-only in the sidebar
+- UPDATED (2026-09-19, main repo): the main repo's booking-abuse-protection
+  step (public-booking.md) added a per-IP-per-day rate limit to
+  submitBooking, which app/api/internal/appointment-gen/route.ts (this
+  tool's backend, main repo) calls directly to create each test booking —
+  bulk-generating appointments would have started failing after 5-10 calls
+  from the same IP. Fixed on the main repo's side, nothing to change
+  here: the route now calls a separate submitBookingInternal export
+  (skips the rate limit entirely, never importable from a client
+  component so it's not reachable from a browser) instead of the public
+  submitBooking. Confirm this still generates appointments without
+  hitting an error once main's fix is deployed.
 
 ## Step: date-cycler-dev-tool
 Status: done

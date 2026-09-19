@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAvailableSlots, submitBooking } from "@/lib/actions/booking";
+import { getAvailableSlots, submitBookingInternal } from "@/lib/actions/booking";
 
 /**
  * Internal endpoint used ONLY by the admin portal's appointment-generator
@@ -35,7 +35,7 @@ export async function POST(request: Request) {
   }
 
   if (body.action === "create") {
-    const result = await submitBooking({
+    const result = await submitBookingInternal({
       slug: body.slug,
       serviceId: body.serviceId,
       providerId: body.providerId ?? null,
