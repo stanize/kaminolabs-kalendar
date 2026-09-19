@@ -167,9 +167,9 @@ const es: BookingPageDictionary = {
     confirmTitle: "Confirmar reserva",
     confirmButton: "Confirmar reserva",
     confirming: "Reservando…",
-    roleConfirmTitle: "Esta cuenta ya existe con otro tipo de acceso",
+    roleConfirmTitle: "Esta cuenta ya existe como cuenta de clínica",
     roleConfirmBodyPrefix: "La cuenta",
-    roleConfirmBodySuffix: "ya existe con otro tipo de acceso. No es posible añadir el acceso de cliente a esta cuenta por tu cuenta. Puedes continuar esta reserva como invitado, sin necesidad de crear una cuenta. Si necesitas ambos tipos de acceso, contacta con soporte.",
+    roleConfirmBodySuffix: "ya existe como cuenta de clínica. No es posible añadir el acceso de cliente a esta cuenta por tu cuenta. Puedes continuar esta reserva como invitado, sin necesidad de crear una cuenta. Si necesitas ambos tipos de acceso, contacta con soporte.",
     roleConfirmAction: "Continuar como invitado",
   },
   authForm: {
@@ -281,9 +281,9 @@ const en: BookingPageDictionary = {
     confirmTitle: "Confirm booking",
     confirmButton: "Confirm booking",
     confirming: "Booking…",
-    roleConfirmTitle: "This account already exists with a different type of access",
+    roleConfirmTitle: "This account already exists as a clinic account",
     roleConfirmBodyPrefix: "The account",
-    roleConfirmBodySuffix: "already exists with a different type of access. You can't add client access to it yourself. You can continue this booking as a guest, no account needed. If you need both types of access, contact support.",
+    roleConfirmBodySuffix: "already exists as a clinic account. You can't add client access to it yourself. You can continue this booking as a guest, no account needed. If you need both types of access, contact support.",
     roleConfirmAction: "Continue as guest",
   },
   authForm: {

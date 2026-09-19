@@ -88,6 +88,21 @@ Criteria:
   into the form's own local state (both only reach their roleConfirm view
   via the email/password path — the Google OAuth path redirects away
   before ever showing it, so there's no missing-email case to handle).
+- UX FOLLOW-UP (2026-09-19, same day, Arun feedback): the three
+  "patient side" surfaces (PatientRoleGate, patient-login-form.tsx's
+  roleConfirm view, booking-wizard.tsx's roleConfirm view — all three
+  triggered when the account holds "clinic" and lacks "patient") said the
+  vague "esta cuenta ya existe con otro tipo de acceso" ("with another
+  type of access"), which didn't actually say what that other type was.
+  Reworded to name it explicitly: "ya existe como cuenta de clínica"
+  ("already exists as a clinic account"). Safe to hardcode "clínica"
+  specifically (not a generic "other role" phrase) because only
+  clinic/patient roles exist today and these three surfaces only trigger
+  on the clinic-conflict direction — same reasoning already used
+  elsewhere in this step for assuming which role a conflict means.
+  RoleUpgradeGate (the "clinic side" surface, conflict = holds "patient")
+  was already specific ("ya existe como cuenta de cliente") from the
+  original design, so it needed no change.
 - IMPLEMENTED (2026-09-18): all four surfaces reworked as designed below —
   Yes/No self-service confirm replaced with an informational message +
   single redirect action. checkPatientRoleConflict/checkClinicRoleConflict
