@@ -137,8 +137,52 @@ Criteria:
   stanize/kaminolabs-kalendar, 2026-09-13.
 
 ## Step: booking-abuse-protection
-Status: not_started
+Status: in_progress
 Criteria:
+- PENDING TESTING + PENDING LIVE MIGRATION (2026-09-19): code implemented
+  and typechecked/linted clean, but not yet exercised in a running app —
+  AND supabase/schema_subset_008.sql (kalendar_rate_limit_hits table +
+  increment_rate_limit_hit function) hasn't been run against the live DB
+  yet. Nothing in this step works in production until Arun runs that file
+  in the Supabase SQL editor. Don't flip to `done` until both the
+  migration has run AND the flow's been exercised for real.
+- IMPLEMENTED (2026-09-19) — Phase 1 honeypot: a `website` text input in
+  the guest-details view of booking-wizard.tsx (ConfirmAuthModal), kept
+  off-screen via `absolute h-0 w-0 opacity-0` (not display:none/
+  type=hidden, per the design note below). Wired through as
+  submitBooking's new `honeypot` param — any non-empty value returns a
+  FAKE success (a real token, no DB write) rather than a real error, so a
+  bot believes it worked.
+- IMPLEMENTED (2026-09-19) — rate limiting, REVISED FROM THE ORIGINAL
+  "5/day flat per IP per endpoint" design below (Arun, 2026-09-19): for
+  submitBooking specifically, it's now a SINGLE per-IP-per-day counter
+  (shared across guest and authenticated attempts from that IP) whose
+  ALLOWED THRESHOLD varies by the current request: 5/day if the request
+  is a guest booking, 10/day if it's an authenticated patient booking
+  (verified via the session-derived patientId, never the client-passed
+  one — can't be spoofed to claim the higher threshold). This replaces
+  the flat 5/day for THIS endpoint only — the original "5/day per IP per
+  endpoint, three independent endpoints sharing one mechanism" framing
+  below still holds for clinic/patient SIGNUP (not yet built, tracked in
+  their own files), which don't have a guest/authenticated distinction to
+  vary the threshold by.
+- IMPLEMENTED (2026-09-19) — shared mechanism: kalendar_rate_limit_hits
+  table (endpoint, ip_key, day, count) + increment_rate_limit_hit()
+  Postgres function (atomic upsert-increment in one round trip — a plain
+  JS-client upsert can't reference the row's own current value) — matches
+  the IMPLEMENTATION note below, built exactly as designed there.
+  lib/rate-limit.ts wraps it (incrementRateLimitHit, getClientIp — reads
+  x-forwarded-for). Only submitBooking calls it today.
+- IMPLEMENTED (2026-09-19) — on exceeding the limit: matches the "real,
+  visible error, not the honeypot's silent-success trick" design below,
+  but with an added twist Arun asked for: the message is deliberately
+  generic ("no ha sido posible completar tu solicitud en este momento")
+  rather than saying "rate limit exceeded" outright, paired with a
+  stable, decodable code (BK-4029 for a guest hitting the limit, BK-4030
+  for an authenticated patient) that Arun can map back to "which limit
+  tripped" if a real person quotes it to support, without a scripted
+  abuser learning exactly what mechanism blocked them from the message
+  text alone.
 - SURFACED (2026-09-14, docs/reviews/2026-09-14-review.md — "Recommended
   next 3" #2): no captcha, honeypot, or rate limiting exists anywhere in
   submitBooking today. Flagged as MORE urgent than it would otherwise be

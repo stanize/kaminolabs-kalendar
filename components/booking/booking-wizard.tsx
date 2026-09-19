@@ -293,6 +293,11 @@ function ConfirmAuthModal({
   const [name, setName]                 = useState("");
   const [confirmPassword, setConfirm]   = useState("");
   const [guestPhone, setGuestPhone]     = useState("");
+  // Honeypot (booking-abuse-protection Phase 1) — real users never see or
+  // fill this field (see the input's own comment below for why it's
+  // off-screen rather than display:none/type=hidden). Any non-empty value
+  // here means a bot filled the form.
+  const [website, setWebsite]           = useState("");
   const [notes, setNotes]               = useState("");
   const [busy, setBusy]                 = useState(false);
   const [localError, setLocalError]     = useState<string | null>(null);
@@ -461,6 +466,7 @@ function ConfirmAuthModal({
       notes,
       guestLocale: locale,
       // No patientId — this is the guest path.
+      honeypot: website,
     });
     setBusy(false);
     if (!res.ok) { setLocalError(res.error); return; }
@@ -680,6 +686,22 @@ function ConfirmAuthModal({
               <textarea placeholder={w.notesPlaceholder} value={notes} rows={3}
                 onChange={(e) => setNotes(e.target.value)} disabled={busy} maxLength={500}
                 className={`${inputBase} resize-none`} />
+              {/* Honeypot — off-screen via absolute positioning + opacity-0,
+                  NOT display:none or type="hidden": basic bots specifically
+                  check for those and skip them. tabIndex/aria-hidden keep it
+                  out of reach for real keyboard/screen-reader users, and
+                  autoComplete="off" plus a generic name stop a browser's own
+                  autofill from ever populating it. */}
+              <input
+                type="text"
+                name="website"
+                value={website}
+                onChange={(e) => setWebsite(e.target.value)}
+                tabIndex={-1}
+                autoComplete="off"
+                aria-hidden="true"
+                className="absolute h-0 w-0 opacity-0"
+              />
             </div>
             <p className="mt-3 text-center text-[12px] text-ink-soft">{am.guestNote}</p>
             <button type="button" onClick={submitGuest} disabled={busy}
