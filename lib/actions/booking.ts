@@ -1,8 +1,10 @@
 "use server";
 
 import { randomBytes } from "crypto";
+import { headers } from "next/headers";
 import { getSession } from "@/lib/auth-session";
 import { createClient } from "@/lib/supabase/server";
+import { incrementRateLimitHit, getClientIp } from "@/lib/rate-limit";
 import { getPublicBookingData, getTakenIntervals } from "@/lib/booking/data";
 import { buildBookingIcsBase64 } from "@/lib/booking/ics";
 import { formatBusinessAddress } from "@/lib/business/data";
@@ -37,6 +39,13 @@ export interface BookingWizardErrorDict {
   errInvalidProvider: string;
   errSlotTaken: string;
   errCreateFailed: string;
+  // {code} placeholder — see RATE_LIMIT_CODE below. Deliberately generic
+  // wording ("no ha sido posible... en este momento") rather than naming
+  // "rate limit" outright: a scripted abuser hitting this shouldn't learn
+  // exactly what tripped, while a real person who hits it legitimately
+  // (shared clinic wifi, a retried double-submit) has a stable code to
+  // quote to support instead of just a dead end.
+  errRateLimitedTemplate: string;
 }
 
 const FALLBACK_WIZARD_ERRORS: BookingWizardErrorDict = {
@@ -49,6 +58,18 @@ const FALLBACK_WIZARD_ERRORS: BookingWizardErrorDict = {
   errInvalidProvider: "Profesional no válido.",
   errSlotTaken: "Ese horario ya no está disponible. Elige otro.",
   errCreateFailed: "No se pudo crear la reserva. Inténtalo de nuevo.",
+  errRateLimitedTemplate:
+    "No ha sido posible completar tu solicitud en este momento. Código: {code}. Si el problema persiste, contacta con soporte e indica este código.",
+};
+
+// Stable, non-obvious code shown to the person and loggable by Arun to
+// decode "which limit tripped" without the message itself saying "rate
+// limit exceeded" — see errRateLimitedTemplate's comment. One code per
+// (endpoint, guest-vs-patient) pair; extend this map rather than the
+// generic-sounding prose above if a new limited endpoint is added later.
+const RATE_LIMIT_CODE: Record<"guest" | "patient", string> = {
+  guest: "BK-4029",
+  patient: "BK-4030",
 };
 
 // ── Available slots for a service/provider/date ────────────────────────────
@@ -217,9 +238,20 @@ export async function submitBooking(input: {
   // a specific status instead of deriving it from patientId. Never set by
   // the real public booking wizard.
   statusOverride?: "confirmed" | "pending_confirmation";
+  // Honeypot field (booking-abuse-protection, public-booking.md Phase 1) —
+  // an input invisible to real users but visible to naive form-filling
+  // bots. Never set by a real person, so any non-empty value here means a
+  // bot filled the form. Rejected with a FAKE success below, not a real
+  // error — the bot should believe it worked and move on, not learn to
+  // look for a different signal to avoid.
+  honeypot?: string;
   dict?: Partial<BookingWizardErrorDict>;
 }): Promise<SubmitResult> {
   const t = { ...FALLBACK_WIZARD_ERRORS, ...input.dict };
+
+  if (input.honeypot) {
+    return { ok: true, token: randomBytes(24).toString("base64url"), status: "confirmed" };
+  }
 
   const data = await getPublicBookingData(input.slug);
   if (!data) return { ok: false, error: t.errBusinessUnavailable };
@@ -293,6 +325,23 @@ export async function submitBooking(input: {
     }
   }
   const isAuthenticated = !!verifiedPatientId;
+
+  // RATE LIMITING (booking-abuse-protection, public-booking.md, design
+  // finalized 2026-09-19) — single per-IP-per-day counter for this
+  // endpoint, shared across guest and authenticated attempts from that IP,
+  // but the ALLOWED THRESHOLD depends on the current request: 5/day for a
+  // guest, 10/day for a verified-session patient (isAuthenticated is
+  // derived from verifiedPatientId above, never the client-passed
+  // patientId — can't be spoofed to claim the higher threshold). Checked
+  // AFTER the honeypot/business/service/slot validation above so a
+  // malformed request doesn't burn budget, but BEFORE any DB write.
+  const ip = getClientIp(await headers());
+  const rateLimitThreshold = isAuthenticated ? 10 : 5;
+  const rateLimitCount = await incrementRateLimitHit("submit_booking", ip);
+  if (rateLimitCount > rateLimitThreshold) {
+    const code = RATE_LIMIT_CODE[isAuthenticated ? "patient" : "guest"];
+    return { ok: false, error: t.errRateLimitedTemplate.replace("{code}", code) };
+  }
 
   // client-linking-on-booking (clinic-clients-page.md) — best-effort: a
   // failure here should never block the booking itself (clinic_client_id

@@ -26,6 +26,7 @@ create extension if not exists "pgcrypto";
 -- Drop existing tables (cascade removes dependent objects: policies, indexes).
 -- Children before parents.
 -- ----------------------------------------------------------------------------
+drop table if exists public.kalendar_rate_limit_hits              cascade;
 drop table if exists public.kalendar_stripe_webhook_events       cascade;
 drop table if exists public.kalendar_discount_schedule_phases    cascade;
 drop table if exists public.kalendar_discount_schedule_templates cascade;
@@ -1005,6 +1006,38 @@ $$;
 create trigger kalendar_bookings_sync_bono_session
   after insert or update of payment_method, bono_purchase_id on public.kalendar_bookings
   for each row execute function public.sync_bono_session_usage();
+
+-- ----------------------------------------------------------------------------
+-- kalendar_rate_limit_hits
+-- Shared per-endpoint, per-IP, per-day counter backing booking-abuse-protection
+-- (public-booking.md) — used by submitBooking, and later by clinic/patient
+-- signup once those get their own thresholds wired in. increment_rate_limit_hit
+-- atomically bumps the counter in one round trip (a plain upsert can't
+-- reference the row's own current value from the Supabase JS client).
+-- ----------------------------------------------------------------------------
+create table public.kalendar_rate_limit_hits (
+  endpoint text        not null,
+  ip_key   text        not null,
+  day      date        not null default current_date,
+  count    int         not null default 0,
+  primary key (endpoint, ip_key, day)
+);
+
+alter table public.kalendar_rate_limit_hits enable row level security;
+
+create policy "RateLimitHits: write"
+  on public.kalendar_rate_limit_hits for all using (true) with check (true);
+
+create or replace function public.increment_rate_limit_hit(p_endpoint text, p_ip_key text)
+returns int
+language sql
+as $$
+  insert into public.kalendar_rate_limit_hits (endpoint, ip_key, day, count)
+  values (p_endpoint, p_ip_key, current_date, 1)
+  on conflict (endpoint, ip_key, day)
+  do update set count = kalendar_rate_limit_hits.count + 1
+  returning count;
+$$;
 
 -- ============================================================================
 -- End of schema.
