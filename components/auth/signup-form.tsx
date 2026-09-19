@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { authClient, navigateWithFallback } from "@/lib/auth-client";
@@ -53,9 +53,16 @@ const EMAIL_FORMAT_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export function SignupForm({
   dict,
   initialEmail = "",
+  signOutFirst = false,
 }: {
   dict: AuthDict;
   initialEmail?: string;
+  // True when the page rendered this form despite an existing (wrong-role)
+  // session — see app/signup/page.tsx's hasConflictingSession comment. Sign
+  // that session out immediately so it can't linger underneath a freshly
+  // submitted sign-up. The interactive form itself is disabled until this
+  // completes, so there's no window to submit against the stale session.
+  signOutFirst?: boolean;
 }) {
   const router = useRouter();
 
@@ -63,8 +70,24 @@ export function SignupForm({
   const [email, setEmail]                     = useState(initialEmail);
   const [password, setPassword]               = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [loading, setLoading]                 = useState(false);
+  // Starts true (form disabled) when signOutFirst is set, so there's no
+  // window to submit against the stale session before it's cleared.
+  const [loading, setLoading]                 = useState(signOutFirst);
   const [error, setError]                     = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!signOutFirst) return;
+    let cancelled = false;
+    authClient.signOut().finally(() => {
+      if (!cancelled) setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // Only ever needs to run once, off the initial prop value — not a
+    // dependency the effect should re-run on.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function handleGoogle() {
     setError(null);
@@ -133,7 +156,7 @@ export function SignupForm({
       <button
         type="button"
         onClick={handleGoogle}
-        disabled={loadingGoogle}
+        disabled={loadingGoogle || loading}
         className="flex w-full items-center justify-center gap-2 rounded-lg border border-line bg-surface px-4 py-2 text-[13px] font-semibold text-ink transition-all hover:border-brand-line disabled:cursor-wait disabled:opacity-60"
       >
         <GoogleIcon />

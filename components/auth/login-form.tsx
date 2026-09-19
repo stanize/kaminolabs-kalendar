@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { authClient, navigateWithFallback } from "@/lib/auth-client";
@@ -29,13 +29,37 @@ const GoogleIcon = () => (
 const inputClass =
   "w-full rounded-lg border border-line bg-surface px-3 py-2 text-[13px] text-ink placeholder:text-ink-soft focus:border-brand focus:outline-none disabled:opacity-50";
 
-export function LoginForm({ dict }: { dict: AuthDict }) {
+export function LoginForm({
+  dict,
+  signOutFirst = false,
+}: {
+  dict: AuthDict;
+  // True when the page rendered this form despite an existing patient-only
+  // session — see app/signin/page.tsx. Sign it out immediately so it can't
+  // linger underneath a freshly submitted sign-in. Same rationale/pattern
+  // as SignupForm's signOutFirst.
+  signOutFirst?: boolean;
+}) {
   const router = useRouter();
   const [email, setEmail]         = useState("");
   const [password, setPassword]   = useState("");
-  const [loading, setLoading]     = useState(false);
+  // Starts true (form disabled) when signOutFirst is set, so there's no
+  // window to submit against the stale session before it's cleared.
+  const [loading, setLoading]     = useState(signOutFirst);
   const [loadingGoogle, setLoadingGoogle] = useState(false);
   const [error, setError]         = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!signOutFirst) return;
+    let cancelled = false;
+    authClient.signOut().finally(() => {
+      if (!cancelled) setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function handleEmailLogin() {
     setError(null);
@@ -120,7 +144,7 @@ export function LoginForm({ dict }: { dict: AuthDict }) {
       <button
         type="button"
         onClick={handleGoogle}
-        disabled={loadingGoogle}
+        disabled={loadingGoogle || loading}
         className="flex w-full items-center justify-center gap-2 rounded-lg border border-line bg-surface px-4 py-2 text-[13px] font-semibold text-ink transition-all hover:border-brand-line disabled:cursor-wait disabled:opacity-60"
       >
         <GoogleIcon />

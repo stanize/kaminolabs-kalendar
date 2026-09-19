@@ -8,7 +8,13 @@ import {
   type PatientAuthView,
 } from "@/components/auth/patient-login-form";
 
-export function PatientAuthCard({ redirectTo }: { redirectTo: string }) {
+export function PatientAuthCard({
+  redirectTo,
+  signOutFirst = false,
+}: {
+  redirectTo: string;
+  signOutFirst?: boolean;
+}) {
   const [view, setView] = useState<PatientAuthView>("picker");
   const { title, subtitle } = patientAuthHeading(view);
 
@@ -23,7 +29,7 @@ export function PatientAuthCard({ redirectTo }: { redirectTo: string }) {
       </div>
 
       <div className="rounded-2xl border border-line bg-surface p-6 shadow-sm">
-        <PatientLoginForm redirectTo={redirectTo} onViewChange={setView} />
+        <PatientLoginForm redirectTo={redirectTo} onViewChange={setView} signOutFirst={signOutFirst} />
       </div>
     </>
   );

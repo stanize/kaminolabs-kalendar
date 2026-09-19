@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { authClient, navigateWithFallback } from "@/lib/auth-client";
@@ -137,7 +137,15 @@ export function PatientLoginForm({
   redirectTo = "/patient",
   labels,
   onViewChange,
-}: PatientLoginFormProps & { onViewChange?: (view: PatientAuthView) => void }) {
+  signOutFirst = false,
+}: PatientLoginFormProps & {
+  onViewChange?: (view: PatientAuthView) => void;
+  // True when the page rendered this form despite an existing clinic-only
+  // session — see app/patient/login/page.tsx. Sign it out immediately so
+  // it can't linger underneath a freshly submitted sign-in/sign-up. Same
+  // rationale/pattern as SignupForm's signOutFirst.
+  signOutFirst?: boolean;
+}) {
   const router = useRouter();
   const L = { ...DEFAULT_LABELS, ...labels };
 
@@ -150,8 +158,22 @@ export function PatientLoginForm({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [loading, setLoading] = useState(false);
+  // Starts true (form disabled) when signOutFirst is set, so there's no
+  // window to submit against the stale session before it's cleared.
+  const [loading, setLoading] = useState(signOutFirst);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!signOutFirst) return;
+    let cancelled = false;
+    authClient.signOut().finally(() => {
+      if (!cancelled) setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // After any successful auth, check for a cross-role conflict before
   // silently adding the patient role, then provision + redirect.

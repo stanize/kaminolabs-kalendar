@@ -58,6 +58,24 @@ Criteria:
   the three pages should ever bounce a same-session-but-wrong-role visitor
   away before they get a chance to actually attempt sign-up/sign-in.
   Included in this step's still-pending-testing scope, not a separate step.
+- FOLLOW-UP FIX (2026-09-19, same day, Arun retested): the role-aware
+  redirect above wasn't sufficient on its own — Arun hit the same block
+  message registering with a genuinely brand-new email/password (not a
+  reused one), meaning a stale wrong-role session cookie was somehow still
+  in play even though the redirect correctly let the form render. Root
+  cause not fully confirmed (suspect: the old session cookie was still
+  attached to the signUp.email/signIn.email/signIn.social request itself,
+  underneath the freshly-submitted new account, since we only stopped
+  redirecting it — we never actually cleared it). Fix: SignupForm,
+  LoginForm, and PatientLoginForm now take a `signOutFirst` prop (set by
+  their page when a conflicting-role session was detected instead of
+  redirected) and call authClient.signOut() on mount before the form is
+  interactive — form stays disabled (loading state starts true) until
+  that completes, so there's no window to submit against the stale
+  session. Threaded through app/signup/page.tsx -> SignupForm,
+  app/signin/page.tsx -> LoginForm, and app/patient/login/page.tsx ->
+  PatientAuthCard -> PatientLoginForm. Still pending testing — this is the
+  fix Arun needs to re-verify next.
 - IMPLEMENTED (2026-09-18): all four surfaces reworked as designed below —
   Yes/No self-service confirm replaced with an informational message +
   single redirect action. checkPatientRoleConflict/checkClinicRoleConflict
