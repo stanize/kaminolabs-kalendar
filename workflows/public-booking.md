@@ -183,6 +183,26 @@ Criteria:
   tripped" if a real person quotes it to support, without a scripted
   abuser learning exactly what mechanism blocked them from the message
   text alone.
+- IMPLEMENTED (2026-09-19, same day, Arun follow-up) — admin-tooling
+  exemption: the admin portal's appointment-generator dev tool
+  (kaminolabs-kalendar-admin, /admin/appointment-gen) calls submitBooking
+  directly via app/api/internal/appointment-gen/route.ts to bulk-create
+  test bookings, and would have started hitting this same rate limit
+  after 5-10 calls from the same IP. First attempt keyed the bypass off
+  `statusOverride` being set — WRONG, caught before shipping: the admin
+  tool's default "auto" mode sends statusOverride as undefined, so the
+  common case wouldn't have been exempted at all. Fixed properly instead:
+  lib/actions/booking.ts's submitBooking was split into a private
+  `submitBookingImpl(input, skipRateLimit)` plus two thin exports —
+  `submitBooking` (skipRateLimit always false, the only one
+  booking-wizard.tsx may import) and `submitBookingInternal`
+  (skipRateLimit always true, imported ONLY by the internal route). Since
+  submitBookingInternal is never imported by a "use client" component, it
+  never enters the Next.js Server Action client-reference manifest — a
+  browser has no way to reach it or the bypass, forged request or not,
+  unlike a boolean flag on the public-facing function would have been.
+  app/api/internal/appointment-gen/route.ts now calls
+  submitBookingInternal instead of submitBooking.
 - SURFACED (2026-09-14, docs/reviews/2026-09-14-review.md — "Recommended
   next 3" #2): no captcha, honeypot, or rate limiting exists anywhere in
   submitBooking today. Flagged as MORE urgent than it would otherwise be

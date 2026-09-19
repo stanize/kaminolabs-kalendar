@@ -220,7 +220,13 @@ export type SubmitResult =
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export async function submitBooking(input: {
+// Internal implementation — see submitBooking/submitBookingInternal below
+// this function for the two thin, purpose-specific exports. Not exported
+// itself: keeping the rate-limit bypass out of anything a client component
+// could import means it's never wired into the Next.js Server Action
+// client-reference manifest, so there's no way to reach it — or the
+// skipRateLimit flag — from a browser at all, forged request or not.
+async function submitBookingImpl(input: {
   slug: string;
   serviceId: string;
   providerId: string | null;
@@ -246,7 +252,7 @@ export async function submitBooking(input: {
   // look for a different signal to avoid.
   honeypot?: string;
   dict?: Partial<BookingWizardErrorDict>;
-}): Promise<SubmitResult> {
+}, skipRateLimit: boolean): Promise<SubmitResult> {
   const t = { ...FALLBACK_WIZARD_ERRORS, ...input.dict };
 
   if (input.honeypot) {
@@ -335,12 +341,27 @@ export async function submitBooking(input: {
   // patientId — can't be spoofed to claim the higher threshold). Checked
   // AFTER the honeypot/business/service/slot validation above so a
   // malformed request doesn't burn budget, but BEFORE any DB write.
-  const ip = getClientIp(await headers());
-  const rateLimitThreshold = isAuthenticated ? 10 : 5;
-  const rateLimitCount = await incrementRateLimitHit("submit_booking", ip);
-  if (rateLimitCount > rateLimitThreshold) {
-    const code = RATE_LIMIT_CODE[isAuthenticated ? "patient" : "guest"];
-    return { ok: false, error: t.errRateLimitedTemplate.replace("{code}", code) };
+  //
+  // EXEMPTION (2026-09-19, Arun): admin tooling — specifically the admin
+  // portal's appointment-generator dev tool, reached only via
+  // app/api/internal/appointment-gen/route.ts, which is gated on
+  // INTERNAL_APPOINTMENT_GEN_SECRET before it ever calls submitBooking —
+  // needs to bulk-create many test bookings in one run without tripping
+  // this. skipRateLimit (this function's second argument, see
+  // submitBookingImpl above) is the signal, set ONLY by
+  // submitBookingInternal below — an export that's never imported by any
+  // client component, so a browser has no way to reach it or the flag,
+  // forged request or not (see submitBookingImpl's own comment). Skips the
+  // increment entirely too, not just the threshold check, so admin-tool
+  // runs don't pollute the real per-IP counter for that day either.
+  if (!skipRateLimit) {
+    const ip = getClientIp(await headers());
+    const rateLimitThreshold = isAuthenticated ? 10 : 5;
+    const rateLimitCount = await incrementRateLimitHit("submit_booking", ip);
+    if (rateLimitCount > rateLimitThreshold) {
+      const code = RATE_LIMIT_CODE[isAuthenticated ? "patient" : "guest"];
+      return { ok: false, error: t.errRateLimitedTemplate.replace("{code}", code) };
+    }
   }
 
   // client-linking-on-booking (clinic-clients-page.md) — best-effort: a
@@ -560,6 +581,29 @@ async function notifyOwnerOfBooking(booking: {
       panelUrl: `${base}/panel/calendar`,
     }),
   });
+}
+
+/** Public wizard entry point — always rate-limited. This is the only one
+ * of the two exports below that any client component may import. */
+export async function submitBooking(
+  input: Parameters<typeof submitBookingImpl>[0]
+): Promise<SubmitResult> {
+  return submitBookingImpl(input, false);
+}
+
+/**
+ * Admin-tooling entry point ONLY (the appointment-generator dev tool, via
+ * app/api/internal/appointment-gen/route.ts — itself gated on
+ * INTERNAL_APPOINTMENT_GEN_SECRET). Skips the per-IP rate limit entirely so
+ * bulk test-appointment generation doesn't trip it. Never import this from
+ * a "use client" component — doing so would make it reachable as a Next.js
+ * Server Action from the browser, defeating the whole point of keeping the
+ * rate-limit bypass off the client-callable surface.
+ */
+export async function submitBookingInternal(
+  input: Parameters<typeof submitBookingImpl>[0]
+): Promise<SubmitResult> {
+  return submitBookingImpl(input, true);
 }
 
 // ── Cancellation (client side, via tokenized link) ─────────────────────────
