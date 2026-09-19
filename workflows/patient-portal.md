@@ -19,6 +19,40 @@ Criteria:
 - redirectTo query param is validated as a same-site relative path only (open-redirect guard)
 - When arriving from a specific clinic's booking page, a "back to booking" link is shown instead of forcing login
 
+## Step: standalone-entry-page
+Status: in_progress
+Criteria:
+- PENDING TESTING (2026-09-19): code implemented and typechecked/linted
+  clean, but not yet exercised in a running app.
+- MOTIVATION (Arun, 2026-09-19): before this, the only way to reach
+  patient sign-up/sign-in was via a specific clinic's booking page
+  (booking-wizard.tsx's ConfirmAuthModal) or by already knowing the
+  internal /patient/login URL — there was no simple, clinic-independent,
+  shareable URL a patient could be given/find to register or sign in on
+  its own. This step adds one: /patients.
+- New route app/patients/page.tsx — same role-aware-redirect +
+  signOutFirst pattern as /patient/login (already-patient sessions go
+  straight to /patient; a conflicting clinic-only session is signed out
+  before the form renders, per no-self-service-dual-role-accounts in
+  clinic-onboarding.md), rendering the existing PatientAuthCard component
+  with redirectTo="/patient" — no new auth logic, reuses everything
+  patient-auth above already built.
+- /patient/login is UNCHANGED and stays exactly as it was — it's the
+  internal unauthenticated-guard redirect target wired throughout the
+  codebase (proxy.ts, the protected layout, password-reset/email links)
+  and isn't meant to be a public marketing URL. /patients is a separate,
+  additional front door onto the same underlying form, not a replacement.
+- BUG FIXED IN THE SAME CHANGE: proxy.ts's /patient/** auth guard used
+  `pathname.startsWith("/patient")`, which also matched the new
+  "/patients" route as a prefix — every unauthenticated visitor to
+  /patients would have been immediately bounced to /patient/login before
+  ever seeing the new page, making it dead on arrival. Fixed to
+  `pathname === "/patient" || pathname.startsWith("/patient/")`.
+- NOT done as part of this step: no link to /patients was added anywhere
+  in the product (landing page nav, footer, booking pages) — Arun asked
+  for the page itself, not for it to be wired into navigation yet. Purely
+  a directly-typed/shared URL for now.
+
 ## Step: patient-provisioning
 Status: done
 Criteria:

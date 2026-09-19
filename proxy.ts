@@ -24,8 +24,12 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  // /patient/** — redirect to /patient/login if not authenticated.
-  if (pathname.startsWith("/patient")) {
+  // /patient/** — redirect to /patient/login if not authenticated. Scoped to
+  // exactly "/patient" and "/patient/*", NOT a plain startsWith("/patient") —
+  // that would also match the unrelated "/patients" route (public entry
+  // point, no auth required to view the form) and bounce every
+  // unauthenticated visitor away from it before they ever saw it.
+  if (pathname === "/patient" || pathname.startsWith("/patient/")) {
     // Allow /patient/login itself through unconditionally.
     if (pathname === "/patient/login") {
       return NextResponse.next();
