@@ -76,6 +76,18 @@ Criteria:
   app/signin/page.tsx -> LoginForm, and app/patient/login/page.tsx ->
   PatientAuthCard -> PatientLoginForm. Still pending testing — this is the
   fix Arun needs to re-verify next.
+- UX IMPROVEMENT (2026-09-19, Arun feedback): all four block/redirect
+  messages (RoleUpgradeGate, PatientRoleGate, patient-login-form.tsx's
+  roleConfirm view, booking-wizard.tsx ConfirmAuthModal's roleConfirm
+  view) now name the exact account email in the message body, so the
+  person can immediately tell whether they're on the wrong email rather
+  than seeing a generic "this account already exists" with nothing to
+  check it against. RoleUpgradeGate/PatientRoleGate get it from
+  session.user.email (server-side, passed down from their layout);
+  patient-login-form.tsx/booking-wizard.tsx use the email already typed
+  into the form's own local state (both only reach their roleConfirm view
+  via the email/password path — the Google OAuth path redirects away
+  before ever showing it, so there's no missing-email case to handle).
 - IMPLEMENTED (2026-09-18): all four surfaces reworked as designed below —
   Yes/No self-service confirm replaced with an informational message +
   single redirect action. checkPatientRoleConflict/checkClinicRoleConflict

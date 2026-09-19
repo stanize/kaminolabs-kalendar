@@ -23,7 +23,7 @@ export default async function PatientLayout({ children }: { children: ReactNode 
     if (roles.length > 0) {
       return (
         <div className="min-h-dvh bg-bg">
-          <PatientRoleGate />
+          <PatientRoleGate email={session.user.email} />
         </div>
       );
     }
