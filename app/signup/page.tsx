@@ -5,6 +5,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { SignupForm } from "@/components/auth/signup-form";
 import { getPublicServerDictionary } from "@/lib/i18n/server";
+import { getUserRoles } from "@/lib/roles/data";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { dict } = await getPublicServerDictionary();
@@ -16,11 +17,20 @@ export default async function SignupPage({
 }: {
   searchParams: Promise<{ email?: string }>;
 }) {
-  // Already signed in — skip straight to the panel.
+  // Already signed in AS A CLINIC ACCOUNT — skip straight to the panel. A
+  // patient-only session must still reach this form: they may be a patient
+  // who's opening a separate clinic account, and previously got bounced
+  // straight to /panel's no-self-service-dual-role-accounts redirect
+  // without ever seeing the sign-up form at all (bug found 2026-09-19 by
+  // Arun testing — /signup redirected on ANY session, not just a clinic
+  // one). Typing the same email they're already signed in with will just
+  // hit Better Auth's normal "email already exists" error here, which is
+  // more informative than a silent redirect.
   try {
     const session = await auth.api.getSession({ headers: await headers() });
     if (session?.user?.id && session?.session?.id) {
-      redirect("/panel");
+      const roles = await getUserRoles(session.user.id);
+      if (roles.includes("clinic")) redirect("/panel");
     }
   } catch {
     // No session — show the sign-up screen.

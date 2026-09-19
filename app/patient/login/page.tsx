@@ -4,6 +4,7 @@ import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { Icon } from "@/components/ui/icon";
 import { PatientAuthCard } from "@/components/auth/patient-auth-card";
+import { getUserRoles } from "@/lib/roles/data";
 
 export const metadata = { title: "Accede a tu cuenta — Kalendar" };
 
@@ -25,10 +26,19 @@ export default async function PatientLoginPage({
   // a way back to it — the person may just be browsing, not ready to log in.
   const backToBooking = redirectTo !== "/patient" && redirectTo.startsWith("/bookings/") ? redirectTo : null;
 
-  // Already authenticated — go straight to the target (or the portal home).
+  // Already authenticated AS A PATIENT — go straight to the target (or the
+  // portal home). A clinic-only session must still reach this form (see
+  // app/signup/page.tsx for the full rationale — same bug, same fix, found
+  // 2026-09-19): a clinic owner testing/using the patient portal with a
+  // different email shouldn't get silently bounced into the
+  // no-self-service-dual-role-accounts redirect before ever seeing the
+  // patient login form.
   try {
     const session = await auth.api.getSession({ headers: await headers() });
-    if (session?.user?.id) redirect(redirectTo);
+    if (session?.user?.id) {
+      const roles = await getUserRoles(session.user.id);
+      if (roles.includes("patient")) redirect(redirectTo);
+    }
   } catch {
     // No session — show login form.
   }
