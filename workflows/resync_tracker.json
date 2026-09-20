@@ -1,0 +1,6 @@
+{
+  "_comment": "Tracks RESYNC.md cadence (weekly, not daily) — keeps CLAUDE.md/MODULES.md honest against code, a different concern from review_tracker.json's product-priority review. A weekly Routine reads this and reminds Arun. Seeded 2026-09-20 with no prior real RESYNC.md run on record (git history has no matching commit) — this is a fresh baseline, not a claim that a resync happened on this date.",
+  "last_resync_date": "2026-09-20",
+  "last_resync_commit": "7d56502",
+  "last_skip_date": null
+}

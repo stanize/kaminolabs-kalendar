@@ -1,0 +1,6 @@
+{
+  "_comment": "Tracks REVIEW.md cadence. A daily Routine reads this: if last_skip_date is today, stays silent; otherwise it computes days-since-last-review and commits-since-last-review (git log last_review_commit..HEAD) and asks Arun whether to run REVIEW.md. See CLAUDE.md's 'Maintenance Cadence' section for the full mechanism.",
+  "last_review_date": "2026-09-14",
+  "last_review_commit": "cd05c10",
+  "last_skip_date": null
+}

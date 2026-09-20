@@ -36,6 +36,65 @@ pending manual/live testing. Only flip to `done` once that testing has
 actually happened — reported by Arun, or done live in a session that has
 a running app.
 
+## Working Process (2026-09-20)
+
+The full loop for any feature: **Design → Code → Test → Review**, with
+`workflows/*.md` as the single source of truth throughout.
+
+- **Design**: brainstorm/decide, write the settled decisions into the
+  relevant `workflows/*.md` step (`Status: not_started`, detailed enough
+  for a different session to build from without re-deriving decisions).
+  Lower-bar/not-yet-decided things go in `workflows/backlog.md` or
+  `workflows/ideas.md` first, get promoted to a real step once actually
+  decided to build. `workflows/notes.md` holds cross-cutting observations
+  that don't belong to one feature.
+- **Code**: picks up from the workflow step, implements it, sets
+  `Status: in_progress` with a "pending testing" criteria note (see
+  above) — never `done` from a coding session alone.
+- **Test**: Arun tests manually. Two outcomes:
+  - Confirms it works → `Status: done`.
+  - Finds a bug → back to Code, append a "BUG FOUND + FIXED" (or still
+    investigating) criteria note, stays `in_progress`/pending testing,
+    loop again. A failed test is not a dead end, it's a normal step back
+    into Code.
+- **Review**: `REVIEW.md`, run in a dedicated session — independent
+  product-and-business analysis, ranked priorities (top 3 / next 3 /
+  nice-to-have / post-MVP). Per Arun's preference, `REVIEW.md` **waits
+  for his confirmation before pushing anything** — this is the one place
+  in the loop that doesn't follow the full-automation default above.
+  Review's output should generally be what starts the next Design pass —
+  don't let ranked findings just sit in a doc nobody acts on.
+
+Same session covering Design → Code → Test-prep back-to-back is fine —
+the workflow-file boundary is what matters, not session boundaries.
+
+### Maintenance cadence — review & resync trackers
+
+Two separate drift problems, two separate trackers, both in `workflows/`:
+
+- **`review_tracker.json`** — tracks `REVIEW.md` cadence (is the *product*
+  behind where it should be). Fields: `last_review_date`,
+  `last_review_commit`, `last_skip_date`. A daily Routine reads it: if
+  `last_skip_date` is today, stays silent (Arun already said skip for the
+  day). Otherwise computes days since `last_review_date` and commit count
+  since `last_review_commit` (`git log <commit>..origin/main --oneline`),
+  and asks Arun whether to run `REVIEW.md` now. On "skip" → set
+  `last_skip_date` to today, push. On "run" → run `REVIEW.md` (still
+  waiting for Arun's confirm-before-push per its own rule above), then on
+  completion set `last_review_date`/`last_review_commit` to today/HEAD.
+- **`resync_tracker.json`** — same shape and mechanism, but for
+  `RESYNC.md` (is the *documentation* — `CLAUDE.md`/`MODULES.md` — behind
+  the code) and on a **weekly**, not daily, cadence.
+- Any session that actually runs `REVIEW.md` or `RESYNC.md` to completion
+  must update the corresponding tracker file as part of that work — the
+  trackers are only as good as this staying disciplined.
+- **Cross-repo note**: kaminolabs-kalendar-admin has no tracker/cadence of
+  its own — its workflow tracking lives centrally here (see repo-scope
+  note elsewhere in this file), so changes there are also in scope for
+  what "commits since last review" should account for if reachable, and
+  are a likely source of staleness the daily/weekly check won't catch on
+  its own if the admin repo isn't cloned in that session.
+
 ## Project Overview
 Kalendar is a SaaS online booking platform targeting Spanish-market professionals (psychologists, nutritionists, physiotherapists, beauty centers, fitness trainers, coaches, tutors, etc.).
 
