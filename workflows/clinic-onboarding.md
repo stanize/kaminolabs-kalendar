@@ -103,6 +103,22 @@ Criteria:
   RoleUpgradeGate (the "clinic side" surface, conflict = holds "patient")
   was already specific ("ya existe como cuenta de cliente") from the
   original design, so it needed no change.
+- UX FOLLOW-UP (2026-09-20, Arun feedback — "stuck in a loop between a
+  client account and a clinic account"): the redirect action on three of
+  the four surfaces (RoleUpgradeGate, PatientRoleGate,
+  patient-login-form.tsx's roleConfirm view) now SIGNS OUT before
+  navigating, instead of pushing straight into the account's other portal
+  while keeping the same session live. Landing directly in the "correct"
+  portal without an explicit re-login made it unclear which account was
+  actually active after a couple of round trips between the two — signing
+  out and sending the person to that portal's own login page (RoleUpgradeGate
+  -> /patient/login, PatientRoleGate and patient-login-form.tsx's
+  roleConfirm -> /signin) makes every account switch a conscious,
+  explicit action instead of an invisible one. Buttons are disabled while
+  the sign-out completes (all three already had or now have a busy
+  state). booking-wizard.tsx's ConfirmAuthModal roleConfirm view
+  (continueAsGuest) already signed out before this feedback — it needed
+  no change, already matches the pattern.
 - IMPLEMENTED (2026-09-18): all four surfaces reworked as designed below —
   Yes/No self-service confirm replaced with an informational message +
   single redirect action. checkPatientRoleConflict/checkClinicRoleConflict

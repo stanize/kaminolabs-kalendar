@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { authClient } from "@/lib/auth-client";
 import { Logo } from "@/components/ui/logo";
 
 const LABELS = {
@@ -16,16 +18,25 @@ const LABELS = {
  * link). Per the 2026-09-14 no-self-service-dual-role-accounts decision
  * (workflows/clinic-onboarding.md), this account is NEVER silently or
  * self-service promoted to patient — there's no "add this role too" option
- * any more, only a redirect back to the account's actual portal (/panel,
- * the only other role today). A second role is granted only by Arun,
+ * any more.
+ *
+ * SIGNS OUT before redirecting (2026-09-20, Arun feedback — see
+ * components/panel/role-upgrade-gate.tsx's matching comment for the full
+ * rationale): landing straight in /panel while still holding the same
+ * session made it unclear which account was actually active after a
+ * couple of these. Signing out first and sending them to /signin makes the
+ * switch explicit instead. A second role is granted only by Arun,
  * manually, from a support ticket (admin-portal-tools.md's
  * manual-role-grant-tool).
  */
 export function PatientRoleGate({ email }: { email: string }) {
   const router = useRouter();
+  const [busy, setBusy] = useState(false);
 
-  function handleGoToPanel() {
-    router.push("/panel");
+  async function handleGoToPanel() {
+    setBusy(true);
+    await authClient.signOut();
+    router.push("/signin");
   }
 
   return (
@@ -46,7 +57,8 @@ export function PatientRoleGate({ email }: { email: string }) {
           <button
             type="button"
             onClick={handleGoToPanel}
-            className="w-full rounded-xl bg-brand px-5 py-3.5 text-[15px] font-semibold text-white transition-all hover:bg-brand/90"
+            disabled={busy}
+            className="w-full rounded-xl bg-brand px-5 py-3.5 text-[15px] font-semibold text-white transition-all hover:bg-brand/90 disabled:cursor-wait disabled:opacity-60"
           >
             {LABELS.action}
           </button>

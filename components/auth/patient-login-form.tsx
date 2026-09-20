@@ -203,9 +203,15 @@ export function PatientLoginForm({
   // Only path out of the roleConfirm view now — no self-service role add
   // (2026-09-14 decision, workflows/clinic-onboarding.md). This account
   // already holds some other role (only "clinic" exists today besides
-  // "patient"), so send them to their actual portal, still signed in.
-  function goToOwnPortal() {
-    router.push("/panel");
+  // "patient"). SIGNS OUT before redirecting (2026-09-20, Arun feedback —
+  // see components/panel/role-upgrade-gate.tsx's matching comment for the
+  // full rationale): landing straight in /panel while still holding this
+  // session made it unclear which account was active. Signing out first
+  // and sending to /signin makes the switch explicit.
+  async function goToOwnPortal() {
+    setLoading(true);
+    await authClient.signOut();
+    router.push("/signin");
   }
 
   async function handleGoogle() {
