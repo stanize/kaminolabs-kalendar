@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { authClient } from "@/lib/auth-client";
 import { Logo } from "@/components/ui/logo";
 import type { PanelShellDictionary } from "@/lib/i18n/dictionaries/panel-shell";
 
@@ -11,15 +13,27 @@ type RoleUpgradeDict = PanelShellDictionary["roleUpgrade"];
  * but not 'clinic' yet. Per the 2026-09-14 no-self-service-dual-role-accounts
  * decision (workflows/clinic-onboarding.md), this account is NEVER silently
  * (or self-service) promoted to clinic just because it landed here — there's
- * no "add this role too" option any more, only a redirect back to the
- * account's actual portal. A second role is granted only by Arun, manually,
+ * no "add this role too" option any more.
+ *
+ * SIGNS OUT before redirecting (2026-09-20, Arun feedback — he got stuck
+ * bouncing between a clinic and a patient account with no clear way to tell
+ * which one was actually active): silently switching straight into the
+ * account's other portal while keeping the same session active was the
+ * problem, not the fix — the person can't tell which account is "live" once
+ * they've clicked through a couple of these. Signing out and landing on
+ * that portal's own login page instead makes every account switch an
+ * explicit, visible action (they type in credentials themselves) rather
+ * than an invisible one. A second role is granted only by Arun, manually,
  * from a support ticket (admin-portal-tools.md's manual-role-grant-tool).
  */
 export function RoleUpgradeGate({ dict, email }: { dict: RoleUpgradeDict; email: string }) {
   const router = useRouter();
+  const [busy, setBusy] = useState(false);
 
-  function handleGoToAccount() {
-    router.push("/patient");
+  async function handleGoToAccount() {
+    setBusy(true);
+    await authClient.signOut();
+    router.push("/patient/login");
   }
 
   return (
@@ -42,7 +56,8 @@ export function RoleUpgradeGate({ dict, email }: { dict: RoleUpgradeDict; email:
           <button
             type="button"
             onClick={handleGoToAccount}
-            className="w-full rounded-xl bg-brand px-5 py-3.5 text-[15px] font-semibold text-white transition-all hover:bg-brand/90"
+            disabled={busy}
+            className="w-full rounded-xl bg-brand px-5 py-3.5 text-[15px] font-semibold text-white transition-all hover:bg-brand/90 disabled:cursor-wait disabled:opacity-60"
           >
             {dict.action}
           </button>
