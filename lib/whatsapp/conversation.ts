@@ -24,6 +24,20 @@ function parseChoice(body: string): number | null {
   return Number.isInteger(n) && n > 0 ? n : null;
 }
 
+/** Confirm/Cancel choice at the awaiting_confirmation step. Accepts either a
+ * native twilio/quick-reply button tap (ButtonPayload "confirm"/"cancel",
+ * passed in as `buttonPayload`) or the legacy plain-text "1"/"2" digit reply
+ * (kept for anyone still on a stale conversation from before this button
+ * upgrade, or a client that doesn't render quick-reply buttons). */
+function parseConfirmChoice(body: string, buttonPayload: string | null): "confirm" | "cancel" | null {
+  if (buttonPayload === "confirm") return "confirm";
+  if (buttonPayload === "cancel") return "cancel";
+  const n = parseChoice(body);
+  if (n === 1) return "confirm";
+  if (n === 2) return "cancel";
+  return null;
+}
+
 function formatDateLabel(dateStr: string): string {
   const [y, m, d] = dateStr.split("-").map(Number);
   const date = new Date(Date.UTC(y, m - 1, d, 12));
@@ -53,6 +67,12 @@ function addDays(dateStr: string, days: number): string {
 
 interface ConversationResult {
   reply: string;
+  /** Present only at the awaiting_confirmation summary step — the caller
+   * (the webhook route) sends this as a native twilio/quick-reply
+   * Confirm/Cancel message instead of `reply` as plain text. `reply` is
+   * still populated in that case as the body text substituted into the
+   * template's {{1}} placeholder, and as a plain-text fallback value. */
+  quickReplySummary?: string;
 }
 
 /** Runs one turn of the WhatsApp booking conversation for a given business +
@@ -62,7 +82,8 @@ export async function handleIncomingMessage(
   businessSlug: string,
   businessId: string,
   phoneNumber: string,
-  body: string
+  body: string,
+  buttonPayload: string | null = null
 ): Promise<ConversationResult> {
   const data = await getPublicBookingData(businessSlug);
   if (!data) {
@@ -79,7 +100,7 @@ export async function handleIncomingMessage(
     case "awaiting_time":
       return awaitingTime(session, businessSlug, data.services, body);
     case "awaiting_confirmation":
-      return awaitingConfirmation(session, businessSlug, data.business.id, data.services, body);
+      return awaitingConfirmation(session, businessSlug, data.business.id, data.services, body, buttonPayload);
     default:
       // completed / expired should never reach here — loadOrResetSession
       // resets those to awaiting_service before returning.
@@ -234,17 +255,16 @@ async function awaitingTime(
   await updateSession(session.id, { state: "awaiting_confirmation", selected_time: slot.startIso });
 
   const service = services.find((s) => s.id === serviceId);
-  return {
-    reply: [
-      "Resumen de tu reserva:",
-      `Servicio: ${service?.name ?? ""}`,
-      `Fecha: ${formatDateLabel(date)}`,
-      `Hora: ${slot.label}`,
-      "",
-      "1. Confirmar",
-      "2. Cancelar",
-    ].join("\n"),
-  };
+  const summary = [
+    "Resumen de tu reserva:",
+    `Servicio: ${service?.name ?? ""}`,
+    `Fecha: ${formatDateLabel(date)}`,
+    `Hora: ${slot.label}`,
+  ].join("\n");
+  // Sent as a native twilio/quick-reply message (Confirm/Cancel buttons) by
+  // the webhook route — `reply` doubles as the {{1}} body text for that
+  // template and as a plain-text fallback value.
+  return { reply: summary, quickReplySummary: summary };
 }
 
 async function awaitingConfirmation(
@@ -252,7 +272,8 @@ async function awaitingConfirmation(
   slug: string,
   businessId: string,
   services: { id: string; name: string }[],
-  body: string
+  body: string,
+  buttonPayload: string | null
 ): Promise<ConversationResult> {
   const serviceId = session.selected_service_id;
   const startIso = session.selected_time; // stored as full ISO in selected_time, see awaitingTime above
@@ -261,26 +282,22 @@ async function awaitingConfirmation(
     return { reply: listServicesMessage(services) };
   }
 
-  const choice = parseChoice(body);
+  const choice = parseConfirmChoice(body, buttonPayload);
 
-  if (choice === 2) {
+  if (choice === "cancel") {
     // Cancel -> reset to awaiting_service, no resource was ever held
     // (hold-mechanics-correction, workflows/whatsapp-booking.md).
     await resetSession(businessId, session.phone_number);
     return { reply: listServicesMessage(services) };
   }
 
-  if (choice !== 1) {
+  if (choice !== "confirm") {
     const service = services.find((s) => s.id === serviceId);
-    return {
-      reply: [
-        "Resumen de tu reserva:",
-        `Servicio: ${service?.name ?? ""}`,
-        "",
-        "1. Confirmar",
-        "2. Cancelar",
-      ].join("\n"),
-    };
+    const summary = [
+      "Resumen de tu reserva:",
+      `Servicio: ${service?.name ?? ""}`,
+    ].join("\n");
+    return { reply: summary, quickReplySummary: summary };
   }
 
   // Confirm -> create the kalendar_bookings row directly (same insert path

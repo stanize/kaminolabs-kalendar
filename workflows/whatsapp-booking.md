@@ -134,20 +134,81 @@ Criteria:
   WhatsApp webhook has no meaningful end-user IP to rate-limit by; the
   unique-slot-index race is still caught and handled with a re-prompt as
   designed.
-  DEVIATION FROM ORIGINAL SPEC SHAPE (not from this file's already-settled
-  design, but worth flagging): replies are plain numbered-list text via
+- **NATIVE INTERACTIVE MESSAGES UPGRADE (2026-09-21, second pass) — PARTIAL,
+  pending live testing.** Follow-up to the deviation flagged below: swapped
+  the reply-sending layer (`lib/whatsapp/twilio-client.ts` +
+  `app/api/whatsapp/webhook/route.ts`) to use Twilio's Content API for real
+  tappable WhatsApp UI where it could be verified safe to build; the
+  conversation state machine itself (`lib/whatsapp/conversation.ts`,
+  `lib/whatsapp/session.ts`) is unchanged in shape.
+  - **SHIPPED: twilio/quick-reply for the Confirm/Cancel step.** At
+    `awaiting_confirmation`, the webhook route now sends a real native
+    Confirm/Cancel WhatsApp message via the Content API
+    (`sendQuickReplyMessage` in `twilio-client.ts`) instead of TwiML text —
+    two static buttons (`id: "confirm"`/`"cancel"`), created once per
+    business on first use and cached (see schema note below), never
+    recreated per message. Confirmed this shape via multiple independent
+    web-search sources (Twilio's own quick-reply docs excerpts + community
+    posts) since it's a static, low-risk shape — two fixed button
+    labels/ids, no dynamic per-item content, so there was nothing here that
+    required guessing. Inbound button taps arrive as Twilio's
+    `ButtonPayload` form field ("confirm"/"cancel"), read in the webhook
+    route and passed into `handleIncomingMessage`; `parseConfirmChoice` in
+    `conversation.ts` accepts either that or the legacy "1"/"2" text digit
+    (kept for backward compatibility with a session that started before
+    this upgrade, or any client that doesn't render quick-reply buttons).
+    Sending switched from synchronous TwiML to an async REST call
+    (`client.messages.create` with `contentSid`/`contentVariables`) for
+    this one step only, then the webhook responds with an empty
+    `<Response/>` so Twilio doesn't also send the plain-text version.
+  - **NOT SHIPPED: twilio/list-picker for the service/date/time lists —
+    still plain numbered-list text via TwiML (`twimlReply`), unchanged.**
+    Reason, concretely: this build's instructions required fetching and
+    reading Twilio's actual current docs
+    (twiliolist-picker/twilio-quick-reply/content-api-resources) before
+    writing the list-picker code, specifically to avoid re-guessing a
+    payload shape after the first build pass flagged that exact risk.
+    Outbound network access to `www.twilio.com` (and every alternate
+    source tried — postman.com, apis.guru, a GitHub issue with no
+    authoritative answer) was blocked by this session's own egress proxy
+    policy (`EGRESS_BLOCKED`, confirmed via the proxy status endpoint —
+    not a transient failure, an actual policy denial not worth retrying).
+    Web search snippets (not full doc pages) gave an incomplete and
+    inconsistent picture of whether `twilio/list-picker`'s `items[]`
+    entries (the service names / dates / times, which are genuinely
+    dynamic — variable length, variable per-clinic/per-day text) support
+    `{{n}}` variable substitution per item, or must be fully static text
+    baked into the template at creation time. That's exactly the ambiguity
+    this feature's own build instructions called out as the reason a
+    generic reusable template might not work, with an explicit
+    instruction to fall back cleanly rather than ship a guess. Text lists
+    for service/date/time selection are unchanged from the first build
+    pass. **Action needed to finish this properly**: a session with actual
+    doc access (or Arun confirming the shape from the Twilio console/his
+    own account) needs to read
+    https://www.twilio.com/docs/content/twiliolist-picker directly before
+    attempting this piece again.
+  - Schema: added `kalendar_whatsapp_config.quick_reply_content_sid`
+    (nullable text, additive) — `supabase/schema_subset_010.sql` (folded
+    into `schema_001.sql` too). No list-picker sid column, since that part
+    wasn't built. Arun still needs to run `schema_subset_010.sql` against
+    the live DB before the quick-reply path will work (same as the other
+    still-`in_progress` schema pieces on this workflow).
+  - What Arun should expect to see change when testing: the **Confirm /
+    Cancel step now renders as two real tappable WhatsApp buttons**
+    instead of "1. Confirmar / 2. Cancelar" text (first time it's sent for
+    a given business, Twilio needs a moment to approve/register the
+    template — if it doesn't render as buttons instantly, that's likely
+    why, retry). Service/date/time selection still look exactly the same
+    as before this pass — plain numbered text, reply with a digit.
+- DEVIATION FROM ORIGINAL SPEC SHAPE, first build pass (superseded above for
+  the Confirm/Cancel step only): replies were plain numbered-list text via
   TwiML (`lib/whatsapp/twilio-client.ts`'s `twimlReply`), not Twilio's native
-  WhatsApp interactive list/button messages (Content API templates). This
-  file's own conversation-flow language ("interactive list", "Confirm/Cancel
-  buttons") reads as native WhatsApp UI components; what's actually built is
-  "reply with the number of your option" as plain text, because the current
-  Twilio Node SDK's exact method shapes/template setup for WhatsApp
-  interactive content were not confidently known and guessing at a payload
-  shape was flagged as a real risk in the build instructions. Functionally
-  equivalent (no free-text NLP either way, per this file's non-goals), but
-  visually a numbered list instead of tappable buttons — worth a product
-  decision on whether to invest in the native version later, with real
-  Twilio account access to verify the exact API shape.
+  WhatsApp interactive list/button messages (Content API templates), because
+  the current Twilio Node SDK's exact method shapes/template setup for
+  WhatsApp interactive content were not confidently known and guessing at a
+  payload shape was flagged as a real risk. Still true for service/date/time
+  lists per the note above; resolved for Confirm/Cancel.
 - State machine per `kalendar_whatsapp_sessions.state`, unchanged in
   shape from the original spec's §6 except where hold-mechanics-correction
   above removes the hold step:

@@ -4,6 +4,8 @@ import {
   decryptConfigAuthToken,
   validateTwilioSignature,
   twimlReply,
+  twimlEmptyReply,
+  sendQuickReplyMessage,
   type WhatsappConfigRow,
 } from "@/lib/whatsapp/twilio-client";
 import { handleIncomingMessage } from "@/lib/whatsapp/conversation";
@@ -30,6 +32,10 @@ export async function POST(request: Request): Promise<Response> {
   const to = paramsObj["To"]; // e.g. "whatsapp:+34600000000"
   const from = paramsObj["From"]; // e.g. "whatsapp:+34611111111"
   const body = paramsObj["Body"] ?? "";
+  // Set when the inbound message is a tap on a native twilio/quick-reply
+  // button (the "id" we set when creating the template — "confirm"/"cancel")
+  // rather than typed text. See lib/whatsapp/twilio-client.ts.
+  const buttonPayload = paramsObj["ButtonPayload"] ?? null;
 
   if (!to || !from) {
     return new NextResponse("Missing To/From", { status: 400 });
@@ -42,7 +48,7 @@ export async function POST(request: Request): Promise<Response> {
   const { data: config } = await supabase
     .from("kalendar_whatsapp_config")
     .select(
-      "id, business_id, enabled, twilio_account_sid, twilio_auth_token_encrypted, twilio_whatsapp_number, is_sandbox"
+      "id, business_id, enabled, twilio_account_sid, twilio_auth_token_encrypted, twilio_whatsapp_number, is_sandbox, quick_reply_content_sid"
     )
     .eq("twilio_whatsapp_number", toNumber)
     .maybeSingle();
@@ -94,14 +100,40 @@ export async function POST(request: Request): Promise<Response> {
     return new NextResponse("", { status: 200 });
   }
 
-  const { reply } = await handleIncomingMessage(
+  const result = await handleIncomingMessage(
     business.slug,
     typedConfig.business_id,
     fromNumber,
-    body
+    body,
+    buttonPayload
   );
 
-  const twiml = twimlReply(reply);
+  if (result.quickReplySummary && typedConfig.twilio_whatsapp_number) {
+    // Confirm/Cancel step: send as a native twilio/quick-reply interactive
+    // message via the REST API rather than TwiML, then reply to the webhook
+    // with an empty TwiML response so Twilio doesn't also relay `reply` as
+    // plain text (see twilio-client.ts's twimlEmptyReply doc comment).
+    try {
+      await sendQuickReplyMessage({
+        config: typedConfig,
+        accountSid: typedConfig.twilio_account_sid ?? "",
+        authToken,
+        from: typedConfig.twilio_whatsapp_number,
+        to: fromNumber,
+        bodyText: result.quickReplySummary,
+      });
+      return new NextResponse(twimlEmptyReply(), {
+        status: 200,
+        headers: { "Content-Type": "text/xml" },
+      });
+    } catch {
+      // Content API call failed (e.g. transient Twilio error) — fall back
+      // to the plain-text reply below rather than leaving the patient with
+      // no response at all.
+    }
+  }
+
+  const twiml = twimlReply(result.reply);
   return new NextResponse(twiml, {
     status: 200,
     headers: { "Content-Type": "text/xml" },

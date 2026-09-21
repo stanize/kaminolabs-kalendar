@@ -1069,6 +1069,13 @@ create table public.kalendar_whatsapp_config (
   -- Currently app-set to true whenever the number matches Twilio's known
   -- sandbox number; see lib/actions/whatsapp.ts.
   is_sandbox                   boolean     not null default true,
+  -- Cached Twilio Content API ContentSid (HXxxxx) for this business's
+  -- twilio/quick-reply Confirm/Cancel template, created lazily on first use
+  -- under the business's own Twilio account and reused after that. No
+  -- equivalent list-picker sid column — see workflows/whatsapp-booking.md
+  -- (conversation-flow step) for why list-picker native messages weren't
+  -- shipped. (schema_subset_010.sql)
+  quick_reply_content_sid      text,
   created_at                   timestamptz not null default now(),
   updated_at                   timestamptz not null default now()
 );
