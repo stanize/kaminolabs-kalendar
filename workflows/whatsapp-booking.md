@@ -163,31 +163,53 @@ Criteria:
     `<Response/>` so Twilio doesn't also send the plain-text version.
   - **NOT SHIPPED: twilio/list-picker for the service/date/time lists —
     still plain numbered-list text via TwiML (`twimlReply`), unchanged.**
-    Reason, concretely: this build's instructions required fetching and
-    reading Twilio's actual current docs
-    (twiliolist-picker/twilio-quick-reply/content-api-resources) before
-    writing the list-picker code, specifically to avoid re-guessing a
-    payload shape after the first build pass flagged that exact risk.
-    Outbound network access to `www.twilio.com` (and every alternate
-    source tried — postman.com, apis.guru, a GitHub issue with no
-    authoritative answer) was blocked by this session's own egress proxy
-    policy (`EGRESS_BLOCKED`, confirmed via the proxy status endpoint —
-    not a transient failure, an actual policy denial not worth retrying).
-    Web search snippets (not full doc pages) gave an incomplete and
-    inconsistent picture of whether `twilio/list-picker`'s `items[]`
-    entries (the service names / dates / times, which are genuinely
-    dynamic — variable length, variable per-clinic/per-day text) support
-    `{{n}}` variable substitution per item, or must be fully static text
-    baked into the template at creation time. That's exactly the ambiguity
-    this feature's own build instructions called out as the reason a
-    generic reusable template might not work, with an explicit
-    instruction to fall back cleanly rather than ship a guess. Text lists
-    for service/date/time selection are unchanged from the first build
-    pass. **Action needed to finish this properly**: a session with actual
-    doc access (or Arun confirming the shape from the Twilio console/his
-    own account) needs to read
-    https://www.twilio.com/docs/content/twiliolist-picker directly before
-    attempting this piece again.
+    **Re-attempted in a third pass (2026-09-21), still not shipped**, this
+    time starting from a real twilio-node usage example (a GitHub issue
+    snippet showing `contentVariables: JSON.stringify({ body, button,
+    items })` sent fresh per message against one static, once-created
+    ContentSid — the "items are per-send, not per-template" question from
+    the earlier passes). That resolved the *send-time* shape question, but
+    the *template-creation* payload — what `types["twilio/list-picker"]`
+    must contain in the POST that creates the ContentSid in the first
+    place — is still unverified, and this pass found real contradicting
+    evidence rather than just a gap:
+    - Doc access is still blocked, confirmed two independent ways this
+      time: both the WebFetch tool and a direct `curl` to
+      `www.twilio.com/docs/content/twiliolist-picker` (and to a
+      Postman-hosted mirror of the same page) got `CONNECT tunnel failed,
+      response 403` from this session's own egress proxy — an org-policy
+      `connect_rejected`, not a transient failure (checked via
+      `curl $HTTPS_PROXY/__agentproxy/status`).
+    - A web-search snippet attributed to Twilio's own list-picker doc shows
+      `items` as real static values baked in at creation time (e.g.
+      `{"id": "SFO1337", "description": "Owl Air Flight 1337 to LGA"}`, no
+      `{{n}}` placeholder) — which contradicts items being dynamic per
+      send if taken at face value for a template meant to be reused with
+      different items every message (our case: a different service/date/
+      time list every time).
+    - The GitHub issue this pass started from as its strongest evidence
+      (twilio/twilio-node#1065, "Supplying Items to a list template does
+      not work (validation errors)") is itself an open bug report that the
+      per-send items-array approach fails validation for real users — the
+      one shape that looked most confirmed is independently documented as
+      unreliable in production, not merely unverified.
+    Given contradictory and partly-broken evidence (not just an
+    information gap), shipping this untested risks breaking the
+    service/date/time steps — the actual core of the conversation, unlike
+    the one-shot Confirm/Cancel step — so it was left as TwiML text again,
+    per this feature's standing instruction to fall back cleanly rather
+    than guess. Text lists for service/date/time selection are unchanged.
+    Existing list-size caps already respect WhatsApp's 10-item list-picker
+    limit with no code change needed if/when this ships:
+    `MAX_DATE_OPTIONS = 7`, `MAX_TIME_OPTIONS = 9`
+    (`lib/whatsapp/conversation.ts`). **Action needed to finish this
+    properly**: a session with actual doc access, or Arun confirming the
+    exact creation payload from the Twilio console/his own account,
+    followed by a real test send against Twilio sandbox before trusting
+    any shape — the search evidence above is not enough on its own to
+    write and ship this blind. See `lib/whatsapp/twilio-client.ts`'s
+    doc comment above `getOrCreateQuickReplyContentSid` for the full
+    per-pass research trail.
   - Schema: added `kalendar_whatsapp_config.quick_reply_content_sid`
     (nullable text, additive) — `supabase/schema_subset_010.sql` (folded
     into `schema_001.sql` too). No list-picker sid column, since that part

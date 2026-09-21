@@ -94,21 +94,47 @@ const CONTENT_API_BASE = "https://content.twilio.com/v1/Content";
  * buttons, no per-item dynamic labels needed, so there was nothing here that
  * required guessing at an unverified variable-substitution shape.
  *
- * NOT SHIPPED: twilio/list-picker for the service/date/time lists. Those
- * lists are genuinely dynamic (variable length, variable per-clinic/per-day
- * labels), and confirming the exact supported shape for that from Twilio's
- * own current docs was blocked this session — outbound network access to
- * www.twilio.com (and other Twilio-doc mirrors: postman.com, apis.guru,
- * github.com raw content in this case) was refused by this session's egress
- * proxy policy (`EGRESS_BLOCKED`, confirmed via the proxy status endpoint,
- * not a transient failure). Community/GitHub-issue evidence surfaced via web
- * search was inconsistent about whether list-picker `items[]` entries
- * support `{{n}}` variable substitution or must be fully static text set at
- * template-creation time — exactly the ambiguity this feature's build
- * instructions said to resolve by fallback rather than by guessing. Text
- * lists (`twimlReply`, unchanged) are kept for service/date/time selection.
- * Revisit once docs access is available in a session, or Arun can confirm
- * the shape from the Twilio console directly.
+ * NOT SHIPPED (re-attempted 2026-09-21, second pass): twilio/list-picker for
+ * the service/date/time lists. This pass had one new piece of confirmed
+ * evidence going in (a twilio-node GitHub issue example showing
+ * `contentVariables: JSON.stringify({ body, button, items })` — i.e. the
+ * whole list-picker object re-sent fresh per message, not per-item `{{n}}`
+ * substitution the way quick-reply's single `{{1}}` body placeholder works)
+ * — but the piece that was still missing, the exact template-CREATION
+ * payload, remains genuinely unverified:
+ * - Direct doc access is still blocked, and this time confirmed two ways,
+ *   not just via the WebFetch tool: `curl` directly to
+ *   www.twilio.com/docs/content/twiliolist-picker and to a Postman-hosted
+ *   copy of the same page both got `CONNECT tunnel failed, response 403`
+ *   from this session's own egress proxy (org policy `connect_rejected`,
+ *   not a transient failure — checked via
+ *   `curl $HTTPS_PROXY/__agentproxy/status`).
+ * - Web search snippets this pass surfaced a *contradiction*, not just a
+ *   gap: one snippet attributed to Twilio's own list-picker doc shows
+ *   `items` given as real, static values at template-creation time (e.g.
+ *   `{"id": "SFO1337", "description": "Owl Air Flight 1337 to LGA"}` baked
+ *   into the template, no `{{n}}` placeholder) — which doesn't match the
+ *   confirmed dynamic-per-send pattern quoted above at all, if items really
+ *   are meant to vary per message (our case) rather than be fixed at
+ *   creation. Reconciling those two would be a guess.
+ * - More importantly: the GitHub issue this pass was pointed at as
+ *   confirmation (twilio/twilio-node#1065, "Supplying Items to a list
+ *   template does not work (validation errors)") is itself a live bug
+ *   report that the exact per-send items-array approach fails validation
+ *   for at least some real users/SDK versions — i.e. even the one shape
+ *   that seemed confirmed is independently documented as unreliable in
+ *   production, not just unverified.
+ * Given real, contradictory, partly-broken evidence rather than just a gap,
+ * shipping this untested risks silently breaking the service/date/time
+ * steps (the core of the conversation, unlike the one-shot Confirm/Cancel
+ * step). Text lists (`twimlReply`, unchanged) are kept for service/date/time
+ * selection, both list sizes already capped well under WhatsApp's 10-item
+ * list-picker limit (`MAX_DATE_OPTIONS = 7`, `MAX_TIME_OPTIONS = 9` in
+ * `lib/whatsapp/conversation.ts`) so no code changes are needed there if/when
+ * this is picked up. Revisit once a session has real doc access, or Arun
+ * confirms the creation payload from the Twilio console/account directly —
+ * test creation + one real send against Twilio sandbox before trusting any
+ * shape, given the above.
  */
 
 /** Creates (once) or returns the cached Content API ContentSid for this
