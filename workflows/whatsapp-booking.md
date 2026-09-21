@@ -191,15 +191,21 @@ Criteria:
     (`client.messages.create` with `contentSid`/`contentVariables`) for
     this one step only, then the webhook responds with an empty
     `<Response/>` so Twilio doesn't also send the plain-text version.
-  - **SHIPPED (2026-09-22, fourth pass): whatsapp/card LIST for the
+  - **SHIPPED then CORRECTED (2026-09-22, fourth pass, see "CONTENT-TYPE
+    BUG FOUND + FIXED" further below): whatsapp/card LIST for the
     SERVICE-selection step only.** The blocker from the second and third
     passes below (an unverifiable/contradictory template-creation payload)
-    is now resolved — Arun supplied a concrete, correct working example
-    from real Twilio reference material, not web search. Two corrections
-    to what the earlier passes had assumed:
-    - The correct content type is **`whatsapp/card`** with
-      `actions: [{ type: "LIST", ... }]`, not `twilio/list-picker` — the
-      wrong type name in every prior attempt.
+    seemed resolved from a doc example Arun supplied — but that example's
+    content type was itself wrong (Twilio's own live validation rejected
+    it), only caught on Arun's actual live test. Two corrections to what
+    the earlier passes had assumed, ~~one of which turned out to be
+    wrong~~:
+    - ~~The correct content type is **`whatsapp/card`** with
+      `actions: [{ type: "LIST", ... }]`, not `twilio/list-picker`~~ —
+      WRONG, caught live: `whatsapp/card` has no `LIST` action type at
+      all. The correct type is `twilio/list-picker` after all (the
+      original, pre-doc-example instinct) — see the fix note below for the
+      real shape.
     - Rows ARE baked into the template at creation time (static), not sent
       per-message via `contentVariables` — the second pass's web-search
       snippet showing static items was actually correct, and the
@@ -217,12 +223,14 @@ Criteria:
       created lazily on first use per business, sid cached on
       `kalendar_whatsapp_config.service_list_content_sid`, never recreated
       per message.
-    - **Known limitation, deliberately not solved this pass**: the cached
-      template is NOT invalidated when the business's services change
-      later (renamed/added/removed) — it keeps showing the services as
-      they were at first use until the cached sid is cleared by hand.
-      Staleness detection was explicitly out of scope to keep this pass
-      scoped; flagged here rather than silently wrong.
+    - **FIXED (2026-09-22, Arun):** the cached template used to go stale
+      when a business's services changed after first use (renamed/added/
+      removed/reordered) — `invalidateServiceListContentSid`
+      (`lib/whatsapp/twilio-client.ts`) is now called from every
+      create/update/delete/reorder action in `lib/actions/services.ts`,
+      nulling `service_list_content_sid` so the next `awaiting_service`
+      prompt rebuilds the template fresh from the business's current
+      services. No longer a known limitation.
     - **Known limitation**: a service name longer than the list's 24-char
       row-title limit is hard-truncated with an ellipsis (`truncate()` in
       `twilio-client.ts`), not solved with smarter wrapping — acceptable
@@ -242,8 +250,10 @@ Criteria:
       than 10 active services so this hasn't been exercised for real, but
       it fails safe (extra services just don't appear in the list) rather
       than erroring.
-  - **SHIPPED (2026-09-22, fifth pass): whatsapp/card LIST for DATE and
-    TIME selection.** Supersedes the "NOT SHIPPED" note that used to be
+  - **SHIPPED then CORRECTED (2026-09-22, fifth pass, same content-type bug
+    as the service list above — see the fix note below): whatsapp/card
+    LIST for DATE and TIME selection.** Supersedes the "NOT SHIPPED" note
+    that used to be
     here — the prior pass's architecture blocker (static-at-creation rows
     can't fit genuinely-per-conversation content without an unacceptable
     per-message template-creation cost) is resolved. Arun supplied a
@@ -311,14 +321,34 @@ Criteria:
     before the date/time list path will work — `010`/`011` should already
     be applied from prior passes; if not, run all three in order
     (010 → 011 → 013).
-  - **Known, separately-tracked follow-up — service-list cache staleness
-    (carried over unchanged, not touched this pass)**: the cached
-    `service_list_content_sid` template is NOT invalidated when the
-    business's services change later. Arun said he wants to revisit this
-    later — deliberately not attempted in this pass either.
+  - **RESOLVED (2026-09-22, Arun)**: service-list cache staleness (was a
+    tracked follow-up — see the data-model step's note) is fixed —
+    `invalidateServiceListContentSid` is called from every
+    create/update/delete/reorder action in `lib/actions/services.ts`.
+  - **CONTENT-TYPE BUG FOUND + FIXED (2026-09-22)**: first live test after
+    this pass showed all three list steps (service/date/time) silently
+    falling back to plain text. The webhook's `catch {}` blocks were
+    swallowing the actual Twilio error with no logging — added
+    `console.error` logging first (see webhook route), which surfaced the
+    real cause via Vercel runtime logs: `whatsapp/card` does NOT support a
+    `LIST` action type at all (Twilio's own validation:
+    `types.whatsapp/card.actions.null.type must be one of [URL,
+    PHONE_NUMBER, QUICK_REPLY, COPY_CODE, VOICE_CALL]`) — the doc example
+    Arun supplied was wrong on this specific point. The correct content
+    type for a tappable list is `twilio/list-picker`, with shape `{ body,
+    button, items: [{ id, item, description }] }` (item, not title/rows/
+    sections) — confirmed against a real twilio-node usage example found
+    earlier in this feature's history. All three list-creation functions
+    (`getOrCreateServiceListContentSid`/`getOrCreateDateListContentSid`/
+    `getOrCreateTimeListContentSid`) switched to `twilio/list-picker`;
+    `friendly_name`s bumped to a `_v2_` suffix so retries don't collide
+    with the failed `whatsapp/card` attempts. Confirm/Cancel
+    (`twilio/quick-reply`) was unaffected — different, correct content
+    type from the start. **Not yet re-tested live** — pending Arun's next
+    test pass.
   - What Arun should expect to see change when testing: **all four steps
     now render as real tappable WhatsApp list/button messages** — service,
-    date, and time as `whatsapp/card` LIST menus, Confirm/Cancel as
+    date, and time as `twilio/list-picker` menus, Confirm/Cancel as
     quick-reply buttons. First send of a given template for a business
     needs a moment for Twilio to approve/register it, same caveat as
     before. Specifically check: (1) date/time lists show the right rows in

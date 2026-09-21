@@ -5,6 +5,7 @@ import { authedAction } from "@/lib/auth-action";
 import { createClient } from "@/lib/supabase/server";
 import { getBusinessForUser } from "@/lib/business/data";
 import { validateService, type ServiceValidationDict } from "@/lib/services/constants";
+import { invalidateServiceListContentSid } from "@/lib/whatsapp/twilio-client";
 
 export type ServiceActionResult =
   | { ok: true; created?: boolean }
@@ -97,6 +98,7 @@ export const createService = authedAction(
 
     if (error) return { ok: false, error: `${a.errCreateFailed} ${error.message}` };
 
+    await invalidateServiceListContentSid(businessId);
     revalidate();
     return { ok: true, created: true };
   }
@@ -154,6 +156,7 @@ export const createServices = authedAction(
     const { error } = await supabase.from("kalendar_services").insert(rows);
     if (error) return { ok: false, error: `${a.errCreateManyFailed} ${error.message}` };
 
+    await invalidateServiceListContentSid(businessId);
     revalidate();
     return { ok: true, created: true };
   }
@@ -188,6 +191,7 @@ export const updateService = authedAction(
 
     if (error) return { ok: false, error: `${a.errSaveFailed} ${error.message}` };
 
+    await invalidateServiceListContentSid(businessId);
     revalidate();
     return { ok: true };
   }
@@ -214,6 +218,7 @@ export const deleteService = authedAction(
 
     if (error) return { ok: false, error: `${a.errDeleteFailed} ${error.message}` };
 
+    await invalidateServiceListContentSid(businessId);
     revalidate();
     return { ok: true };
   }
@@ -251,6 +256,7 @@ export const reorderServices = authedAction(
       return { ok: false, error: `${a.errReorderFailed} ${failed.error.message}` };
     }
 
+    await invalidateServiceListContentSid(businessId);
     revalidate();
     return { ok: true };
   }

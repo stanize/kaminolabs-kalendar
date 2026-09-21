@@ -250,12 +250,13 @@ function truncate(s: string, max: number): string {
  * kalendar_whatsapp_config so it's created at most once per business, not
  * on every message.
  *
- * KNOWN LIMITATION: rows are baked into the template at creation time, so if
- * `services` changes after the first call (a service renamed/added/removed),
- * the cached template keeps showing the old list until the cache is cleared
- * by hand (e.g. nulling the column) — no staleness detection is built here,
- * deliberately, to keep this pass scoped. See
- * workflows/whatsapp-booking.md's conversation-flow step.
+ * Rows are baked into the template at creation time, so if `services`
+ * changes after the first call (a service renamed/added/removed/reordered),
+ * the cached template would keep showing the old list — FIXED (2026-09-22):
+ * `invalidateServiceListContentSid` below is called from every
+ * create/update/delete/reorder action in lib/actions/services.ts, nulling
+ * this cache so the next `awaiting_service` prompt rebuilds it fresh from
+ * the business's current services.
  *
  * KNOWN LIMITATION: a service name longer than LIST_ROW_TITLE_MAX (24 chars)
  * is hard-truncated with an ellipsis rather than solved with any smarter
@@ -345,6 +346,22 @@ export async function sendServiceListMessage(params: {
 export function parseServiceListId(listId: string | null): string | null {
   if (!listId || !listId.startsWith(SERVICE_LIST_ROW_PREFIX)) return null;
   return listId.slice(SERVICE_LIST_ROW_PREFIX.length);
+}
+
+/** Clears a business's cached service-list Content SID so the next
+ * `awaiting_service` prompt rebuilds the WhatsApp template from the
+ * business's current `kalendar_services` rows, instead of replaying the
+ * frozen list from whenever the template was first created (see
+ * getOrCreateServiceListContentSid's "KNOWN LIMITATION" doc comment above
+ * — this closes that gap). Called from lib/actions/services.ts on every
+ * create/update/delete/reorder. A no-op if the business has no WhatsApp
+ * config row yet (WhatsApp booking not enabled) — nothing to invalidate. */
+export async function invalidateServiceListContentSid(businessId: string): Promise<void> {
+  const supabase = await createClient();
+  await supabase
+    .from("kalendar_whatsapp_config")
+    .update({ service_list_content_sid: null })
+    .eq("business_id", businessId);
 }
 
 /**
