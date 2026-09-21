@@ -270,10 +270,10 @@ export async function getOrCreateServiceListContentSid(
 ): Promise<string> {
   if (config.service_list_content_sid) return config.service_list_content_sid;
 
-  // Content API list-message row cap is 10 total across all sections.
-  const rows = services.slice(0, 10).map((s) => ({
+  // Content API list-message row cap is 10 total.
+  const items = services.slice(0, 10).map((s) => ({
     id: `${SERVICE_LIST_ROW_PREFIX}${s.id}`,
-    title: truncate(s.name, LIST_ROW_TITLE_MAX),
+    item: truncate(s.name, LIST_ROW_TITLE_MAX),
     ...(s.duration_min ? { description: truncate(`${s.duration_min} min`, 72) } : {}),
   }));
 
@@ -284,27 +284,13 @@ export async function getOrCreateServiceListContentSid(
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      friendly_name: `kalendar_service_list_${config.business_id}`,
+      friendly_name: `kalendar_service_list_v2_${config.business_id}`,
       language: "es",
       types: {
-        "whatsapp/card": {
+        "twilio/list-picker": {
           body: "¡Hola! 👋 ¿Qué servicio te gustaría reservar?",
-          actions: [
-            {
-              type: "LIST",
-              title: truncate("Elegir servicio", LIST_BUTTON_LABEL_MAX),
-              item: {
-                title: "Servicios disponibles",
-                subtitle: "Elige una opción",
-              },
-              sections: [
-                {
-                  title: "Servicios",
-                  rows,
-                },
-              ],
-            },
-          ],
+          button: truncate("Elegir servicio", LIST_BUTTON_LABEL_MAX),
+          items,
         },
       },
     }),
@@ -410,10 +396,10 @@ const TIME_LIST_ROW_PREFIX = "time_";
 const LIST_ROW_FILLER_TITLE = "(no disponible)";
 
 function buildRowPlaceholders(startIndex: number, count: number) {
-  const rows: { id: string; title: string; description: string }[] = [];
+  const rows: { id: string; item: string; description: string }[] = [];
   let idx = startIndex;
   for (let i = 0; i < count; i++) {
-    rows.push({ id: `{{${idx}}}`, title: `{{${idx + 1}}}`, description: `{{${idx + 2}}}` });
+    rows.push({ id: `{{${idx}}}`, item: `{{${idx + 1}}}`, description: `{{${idx + 2}}}` });
     idx += 3;
   }
   return rows;
@@ -439,19 +425,13 @@ export async function getOrCreateDateListContentSid(
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      friendly_name: `kalendar_date_list_${config.business_id}`,
+      friendly_name: `kalendar_date_list_v2_${config.business_id}`,
       language: "es",
       types: {
-        "whatsapp/card": {
+        "twilio/list-picker": {
           body: "Servicio: *{{1}}*\n\n¿Qué día prefieres? Elige una opción:",
-          actions: [
-            {
-              type: "LIST",
-              title: truncate("Elegir fecha", LIST_BUTTON_LABEL_MAX),
-              item: { title: "Fechas disponibles", subtitle: "Elige un día" },
-              sections: [{ title: "Próximos días", rows }],
-            },
-          ],
+          button: truncate("Elegir fecha", LIST_BUTTON_LABEL_MAX),
+          items: rows,
         },
       },
     }),
@@ -492,19 +472,13 @@ export async function getOrCreateTimeListContentSid(
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      friendly_name: `kalendar_time_list_${config.business_id}`,
+      friendly_name: `kalendar_time_list_v2_${config.business_id}`,
       language: "es",
       types: {
-        "whatsapp/card": {
+        "twilio/list-picker": {
           body: "Fecha: *{{1}}*\n\n¿A qué hora prefieres? Elige una opción:",
-          actions: [
-            {
-              type: "LIST",
-              title: truncate("Elegir hora", LIST_BUTTON_LABEL_MAX),
-              item: { title: "Horas disponibles", subtitle: "Elige un horario" },
-              sections: [{ title: "Horas disponibles", rows }],
-            },
-          ],
+          button: truncate("Elegir hora", LIST_BUTTON_LABEL_MAX),
+          items: rows,
         },
       },
     }),
