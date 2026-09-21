@@ -35,6 +35,7 @@ import {
   QrCode,
   Eye,
   EyeOff,
+  MessageCircle,
   type LucideIcon,
 } from "lucide-react";
 
@@ -75,6 +76,10 @@ export const ICONS: Record<string, LucideIcon> = {
   qrCode: QrCode,
   eye: Eye,
   eyeOff: EyeOff,
+  // lucide-react has no dedicated WhatsApp glyph — MessageCircle is the
+  // closest generic chat-bubble icon, used for the WhatsApp booking settings
+  // section (workflows/whatsapp-booking.md).
+  whatsapp: MessageCircle,
 };
 
 export function Icon({

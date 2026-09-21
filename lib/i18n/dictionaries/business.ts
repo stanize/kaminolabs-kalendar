@@ -85,6 +85,25 @@ export interface BusinessDictionary {
     errSlugTooLong: string;
     errSlugInvalidChars: string;
   };
+  whatsapp: {
+    sectionTitle: string;
+    sectionSubtitle: string;
+    enabledLabel: string;
+    accountSidLabel: string;
+    accountSidPlaceholder: string;
+    authTokenLabel: string;
+    authTokenPlaceholder: string;
+    authTokenConfiguredHint: string;
+    numberLabel: string;
+    numberPlaceholder: string;
+    statusSandbox: string;
+    statusProduction: string;
+    saveButton: string;
+    saving: string;
+    saved: string;
+    errBusinessRequired: string;
+    errSaveFailed: string;
+  };
 }
 
 const es: BusinessDictionary = {
@@ -162,6 +181,26 @@ const es: BusinessDictionary = {
     errSlugTooLong: "El enlace no puede superar los {max} caracteres.",
     errSlugInvalidChars: "Usa solo minúsculas, números y guiones (sin espacios ni guiones al inicio o final).",
   },
+  whatsapp: {
+    sectionTitle: "Reservas por WhatsApp",
+    sectionSubtitle:
+      "Deja que tus pacientes reserven cita hablando directamente con el WhatsApp de tu negocio.",
+    enabledLabel: "Activar reservas por WhatsApp",
+    accountSidLabel: "Account SID de Twilio",
+    accountSidPlaceholder: "ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    authTokenLabel: "Auth Token de Twilio",
+    authTokenPlaceholder: "Pega tu Auth Token",
+    authTokenConfiguredHint: "Ya hay un Auth Token guardado. Déjalo en blanco para mantenerlo.",
+    numberLabel: "Número de WhatsApp",
+    numberPlaceholder: "+34600000000",
+    statusSandbox: "Modo sandbox (pruebas)",
+    statusProduction: "Modo producción",
+    saveButton: "Guardar configuración",
+    saving: "Guardando…",
+    saved: "¡Configuración guardada!",
+    errBusinessRequired: "Completa primero los datos de tu negocio.",
+    errSaveFailed: "No se pudo guardar la configuración.",
+  },
 };
 
 const en: BusinessDictionary = {
@@ -238,6 +277,25 @@ const en: BusinessDictionary = {
     errSlugTooShort: "The link must be at least {min} characters.",
     errSlugTooLong: "The link can't be more than {max} characters.",
     errSlugInvalidChars: "Use only lowercase letters, numbers, and hyphens (no spaces or leading/trailing hyphens).",
+  },
+  whatsapp: {
+    sectionTitle: "WhatsApp booking",
+    sectionSubtitle: "Let your patients book an appointment by chatting with your business's WhatsApp number.",
+    enabledLabel: "Enable WhatsApp booking",
+    accountSidLabel: "Twilio Account SID",
+    accountSidPlaceholder: "ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    authTokenLabel: "Twilio Auth Token",
+    authTokenPlaceholder: "Paste your Auth Token",
+    authTokenConfiguredHint: "An Auth Token is already saved. Leave blank to keep it.",
+    numberLabel: "WhatsApp number",
+    numberPlaceholder: "+34600000000",
+    statusSandbox: "Sandbox mode (testing)",
+    statusProduction: "Production mode",
+    saveButton: "Save configuration",
+    saving: "Saving…",
+    saved: "Configuration saved!",
+    errBusinessRequired: "Complete your business details first.",
+    errSaveFailed: "Couldn't save the configuration.",
   },
 };
 

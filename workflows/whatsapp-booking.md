@@ -8,8 +8,22 @@ requirements spec Arun brought from a separate planning session
 build starts.
 
 ## Step: data-model
-Status: not_started
+Status: in_progress
 Criteria:
+- CODE IMPLEMENTED, TYPECHECKED, LINTED, BUILD PASSES (2026-09-21) — pending
+  live testing (running schema_subset_009.sql against the live DB, then
+  exercising the tables via the rest of the feature). Tables created in
+  `supabase/schema_001.sql` (folded in) and `supabase/schema_subset_009.sql`
+  (standalone, next after schema_subset_008.sql). Encryption implemented in
+  application code (`lib/whatsapp/crypto.ts`, Node `node:crypto` AES-256-GCM,
+  key from `WHATSAPP_CONFIG_ENCRYPTION_KEY` env var — NOT pgcrypto/pgsodium
+  in SQL, so the key never touches the DB layer at all) — a deliberate
+  variation from this step's original criteria text below, which proposed
+  pgcrypto/pgsodium; the app-layer approach was judged simpler and keeps the
+  key fully out of SQL. `WHATSAPP_CONFIG_ENCRYPTION_KEY` still needs to be
+  set in Vercel env vars before this can work live — not yet added to the
+  Environment Variables table in CLAUDE.md as part of this pass; flag for a
+  RESYNC.md pass.
 - New tables, following the `kalendar_` prefix convention (spec's draft
   used bare `whatsapp_config`/`whatsapp_sessions` — corrected):
   `kalendar_whatsapp_config` and `kalendar_whatsapp_sessions`.
@@ -68,8 +82,18 @@ Criteria:
   booking-detail actions) but this feature doesn't need it.
 
 ## Step: webhook-routing
-Status: not_started
+Status: in_progress
 Criteria:
+- CODE IMPLEMENTED, TYPECHECKED, LINTED, BUILD PASSES (2026-09-21) — pending
+  live testing against a real Twilio (sandbox) webhook. Route at
+  `app/api/whatsapp/webhook/route.ts`, business resolved by matching `To`
+  against `kalendar_whatsapp_config.twilio_whatsapp_number`
+  (`lib/whatsapp/twilio-client.ts` + the route). Signature validated via the
+  Twilio Node SDK's `twilio.validateRequest` using the resolved business's
+  own decrypted auth token, checked against the exact
+  `NEXT_PUBLIC_APP_URL`-derived webhook URL — this must match byte-for-byte
+  what's configured in the Twilio console (trailing slash, protocol, host)
+  or every request fails; worth confirming carefully during live testing.
 - DECISION (2026-09-21, Arun, researched): sticking with the **per-clinic
   Twilio account model** — each clinic creates and owns their own Twilio
   account, gets their own WhatsApp number, and pastes their own
@@ -95,8 +119,35 @@ Criteria:
   secret used to validate requests claiming to be for that clinic.
 
 ## Step: conversation-flow
-Status: not_started
+Status: in_progress
 Criteria:
+- CODE IMPLEMENTED, TYPECHECKED, LINTED, BUILD PASSES (2026-09-21) — pending
+  live testing (a real WhatsApp conversation through Twilio sandbox, all
+  branches: happy path, slot-taken race, cancel, timeout reset, unrecognized
+  reply). State machine in `lib/whatsapp/conversation.ts`, session
+  persistence in `lib/whatsapp/session.ts` (30-min timeout as designed).
+  Reuses `getAvailableSlots` and `getPublicBookingData`
+  (`lib/actions/booking.ts` / `lib/booking/data.ts`, the same functions the
+  public wizard uses) for date/time listing, and `submitBookingInternal`
+  (same file) for the actual `kalendar_bookings` insert on Confirm — the
+  admin-tooling entry point that skips the public per-IP rate limit, since a
+  WhatsApp webhook has no meaningful end-user IP to rate-limit by; the
+  unique-slot-index race is still caught and handled with a re-prompt as
+  designed.
+  DEVIATION FROM ORIGINAL SPEC SHAPE (not from this file's already-settled
+  design, but worth flagging): replies are plain numbered-list text via
+  TwiML (`lib/whatsapp/twilio-client.ts`'s `twimlReply`), not Twilio's native
+  WhatsApp interactive list/button messages (Content API templates). This
+  file's own conversation-flow language ("interactive list", "Confirm/Cancel
+  buttons") reads as native WhatsApp UI components; what's actually built is
+  "reply with the number of your option" as plain text, because the current
+  Twilio Node SDK's exact method shapes/template setup for WhatsApp
+  interactive content were not confidently known and guessing at a payload
+  shape was flagged as a real risk in the build instructions. Functionally
+  equivalent (no free-text NLP either way, per this file's non-goals), but
+  visually a numbered list instead of tappable buttons — worth a product
+  decision on whether to invest in the native version later, with real
+  Twilio account access to verify the exact API shape.
 - State machine per `kalendar_whatsapp_sessions.state`, unchanged in
   shape from the original spec's §6 except where hold-mechanics-correction
   above removes the hold step:
@@ -132,8 +183,24 @@ Criteria:
   design pass — fine as a starting number, adjust after real usage).
 
 ## Step: settings-ui
-Status: not_started
+Status: in_progress
 Criteria:
+- CODE IMPLEMENTED, TYPECHECKED, LINTED, BUILD PASSES (2026-09-21) — pending
+  live/manual testing in the panel. New section rendered under
+  `/panel/business` (`components/panel/whatsapp-settings.tsx`, wired into
+  `app/panel/business/page.tsx` below the existing `BusinessForm`, shown
+  only once a business exists). Server actions in `lib/actions/whatsapp.ts`
+  (`getWhatsappConfig`, `saveWhatsappConfig`), both wrapped in
+  `authedAction`. Auth token is write-only from the client — the read action
+  never returns the decrypted (or even encrypted) token, only a
+  `hasAuthToken` boolean, and leaving the token field blank on save keeps
+  the existing stored value rather than clearing it. `is_sandbox` is
+  derived automatically by matching the entered number against Twilio's
+  known sandbox number, not manually settable, as designed. Spanish copy
+  added to `lib/i18n/dictionaries/business.ts`'s new `whatsapp` section (plus
+  English, following that file's existing es/en pattern). New `whatsapp`
+  icon added to `components/ui/icon.tsx` (maps to lucide's `MessageCircle` —
+  lucide has no dedicated WhatsApp glyph).
 - DECISION (2026-09-21, Arun) — CORRECTED from the original spec: lives
   under `/panel/business`, not `/panel/settings`. Per CLAUDE.md's
   conventions, `/panel/settings` is explicitly reserved for future

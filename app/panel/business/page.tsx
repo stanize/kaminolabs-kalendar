@@ -1,8 +1,10 @@
 import { requireSession } from "@/lib/auth-session";
 import { getBusinessForUser } from "@/lib/business/data";
 import { BusinessForm } from "@/components/panel/business-form";
+import { WhatsappSettings } from "@/components/panel/whatsapp-settings";
 import { getLocale } from "@/lib/i18n/server";
 import { getBusinessDictionary } from "@/lib/i18n/dictionaries/business";
+import { getWhatsappConfig } from "@/lib/actions/whatsapp";
 
 export default async function BusinessPage({
   searchParams,
@@ -22,6 +24,9 @@ export default async function BusinessPage({
 
   const locale = await getLocale();
   const dict = getBusinessDictionary(locale);
+  // Only a real (already-onboarded) business can have WhatsApp config —
+  // skipped entirely on the "create your business" first-run form.
+  const whatsappConfig = business ? await getWhatsappConfig() : null;
 
   return (
     <div className="mx-auto max-w-[680px] px-4 py-6 sm:px-8 sm:py-8">
@@ -72,6 +77,8 @@ export default async function BusinessPage({
             : null
         }
       />
+
+      {business && <WhatsappSettings initial={whatsappConfig} dict={dict.whatsapp} />}
     </div>
   );
 }

@@ -34,6 +34,8 @@ drop table if exists public.kalendar_plan_prices                 cascade;
 drop table if exists public.kalendar_presales_codes   cascade;
 drop table if exists public.kalendar_support_tickets  cascade;
 drop table if exists public.kalendar_user_preferences cascade;
+drop table if exists public.kalendar_whatsapp_sessions cascade;
+drop table if exists public.kalendar_whatsapp_config    cascade;
 drop table if exists public.kalendar_bookings        cascade;
 drop table if exists public.kalendar_clients         cascade;
 drop table if exists public.kalendar_client_notes     cascade;
@@ -1038,6 +1040,75 @@ as $$
   do update set count = kalendar_rate_limit_hits.count + 1
   returning count;
 $$;
+
+-- ----------------------------------------------------------------------------
+-- kalendar_whatsapp_config / kalendar_whatsapp_sessions
+-- (workflows/whatsapp-booking.md — data-model step) Patients book entirely
+-- inside a WhatsApp conversation with the clinic's own WhatsApp number, per
+-- the per-clinic Twilio account model (webhook-routing step). One config row
+-- per business; one session row per (business, patient phone) tracking the
+-- conversation state machine (conversation-flow step).
+--
+-- twilio_auth_token_encrypted: encrypted AT REST, but NOT with pgcrypto/
+-- pgsodium in SQL — deliberately application-layer instead (Node's
+-- node:crypto, AES-256-GCM, key from WHATSAPP_CONFIG_ENCRYPTION_KEY env var),
+-- so the decryption key never touches the DB layer at all, not even as a
+-- call-time parameter. See lib/whatsapp/crypto.ts. This column stores only
+-- the ciphertext (iv:authTag:ciphertext, base64), opaque to Postgres.
+-- ----------------------------------------------------------------------------
+create table public.kalendar_whatsapp_config (
+  id                          uuid        primary key default gen_random_uuid(),
+  business_id                 uuid        not null unique
+                                          references public.kalendar_businesses (id) on delete cascade,
+  enabled                      boolean     not null default false,
+  twilio_account_sid           text,
+  twilio_auth_token_encrypted  text,
+  twilio_whatsapp_number       text, -- E.164, e.g. "+34600000000" (no "whatsapp:" prefix stored)
+  -- Not manually editable — set from which Twilio number type was entered
+  -- (Twilio's sandbox shared number vs. a clinic's own production number).
+  -- Currently app-set to true whenever the number matches Twilio's known
+  -- sandbox number; see lib/actions/whatsapp.ts.
+  is_sandbox                   boolean     not null default true,
+  created_at                   timestamptz not null default now(),
+  updated_at                   timestamptz not null default now()
+);
+
+create index kalendar_whatsapp_config_business_idx on public.kalendar_whatsapp_config (business_id);
+-- Webhook routing resolves the business from Twilio's "To" field by looking
+-- up this column directly (app/api/whatsapp/webhook/route.ts).
+create index kalendar_whatsapp_config_number_idx on public.kalendar_whatsapp_config (twilio_whatsapp_number);
+
+alter table public.kalendar_whatsapp_config enable row level security;
+
+create policy "WhatsappConfig: write"
+  on public.kalendar_whatsapp_config for all using (true) with check (true);
+
+create table public.kalendar_whatsapp_sessions (
+  id                   uuid        primary key default gen_random_uuid(),
+  business_id          uuid        not null references public.kalendar_businesses (id) on delete cascade,
+  phone_number         text        not null, -- E.164, from Twilio's "From"
+  state                text        not null default 'awaiting_service' check (
+    state in (
+      'awaiting_service', 'awaiting_date', 'awaiting_time',
+      'awaiting_confirmation', 'completed', 'expired'
+    )
+  ),
+  selected_service_id  uuid        references public.kalendar_services (id) on delete set null,
+  selected_date        date,
+  selected_time        text, -- "HH:MM" in business tz; paired with selected_date to resolve the exact slot
+  last_message_at      timestamptz not null default now(),
+  created_at           timestamptz not null default now(),
+  updated_at           timestamptz not null default now(),
+  unique (business_id, phone_number)
+);
+
+create index kalendar_whatsapp_sessions_lookup_idx
+  on public.kalendar_whatsapp_sessions (business_id, phone_number);
+
+alter table public.kalendar_whatsapp_sessions enable row level security;
+
+create policy "WhatsappSessions: write"
+  on public.kalendar_whatsapp_sessions for all using (true) with check (true);
 
 -- ============================================================================
 -- End of schema.

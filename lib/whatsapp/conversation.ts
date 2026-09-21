@@ -1,0 +1,331 @@
+import "server-only";
+import { createClient } from "@/lib/supabase/server";
+import { getPublicBookingData } from "@/lib/booking/data";
+import { getAvailableSlots, submitBookingInternal, type SlotDTO } from "@/lib/actions/booking";
+import {
+  loadOrResetSession,
+  resetSession,
+  updateSession,
+  type WhatsappSessionRow,
+} from "@/lib/whatsapp/session";
+
+// Non-goals carried over from workflows/whatsapp-booking.md: new bookings
+// only (no cancel/reschedule via WhatsApp), no free-text NLP — every step is
+// "reply with the number of your choice", which we implement as parsing a
+// plain-text digit out of the inbound message body.
+
+const DAYS_AHEAD = 14; // how far out to look for open dates
+const MAX_DATE_OPTIONS = 7;
+const MAX_TIME_OPTIONS = 9;
+
+function parseChoice(body: string): number | null {
+  const trimmed = body.trim();
+  const n = Number(trimmed);
+  return Number.isInteger(n) && n > 0 ? n : null;
+}
+
+function formatDateLabel(dateStr: string): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d, 12));
+  return date.toLocaleDateString("es-ES", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+  });
+}
+
+function todayInBusinessTz(): string {
+  const now = new Date();
+  const y = now.getUTCFullYear();
+  const m = String(now.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(now.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function addDays(dateStr: string, days: number): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d + days));
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(
+    date.getUTCDate()
+  ).padStart(2, "0")}`;
+}
+
+interface ConversationResult {
+  reply: string;
+}
+
+/** Runs one turn of the WhatsApp booking conversation for a given business +
+ * patient phone number, given the raw inbound message body. Never throws for
+ * ordinary flow outcomes — always returns a reply string. */
+export async function handleIncomingMessage(
+  businessSlug: string,
+  businessId: string,
+  phoneNumber: string,
+  body: string
+): Promise<ConversationResult> {
+  const data = await getPublicBookingData(businessSlug);
+  if (!data) {
+    return { reply: "Lo sentimos, este negocio no está disponible en este momento." };
+  }
+
+  const session = await loadOrResetSession(businessId, phoneNumber);
+
+  switch (session.state) {
+    case "awaiting_service":
+      return awaitingService(session, businessSlug, data.services, body);
+    case "awaiting_date":
+      return awaitingDate(session, businessSlug, data.services, body);
+    case "awaiting_time":
+      return awaitingTime(session, businessSlug, data.services, body);
+    case "awaiting_confirmation":
+      return awaitingConfirmation(session, businessSlug, data.business.id, data.services, body);
+    default:
+      // completed / expired should never reach here — loadOrResetSession
+      // resets those to awaiting_service before returning.
+      return awaitingService(session, businessSlug, data.services, "");
+  }
+}
+
+function listServicesMessage(services: { id: string; name: string }[]): string {
+  const lines = services.map((s, i) => `${i + 1}. ${s.name}`);
+  return [
+    "¡Hola! 👋 ¿Qué servicio te gustaría reservar? Responde con el número:",
+    ...lines,
+  ].join("\n");
+}
+
+async function awaitingService(
+  session: WhatsappSessionRow,
+  slug: string,
+  services: { id: string; name: string; duration_min: number }[],
+  body: string
+): Promise<ConversationResult> {
+  const choice = parseChoice(body);
+  if (choice === null || choice < 1 || choice > services.length) {
+    return { reply: listServicesMessage(services) };
+  }
+
+  const service = services[choice - 1];
+  await updateSession(session.id, { state: "awaiting_date", selected_service_id: service.id });
+
+  const { reply } = await buildDateOptionsReply(slug, service.id);
+  return { reply };
+}
+
+async function buildDateOptionsReply(
+  slug: string,
+  serviceId: string
+): Promise<{ reply: string; dates: string[] }> {
+  const from = todayInBusinessTz();
+  const to = addDays(from, DAYS_AHEAD);
+  const result = await getAvailableSlots({
+    slug,
+    serviceId,
+    providerId: null,
+    dateFrom: from,
+    dateTo: to,
+  });
+
+  if (!result.ok) {
+    return { reply: "No se pudo comprobar la disponibilidad. Inténtalo de nuevo más tarde.", dates: [] };
+  }
+
+  const openDates = Object.entries(result.slotsByDate)
+    .filter(([, slots]) => slots.length > 0)
+    .map(([date]) => date)
+    .sort()
+    .slice(0, MAX_DATE_OPTIONS);
+
+  if (openDates.length === 0) {
+    return { reply: "No hay fechas disponibles próximamente. Vuelve a intentarlo más adelante.", dates: [] };
+  }
+
+  const lines = openDates.map((d, i) => `${i + 1}. ${formatDateLabel(d)}`);
+  return {
+    reply: ["¿Qué día prefieres? Responde con el número:", ...lines].join("\n"),
+    dates: openDates,
+  };
+}
+
+async function awaitingDate(
+  session: WhatsappSessionRow,
+  slug: string,
+  services: { id: string; name: string }[],
+  body: string
+): Promise<ConversationResult> {
+  const serviceId = session.selected_service_id;
+  if (!serviceId) {
+    await resetSession(session.business_id, session.phone_number);
+    return { reply: listServicesMessage(services) };
+  }
+
+  const { reply, dates } = await buildDateOptionsReply(slug, serviceId);
+  const choice = parseChoice(body);
+
+  if (choice === null || choice < 1 || choice > dates.length) {
+    return { reply };
+  }
+
+  const selectedDate = dates[choice - 1];
+  await updateSession(session.id, { state: "awaiting_time", selected_date: selectedDate });
+
+  const timesReply = await buildTimeOptionsReply(slug, serviceId, selectedDate);
+  return { reply: timesReply.reply };
+}
+
+async function buildTimeOptionsReply(
+  slug: string,
+  serviceId: string,
+  date: string
+): Promise<{ reply: string; slots: SlotDTO[] }> {
+  const result = await getAvailableSlots({
+    slug,
+    serviceId,
+    providerId: null,
+    dateFrom: date,
+    dateTo: date,
+  });
+
+  if (!result.ok) {
+    return { reply: "No se pudo comprobar la disponibilidad. Inténtalo de nuevo más tarde.", slots: [] };
+  }
+
+  const slots = (result.slotsByDate[date] ?? []).slice(0, MAX_TIME_OPTIONS);
+  if (slots.length === 0) {
+    return {
+      reply: "Ya no quedan huecos ese día. Responde con cualquier mensaje para elegir otra fecha.",
+      slots: [],
+    };
+  }
+
+  const lines = slots.map((s, i) => `${i + 1}. ${s.label}`);
+  return { reply: ["¿A qué hora? Responde con el número:", ...lines].join("\n"), slots };
+}
+
+async function awaitingTime(
+  session: WhatsappSessionRow,
+  slug: string,
+  services: { id: string; name: string }[],
+  body: string
+): Promise<ConversationResult> {
+  const serviceId = session.selected_service_id;
+  const date = session.selected_date;
+  if (!serviceId || !date) {
+    await resetSession(session.business_id, session.phone_number);
+    return { reply: listServicesMessage(services) };
+  }
+
+  const { reply, slots } = await buildTimeOptionsReply(slug, serviceId, date);
+  const choice = parseChoice(body);
+
+  if (slots.length === 0) {
+    // No slots left for this date at all — bounce back to date selection.
+    await updateSession(session.id, { state: "awaiting_date", selected_date: null });
+    const dateReply = await buildDateOptionsReply(slug, serviceId);
+    return { reply: dateReply.reply };
+  }
+
+  if (choice === null || choice < 1 || choice > slots.length) {
+    return { reply };
+  }
+
+  const slot = slots[choice - 1];
+  await updateSession(session.id, { state: "awaiting_confirmation", selected_time: slot.startIso });
+
+  const service = services.find((s) => s.id === serviceId);
+  return {
+    reply: [
+      "Resumen de tu reserva:",
+      `Servicio: ${service?.name ?? ""}`,
+      `Fecha: ${formatDateLabel(date)}`,
+      `Hora: ${slot.label}`,
+      "",
+      "1. Confirmar",
+      "2. Cancelar",
+    ].join("\n"),
+  };
+}
+
+async function awaitingConfirmation(
+  session: WhatsappSessionRow,
+  slug: string,
+  businessId: string,
+  services: { id: string; name: string }[],
+  body: string
+): Promise<ConversationResult> {
+  const serviceId = session.selected_service_id;
+  const startIso = session.selected_time; // stored as full ISO in selected_time, see awaitingTime above
+  if (!serviceId || !startIso) {
+    await resetSession(businessId, session.phone_number);
+    return { reply: listServicesMessage(services) };
+  }
+
+  const choice = parseChoice(body);
+
+  if (choice === 2) {
+    // Cancel -> reset to awaiting_service, no resource was ever held
+    // (hold-mechanics-correction, workflows/whatsapp-booking.md).
+    await resetSession(businessId, session.phone_number);
+    return { reply: listServicesMessage(services) };
+  }
+
+  if (choice !== 1) {
+    const service = services.find((s) => s.id === serviceId);
+    return {
+      reply: [
+        "Resumen de tu reserva:",
+        `Servicio: ${service?.name ?? ""}`,
+        "",
+        "1. Confirmar",
+        "2. Cancelar",
+      ].join("\n"),
+    };
+  }
+
+  // Confirm -> create the kalendar_bookings row directly (same insert path
+  // as a guest website booking, via submitBookingInternal). Guest identity
+  // is minimal here (no name/email collected over WhatsApp in v1) — phone
+  // number is the only identifying info we reliably have.
+  const supabase = await createClient();
+  const { data: businessRow } = await supabase
+    .from("kalendar_businesses")
+    .select("name")
+    .eq("id", businessId)
+    .maybeSingle();
+
+  const result = await submitBookingInternal({
+    slug,
+    serviceId,
+    providerId: null,
+    startIso,
+    clientName: `WhatsApp ${phoneDisplay(session.phone_number)}`,
+    clientEmail: `${session.phone_number.replace(/[^0-9]/g, "")}@whatsapp.kalendar.invalid`,
+    clientPhone: session.phone_number,
+    guestLocale: "es",
+  });
+
+  if (!result.ok) {
+    // Unique-index conflict (slot taken by someone else in the meantime) or
+    // any other failure -> re-prompt with fresh times for the same date,
+    // stay in awaiting_time (per conversation-flow step 5's race handling).
+    await updateSession(session.id, { state: "awaiting_time", selected_time: null });
+    const date = session.selected_date;
+    if (date) {
+      const retry = await buildTimeOptionsReply(slug, serviceId, date);
+      return {
+        reply: `${result.error} Elige otro horario:\n${retry.reply}`,
+      };
+    }
+    return { reply: result.error };
+  }
+
+  await updateSession(session.id, { state: "completed" });
+  return {
+    reply: `¡Reserva confirmada! Te esperamos en ${businessRow?.name ?? "el negocio"}. Gracias por reservar por WhatsApp.`,
+  };
+}
+
+function phoneDisplay(phone: string): string {
+  return phone.replace(/^whatsapp:/, "");
+}
