@@ -7,6 +7,8 @@ import {
   twimlEmptyReply,
   sendQuickReplyMessage,
   sendServiceListMessage,
+  sendDateListMessage,
+  sendTimeListMessage,
   type WhatsappConfigRow,
 } from "@/lib/whatsapp/twilio-client";
 import { handleIncomingMessage } from "@/lib/whatsapp/conversation";
@@ -53,7 +55,7 @@ export async function POST(request: Request): Promise<Response> {
   const { data: config } = await supabase
     .from("kalendar_whatsapp_config")
     .select(
-      "id, business_id, enabled, twilio_account_sid, twilio_auth_token_encrypted, twilio_whatsapp_number, is_sandbox, quick_reply_content_sid, service_list_content_sid"
+      "id, business_id, enabled, twilio_account_sid, twilio_auth_token_encrypted, twilio_whatsapp_number, is_sandbox, quick_reply_content_sid, service_list_content_sid, date_list_content_sid, time_list_content_sid"
     )
     .eq("twilio_whatsapp_number", toNumber)
     .maybeSingle();
@@ -136,6 +138,52 @@ export async function POST(request: Request): Promise<Response> {
       // Content API call failed (e.g. transient Twilio error) — fall back
       // to the plain-text reply below rather than leaving the patient with
       // no response at all.
+    }
+  }
+
+  if (result.dateListOptions && result.dateListOptions.dates.length > 0 && typedConfig.twilio_whatsapp_number) {
+    // Date-selection prompt: native whatsapp/card LIST via the Content API
+    // (static numbered-placeholder template, real values injected per-send
+    // via contentVariables — see twilio-client.ts's doc comment). Same
+    // empty-TwiML-on-success / fall-through-on-failure pattern as the
+    // service-list block above.
+    try {
+      await sendDateListMessage({
+        config: typedConfig,
+        accountSid: typedConfig.twilio_account_sid ?? "",
+        authToken,
+        from: typedConfig.twilio_whatsapp_number,
+        to: fromNumber,
+        serviceName: result.dateListOptions.serviceName,
+        dates: result.dateListOptions.dates,
+      });
+      return new NextResponse(twimlEmptyReply(), {
+        status: 200,
+        headers: { "Content-Type": "text/xml" },
+      });
+    } catch {
+      // Content API call failed — fall back to the plain-text reply below.
+    }
+  }
+
+  if (result.timeListOptions && result.timeListOptions.slots.length > 0 && typedConfig.twilio_whatsapp_number) {
+    // Time-selection prompt: same pattern as the date-list block above.
+    try {
+      await sendTimeListMessage({
+        config: typedConfig,
+        accountSid: typedConfig.twilio_account_sid ?? "",
+        authToken,
+        from: typedConfig.twilio_whatsapp_number,
+        to: fromNumber,
+        dateLabel: result.timeListOptions.dateLabel,
+        slots: result.timeListOptions.slots,
+      });
+      return new NextResponse(twimlEmptyReply(), {
+        status: 200,
+        headers: { "Content-Type": "text/xml" },
+      });
+    } catch {
+      // Content API call failed — fall back to the plain-text reply below.
     }
   }
 

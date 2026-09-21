@@ -2,7 +2,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { getPublicBookingData } from "@/lib/booking/data";
 import { getAvailableSlots, submitBookingInternal, type SlotDTO } from "@/lib/actions/booking";
-import { parseServiceListId } from "@/lib/whatsapp/twilio-client";
+import { parseServiceListId, parseDateListId, parseTimeListId } from "@/lib/whatsapp/twilio-client";
 import {
   loadOrResetSession,
   resetSession,
@@ -80,6 +80,13 @@ interface ConversationResult {
    * text. `reply` is still populated in that case as the numbered-text
    * fallback value (used if the Content API send fails). */
   serviceListOptions?: { id: string; name: string; duration_min: number }[];
+  /** Present whenever a date-selection prompt is being sent — the caller
+   * sends this as a native whatsapp/card LIST message instead of `reply` as
+   * plain text. `reply` is still populated as the numbered-text fallback. */
+  dateListOptions?: { serviceName: string; dates: { id: string; label: string }[] };
+  /** Present whenever a time-selection prompt is being sent — same pattern
+   * as dateListOptions above, for times. */
+  timeListOptions?: { dateLabel: string; slots: { id: string; label: string }[] };
 }
 
 /** Runs one turn of the WhatsApp booking conversation for a given business +
@@ -104,9 +111,9 @@ export async function handleIncomingMessage(
     case "awaiting_service":
       return awaitingService(session, businessSlug, data.services, body, listId);
     case "awaiting_date":
-      return awaitingDate(session, businessSlug, data.services, body);
+      return awaitingDate(session, businessSlug, data.services, body, listId);
     case "awaiting_time":
-      return awaitingTime(session, businessSlug, data.services, body);
+      return awaitingTime(session, businessSlug, data.services, body, listId);
     case "awaiting_confirmation":
       return awaitingConfirmation(session, businessSlug, data.business.id, data.services, body, buttonPayload);
     default:
@@ -151,8 +158,14 @@ async function awaitingService(
 
   await updateSession(session.id, { state: "awaiting_date", selected_service_id: service.id });
 
-  const { reply } = await buildDateOptionsReply(slug, service.id);
-  return { reply };
+  const { reply, dates } = await buildDateOptionsReply(slug, service.id);
+  return {
+    reply,
+    dateListOptions:
+      dates.length > 0
+        ? { serviceName: service.name, dates: dates.map((d) => ({ id: d, label: formatDateLabel(d) })) }
+        : undefined,
+  };
 }
 
 async function buildDateOptionsReply(
@@ -194,26 +207,55 @@ async function awaitingDate(
   session: WhatsappSessionRow,
   slug: string,
   services: { id: string; name: string; duration_min: number }[],
-  body: string
+  body: string,
+  listId: string | null
 ): Promise<ConversationResult> {
   const serviceId = session.selected_service_id;
   if (!serviceId) {
     await resetSession(session.business_id, session.phone_number);
     return { reply: listServicesMessage(services), serviceListOptions: services };
   }
+  const service = services.find((s) => s.id === serviceId);
 
   const { reply, dates } = await buildDateOptionsReply(slug, serviceId);
-  const choice = parseChoice(body);
 
-  if (choice === null || choice < 1 || choice > dates.length) {
-    return { reply };
+  // Native whatsapp/card LIST row tap: ListId carries the raw date string
+  // directly (see parseDateListId). Falls back to the legacy numbered-text
+  // digit reply for a stale session, a client that doesn't render list
+  // messages, or a tap on one of the template's unused filler rows (which
+  // never matches a real `dates` entry).
+  const listDate = parseDateListId(listId);
+  const selectedDate =
+    listDate && dates.includes(listDate)
+      ? listDate
+      : (() => {
+          const choice = parseChoice(body);
+          return choice !== null && choice >= 1 && choice <= dates.length ? dates[choice - 1] : null;
+        })();
+
+  if (!selectedDate) {
+    return {
+      reply,
+      dateListOptions:
+        dates.length > 0
+          ? { serviceName: service?.name ?? "", dates: dates.map((d) => ({ id: d, label: formatDateLabel(d) })) }
+          : undefined,
+    };
   }
 
-  const selectedDate = dates[choice - 1];
   await updateSession(session.id, { state: "awaiting_time", selected_date: selectedDate });
 
   const timesReply = await buildTimeOptionsReply(slug, serviceId, selectedDate);
-  return { reply: timesReply.reply };
+  return {
+    reply: timesReply.reply,
+    timeListOptions:
+      timesReply.slots.length > 0
+        ? {
+            dateLabel: formatDateLabel(selectedDate),
+            slots: timesReply.slots.map((s) => ({ id: s.startIso, label: s.label })),
+          }
+        : undefined,
+  };
 }
 
 async function buildTimeOptionsReply(
@@ -249,7 +291,8 @@ async function awaitingTime(
   session: WhatsappSessionRow,
   slug: string,
   services: { id: string; name: string; duration_min: number }[],
-  body: string
+  body: string,
+  listId: string | null
 ): Promise<ConversationResult> {
   const serviceId = session.selected_service_id;
   const date = session.selected_date;
@@ -259,20 +302,42 @@ async function awaitingTime(
   }
 
   const { reply, slots } = await buildTimeOptionsReply(slug, serviceId, date);
-  const choice = parseChoice(body);
 
   if (slots.length === 0) {
     // No slots left for this date at all — bounce back to date selection.
     await updateSession(session.id, { state: "awaiting_date", selected_date: null });
     const dateReply = await buildDateOptionsReply(slug, serviceId);
-    return { reply: dateReply.reply };
+    const service = services.find((s) => s.id === serviceId);
+    return {
+      reply: dateReply.reply,
+      dateListOptions:
+        dateReply.dates.length > 0
+          ? {
+              serviceName: service?.name ?? "",
+              dates: dateReply.dates.map((d) => ({ id: d, label: formatDateLabel(d) })),
+            }
+          : undefined,
+    };
   }
 
-  if (choice === null || choice < 1 || choice > slots.length) {
-    return { reply };
+  // Native whatsapp/card LIST row tap: ListId carries the slot's startIso
+  // directly (see parseTimeListId). Falls back to the legacy numbered-text
+  // digit reply, same pattern as awaitingDate above.
+  const listTime = parseTimeListId(listId);
+  const slot =
+    (listTime ? slots.find((s) => s.startIso === listTime) : undefined) ??
+    (() => {
+      const choice = parseChoice(body);
+      return choice !== null && choice >= 1 && choice <= slots.length ? slots[choice - 1] : undefined;
+    })();
+
+  if (!slot) {
+    return {
+      reply,
+      timeListOptions: { dateLabel: formatDateLabel(date), slots: slots.map((s) => ({ id: s.startIso, label: s.label })) },
+    };
   }
 
-  const slot = slots[choice - 1];
   await updateSession(session.id, { state: "awaiting_confirmation", selected_time: slot.startIso });
 
   const service = services.find((s) => s.id === serviceId);

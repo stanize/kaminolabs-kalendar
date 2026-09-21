@@ -13,6 +13,8 @@ export interface WhatsappConfigRow {
   is_sandbox: boolean;
   quick_reply_content_sid: string | null;
   service_list_content_sid: string | null;
+  date_list_content_sid: string | null;
+  time_list_content_sid: string | null;
 }
 
 /** Decrypts a config row's Twilio auth token. Throws if the row has none. */
@@ -357,4 +359,263 @@ export async function sendServiceListMessage(params: {
 export function parseServiceListId(listId: string | null): string | null {
   if (!listId || !listId.startsWith(SERVICE_LIST_ROW_PREFIX)) return null;
   return listId.slice(SERVICE_LIST_ROW_PREFIX.length);
+}
+
+/**
+ * DATE and TIME list-picker upgrade (2026-09-22, fifth pass,
+ * workflows/whatsapp-booking.md conversation-flow step).
+ *
+ * Unlike the service list above, date/time options are genuinely different
+ * every conversation, so this cannot reuse the "bake rows in at creation
+ * time" approach. Arun supplied a concrete working example showing the
+ * correct shape for genuinely dynamic content: a template with NUMBERED
+ * PLACEHOLDERS (`{{1}}`, `{{2}}`, ... `{{n}}`) for the body text AND every
+ * row's id/title/description, created ONCE per business (static, reusable,
+ * exactly like the service-list/quick-reply templates), with real values
+ * injected via `contentVariables` on every single send — never a new
+ * template per message.
+ *
+ * Row-count design: the template's placeholder count is fixed at creation
+ * time, so it must be sized to the conversation's actual maximum
+ * (`MAX_DATE_OPTIONS` / `MAX_TIME_OPTIONS` in conversation.ts — 7 and 9
+ * respectively, already respecting WhatsApp's 10-row cap). These constants
+ * are duplicated here (DATE_LIST_MAX_ROWS / TIME_LIST_MAX_ROWS) rather than
+ * imported, to avoid a circular import (conversation.ts already imports
+ * parseServiceListId from this file) — keep the two pairs of constants in
+ * sync if either changes.
+ *
+ * FEWER-THAN-MAX ROWS: when a real send has fewer options than the
+ * template's max (e.g. only 3 open slots that day out of a 9-row time
+ * template), the unused row slots are filled with a non-matching sentinel
+ * id (`date_unused_<n>` / `time_unused_<n>`, which parseDateListId /
+ * parseTimeListId strip to a value that never matches a real option, so a
+ * tap on one is treated as invalid input and re-prompts, same as any other
+ * unrecognized reply) and a literal filler title ("(no disponible)"). This
+ * is NOT verified live — flagged as a known limitation below and in the
+ * workflow doc rather than assumed safe: an empty-string id/title was
+ * considered but risks either a blank-looking row or a template-creation
+ * validation error (row title has a minimum length in WhatsApp's schema),
+ * so a real, visible-but-inert filler row was judged the safer default for
+ * an unverified case. Revisit once this is actually exercised live.
+ */
+
+// Row-count constants — MUST stay in sync with conversation.ts's
+// MAX_DATE_OPTIONS / MAX_TIME_OPTIONS (see doc comment above for why they're
+// not imported directly).
+const DATE_LIST_MAX_ROWS = 7;
+const TIME_LIST_MAX_ROWS = 9;
+
+const DATE_LIST_ROW_PREFIX = "date_";
+const TIME_LIST_ROW_PREFIX = "time_";
+const LIST_ROW_FILLER_TITLE = "(no disponible)";
+
+function buildRowPlaceholders(startIndex: number, count: number) {
+  const rows: { id: string; title: string; description: string }[] = [];
+  let idx = startIndex;
+  for (let i = 0; i < count; i++) {
+    rows.push({ id: `{{${idx}}}`, title: `{{${idx + 1}}}`, description: `{{${idx + 2}}}` });
+    idx += 3;
+  }
+  return rows;
+}
+
+/** Creates (once) or returns the cached Content API ContentSid for this
+ * business's date-selection whatsapp/card LIST template (numbered
+ * placeholders, values injected per-send via contentVariables — see the doc
+ * comment above). Caches on kalendar_whatsapp_config.date_list_content_sid. */
+export async function getOrCreateDateListContentSid(
+  config: WhatsappConfigRow,
+  accountSid: string,
+  authToken: string
+): Promise<string> {
+  if (config.date_list_content_sid) return config.date_list_content_sid;
+
+  const rows = buildRowPlaceholders(2, DATE_LIST_MAX_ROWS);
+
+  const res = await fetch(CONTENT_API_BASE, {
+    method: "POST",
+    headers: {
+      Authorization: "Basic " + Buffer.from(`${accountSid}:${authToken}`).toString("base64"),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      friendly_name: `kalendar_date_list_${config.business_id}`,
+      language: "es",
+      types: {
+        "whatsapp/card": {
+          body: "Servicio: *{{1}}*\n\n¿Qué día prefieres? Elige una opción:",
+          actions: [
+            {
+              type: "LIST",
+              title: truncate("Elegir fecha", LIST_BUTTON_LABEL_MAX),
+              item: { title: "Fechas disponibles", subtitle: "Elige un día" },
+              sections: [{ title: "Próximos días", rows }],
+            },
+          ],
+        },
+      },
+    }),
+  });
+
+  if (!res.ok) {
+    const errBody = await res.text().catch(() => "");
+    throw new Error(`Twilio Content API create (date list) failed (${res.status}): ${errBody}`);
+  }
+
+  const data = (await res.json()) as { sid: string };
+
+  const supabase = await createClient();
+  await supabase
+    .from("kalendar_whatsapp_config")
+    .update({ date_list_content_sid: data.sid })
+    .eq("id", config.id);
+
+  return data.sid;
+}
+
+/** Creates (once) or returns the cached Content API ContentSid for this
+ * business's time-selection whatsapp/card LIST template. Caches on
+ * kalendar_whatsapp_config.time_list_content_sid. */
+export async function getOrCreateTimeListContentSid(
+  config: WhatsappConfigRow,
+  accountSid: string,
+  authToken: string
+): Promise<string> {
+  if (config.time_list_content_sid) return config.time_list_content_sid;
+
+  const rows = buildRowPlaceholders(2, TIME_LIST_MAX_ROWS);
+
+  const res = await fetch(CONTENT_API_BASE, {
+    method: "POST",
+    headers: {
+      Authorization: "Basic " + Buffer.from(`${accountSid}:${authToken}`).toString("base64"),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      friendly_name: `kalendar_time_list_${config.business_id}`,
+      language: "es",
+      types: {
+        "whatsapp/card": {
+          body: "Fecha: *{{1}}*\n\n¿A qué hora prefieres? Elige una opción:",
+          actions: [
+            {
+              type: "LIST",
+              title: truncate("Elegir hora", LIST_BUTTON_LABEL_MAX),
+              item: { title: "Horas disponibles", subtitle: "Elige un horario" },
+              sections: [{ title: "Horas disponibles", rows }],
+            },
+          ],
+        },
+      },
+    }),
+  });
+
+  if (!res.ok) {
+    const errBody = await res.text().catch(() => "");
+    throw new Error(`Twilio Content API create (time list) failed (${res.status}): ${errBody}`);
+  }
+
+  const data = (await res.json()) as { sid: string };
+
+  const supabase = await createClient();
+  await supabase
+    .from("kalendar_whatsapp_config")
+    .update({ time_list_content_sid: data.sid })
+    .eq("id", config.id);
+
+  return data.sid;
+}
+
+/** Sends the native whatsapp/card LIST date-selection message via the
+ * Content API — creates/caches the (static, placeholder-only) template on
+ * first use, then injects the real service name + date rows for this send
+ * via contentVariables. Unused row slots (fewer real dates than
+ * DATE_LIST_MAX_ROWS) are filled with an inert sentinel row — see the doc
+ * comment above. */
+export async function sendDateListMessage(params: {
+  config: WhatsappConfigRow;
+  accountSid: string;
+  authToken: string;
+  from: string; // E.164, no "whatsapp:" prefix
+  to: string; // E.164, no "whatsapp:" prefix
+  serviceName: string;
+  dates: { id: string; label: string }[]; // id = raw "YYYY-MM-DD", unprefixed
+}): Promise<void> {
+  const contentSid = await getOrCreateDateListContentSid(params.config, params.accountSid, params.authToken);
+
+  const variables: Record<string, string> = { "1": truncate(params.serviceName, 200) };
+  let idx = 2;
+  for (let i = 0; i < DATE_LIST_MAX_ROWS; i++) {
+    const d = params.dates[i];
+    if (d) {
+      variables[String(idx)] = `${DATE_LIST_ROW_PREFIX}${d.id}`;
+      variables[String(idx + 1)] = truncate(d.label, LIST_ROW_TITLE_MAX);
+      variables[String(idx + 2)] = "";
+    } else {
+      variables[String(idx)] = `${DATE_LIST_ROW_PREFIX}unused_${i}`;
+      variables[String(idx + 1)] = LIST_ROW_FILLER_TITLE;
+      variables[String(idx + 2)] = "";
+    }
+    idx += 3;
+  }
+
+  const client = twilio(params.accountSid, params.authToken);
+  await client.messages.create({
+    from: `whatsapp:${params.from}`,
+    to: `whatsapp:${params.to}`,
+    contentSid,
+    contentVariables: JSON.stringify(variables),
+  });
+}
+
+/** Sends the native whatsapp/card LIST time-selection message via the
+ * Content API — same pattern as sendDateListMessage above, for times. */
+export async function sendTimeListMessage(params: {
+  config: WhatsappConfigRow;
+  accountSid: string;
+  authToken: string;
+  from: string; // E.164, no "whatsapp:" prefix
+  to: string; // E.164, no "whatsapp:" prefix
+  dateLabel: string;
+  slots: { id: string; label: string }[]; // id = slot's startIso, unprefixed
+}): Promise<void> {
+  const contentSid = await getOrCreateTimeListContentSid(params.config, params.accountSid, params.authToken);
+
+  const variables: Record<string, string> = { "1": truncate(params.dateLabel, 200) };
+  let idx = 2;
+  for (let i = 0; i < TIME_LIST_MAX_ROWS; i++) {
+    const s = params.slots[i];
+    if (s) {
+      variables[String(idx)] = `${TIME_LIST_ROW_PREFIX}${s.id}`;
+      variables[String(idx + 1)] = truncate(s.label, LIST_ROW_TITLE_MAX);
+      variables[String(idx + 2)] = "";
+    } else {
+      variables[String(idx)] = `${TIME_LIST_ROW_PREFIX}unused_${i}`;
+      variables[String(idx + 1)] = LIST_ROW_FILLER_TITLE;
+      variables[String(idx + 2)] = "";
+    }
+    idx += 3;
+  }
+
+  const client = twilio(params.accountSid, params.authToken);
+  await client.messages.create({
+    from: `whatsapp:${params.from}`,
+    to: `whatsapp:${params.to}`,
+    contentSid,
+    contentVariables: JSON.stringify(variables),
+  });
+}
+
+/** Strips the date-list row-id prefix, returning the underlying raw
+ * "YYYY-MM-DD" date string, or null if `listId` isn't a date-list row id. */
+export function parseDateListId(listId: string | null): string | null {
+  if (!listId || !listId.startsWith(DATE_LIST_ROW_PREFIX)) return null;
+  return listId.slice(DATE_LIST_ROW_PREFIX.length);
+}
+
+/** Strips the time-list row-id prefix, returning the underlying slot
+ * startIso string, or null if `listId` isn't a time-list row id. */
+export function parseTimeListId(listId: string | null): string | null {
+  if (!listId || !listId.startsWith(TIME_LIST_ROW_PREFIX)) return null;
+  return listId.slice(TIME_LIST_ROW_PREFIX.length);
 }

@@ -1081,10 +1081,24 @@ create table public.kalendar_whatsapp_config (
   -- list message), created lazily on first use from the business's current
   -- active services and reused after that — NOT recreated when services
   -- change, a known limitation (see workflows/whatsapp-booking.md,
-  -- conversation-flow step). No equivalent column for date/time lists,
-  -- which remain plain text — see the same doc for why.
+  -- conversation-flow step). Date/time lists use a DIFFERENT shape (below)
+  -- since their content is genuinely different every conversation.
   -- (schema_subset_011.sql)
   service_list_content_sid     text,
+  -- Cached Twilio Content API ContentSid (HXxxxx) for this business's
+  -- whatsapp/card LIST date-selection template. Unlike service_list_*
+  -- above, this template's body/rows are all NUMBERED PLACEHOLDERS
+  -- ({{1}}..{{n}}) — real per-send values (service name + date rows) are
+  -- injected via contentVariables on every send, not baked in at creation
+  -- time, so the same static template works for genuinely-dynamic
+  -- every-conversation content. Sized to 7 rows (conversation.ts's
+  -- MAX_DATE_OPTIONS). See lib/whatsapp/twilio-client.ts.
+  -- (schema_subset_013.sql)
+  date_list_content_sid        text,
+  -- Same pattern as date_list_content_sid above, for the time-selection
+  -- step. Sized to 9 rows (conversation.ts's MAX_TIME_OPTIONS).
+  -- (schema_subset_013.sql)
+  time_list_content_sid        text,
   created_at                   timestamptz not null default now(),
   updated_at                   timestamptz not null default now()
 );
