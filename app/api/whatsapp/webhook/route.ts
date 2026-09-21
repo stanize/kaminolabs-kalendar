@@ -6,6 +6,7 @@ import {
   twimlReply,
   twimlEmptyReply,
   sendQuickReplyMessage,
+  sendServiceListMessage,
   type WhatsappConfigRow,
 } from "@/lib/whatsapp/twilio-client";
 import { handleIncomingMessage } from "@/lib/whatsapp/conversation";
@@ -36,6 +37,10 @@ export async function POST(request: Request): Promise<Response> {
   // button (the "id" we set when creating the template — "confirm"/"cancel")
   // rather than typed text. See lib/whatsapp/twilio-client.ts.
   const buttonPayload = paramsObj["ButtonPayload"] ?? null;
+  // Set when the inbound message is a tap on a native whatsapp/card LIST
+  // row (the service-selection list) rather than typed text or a button.
+  // See lib/whatsapp/twilio-client.ts's parseServiceListId.
+  const listId = paramsObj["ListId"] ?? null;
 
   if (!to || !from) {
     return new NextResponse("Missing To/From", { status: 400 });
@@ -48,7 +53,7 @@ export async function POST(request: Request): Promise<Response> {
   const { data: config } = await supabase
     .from("kalendar_whatsapp_config")
     .select(
-      "id, business_id, enabled, twilio_account_sid, twilio_auth_token_encrypted, twilio_whatsapp_number, is_sandbox, quick_reply_content_sid"
+      "id, business_id, enabled, twilio_account_sid, twilio_auth_token_encrypted, twilio_whatsapp_number, is_sandbox, quick_reply_content_sid, service_list_content_sid"
     )
     .eq("twilio_whatsapp_number", toNumber)
     .maybeSingle();
@@ -105,8 +110,34 @@ export async function POST(request: Request): Promise<Response> {
     typedConfig.business_id,
     fromNumber,
     body,
-    buttonPayload
+    buttonPayload,
+    listId
   );
+
+  if (result.serviceListOptions && result.serviceListOptions.length > 0 && typedConfig.twilio_whatsapp_number) {
+    // Service-selection prompt: send as a native whatsapp/card LIST
+    // interactive message via the REST API rather than TwiML, then reply to
+    // the webhook with an empty TwiML response so Twilio doesn't also relay
+    // `reply` as plain text (same pattern as the quick-reply block below).
+    try {
+      await sendServiceListMessage({
+        config: typedConfig,
+        accountSid: typedConfig.twilio_account_sid ?? "",
+        authToken,
+        from: typedConfig.twilio_whatsapp_number,
+        to: fromNumber,
+        services: result.serviceListOptions,
+      });
+      return new NextResponse(twimlEmptyReply(), {
+        status: 200,
+        headers: { "Content-Type": "text/xml" },
+      });
+    } catch {
+      // Content API call failed (e.g. transient Twilio error) — fall back
+      // to the plain-text reply below rather than leaving the patient with
+      // no response at all.
+    }
+  }
 
   if (result.quickReplySummary && typedConfig.twilio_whatsapp_number) {
     // Confirm/Cancel step: send as a native twilio/quick-reply interactive

@@ -12,6 +12,7 @@ export interface WhatsappConfigRow {
   twilio_whatsapp_number: string | null;
   is_sandbox: boolean;
   quick_reply_content_sid: string | null;
+  service_list_content_sid: string | null;
 }
 
 /** Decrypts a config row's Twilio auth token. Throws if the row has none. */
@@ -94,47 +95,44 @@ const CONTENT_API_BASE = "https://content.twilio.com/v1/Content";
  * buttons, no per-item dynamic labels needed, so there was nothing here that
  * required guessing at an unverified variable-substitution shape.
  *
- * NOT SHIPPED (re-attempted 2026-09-21, second pass): twilio/list-picker for
- * the service/date/time lists. This pass had one new piece of confirmed
- * evidence going in (a twilio-node GitHub issue example showing
- * `contentVariables: JSON.stringify({ body, button, items })` — i.e. the
- * whole list-picker object re-sent fresh per message, not per-item `{{n}}`
- * substitution the way quick-reply's single `{{1}}` body placeholder works)
- * — but the piece that was still missing, the exact template-CREATION
- * payload, remains genuinely unverified:
- * - Direct doc access is still blocked, and this time confirmed two ways,
- *   not just via the WebFetch tool: `curl` directly to
- *   www.twilio.com/docs/content/twiliolist-picker and to a Postman-hosted
- *   copy of the same page both got `CONNECT tunnel failed, response 403`
- *   from this session's own egress proxy (org policy `connect_rejected`,
- *   not a transient failure — checked via
- *   `curl $HTTPS_PROXY/__agentproxy/status`).
- * - Web search snippets this pass surfaced a *contradiction*, not just a
- *   gap: one snippet attributed to Twilio's own list-picker doc shows
- *   `items` given as real, static values at template-creation time (e.g.
- *   `{"id": "SFO1337", "description": "Owl Air Flight 1337 to LGA"}` baked
- *   into the template, no `{{n}}` placeholder) — which doesn't match the
- *   confirmed dynamic-per-send pattern quoted above at all, if items really
- *   are meant to vary per message (our case) rather than be fixed at
- *   creation. Reconciling those two would be a guess.
- * - More importantly: the GitHub issue this pass was pointed at as
- *   confirmation (twilio/twilio-node#1065, "Supplying Items to a list
- *   template does not work (validation errors)") is itself a live bug
- *   report that the exact per-send items-array approach fails validation
- *   for at least some real users/SDK versions — i.e. even the one shape
- *   that seemed confirmed is independently documented as unreliable in
- *   production, not just unverified.
- * Given real, contradictory, partly-broken evidence rather than just a gap,
- * shipping this untested risks silently breaking the service/date/time
- * steps (the core of the conversation, unlike the one-shot Confirm/Cancel
- * step). Text lists (`twimlReply`, unchanged) are kept for service/date/time
- * selection, both list sizes already capped well under WhatsApp's 10-item
- * list-picker limit (`MAX_DATE_OPTIONS = 7`, `MAX_TIME_OPTIONS = 9` in
- * `lib/whatsapp/conversation.ts`) so no code changes are needed there if/when
- * this is picked up. Revisit once a session has real doc access, or Arun
- * confirms the creation payload from the Twilio console/account directly —
- * test creation + one real send against Twilio sandbox before trusting any
- * shape, given the above.
+ * SHIPPED (2026-09-21, fourth pass): whatsapp/card with a LIST action for
+ * the SERVICE-selection step (`getOrCreateServiceListContentSid` /
+ * `sendServiceListMessage` below). The prior two passes' blocker — an
+ * unverifiable/contradictory template-creation payload for
+ * `twilio/list-picker` — is resolved: Arun supplied a concrete, verified
+ * working example from real Twilio reference material. The correct content
+ * type is `whatsapp/card` (NOT `twilio/list-picker`, which was the wrong
+ * type in prior attempts), with `actions: [{ type: "LIST", ... }]` and the
+ * row items given as real static values baked in at template-creation time
+ * — which is exactly what the second pass's web-search snippet showed and
+ * flagged as a contradiction; it wasn't a contradiction, it was correct, and
+ * the "items are per-send/dynamic" GitHub-issue-derived theory from that
+ * pass was the wrong track.
+ *
+ * Because rows are baked in at creation time (not `contentVariables` at
+ * send time), a template is tied to one exact set of rows — unlike
+ * quick-reply's two fixed buttons, our lists are dynamic content. Services
+ * are the one list stable enough to treat like quick-reply (create once per
+ * business, cache the sid, reuse): a business's service list doesn't change
+ * every conversation the way available dates/times do. So this pass ships
+ * the service list only. Recreating the template on every services-edit
+ * (staleness detection) is deliberately NOT built this pass — see the
+ * schema comment and workflows/whatsapp-booking.md for that known
+ * limitation.
+ *
+ * NOT SHIPPED: date and time lists remain plain-text TwiML
+ * (`buildDateOptionsReply`/`buildTimeOptionsReply` in conversation.ts,
+ * unchanged). Those lists are genuinely different every conversation
+ * (different open dates/times each time), and this Content API shape has no
+ * per-send row override — creating a brand-new persistent Content Template
+ * via a full HTTP POST on every single message would be a real operational
+ * cost (slow, and Twilio accounts have per-account content-template limits)
+ * — not a lightweight thing to do once per conversation turn. That's a
+ * genuine architecture mismatch with this static-template approach, not a
+ * verification gap like the service list's was, so it's being flagged
+ * explicitly rather than shipped blind. Revisit only if Twilio's Content API
+ * gains a real per-send row-override mechanism, or if the dynamic-content
+ * cost/limits trade-off is judged acceptable later.
  */
 
 /** Creates (once) or returns the cached Content API ContentSid for this
@@ -227,4 +225,136 @@ export async function sendQuickReplyMessage(params: {
     contentSid,
     contentVariables: JSON.stringify({ "1": params.bodyText }),
   });
+}
+
+// WhatsApp interactive list message row limits (see doc comment above):
+// max 10 rows total across all sections combined, row title max 24 chars,
+// row description max 72 chars, list button/menu label max 20 chars.
+const LIST_ROW_TITLE_MAX = 24;
+const LIST_BUTTON_LABEL_MAX = 20;
+
+/** Row id prefix for service-list rows, so the webhook can recognize and
+ * strip it to recover the underlying kalendar_services.id from the
+ * inbound `ListId` field without ambiguity against any other row-id shape. */
+const SERVICE_LIST_ROW_PREFIX = "svc_";
+
+function truncate(s: string, max: number): string {
+  return s.length <= max ? s : s.slice(0, max - 1) + "…";
+}
+
+/** Creates (once) or returns the cached Content API ContentSid for this
+ * business's service-selection whatsapp/card LIST template, using the
+ * business's own decrypted Twilio credentials. Caches the sid on
+ * kalendar_whatsapp_config so it's created at most once per business, not
+ * on every message.
+ *
+ * KNOWN LIMITATION: rows are baked into the template at creation time, so if
+ * `services` changes after the first call (a service renamed/added/removed),
+ * the cached template keeps showing the old list until the cache is cleared
+ * by hand (e.g. nulling the column) — no staleness detection is built here,
+ * deliberately, to keep this pass scoped. See
+ * workflows/whatsapp-booking.md's conversation-flow step.
+ *
+ * KNOWN LIMITATION: a service name longer than LIST_ROW_TITLE_MAX (24 chars)
+ * is hard-truncated with an ellipsis rather than solved with any smarter
+ * wrapping/shortening logic — acceptable for now, flagged rather than
+ * silently broken.
+ */
+export async function getOrCreateServiceListContentSid(
+  config: WhatsappConfigRow,
+  accountSid: string,
+  authToken: string,
+  services: { id: string; name: string; duration_min?: number }[]
+): Promise<string> {
+  if (config.service_list_content_sid) return config.service_list_content_sid;
+
+  // Content API list-message row cap is 10 total across all sections.
+  const rows = services.slice(0, 10).map((s) => ({
+    id: `${SERVICE_LIST_ROW_PREFIX}${s.id}`,
+    title: truncate(s.name, LIST_ROW_TITLE_MAX),
+    ...(s.duration_min ? { description: truncate(`${s.duration_min} min`, 72) } : {}),
+  }));
+
+  const res = await fetch(CONTENT_API_BASE, {
+    method: "POST",
+    headers: {
+      Authorization: "Basic " + Buffer.from(`${accountSid}:${authToken}`).toString("base64"),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      friendly_name: `kalendar_service_list_${config.business_id}`,
+      language: "es",
+      types: {
+        "whatsapp/card": {
+          body: "¡Hola! 👋 ¿Qué servicio te gustaría reservar?",
+          actions: [
+            {
+              type: "LIST",
+              title: truncate("Elegir servicio", LIST_BUTTON_LABEL_MAX),
+              item: {
+                title: "Servicios disponibles",
+                subtitle: "Elige una opción",
+              },
+              sections: [
+                {
+                  title: "Servicios",
+                  rows,
+                },
+              ],
+            },
+          ],
+        },
+      },
+    }),
+  });
+
+  if (!res.ok) {
+    const errBody = await res.text().catch(() => "");
+    throw new Error(`Twilio Content API create (service list) failed (${res.status}): ${errBody}`);
+  }
+
+  const data = (await res.json()) as { sid: string };
+
+  const supabase = await createClient();
+  await supabase
+    .from("kalendar_whatsapp_config")
+    .update({ service_list_content_sid: data.sid })
+    .eq("id", config.id);
+
+  return data.sid;
+}
+
+/** Sends the native whatsapp/card LIST service-selection message via the
+ * Content API, creating/caching the template on first use. Static body —
+ * no per-send contentVariables, since the rows are baked into the template
+ * (see getOrCreateServiceListContentSid's doc comment for why). */
+export async function sendServiceListMessage(params: {
+  config: WhatsappConfigRow;
+  accountSid: string;
+  authToken: string;
+  from: string; // E.164, no "whatsapp:" prefix
+  to: string; // E.164, no "whatsapp:" prefix
+  services: { id: string; name: string; duration_min?: number }[];
+}): Promise<void> {
+  const contentSid = await getOrCreateServiceListContentSid(
+    params.config,
+    params.accountSid,
+    params.authToken,
+    params.services
+  );
+
+  const client = twilio(params.accountSid, params.authToken);
+  await client.messages.create({
+    from: `whatsapp:${params.from}`,
+    to: `whatsapp:${params.to}`,
+    contentSid,
+  });
+}
+
+/** Strips the service-list row-id prefix, returning the underlying
+ * kalendar_services.id, or null if `listId` isn't a service-list row id
+ * (e.g. absent, or a stale/unrelated payload). */
+export function parseServiceListId(listId: string | null): string | null {
+  if (!listId || !listId.startsWith(SERVICE_LIST_ROW_PREFIX)) return null;
+  return listId.slice(SERVICE_LIST_ROW_PREFIX.length);
 }

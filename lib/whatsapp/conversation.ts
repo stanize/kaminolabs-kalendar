@@ -2,6 +2,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { getPublicBookingData } from "@/lib/booking/data";
 import { getAvailableSlots, submitBookingInternal, type SlotDTO } from "@/lib/actions/booking";
+import { parseServiceListId } from "@/lib/whatsapp/twilio-client";
 import {
   loadOrResetSession,
   resetSession,
@@ -73,6 +74,12 @@ interface ConversationResult {
    * still populated in that case as the body text substituted into the
    * template's {{1}} placeholder, and as a plain-text fallback value. */
   quickReplySummary?: string;
+  /** Present whenever a service-selection prompt is being sent (initial
+   * contact, or a re-prompt on an unrecognized reply) — the caller sends
+   * this as a native whatsapp/card LIST message instead of `reply` as plain
+   * text. `reply` is still populated in that case as the numbered-text
+   * fallback value (used if the Content API send fails). */
+  serviceListOptions?: { id: string; name: string; duration_min: number }[];
 }
 
 /** Runs one turn of the WhatsApp booking conversation for a given business +
@@ -83,7 +90,8 @@ export async function handleIncomingMessage(
   businessId: string,
   phoneNumber: string,
   body: string,
-  buttonPayload: string | null = null
+  buttonPayload: string | null = null,
+  listId: string | null = null
 ): Promise<ConversationResult> {
   const data = await getPublicBookingData(businessSlug);
   if (!data) {
@@ -94,7 +102,7 @@ export async function handleIncomingMessage(
 
   switch (session.state) {
     case "awaiting_service":
-      return awaitingService(session, businessSlug, data.services, body);
+      return awaitingService(session, businessSlug, data.services, body, listId);
     case "awaiting_date":
       return awaitingDate(session, businessSlug, data.services, body);
     case "awaiting_time":
@@ -104,11 +112,11 @@ export async function handleIncomingMessage(
     default:
       // completed / expired should never reach here — loadOrResetSession
       // resets those to awaiting_service before returning.
-      return awaitingService(session, businessSlug, data.services, "");
+      return awaitingService(session, businessSlug, data.services, "", null);
   }
 }
 
-function listServicesMessage(services: { id: string; name: string }[]): string {
+function listServicesMessage(services: { id: string; name: string; duration_min: number }[]): string {
   const lines = services.map((s, i) => `${i + 1}. ${s.name}`);
   return [
     "¡Hola! 👋 ¿Qué servicio te gustaría reservar? Responde con el número:",
@@ -120,14 +128,27 @@ async function awaitingService(
   session: WhatsappSessionRow,
   slug: string,
   services: { id: string; name: string; duration_min: number }[],
-  body: string
+  body: string,
+  listId: string | null
 ): Promise<ConversationResult> {
-  const choice = parseChoice(body);
-  if (choice === null || choice < 1 || choice > services.length) {
-    return { reply: listServicesMessage(services) };
+  // Native whatsapp/card LIST row tap: ListId carries the exact selected
+  // service id directly, no digit-matching needed. Falls back to the
+  // legacy numbered-text digit reply for a stale session predating this
+  // upgrade, or a client that doesn't render list messages.
+  const listServiceId = parseServiceListId(listId);
+  const service = listServiceId
+    ? services.find((s) => s.id === listServiceId)
+    : (() => {
+        const choice = parseChoice(body);
+        return choice !== null && choice >= 1 && choice <= services.length
+          ? services[choice - 1]
+          : undefined;
+      })();
+
+  if (!service) {
+    return { reply: listServicesMessage(services), serviceListOptions: services };
   }
 
-  const service = services[choice - 1];
   await updateSession(session.id, { state: "awaiting_date", selected_service_id: service.id });
 
   const { reply } = await buildDateOptionsReply(slug, service.id);
@@ -172,13 +193,13 @@ async function buildDateOptionsReply(
 async function awaitingDate(
   session: WhatsappSessionRow,
   slug: string,
-  services: { id: string; name: string }[],
+  services: { id: string; name: string; duration_min: number }[],
   body: string
 ): Promise<ConversationResult> {
   const serviceId = session.selected_service_id;
   if (!serviceId) {
     await resetSession(session.business_id, session.phone_number);
-    return { reply: listServicesMessage(services) };
+    return { reply: listServicesMessage(services), serviceListOptions: services };
   }
 
   const { reply, dates } = await buildDateOptionsReply(slug, serviceId);
@@ -227,14 +248,14 @@ async function buildTimeOptionsReply(
 async function awaitingTime(
   session: WhatsappSessionRow,
   slug: string,
-  services: { id: string; name: string }[],
+  services: { id: string; name: string; duration_min: number }[],
   body: string
 ): Promise<ConversationResult> {
   const serviceId = session.selected_service_id;
   const date = session.selected_date;
   if (!serviceId || !date) {
     await resetSession(session.business_id, session.phone_number);
-    return { reply: listServicesMessage(services) };
+    return { reply: listServicesMessage(services), serviceListOptions: services };
   }
 
   const { reply, slots } = await buildTimeOptionsReply(slug, serviceId, date);
@@ -271,7 +292,7 @@ async function awaitingConfirmation(
   session: WhatsappSessionRow,
   slug: string,
   businessId: string,
-  services: { id: string; name: string }[],
+  services: { id: string; name: string; duration_min: number }[],
   body: string,
   buttonPayload: string | null
 ): Promise<ConversationResult> {
@@ -279,7 +300,7 @@ async function awaitingConfirmation(
   const startIso = session.selected_time; // stored as full ISO in selected_time, see awaitingTime above
   if (!serviceId || !startIso) {
     await resetSession(businessId, session.phone_number);
-    return { reply: listServicesMessage(services) };
+    return { reply: listServicesMessage(services), serviceListOptions: services };
   }
 
   const choice = parseConfirmChoice(body, buttonPayload);
@@ -288,7 +309,7 @@ async function awaitingConfirmation(
     // Cancel -> reset to awaiting_service, no resource was ever held
     // (hold-mechanics-correction, workflows/whatsapp-booking.md).
     await resetSession(businessId, session.phone_number);
-    return { reply: listServicesMessage(services) };
+    return { reply: listServicesMessage(services), serviceListOptions: services };
   }
 
   if (choice !== "confirm") {

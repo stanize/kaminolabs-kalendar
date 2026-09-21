@@ -7,14 +7,21 @@ requirements spec Arun brought from a separate planning session
 (2026-09-21); verified against actual code and revised below before any
 build starts.
 
-**FROZEN (2026-09-21) for a client demo tomorrow (2026-09-22):** the flow
+**Demo (2026-09-22) has happened.** The freeze note below is historical —
+Arun asked, post-demo, to build the list-picker follow-up it deferred.
+That reopens **conversation-flow only**, scoped specifically to the
+service-selection list-picker addition (see "SHIPPED: whatsapp/card LIST
+for service selection" below) — not a full re-test of the rest of the
+step, which stays as Arun tested it on 2026-09-21.
+
+~~FROZEN (2026-09-21) for a client demo tomorrow (2026-09-22): the flow
 below (service/date/time as numbered text, Confirm/Cancel as real
 tappable buttons) is Arun-tested and confirmed working live via Twilio
 Sandbox. Deliberately staying as-is — do not touch conversation-flow,
 webhook-routing, settings-ui, or data-model before the demo. The
 list-picker (tappable service/date/time) upgrade is the one known
 follow-up, explicitly deferred — see the NOT SHIPPED note under
-conversation-flow.
+conversation-flow.~~
 
 ## Step: data-model
 Status: done
@@ -134,15 +141,19 @@ Criteria:
   secret used to validate requests claiming to be for that clinic.
 
 ## Step: conversation-flow
-Status: done
+Status: in_progress
 Criteria:
 - TESTED (2026-09-21, Arun): confirmed working live end-to-end through
   Twilio's WhatsApp Sandbox — service → date → time → confirm produces a
   real `kalendar_bookings` row, Confirm/Cancel renders as real tappable
-  WhatsApp buttons. FROZEN AS-IS for a client demo tomorrow (2026-09-22) —
-  the list-picker upgrade for service/date/time (still plain numbered text,
-  see the NOT SHIPPED note below) is explicitly deferred, not a blocker for
-  the demo. No further changes to this step until after the demo.
+  WhatsApp buttons. This part of the step was Arun-tested and is NOT being
+  re-tested as part of the list-picker addition below.
+- **REOPENED (2026-09-22, fourth pass) for the service-list-picker addition
+  — CODE IMPLEMENTED, TYPECHECKED, LINTED, BUILD PASSES, pending Arun's live
+  testing.** Back to `in_progress` per CLAUDE.md's rule (code merged in a
+  coding session is never marked `done` by that session) — only the
+  service-selection step changed; date/time/confirm behavior is unchanged
+  from the 2026-09-21 tested state above.
 - CODE IMPLEMENTED, TYPECHECKED, LINTED, BUILD PASSES (2026-09-21). State machine in `lib/whatsapp/conversation.ts`, session
   persistence in `lib/whatsapp/session.ts` (30-min timeout as designed).
   Reuses `getAvailableSlots` and `getPublicBookingData`
@@ -153,13 +164,13 @@ Criteria:
   WhatsApp webhook has no meaningful end-user IP to rate-limit by; the
   unique-slot-index race is still caught and handled with a re-prompt as
   designed.
-- **NATIVE INTERACTIVE MESSAGES UPGRADE (2026-09-21, second pass) — PARTIAL,
-  pending live testing.** Follow-up to the deviation flagged below: swapped
-  the reply-sending layer (`lib/whatsapp/twilio-client.ts` +
+- **NATIVE INTERACTIVE MESSAGES UPGRADE — cumulative status (fourth pass,
+  2026-09-22).** Follow-up to the deviation flagged below: swapped the
+  reply-sending layer (`lib/whatsapp/twilio-client.ts` +
   `app/api/whatsapp/webhook/route.ts`) to use Twilio's Content API for real
   tappable WhatsApp UI where it could be verified safe to build; the
   conversation state machine itself (`lib/whatsapp/conversation.ts`,
-  `lib/whatsapp/session.ts`) is unchanged in shape.
+  `lib/whatsapp/session.ts`) is unchanged in shape throughout all passes.
   - **SHIPPED: twilio/quick-reply for the Confirm/Cancel step.** At
     `awaiting_confirmation`, the webhook route now sends a real native
     Confirm/Cancel WhatsApp message via the Content API
@@ -180,68 +191,93 @@ Criteria:
     (`client.messages.create` with `contentSid`/`contentVariables`) for
     this one step only, then the webhook responds with an empty
     `<Response/>` so Twilio doesn't also send the plain-text version.
-  - **NOT SHIPPED: twilio/list-picker for the service/date/time lists —
-    still plain numbered-list text via TwiML (`twimlReply`), unchanged.**
-    **Re-attempted in a third pass (2026-09-21), still not shipped**, this
-    time starting from a real twilio-node usage example (a GitHub issue
-    snippet showing `contentVariables: JSON.stringify({ body, button,
-    items })` sent fresh per message against one static, once-created
-    ContentSid — the "items are per-send, not per-template" question from
-    the earlier passes). That resolved the *send-time* shape question, but
-    the *template-creation* payload — what `types["twilio/list-picker"]`
-    must contain in the POST that creates the ContentSid in the first
-    place — is still unverified, and this pass found real contradicting
-    evidence rather than just a gap:
-    - Doc access is still blocked, confirmed two independent ways this
-      time: both the WebFetch tool and a direct `curl` to
-      `www.twilio.com/docs/content/twiliolist-picker` (and to a
-      Postman-hosted mirror of the same page) got `CONNECT tunnel failed,
-      response 403` from this session's own egress proxy — an org-policy
-      `connect_rejected`, not a transient failure (checked via
-      `curl $HTTPS_PROXY/__agentproxy/status`).
-    - A web-search snippet attributed to Twilio's own list-picker doc shows
-      `items` as real static values baked in at creation time (e.g.
-      `{"id": "SFO1337", "description": "Owl Air Flight 1337 to LGA"}`, no
-      `{{n}}` placeholder) — which contradicts items being dynamic per
-      send if taken at face value for a template meant to be reused with
-      different items every message (our case: a different service/date/
-      time list every time).
-    - The GitHub issue this pass started from as its strongest evidence
-      (twilio/twilio-node#1065, "Supplying Items to a list template does
-      not work (validation errors)") is itself an open bug report that the
-      per-send items-array approach fails validation for real users — the
-      one shape that looked most confirmed is independently documented as
-      unreliable in production, not merely unverified.
-    Given contradictory and partly-broken evidence (not just an
-    information gap), shipping this untested risks breaking the
-    service/date/time steps — the actual core of the conversation, unlike
-    the one-shot Confirm/Cancel step — so it was left as TwiML text again,
-    per this feature's standing instruction to fall back cleanly rather
-    than guess. Text lists for service/date/time selection are unchanged.
-    Existing list-size caps already respect WhatsApp's 10-item list-picker
-    limit with no code change needed if/when this ships:
+  - **SHIPPED (2026-09-22, fourth pass): whatsapp/card LIST for the
+    SERVICE-selection step only.** The blocker from the second and third
+    passes below (an unverifiable/contradictory template-creation payload)
+    is now resolved — Arun supplied a concrete, correct working example
+    from real Twilio reference material, not web search. Two corrections
+    to what the earlier passes had assumed:
+    - The correct content type is **`whatsapp/card`** with
+      `actions: [{ type: "LIST", ... }]`, not `twilio/list-picker` — the
+      wrong type name in every prior attempt.
+    - Rows ARE baked into the template at creation time (static), not sent
+      per-message via `contentVariables` — the second pass's web-search
+      snippet showing static items was actually correct, and the
+      "items-are-dynamic-per-send" theory (built off a twilio-node GitHub
+      issue in the third pass) was the wrong track.
+    Because rows are static-at-creation, and our service/date/time lists
+    are genuinely dynamic per conversation, a template is only reusable
+    for content that doesn't change every message. That's true of a
+    business's **service list** (stable, same problem shape as
+    Confirm/Cancel — create once per business, cache the sid) but not of
+    **date/time lists** (different every conversation). So this pass ships
+    the service list only:
+    - `getOrCreateServiceListContentSid` / `sendServiceListMessage`
+      (`lib/whatsapp/twilio-client.ts`) mirror the quick-reply pattern:
+      created lazily on first use per business, sid cached on
+      `kalendar_whatsapp_config.service_list_content_sid`, never recreated
+      per message.
+    - **Known limitation, deliberately not solved this pass**: the cached
+      template is NOT invalidated when the business's services change
+      later (renamed/added/removed) — it keeps showing the services as
+      they were at first use until the cached sid is cleared by hand.
+      Staleness detection was explicitly out of scope to keep this pass
+      scoped; flagged here rather than silently wrong.
+    - **Known limitation**: a service name longer than the list's 24-char
+      row-title limit is hard-truncated with an ellipsis (`truncate()` in
+      `twilio-client.ts`), not solved with smarter wrapping — acceptable
+      for now, flagged rather than silently broken. Not expected to bite
+      today's known service names, but not verified against every
+      business's actual service names either.
+    - Row `id`s are `svc_<kalendar_services.id>` — the webhook reads the
+      tapped row back via Twilio's `ListId` form field
+      (`app/api/whatsapp/webhook/route.ts`), `parseServiceListId` strips
+      the prefix to recover the exact service id directly (no
+      digit-matching needed for this step anymore). Falls back to the
+      legacy numbered-text digit reply for a stale session that predates
+      this upgrade, or a client that doesn't render list messages, exactly
+      the same fallback pattern as Confirm/Cancel's `ButtonPayload`.
+    - Existing 10-row cap already applied (`services.slice(0, 10)` in
+      `getOrCreateServiceListContentSid`); no clinic currently has more
+      than 10 active services so this hasn't been exercised for real, but
+      it fails safe (extra services just don't appear in the list) rather
+      than erroring.
+  - **NOT SHIPPED (still, deliberately): date and time lists remain plain
+    numbered-list text via TwiML (`twimlReply`), unchanged.** This is now
+    an architecture call, not an unverified-payload blocker like before:
+    the Content API's `whatsapp/card` LIST rows are static-at-creation, and
+    date/time options are genuinely different every single conversation
+    (different open slots each time). The only way to make those dynamic
+    with this shape would be creating a brand-new persistent Content
+    Template via a full HTTP POST on every single inbound message — a real
+    operational cost (a slow, full API round-trip creating a persistent
+    resource, not a lightweight per-send call) and a real risk of hitting
+    Twilio's per-account content-template limits over time. That trade-off
+    was judged not worth it for this pass, so date/time selection is
+    intentionally left as the existing plain-text numbered list — the
+    genuinely-dynamic-every-message case this static-template approach
+    doesn't cleanly fit, called out explicitly rather than forced. Revisit
+    only if Twilio's Content API gains a real per-send row-override
+    mechanism, or if the per-message template-creation cost is judged
+    acceptable later. Existing list-size caps already respect WhatsApp's
+    10-item list-picker limit if/when this is revisited:
     `MAX_DATE_OPTIONS = 7`, `MAX_TIME_OPTIONS = 9`
-    (`lib/whatsapp/conversation.ts`). **Action needed to finish this
-    properly**: a session with actual doc access, or Arun confirming the
-    exact creation payload from the Twilio console/his own account,
-    followed by a real test send against Twilio sandbox before trusting
-    any shape — the search evidence above is not enough on its own to
-    write and ship this blind. See `lib/whatsapp/twilio-client.ts`'s
-    doc comment above `getOrCreateQuickReplyContentSid` for the full
-    per-pass research trail.
+    (`lib/whatsapp/conversation.ts`).
   - Schema: added `kalendar_whatsapp_config.quick_reply_content_sid`
-    (nullable text, additive) — `supabase/schema_subset_010.sql` (folded
-    into `schema_001.sql` too). No list-picker sid column, since that part
-    wasn't built. Arun still needs to run `schema_subset_010.sql` against
-    the live DB before the quick-reply path will work (same as the other
-    still-`in_progress` schema pieces on this workflow).
-  - What Arun should expect to see change when testing: the **Confirm /
-    Cancel step now renders as two real tappable WhatsApp buttons**
-    instead of "1. Confirmar / 2. Cancelar" text (first time it's sent for
-    a given business, Twilio needs a moment to approve/register the
-    template — if it doesn't render as buttons instantly, that's likely
-    why, retry). Service/date/time selection still look exactly the same
-    as before this pass — plain numbered text, reply with a digit.
+    (nullable text, additive, prior pass) and now also
+    `service_list_content_sid` (nullable text, additive, this pass) —
+    `supabase/schema_subset_010.sql` and `supabase/schema_subset_011.sql`
+    respectively (both folded into `schema_001.sql` too). **Arun still
+    needs to run `schema_subset_011.sql` against the live DB** before the
+    service-list path will work — `schema_subset_010.sql` should already be
+    applied from the prior pass; if not, both need to run (in order).
+  - What Arun should expect to see change when testing: the **service
+    (first) step now renders as a real tappable WhatsApp list message**
+    ("Elegir servicio" button → row per service) instead of "1. ... / 2.
+    ..." numbered text — first time it's sent for a given business, Twilio
+    needs a moment to approve/register the template, same caveat as
+    Confirm/Cancel. Date, time, and Confirm/Cancel selection all look
+    exactly the same as the 2026-09-21 tested state — no changes there.
 - DEVIATION FROM ORIGINAL SPEC SHAPE, first build pass (superseded above for
   the Confirm/Cancel step only): replies were plain numbered-list text via
   TwiML (`lib/whatsapp/twilio-client.ts`'s `twimlReply`), not Twilio's native

@@ -1076,6 +1076,15 @@ create table public.kalendar_whatsapp_config (
   -- (conversation-flow step) for why list-picker native messages weren't
   -- shipped. (schema_subset_010.sql)
   quick_reply_content_sid      text,
+  -- Cached Twilio Content API ContentSid (HXxxxx) for this business's
+  -- whatsapp/card LIST service-selection template (real tappable WhatsApp
+  -- list message), created lazily on first use from the business's current
+  -- active services and reused after that — NOT recreated when services
+  -- change, a known limitation (see workflows/whatsapp-booking.md,
+  -- conversation-flow step). No equivalent column for date/time lists,
+  -- which remain plain text — see the same doc for why.
+  -- (schema_subset_011.sql)
+  service_list_content_sid     text,
   created_at                   timestamptz not null default now(),
   updated_at                   timestamptz not null default now()
 );
