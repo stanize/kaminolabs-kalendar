@@ -7,12 +7,23 @@ requirements spec Arun brought from a separate planning session
 (2026-09-21); verified against actual code and revised below before any
 build starts.
 
+**FROZEN (2026-09-21) for a client demo tomorrow (2026-09-22):** the flow
+below (service/date/time as numbered text, Confirm/Cancel as real
+tappable buttons) is Arun-tested and confirmed working live via Twilio
+Sandbox. Deliberately staying as-is — do not touch conversation-flow,
+webhook-routing, settings-ui, or data-model before the demo. The
+list-picker (tappable service/date/time) upgrade is the one known
+follow-up, explicitly deferred — see the NOT SHIPPED note under
+conversation-flow.
+
 ## Step: data-model
-Status: in_progress
+Status: done
 Criteria:
-- CODE IMPLEMENTED, TYPECHECKED, LINTED, BUILD PASSES (2026-09-21) — pending
-  live testing (running schema_subset_009.sql against the live DB, then
-  exercising the tables via the rest of the feature). Tables created in
+- TESTED (2026-09-21, Arun): confirmed working live — schema_subset_009.sql
+  run against the live DB, WhatsApp config saves correctly from
+  `/panel/business` for the test clinic. Freezing here for a client demo
+  tomorrow (2026-09-22) — no further changes to this step until after that.
+- CODE IMPLEMENTED, TYPECHECKED, LINTED, BUILD PASSES (2026-09-21). Tables created in
   `supabase/schema_001.sql` (folded in) and `supabase/schema_subset_009.sql`
   (standalone, next after schema_subset_008.sql). Encryption implemented in
   application code (`lib/whatsapp/crypto.ts`, Node `node:crypto` AES-256-GCM,
@@ -82,10 +93,14 @@ Criteria:
   booking-detail actions) but this feature doesn't need it.
 
 ## Step: webhook-routing
-Status: in_progress
+Status: done
 Criteria:
-- CODE IMPLEMENTED, TYPECHECKED, LINTED, BUILD PASSES (2026-09-21) — pending
-  live testing against a real Twilio (sandbox) webhook. Route at
+- TESTED (2026-09-21, Arun): confirmed working live against Twilio's WhatsApp
+  Sandbox — webhook URL registered in the Twilio console, signature
+  validation passing, business correctly resolved by `To` number. Freezing
+  here for a client demo tomorrow (2026-09-22) — no further changes to this
+  step until after that.
+- CODE IMPLEMENTED, TYPECHECKED, LINTED, BUILD PASSES (2026-09-21). Route at
   `app/api/whatsapp/webhook/route.ts`, business resolved by matching `To`
   against `kalendar_whatsapp_config.twilio_whatsapp_number`
   (`lib/whatsapp/twilio-client.ts` + the route). Signature validated via the
@@ -119,12 +134,16 @@ Criteria:
   secret used to validate requests claiming to be for that clinic.
 
 ## Step: conversation-flow
-Status: in_progress
+Status: done
 Criteria:
-- CODE IMPLEMENTED, TYPECHECKED, LINTED, BUILD PASSES (2026-09-21) — pending
-  live testing (a real WhatsApp conversation through Twilio sandbox, all
-  branches: happy path, slot-taken race, cancel, timeout reset, unrecognized
-  reply). State machine in `lib/whatsapp/conversation.ts`, session
+- TESTED (2026-09-21, Arun): confirmed working live end-to-end through
+  Twilio's WhatsApp Sandbox — service → date → time → confirm produces a
+  real `kalendar_bookings` row, Confirm/Cancel renders as real tappable
+  WhatsApp buttons. FROZEN AS-IS for a client demo tomorrow (2026-09-22) —
+  the list-picker upgrade for service/date/time (still plain numbered text,
+  see the NOT SHIPPED note below) is explicitly deferred, not a blocker for
+  the demo. No further changes to this step until after the demo.
+- CODE IMPLEMENTED, TYPECHECKED, LINTED, BUILD PASSES (2026-09-21). State machine in `lib/whatsapp/conversation.ts`, session
   persistence in `lib/whatsapp/session.ts` (30-min timeout as designed).
   Reuses `getAvailableSlots` and `getPublicBookingData`
   (`lib/actions/booking.ts` / `lib/booking/data.ts`, the same functions the
@@ -266,10 +285,14 @@ Criteria:
   design pass — fine as a starting number, adjust after real usage).
 
 ## Step: settings-ui
-Status: in_progress
+Status: done
 Criteria:
-- CODE IMPLEMENTED, TYPECHECKED, LINTED, BUILD PASSES (2026-09-21) — pending
-  live/manual testing in the panel. New section rendered under
+- TESTED (2026-09-21, Arun): confirmed working live — WhatsApp section on
+  `/panel/business` saves correctly (toggle, Account SID, Auth Token,
+  number), sandbox badge correctly auto-detected. Freezing here for a
+  client demo tomorrow (2026-09-22) — no further changes to this step
+  until after that.
+- CODE IMPLEMENTED, TYPECHECKED, LINTED, BUILD PASSES (2026-09-21). New section rendered under
   `/panel/business` (`components/panel/whatsapp-settings.tsx`, wired into
   `app/panel/business/page.tsx` below the existing `BusinessForm`, shown
   only once a business exists). Server actions in `lib/actions/whatsapp.ts`
