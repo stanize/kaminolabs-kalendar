@@ -134,10 +134,12 @@ export async function POST(request: Request): Promise<Response> {
         status: 200,
         headers: { "Content-Type": "text/xml" },
       });
-    } catch {
+    } catch (err) {
       // Content API call failed (e.g. transient Twilio error) — fall back
       // to the plain-text reply below rather than leaving the patient with
-      // no response at all.
+      // no response at all. Logged (not silently swallowed) so a failure
+      // mode is actually diagnosable from Vercel logs.
+      console.error("[whatsapp] sendServiceListMessage failed, falling back to text:", err);
     }
   }
 
@@ -161,8 +163,9 @@ export async function POST(request: Request): Promise<Response> {
         status: 200,
         headers: { "Content-Type": "text/xml" },
       });
-    } catch {
+    } catch (err) {
       // Content API call failed — fall back to the plain-text reply below.
+      console.error("[whatsapp] sendDateListMessage failed, falling back to text:", err);
     }
   }
 
@@ -182,8 +185,9 @@ export async function POST(request: Request): Promise<Response> {
         status: 200,
         headers: { "Content-Type": "text/xml" },
       });
-    } catch {
+    } catch (err) {
       // Content API call failed — fall back to the plain-text reply below.
+      console.error("[whatsapp] sendTimeListMessage failed, falling back to text:", err);
     }
   }
 
@@ -205,10 +209,12 @@ export async function POST(request: Request): Promise<Response> {
         status: 200,
         headers: { "Content-Type": "text/xml" },
       });
-    } catch {
+    } catch (err) {
       // Content API call failed (e.g. transient Twilio error) — fall back
       // to the plain-text reply below rather than leaving the patient with
-      // no response at all.
+      // no response at all. Logged (not silently swallowed) so a failure
+      // mode is actually diagnosable from Vercel logs.
+      console.error("[whatsapp] sendQuickReplyMessage failed, falling back to text:", err);
     }
   }
 
