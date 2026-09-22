@@ -2,7 +2,12 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { getPublicBookingData } from "@/lib/booking/data";
 import { getAvailableSlots, submitBookingInternal, type SlotDTO } from "@/lib/actions/booking";
-import { parseServiceListId, parseDateListId, parseTimeListId } from "@/lib/whatsapp/twilio-client";
+import {
+  parseServiceListId,
+  parseDateListId,
+  parseTimeListId,
+  DATE_LIST_MORE_ROW_ID,
+} from "@/lib/whatsapp/twilio-client";
 import {
   loadOrResetSession,
   resetSession,
@@ -15,8 +20,12 @@ import {
 // "reply with the number of your choice", which we implement as parsing a
 // plain-text digit out of the inbound message body.
 
-const DAYS_AHEAD = 14; // how far out to look for open dates
-const MAX_DATE_OPTIONS = 7;
+// DAYS_AHEAD widened 14 -> 60 (2026-09-22, date-list pagination) so there is
+// a real, wide-enough pool of open dates to paginate through — the whole
+// window is fetched once (buildDateOptionsReply below) and paginated
+// in-memory, DATE_PAGE_SIZE per page, rather than re-querying per page.
+const DAYS_AHEAD = 60;
+const DATE_PAGE_SIZE = 6; // real dates per date-list page; the 7th row is "Ver más fechas" when a next page exists
 const MAX_TIME_OPTIONS = 9;
 
 function parseChoice(body: string): number | null {
@@ -82,11 +91,20 @@ interface ConversationResult {
   serviceListOptions?: { id: string; name: string; duration_min: number }[];
   /** Present whenever a date-selection prompt is being sent — the caller
    * sends this as a native whatsapp/card LIST message instead of `reply` as
-   * plain text. `reply` is still populated as the numbered-text fallback. */
-  dateListOptions?: { serviceName: string; dates: { id: string; label: string }[] };
+   * plain text. `reply` is still populated as the numbered-text fallback.
+   * `dates` is one page (up to DATE_PAGE_SIZE); `hasMore` says whether a
+   * "Ver más fechas" row should be shown — see date-list-pagination
+   * addition (2026-09-22, sixth pass). */
+  dateListOptions?: { serviceName: string; dates: { id: string; label: string }[]; hasMore: boolean };
   /** Present whenever a time-selection prompt is being sent — same pattern
    * as dateListOptions above, for times. */
   timeListOptions?: { dateLabel: string; slots: { id: string; label: string }[] };
+  /** Present only for the "requested a page beyond the last one" case — the
+   * caller sends this as a separate plain-text WhatsApp message BEFORE the
+   * (page-1) dateListOptions list that follows in the same result, so the
+   * patient sees an explicit "no hay más fechas" notice rather than a
+   * silent loop back to page 1. */
+  plainTextBefore?: string;
 }
 
 /** Runs one turn of the WhatsApp booking conversation for a given business +
@@ -156,22 +174,44 @@ async function awaitingService(
     return { reply: listServicesMessage(services), serviceListOptions: services };
   }
 
-  await updateSession(session.id, { state: "awaiting_date", selected_service_id: service.id });
+  await updateSession(session.id, {
+    state: "awaiting_date",
+    selected_service_id: service.id,
+    date_page: 0, // fresh service selection -> fresh date-list pagination
+  });
 
-  const { reply, dates } = await buildDateOptionsReply(slug, service.id);
+  const page = await buildDateOptionsReply(slug, service.id, 0);
   return {
-    reply,
+    reply: page.reply,
     dateListOptions:
-      dates.length > 0
-        ? { serviceName: service.name, dates: dates.map((d) => ({ id: d, label: formatDateLabel(d) })) }
+      page.dates.length > 0
+        ? {
+            serviceName: service.name,
+            dates: page.dates.map((d) => ({ id: d, label: formatDateLabel(d) })),
+            hasMore: page.hasMore,
+          }
         : undefined,
   };
 }
 
-async function buildDateOptionsReply(
-  slug: string,
-  serviceId: string
-): Promise<{ reply: string; dates: string[] }> {
+interface DatePageResult {
+  reply: string;
+  /** This page's real dates (up to DATE_PAGE_SIZE), empty on failure, no
+   * open dates at all, or an out-of-range page request. */
+  dates: string[];
+  /** Whether a further page exists beyond this one. */
+  hasMore: boolean;
+  /** True only when `page` was requested beyond the last real page (i.e.
+   * there is nothing at all to show for it) — the caller must NOT render
+   * this as a date list; it should show the "no hay más fechas" notice and
+   * fall back to page 0 instead. */
+  pageInvalid: boolean;
+}
+
+/** Fetches ALL open dates within the DAYS_AHEAD lookahead window in one call
+ * (not re-queried per page), sorted ascending, and returns the requested
+ * DATE_PAGE_SIZE-sized page plus pagination metadata. */
+async function buildDateOptionsReply(slug: string, serviceId: string, page: number): Promise<DatePageResult> {
   const from = todayInBusinessTz();
   const to = addDays(from, DAYS_AHEAD);
   const result = await getAvailableSlots({
@@ -183,23 +223,44 @@ async function buildDateOptionsReply(
   });
 
   if (!result.ok) {
-    return { reply: "No se pudo comprobar la disponibilidad. Inténtalo de nuevo más tarde.", dates: [] };
+    return {
+      reply: "No se pudo comprobar la disponibilidad. Inténtalo de nuevo más tarde.",
+      dates: [],
+      hasMore: false,
+      pageInvalid: false,
+    };
   }
 
-  const openDates = Object.entries(result.slotsByDate)
+  const allOpenDates = Object.entries(result.slotsByDate)
     .filter(([, slots]) => slots.length > 0)
     .map(([date]) => date)
-    .sort()
-    .slice(0, MAX_DATE_OPTIONS);
+    .sort();
 
-  if (openDates.length === 0) {
-    return { reply: "No hay fechas disponibles próximamente. Vuelve a intentarlo más adelante.", dates: [] };
+  if (allOpenDates.length === 0) {
+    return {
+      reply: "No hay fechas disponibles próximamente. Vuelve a intentarlo más adelante.",
+      dates: [],
+      hasMore: false,
+      pageInvalid: false,
+    };
   }
 
-  const lines = openDates.map((d, i) => `${i + 1}. ${formatDateLabel(d)}`);
+  const totalPages = Math.ceil(allOpenDates.length / DATE_PAGE_SIZE);
+  if (page >= totalPages) {
+    return { reply: "", dates: [], hasMore: false, pageInvalid: true };
+  }
+
+  const pageDates = allOpenDates.slice(page * DATE_PAGE_SIZE, page * DATE_PAGE_SIZE + DATE_PAGE_SIZE);
+  const hasMore = page + 1 < totalPages;
+
+  const lines = pageDates.map((d, i) => `${i + 1}. ${formatDateLabel(d)}`);
+  if (hasMore) lines.push(`${pageDates.length + 1}. Ver más fechas`);
+
   return {
     reply: ["¿Qué día prefieres? Responde con el número:", ...lines].join("\n"),
-    dates: openDates,
+    dates: pageDates,
+    hasMore,
+    pageInvalid: false,
   };
 }
 
@@ -216,29 +277,81 @@ async function awaitingDate(
     return { reply: listServicesMessage(services), serviceListOptions: services };
   }
   const service = services.find((s) => s.id === serviceId);
+  const currentPage = session.date_page ?? 0;
 
-  const { reply, dates } = await buildDateOptionsReply(slug, serviceId);
+  const page = await buildDateOptionsReply(slug, serviceId, currentPage);
 
   // Native whatsapp/card LIST row tap: ListId carries the raw date string
-  // directly (see parseDateListId). Falls back to the legacy numbered-text
-  // digit reply for a stale session, a client that doesn't render list
-  // messages, or a tap on one of the template's unused filler rows (which
-  // never matches a real `dates` entry).
+  // directly (see parseDateListId), or the "more" sentinel for the
+  // pagination row (see DATE_LIST_MORE_ROW_ID). Falls back to the legacy
+  // numbered-text digit reply for a stale session, a client that doesn't
+  // render list messages, or a tap on one of the template's unused filler
+  // rows (which never matches a real `dates` entry).
   const listDate = parseDateListId(listId);
+
+  // "Ver más fechas" detection — a list-row tap on the sentinel id, or (no
+  // list tap at all) the legacy numbered-text fallback digit, which is
+  // always the row right after this page's real dates whenever a next page
+  // exists (see buildDateOptionsReply's `lines.push` above).
+  const moreDigit = page.hasMore ? page.dates.length + 1 : null;
+  const isMoreTap =
+    listDate === DATE_LIST_MORE_ROW_ID || (!listDate && moreDigit !== null && parseChoice(body) === moreDigit);
+
+  if (isMoreTap) {
+    const nextPage = currentPage + 1;
+    const next = await buildDateOptionsReply(slug, serviceId, nextPage);
+
+    if (next.pageInvalid) {
+      // Requested a page beyond the last one — explicit notice, then reset
+      // and show page 1 again (never a silent loop, never a dead end).
+      await updateSession(session.id, { date_page: 0 });
+      const first = await buildDateOptionsReply(slug, serviceId, 0);
+      return {
+        reply: first.reply,
+        plainTextBefore: "No hay más fechas disponibles.",
+        dateListOptions:
+          first.dates.length > 0
+            ? {
+                serviceName: service?.name ?? "",
+                dates: first.dates.map((d) => ({ id: d, label: formatDateLabel(d) })),
+                hasMore: first.hasMore,
+              }
+            : undefined,
+      };
+    }
+
+    await updateSession(session.id, { date_page: nextPage });
+    return {
+      reply: next.reply,
+      dateListOptions:
+        next.dates.length > 0
+          ? {
+              serviceName: service?.name ?? "",
+              dates: next.dates.map((d) => ({ id: d, label: formatDateLabel(d) })),
+              hasMore: next.hasMore,
+            }
+          : undefined,
+    };
+  }
+
   const selectedDate =
-    listDate && dates.includes(listDate)
+    listDate && page.dates.includes(listDate)
       ? listDate
       : (() => {
           const choice = parseChoice(body);
-          return choice !== null && choice >= 1 && choice <= dates.length ? dates[choice - 1] : null;
+          return choice !== null && choice >= 1 && choice <= page.dates.length ? page.dates[choice - 1] : null;
         })();
 
   if (!selectedDate) {
     return {
-      reply,
+      reply: page.reply,
       dateListOptions:
-        dates.length > 0
-          ? { serviceName: service?.name ?? "", dates: dates.map((d) => ({ id: d, label: formatDateLabel(d) })) }
+        page.dates.length > 0
+          ? {
+              serviceName: service?.name ?? "",
+              dates: page.dates.map((d) => ({ id: d, label: formatDateLabel(d) })),
+              hasMore: page.hasMore,
+            }
           : undefined,
     };
   }
@@ -304,9 +417,11 @@ async function awaitingTime(
   const { reply, slots } = await buildTimeOptionsReply(slug, serviceId, date);
 
   if (slots.length === 0) {
-    // No slots left for this date at all — bounce back to date selection.
+    // No slots left for this date at all — bounce back to date selection,
+    // keeping the patient's current date_page (this isn't a fresh service
+    // selection or a session reset, so pagination state is preserved).
     await updateSession(session.id, { state: "awaiting_date", selected_date: null });
-    const dateReply = await buildDateOptionsReply(slug, serviceId);
+    const dateReply = await buildDateOptionsReply(slug, serviceId, session.date_page ?? 0);
     const service = services.find((s) => s.id === serviceId);
     return {
       reply: dateReply.reply,
@@ -315,6 +430,7 @@ async function awaitingTime(
           ? {
               serviceName: service?.name ?? "",
               dates: dateReply.dates.map((d) => ({ id: d, label: formatDateLabel(d) })),
+              hasMore: dateReply.hasMore,
             }
           : undefined,
     };

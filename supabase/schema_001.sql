@@ -1126,6 +1126,7 @@ create table public.kalendar_whatsapp_sessions (
   selected_service_id  uuid        references public.kalendar_services (id) on delete set null,
   selected_date        date,
   selected_time        text, -- "HH:MM" in business tz; paired with selected_date to resolve the exact slot
+  date_page            integer     not null default 0, -- current date-list page (0-indexed); reset to 0 whenever awaiting_date is (re)entered fresh (from awaiting_service or a session reset) — see conversation-flow's date-list pagination
   last_message_at      timestamptz not null default now(),
   created_at           timestamptz not null default now(),
   updated_at           timestamptz not null default now(),

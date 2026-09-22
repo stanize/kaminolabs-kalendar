@@ -17,6 +17,7 @@ export interface WhatsappSessionRow {
   selected_service_id: string | null;
   selected_date: string | null; // "YYYY-MM-DD"
   selected_time: string | null; // "HH:MM"
+  date_page: number; // current date-list page (0-indexed) — see conversation.ts's date-list pagination
   last_message_at: string;
 }
 
@@ -69,6 +70,7 @@ export async function resetSession(
         selected_service_id: null,
         selected_date: null,
         selected_time: null,
+        date_page: 0,
         last_message_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       },
@@ -89,7 +91,7 @@ export async function updateSession(
   patch: Partial<
     Pick<
       WhatsappSessionRow,
-      "state" | "selected_service_id" | "selected_date" | "selected_time"
+      "state" | "selected_service_id" | "selected_date" | "selected_time" | "date_page"
     >
   >
 ): Promise<void> {

@@ -9,6 +9,7 @@ import {
   sendServiceListMessage,
   sendDateListMessage,
   sendTimeListMessage,
+  sendPlainMessage,
   type WhatsappConfigRow,
 } from "@/lib/whatsapp/twilio-client";
 import { handleIncomingMessage } from "@/lib/whatsapp/conversation";
@@ -149,6 +150,27 @@ export async function POST(request: Request): Promise<Response> {
     // via contentVariables — see twilio-client.ts's doc comment). Same
     // empty-TwiML-on-success / fall-through-on-failure pattern as the
     // service-list block above.
+    //
+    // `plainTextBefore` (date-list-pagination, 2026-09-22): only set for
+    // the "requested a page beyond the last one" case — an explicit "no hay
+    // más fechas" notice sent as its own plain-text message BEFORE the
+    // page-1 list that follows, never silently swallowed. A failure here is
+    // logged but not fatal to the turn — the list message below still goes
+    // out.
+    if (result.plainTextBefore) {
+      try {
+        await sendPlainMessage({
+          accountSid: typedConfig.twilio_account_sid ?? "",
+          authToken,
+          from: typedConfig.twilio_whatsapp_number,
+          to: fromNumber,
+          body: result.plainTextBefore,
+        });
+      } catch (err) {
+        console.error("[whatsapp] sendPlainMessage (plainTextBefore) failed:", err);
+      }
+    }
+
     try {
       await sendDateListMessage({
         config: typedConfig,
@@ -158,6 +180,7 @@ export async function POST(request: Request): Promise<Response> {
         to: fromNumber,
         serviceName: result.dateListOptions.serviceName,
         dates: result.dateListOptions.dates,
+        hasMore: result.dateListOptions.hasMore,
       });
       return new NextResponse(twimlEmptyReply(), {
         status: 200,

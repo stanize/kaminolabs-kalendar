@@ -517,12 +517,29 @@ export async function getOrCreateTimeListContentSid(
   return data.sid;
 }
 
+/** Row id (stripped of DATE_LIST_ROW_PREFIX, i.e. the value parseDateListId
+ * returns) for the "Ver más fechas" pagination row — see
+ * workflows/whatsapp-booking.md's date-list-pagination addition
+ * (2026-09-22, sixth pass). Full row id sent to Twilio is
+ * `${DATE_LIST_ROW_PREFIX}more` = "date_more", which can never collide with
+ * a real date row id ("date_YYYY-MM-DD"). */
+export const DATE_LIST_MORE_ROW_ID = "more";
+const DATE_LIST_MORE_ROW_TITLE = "Ver más fechas";
+
 /** Sends the native whatsapp/card LIST date-selection message via the
  * Content API — creates/caches the (static, placeholder-only) template on
  * first use, then injects the real service name + date rows for this send
- * via contentVariables. Unused row slots (fewer real dates than
- * DATE_LIST_MAX_ROWS) are filled with an inert sentinel row — see the doc
- * comment above. */
+ * via contentVariables.
+ *
+ * PAGINATION (2026-09-22, sixth pass): `dates` is one page — at most 6 real
+ * dates — and `hasMore` says whether a further page exists. The template
+ * itself is unchanged (still DATE_LIST_MAX_ROWS = 7 rows, same cached sid,
+ * no template recreation needed): row 7 becomes a "Ver más fechas" row
+ * (id `date_more`) only when `hasMore` is true, so the "more" option never
+ * appears on the last page (per the pagination design's requirement that a
+ * tap must never loop to nothing). Any other unused row slots (fewer than 6
+ * real dates AND no more pages, i.e. the last page) fall back to the
+ * existing inert filler-row sentinel, same as before pagination. */
 export async function sendDateListMessage(params: {
   config: WhatsappConfigRow;
   accountSid: string;
@@ -530,7 +547,8 @@ export async function sendDateListMessage(params: {
   from: string; // E.164, no "whatsapp:" prefix
   to: string; // E.164, no "whatsapp:" prefix
   serviceName: string;
-  dates: { id: string; label: string }[]; // id = raw "YYYY-MM-DD", unprefixed
+  dates: { id: string; label: string }[]; // one page, up to 6 real dates, id = raw "YYYY-MM-DD" unprefixed
+  hasMore: boolean;
 }): Promise<void> {
   const contentSid = await getOrCreateDateListContentSid(params.config, params.accountSid, params.authToken);
 
@@ -541,6 +559,10 @@ export async function sendDateListMessage(params: {
     if (d) {
       variables[String(idx)] = `${DATE_LIST_ROW_PREFIX}${d.id}`;
       variables[String(idx + 1)] = truncate(d.label, LIST_ROW_TITLE_MAX);
+      variables[String(idx + 2)] = "";
+    } else if (i === params.dates.length && params.hasMore) {
+      variables[String(idx)] = `${DATE_LIST_ROW_PREFIX}${DATE_LIST_MORE_ROW_ID}`;
+      variables[String(idx + 1)] = truncate(DATE_LIST_MORE_ROW_TITLE, LIST_ROW_TITLE_MAX);
       variables[String(idx + 2)] = "";
     } else {
       variables[String(idx)] = `${DATE_LIST_ROW_PREFIX}unused_${i}`;

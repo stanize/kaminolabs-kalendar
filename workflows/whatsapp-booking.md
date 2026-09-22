@@ -148,6 +148,64 @@ Criteria:
   real `kalendar_bookings` row, Confirm/Cancel renders as real tappable
   WhatsApp buttons. This part of the step was Arun-tested and is NOT being
   re-tested as part of the list-picker addition below.
+- **REOPENED (2026-09-22, sixth pass) for the DATE-LIST PAGINATION addition
+  — CODE IMPLEMENTED, TYPECHECKED, LINTED, BUILD PASSES, pending Arun's live
+  testing.** Back to `in_progress` per CLAUDE.md's rule. Scoped strictly to
+  date-list pagination — service selection, time selection, and
+  Confirm/Cancel are untouched by this pass.
+  - **Problem being fixed**: the date list was fixed at
+    `DAYS_AHEAD = 14` / `MAX_DATE_OPTIONS = 7`, so any open date beyond the
+    first 7 within a 14-day window was silently dropped with no way for a
+    patient to see it.
+  - **Search window widened**: `DAYS_AHEAD` in `conversation.ts` is now
+    `60` (was `14`). `buildDateOptionsReply` fetches the FULL sorted list
+    of open dates in that 60-day window in ONE call to `getAvailableSlots`,
+    then paginates over it in-memory — no new DB/availability query per
+    page.
+  - **Paging UI stays inside the same 7-row `twilio/list-picker` template**
+    (no template recreation, same cached `date_list_content_sid`): each
+    page now shows up to `DATE_PAGE_SIZE = 6` real dates, plus a 7th "Ver
+    más fechas" row whenever a next page exists. On the last page (no more
+    dates beyond what's shown), that 7th slot either isn't rendered at all
+    (fewer than 6 real dates) or falls back to the existing inert
+    "(no disponible)" filler row (exactly 6 real dates, no more pages) —
+    the "more" row is never shown where tapping it would loop to nothing.
+  - **State**: new `kalendar_whatsapp_sessions.date_page` integer column
+    (default 0), added via `supabase/schema_subset_014.sql` (folded into
+    `schema_001.sql` too — **Arun still needs to run this against the live
+    DB**). Reset to 0 whenever `awaiting_date` is (re)entered fresh — from
+    `awaiting_service` (a new service selection, in `awaitingService`) or
+    from a session reset (`resetSession` in `session.ts`, which already
+    zeroes every selection field) — but preserved when `awaitingTime`
+    bounces back to date selection because a previously-open date ran out
+    of slots (that's a re-entry within the same date-selection attempt, not
+    a fresh one).
+  - **"More" row id / detection**: the row's id (post-`DATE_LIST_ROW_PREFIX`
+    strip) is the sentinel `DATE_LIST_MORE_ROW_ID = "more"`
+    (`lib/whatsapp/twilio-client.ts`) — full row id `date_more`, which can't
+    collide with a real date row id (`date_YYYY-MM-DD`). `awaitingDate` in
+    `conversation.ts` detects a tap on it (via `ListId`) OR the legacy
+    numbered-text digit fallback (always the row right after this page's
+    real dates, e.g. "7. Ver más fechas" when there are 6 real dates and a
+    next page — same numbered-list convention as every other step) BEFORE
+    falling through to normal date-selection parsing. On a match: advances
+    `date_page` by 1 and re-sends the next page's list, staying in
+    `awaiting_date` (no state transition).
+  - **Paging past the last page**: if `date_page + 1` has no dates at all
+    (a patient's stored page somehow points past what's currently
+    available, e.g. slots got booked up in the meantime), the reply is an
+    explicit "No hay más fechas disponibles." plain-text message
+    (`plainTextBefore` on `ConversationResult`, sent by the webhook route
+    via `sendPlainMessage` BEFORE the list message that follows in the same
+    turn) followed immediately by a fresh page 1 (`date_page` reset to 0) —
+    never a silent loop, never a dead end.
+  - **Not verified live yet** — same caveat as the rest of this feature's
+    interactive-message work: check on Arun's next test pass that (1) a
+    clinic with fewer than 6 open dates never shows a "more" row, (2)
+    tapping "Ver más fechas" genuinely advances rather than resetting, (3)
+    the next inbound message after a page-2+ tap correctly resumes on that
+    page (persistence across messages), (4) the explicit
+    no-more-pages-available path if it can be provoked live.
 - **REOPENED (2026-09-22, fourth pass) for the service-list-picker addition
   — CODE IMPLEMENTED, TYPECHECKED, LINTED, BUILD PASSES, pending Arun's live
   testing.** Back to `in_progress` per CLAUDE.md's rule (code merged in a
