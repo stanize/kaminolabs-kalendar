@@ -27,6 +27,22 @@ import {
 const DAYS_AHEAD = 60;
 const DATE_PAGE_SIZE = 6; // real dates per date-list page; the 7th row is "Ver más fechas" when a next page exists
 const MAX_TIME_OPTIONS = 9;
+// Cap for a captured WhatsApp ProfileName — text column has no DB length
+// constraint (matches kalendar_clients.name / kalendar_bookings.client_name,
+// both plain `text`), but WhatsApp profile names are user-set and could in
+// theory be pathological, so trim+cap defensively rather than store unbounded.
+const MAX_PROFILE_NAME_LENGTH = 120;
+
+/** Trims a raw Twilio ProfileName value and caps its length. Returns null for
+ * an absent/empty/whitespace-only value so callers can treat "nothing worth
+ * keeping" uniformly. Deliberately no further sanitization — WhatsApp profile
+ * names can contain emoji/unusual characters, which is fine to store as-is. */
+function sanitizeProfileName(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  return trimmed.slice(0, MAX_PROFILE_NAME_LENGTH);
+}
 
 function parseChoice(body: string): number | null {
   const trimmed = body.trim();
@@ -116,7 +132,8 @@ export async function handleIncomingMessage(
   phoneNumber: string,
   body: string,
   buttonPayload: string | null = null,
-  listId: string | null = null
+  listId: string | null = null,
+  profileName: string | null = null
 ): Promise<ConversationResult> {
   const data = await getPublicBookingData(businessSlug);
   if (!data) {
@@ -124,6 +141,17 @@ export async function handleIncomingMessage(
   }
 
   const session = await loadOrResetSession(businessId, phoneNumber);
+
+  // Opportunistic profile-name capture: a patient's WhatsApp display name is
+  // stable across their whole conversation, so it's captured once, whenever
+  // present, and kept for every later message regardless of which specific
+  // inbound message carried it. Never overwrites a previously-captured name
+  // with an absent/empty value on a later message.
+  const capturedProfileName = sanitizeProfileName(profileName);
+  if (capturedProfileName && capturedProfileName !== session.profile_name) {
+    await updateSession(session.id, { profile_name: capturedProfileName });
+    session.profile_name = capturedProfileName;
+  }
 
   switch (session.state) {
     case "awaiting_service":
@@ -504,8 +532,11 @@ async function awaitingConfirmation(
 
   // Confirm -> create the kalendar_bookings row directly (same insert path
   // as a guest website booking, via submitBookingInternal). Guest identity
-  // is minimal here (no name/email collected over WhatsApp in v1) — phone
-  // number is the only identifying info we reliably have.
+  // is minimal here (no name/email collected via a form over WhatsApp in
+  // v1) — clientName uses the captured WhatsApp ProfileName when available
+  // (see sanitizeProfileName/handleIncomingMessage above), falling back to
+  // the "WhatsApp <phone>" placeholder when it isn't. Phone number is the
+  // only identifying info we're guaranteed to have.
   const supabase = await createClient();
   const { data: businessRow } = await supabase
     .from("kalendar_businesses")
@@ -518,7 +549,7 @@ async function awaitingConfirmation(
     serviceId,
     providerId: null,
     startIso,
-    clientName: `WhatsApp ${phoneDisplay(session.phone_number)}`,
+    clientName: session.profile_name ?? `WhatsApp ${phoneDisplay(session.phone_number)}`,
     clientEmail: `${session.phone_number.replace(/[^0-9]/g, "")}@whatsapp.kalendar.dev`,
     clientPhone: session.phone_number,
     guestLocale: "es",

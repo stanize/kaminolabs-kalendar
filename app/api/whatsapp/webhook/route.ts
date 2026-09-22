@@ -44,6 +44,11 @@ export async function POST(request: Request): Promise<Response> {
   // row (the service-selection list) rather than typed text or a button.
   // See lib/whatsapp/twilio-client.ts's parseServiceListId.
   const listId = paramsObj["ListId"] ?? null;
+  // The WhatsApp sender's self-set display name — present on many but not
+  // all inbound messages (Twilio's own changelog: "New Parameters in
+  // Callbacks for Inbound WhatsApp Messages"). Captured opportunistically in
+  // handleIncomingMessage/session.ts and used as the booking's client name.
+  const profileName = paramsObj["ProfileName"] ?? null;
 
   if (!to || !from) {
     return new NextResponse("Missing To/From", { status: 400 });
@@ -114,7 +119,8 @@ export async function POST(request: Request): Promise<Response> {
     fromNumber,
     body,
     buttonPayload,
-    listId
+    listId,
+    profileName
   );
 
   if (result.serviceListOptions && result.serviceListOptions.length > 0 && typedConfig.twilio_whatsapp_number) {

@@ -18,6 +18,7 @@ export interface WhatsappSessionRow {
   selected_date: string | null; // "YYYY-MM-DD"
   selected_time: string | null; // "HH:MM"
   date_page: number; // current date-list page (0-indexed) — see conversation.ts's date-list pagination
+  profile_name: string | null; // best WhatsApp ProfileName seen so far this conversation — see conversation.ts
   last_message_at: string;
 }
 
@@ -71,6 +72,12 @@ export async function resetSession(
         selected_date: null,
         selected_time: null,
         date_page: 0,
+        // Not reset to null on a fresh conversation start — a `resetSession`
+        // upsert with onConflict keeps existing columns when re-triggered for
+        // the same (business, phone) unless explicitly included here. It IS
+        // intentionally left out of this object so a previously-captured
+        // name survives a stale-session reset for the same patient; a truly
+        // new row still defaults profile_name to null per the column default.
         last_message_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       },
@@ -91,7 +98,7 @@ export async function updateSession(
   patch: Partial<
     Pick<
       WhatsappSessionRow,
-      "state" | "selected_service_id" | "selected_date" | "selected_time" | "date_page"
+      "state" | "selected_service_id" | "selected_date" | "selected_time" | "date_page" | "profile_name"
     >
   >
 ): Promise<void> {

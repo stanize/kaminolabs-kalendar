@@ -1127,6 +1127,13 @@ create table public.kalendar_whatsapp_sessions (
   selected_date        date,
   selected_time        text, -- "HH:MM" in business tz; paired with selected_date to resolve the exact slot
   date_page            integer     not null default 0, -- current date-list page (0-indexed); reset to 0 whenever awaiting_date is (re)entered fresh (from awaiting_service or a session reset) — see conversation-flow's date-list pagination
+  -- The WhatsApp sender's self-set display name, from Twilio's inbound
+  -- ProfileName form field (not present on every message — captured
+  -- opportunistically whenever it is, and never overwritten by a later
+  -- null/empty value, so the best name seen so far is kept for the whole
+  -- conversation). Used as the booking's clientName at awaiting_confirmation
+  -- in place of the "WhatsApp <phone>" placeholder. (schema_subset_015.sql)
+  profile_name         text,
   last_message_at      timestamptz not null default now(),
   created_at           timestamptz not null default now(),
   updated_at           timestamptz not null default now(),

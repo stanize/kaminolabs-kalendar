@@ -143,6 +143,68 @@ Criteria:
 ## Step: conversation-flow
 Status: in_progress
 Criteria:
+- **REOPENED (2026-09-22, eighth pass) for WhatsApp PROFILE-NAME CAPTURE —
+  CODE IMPLEMENTED, TYPECHECKED, LINTED, BUILD PASSES, pending Arun's live
+  testing.** Back to `in_progress` per CLAUDE.md's rule. Replaces the
+  `WhatsApp <phone>` placeholder client name with the sender's real WhatsApp
+  display name when available.
+  1. **Capture.** Twilio's inbound webhook payload includes a `ProfileName`
+     form field on many (not all) messages — the sender's self-set WhatsApp
+     display name (confirmed via Twilio's own changelog docs: "New
+     Parameters in Callbacks for Inbound WhatsApp Messages"). The webhook
+     route (`app/api/whatsapp/webhook/route.ts`) now reads
+     `paramsObj["ProfileName"]` (nullable) and passes it into
+     `handleIncomingMessage` (`lib/whatsapp/conversation.ts`).
+  2. **Persistence.** New nullable `kalendar_whatsapp_sessions.profile_name`
+     column (`supabase/schema_subset_015.sql`, folded into `schema_001.sql`
+     too — **Arun still needs to run `schema_subset_015.sql` against the
+     live DB**). `handleIncomingMessage` sanitizes the raw value
+     (`sanitizeProfileName` — trim, drop if empty, cap at 120 chars; no
+     further sanitization since WhatsApp profile names can legitimately
+     contain emoji/unusual characters) and, whenever a non-empty value is
+     present AND differs from what's already stored, writes it via
+     `updateSession`. A later message with no/empty `ProfileName` never
+     clears or overwrites a previously-captured name — the best name seen
+     so far across the whole conversation is kept, available at
+     `awaiting_confirmation` regardless of which specific message it
+     arrived on. `resetSession` (`lib/whatsapp/session.ts`) deliberately
+     omits `profile_name` from its upsert payload so a stale-session reset
+     for the same (business, phone) doesn't wipe an already-captured name
+     (Postgres `ON CONFLICT DO UPDATE` only touches columns present in the
+     SET clause); a genuinely new row still defaults it to `null` via the
+     column default.
+  3. **Use at confirmation.** `awaitingConfirmation`'s `clientName` passed
+     to `submitBookingInternal` is now `session.profile_name ?? "WhatsApp
+     <phone>"` — falls back to the existing placeholder only when no name
+     was ever captured. No length constraint exists on
+     `kalendar_clients.name` / `kalendar_bookings.client_name` (both plain
+     `text` in `schema_001.sql`) to match against; the 120-char cap above is
+     a defensive choice, not one forced by a DB constraint.
+  4. **Phone-dedup interaction — placeholder-upgrade rule.** The prior pass's
+     `matchByPhone` reuse-by-phone path (`lib/booking/client-link.ts`'s
+     `resolveClinicClientId`) previously never refreshed a reused row's
+     `name`, reasoned at the time as "the WhatsApp guest name is always the
+     constant placeholder, so there's nothing fresher." That's no longer
+     true now that a real name can be captured, so the rule is: **upgrade a
+     placeholder to a real name, never downgrade a real name, never rewrite
+     placeholder-to-placeholder.** Concretely, on a phone-matched reuse: if
+     the existing row's stored `name` currently matches the
+     `WhatsApp <phone>`-shaped placeholder pattern AND the new booking's
+     `clientName` does NOT match that shape (i.e. it's a real captured
+     profile name), the existing row's `name` is updated to the new value.
+     Any other combination (existing row already has a real name; new
+     booking's name is itself still a placeholder) leaves the stored name
+     untouched. Chosen over always-refresh ("latest wins") specifically to
+     avoid a real name ever being overwritten by a stale/placeholder value
+     on some later message where `ProfileName` happened to be absent.
+  - **Not verified live yet** — pending Arun's next test pass, specifically:
+    (1) a booking made with `ProfileName` present shows the real name (not
+    the placeholder) on the resulting `kalendar_bookings`/`kalendar_clients`
+    rows, (2) a booking with no `ProfileName` still falls back correctly to
+    the placeholder, (3) a returning WhatsApp guest whose first booking had
+    no `ProfileName` (placeholder row) but whose later booking does gets
+    their existing `kalendar_clients` row's name upgraded rather than a
+    duplicate row created.
 - **REOPENED (2026-09-22, seventh pass) for three small, related fixes —
   CODE IMPLEMENTED, TYPECHECKED, LINTED, BUILD PASSES, pending Arun's live
   testing.** Back to `in_progress` per CLAUDE.md's rule.

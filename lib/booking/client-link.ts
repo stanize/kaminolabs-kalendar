@@ -30,13 +30,22 @@ import { createClient } from "@/lib/supabase/server";
  *   kalendar_clients row for (business_id, phone) with patient_id IS NULL
  *   (a prior guest/WhatsApp record — never someone else's linked portal
  *   account) and reuse its id if found, instead of always creating a new
- *   row. Deliberately doesn't refresh name/email on the existing row when
- *   reused: the WhatsApp guest name is always the constant
- *   `WhatsApp <phone>` (see conversation.ts's clientName), so there's
- *   nothing meaningfully fresher to write back. Website guest behavior
- *   (matchByPhone omitted/false) is completely unchanged — still always
- *   creates a new row, per the general rule above.
+ *   row.
+ *
+ *   PLACEHOLDER-NAME UPGRADE (2026-09-22, profile-name capture): now that a
+ *   real WhatsApp display name (Twilio's ProfileName) may be available,
+ *   the reused row's `name` is refreshed, but only in the narrow,
+ *   never-downgrading direction — the existing row's stored name currently
+ *   IS still the synthetic `WhatsApp <phone>` placeholder shape AND the
+ *   new booking's `name` is a real (non-placeholder-shaped) value, e.g.
+ *   their first WhatsApp message didn't carry a ProfileName but a later one
+ *   did. A row that already has a real name is never overwritten — a later
+ *   booking's name is never trusted over an already-known real one (no
+ *   "latest wins" churn), and a genuine placeholder is never written over a
+ *   real name. This keeps the rule simple: upgrade placeholder -> real,
+ *   never real -> anything, never placeholder -> placeholder.
  */
+const WHATSAPP_PLACEHOLDER_NAME_RE = /^WhatsApp\s.+$/;
 export async function resolveClinicClientId(input: {
   businessId: string;
   patientId: string | null;
@@ -80,13 +89,22 @@ export async function resolveClinicClientId(input: {
   if (input.matchByPhone && input.phone) {
     const { data: existingGuest } = await supabase
       .from("kalendar_clients")
-      .select("id")
+      .select("id, name")
       .eq("business_id", input.businessId)
       .is("patient_id", null)
       .eq("phone", input.phone)
       .maybeSingle();
 
-    if (existingGuest) return existingGuest.id;
+    if (existingGuest) {
+      // Placeholder -> real name upgrade only (see doc comment above) — a
+      // real name already on the row is never touched.
+      const existingIsPlaceholder = WHATSAPP_PLACEHOLDER_NAME_RE.test(existingGuest.name ?? "");
+      const newNameIsReal = !!input.name && !WHATSAPP_PLACEHOLDER_NAME_RE.test(input.name);
+      if (existingIsPlaceholder && newNameIsReal) {
+        await supabase.from("kalendar_clients").update({ name: input.name }).eq("id", existingGuest.id);
+      }
+      return existingGuest.id;
+    }
   }
 
   // Guest — otherwise always a new row, no dedupe (see doc comment above).
