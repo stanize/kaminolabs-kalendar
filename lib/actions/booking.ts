@@ -237,6 +237,13 @@ async function submitBookingImpl(input: {
   // Optional free-text comment from whoever's booking, shown to the clinic.
   notes?: string;
   guestLocale: "es" | "en";
+  // WhatsApp-guest-only signal (set exclusively by
+  // lib/whatsapp/conversation.ts's awaitingConfirmation via
+  // submitBookingInternal) — passed through to resolveClinicClientId to
+  // dedupe by phone instead of always creating a new kalendar_clients row.
+  // Never set by the website wizard (submitBooking). See client-link.ts's
+  // doc comment for the full rationale.
+  matchByPhone?: boolean;
   // When set, the booking is for an authenticated patient: status is 'confirmed'
   // immediately, pending_expiry_at is null, and patient_id is stored.
   patientId?: string | null;
@@ -373,6 +380,7 @@ async function submitBookingImpl(input: {
     name,
     email,
     phone: phone || null,
+    matchByPhone: input.matchByPhone,
   }).catch(() => null);
 
   // Every normal-flow booking is confirmed immediately, no review/expiry

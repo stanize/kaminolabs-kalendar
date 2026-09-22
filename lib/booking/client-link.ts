@@ -20,6 +20,22 @@ import { createClient } from "@/lib/supabase/server";
  *   oversight. A guest has no stable identity Kalendar can trust (anyone
  *   can type any email), so guessing "this is the same person as last
  *   time" risks silently merging two different people's history.
+ *
+ * - EXCEPTION — WhatsApp guest bookings (matchByPhone: true), 2026-09-22:
+ *   a WhatsApp sender's phone number is NOT self-reported the way a typed
+ *   email is — it's literally who sent the inbound message, so unlike a
+ *   guest-typed email it's a trustworthy identity signal. For this case
+ *   only (set exclusively from lib/whatsapp/conversation.ts's
+ *   awaitingConfirmation, via submitBookingInternal), look up an existing
+ *   kalendar_clients row for (business_id, phone) with patient_id IS NULL
+ *   (a prior guest/WhatsApp record — never someone else's linked portal
+ *   account) and reuse its id if found, instead of always creating a new
+ *   row. Deliberately doesn't refresh name/email on the existing row when
+ *   reused: the WhatsApp guest name is always the constant
+ *   `WhatsApp <phone>` (see conversation.ts's clientName), so there's
+ *   nothing meaningfully fresher to write back. Website guest behavior
+ *   (matchByPhone omitted/false) is completely unchanged — still always
+ *   creates a new row, per the general rule above.
  */
 export async function resolveClinicClientId(input: {
   businessId: string;
@@ -27,6 +43,10 @@ export async function resolveClinicClientId(input: {
   name: string;
   email: string;
   phone: string | null;
+  /** WhatsApp-guest-only: match/reuse an existing guest kalendar_clients row
+   * by (business_id, phone) instead of always creating a new one. Never set
+   * for website bookings — see doc comment above. */
+  matchByPhone?: boolean;
 }): Promise<string | null> {
   const supabase = await createClient();
 
@@ -56,7 +76,20 @@ export async function resolveClinicClientId(input: {
     return created.id;
   }
 
-  // Guest — always a new row, no dedupe (see doc comment above).
+  // Guest — WhatsApp-specific phone-match exception (see doc comment above).
+  if (input.matchByPhone && input.phone) {
+    const { data: existingGuest } = await supabase
+      .from("kalendar_clients")
+      .select("id")
+      .eq("business_id", input.businessId)
+      .is("patient_id", null)
+      .eq("phone", input.phone)
+      .maybeSingle();
+
+    if (existingGuest) return existingGuest.id;
+  }
+
+  // Guest — otherwise always a new row, no dedupe (see doc comment above).
   const { data: created, error } = await supabase
     .from("kalendar_clients")
     .insert({

@@ -143,6 +143,53 @@ Criteria:
 ## Step: conversation-flow
 Status: in_progress
 Criteria:
+- **REOPENED (2026-09-22, seventh pass) for three small, related fixes —
+  CODE IMPLEMENTED, TYPECHECKED, LINTED, BUILD PASSES, pending Arun's live
+  testing.** Back to `in_progress` per CLAUDE.md's rule.
+  1. **Sentinel email domain renamed.** The synthetic `client_email` built
+     for WhatsApp guests (`kalendar_bookings.client_email` stays NOT NULL —
+     not being made nullable, per Arun's earlier call to keep the blast
+     radius small) is now `<digits>@whatsapp.kalendar.dev`, replacing the
+     uglier `@whatsapp.kalendar.invalid`. Changed in
+     `lib/whatsapp/conversation.ts`'s `awaitingConfirmation`.
+  2. **Real send skipped for that sentinel domain, centrally.** `lib/email.ts`'s
+     core `sendEmail` now checks `to` against both
+     `@whatsapp.kalendar.dev` (new) and `@whatsapp.kalendar.invalid` (old —
+     kept recognized too, so already-existing booking rows in the live DB
+     that still carry the old sentinel are also covered) and skips the
+     actual Resend call for either, logging
+     `[email] skipping send to WhatsApp sentinel address ...` instead of
+     silently no-op'ing. Centralized in the one core send function, so every
+     current and future email call site (confirmation, cancellation,
+     reminders, owner-notify, etc.) is automatically covered — this fixes a
+     real bug confirmed from a live Vercel log line
+     (`[email] sent to=...@whatsapp.kalendar.invalid id=... subject="Cita
+     confirmada..."`) that should no longer happen once this ships.
+  3. **WhatsApp guest bookings dedupe by phone number.** Unlike a
+     guest-typed email (which `lib/booking/client-link.ts`'s
+     `resolveClinicClientId` deliberately never dedupes — see its doc
+     comment), a WhatsApp sender's phone number is a trustworthy identity
+     signal — it's literally who sent the inbound message, not something
+     self-reported into a form. New optional `matchByPhone` flag threaded
+     `awaitingConfirmation` → `submitBookingInternal`'s input →
+     `submitBookingImpl` → `resolveClinicClientId`, set to `true` only from
+     the WhatsApp path. When set, `resolveClinicClientId` looks up an
+     existing `kalendar_clients` row for `(business_id, phone)` with
+     `patient_id IS NULL` (a prior guest/WhatsApp record, never someone
+     else's linked portal account) and reuses its id if found, before
+     falling back to the existing "always create a new row" guest path.
+     Deliberately does NOT refresh name/email on a reused row — the
+     WhatsApp guest name is always the constant `WhatsApp <phone>`, so
+     there's nothing meaningfully fresher to write back. Website guest
+     behavior (`matchByPhone` omitted) is completely unchanged.
+  - **Follow-up, out of scope for this pass**: a patient who has both a
+    real portal account (client row linked via `patient_id`) AND a
+    WhatsApp-phone-matched guest row for the same business now has two
+    separate `kalendar_clients` rows. Tracked as a low-priority
+    admin-portal merge-tool backlog item in `workflows/backlog.md` — not
+    attempted here.
+  - No schema change was needed for any of this — `client_email` stays NOT
+    NULL, no new columns.
 - TESTED (2026-09-21, Arun): confirmed working live end-to-end through
   Twilio's WhatsApp Sandbox — service → date → time → confirm produces a
   real `kalendar_bookings` row, Confirm/Cancel renders as real tappable

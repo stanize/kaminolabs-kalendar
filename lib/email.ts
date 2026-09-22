@@ -26,6 +26,23 @@
  */
 export const EMAIL_LOCALE: "es" | "en" = "es";
 
+/**
+ * Synthetic `client_email` domains used for WhatsApp guest bookings
+ * (`kalendar_bookings.client_email` is NOT NULL, but a WhatsApp guest never
+ * types a real email — see lib/whatsapp/conversation.ts's awaitingConfirmation).
+ * Nothing should ever actually be sent to one of these — there's no real
+ * inbox behind them. `@whatsapp.kalendar.dev` is the current sentinel
+ * (renamed 2026-09-22 from the uglier `@whatsapp.kalendar.invalid`); the old
+ * `.invalid` domain is kept here too so already-existing booking rows in the
+ * live DB that still carry it are also skipped, not just new ones.
+ */
+const WHATSAPP_SENTINEL_EMAIL_DOMAINS = ["@whatsapp.kalendar.dev", "@whatsapp.kalendar.invalid"];
+
+function isWhatsappSentinelEmail(to: string): boolean {
+  const lower = to.trim().toLowerCase();
+  return WHATSAPP_SENTINEL_EMAIL_DOMAINS.some((domain) => lower.endsWith(domain));
+}
+
 type SendEmailInput = {
   to: string;
   subject: string;
@@ -41,6 +58,13 @@ export type SendEmailResult =
 const DEFAULT_FROM = "Kalendar <onboarding@resend.dev>";
 
 export async function sendEmail({ to, subject, html, attachments }: SendEmailInput): Promise<SendEmailResult> {
+  if (isWhatsappSentinelEmail(to)) {
+    // WhatsApp guest booking's synthetic email — no real inbox behind it,
+    // skip the send (see WHATSAPP_SENTINEL_EMAIL_DOMAINS above).
+    console.warn(`[email] skipping send to WhatsApp sentinel address to=${to} subject="${subject}"`);
+    return { ok: false, error: "skipped: WhatsApp sentinel email address" };
+  }
+
   const apiKey = process.env.RESEND_API_KEY;
   const from   = process.env.EMAIL_FROM ?? DEFAULT_FROM;
 

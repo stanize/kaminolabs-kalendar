@@ -519,9 +519,10 @@ async function awaitingConfirmation(
     providerId: null,
     startIso,
     clientName: `WhatsApp ${phoneDisplay(session.phone_number)}`,
-    clientEmail: `${session.phone_number.replace(/[^0-9]/g, "")}@whatsapp.kalendar.invalid`,
+    clientEmail: `${session.phone_number.replace(/[^0-9]/g, "")}@whatsapp.kalendar.dev`,
     clientPhone: session.phone_number,
     guestLocale: "es",
+    matchByPhone: true,
   });
 
   if (!result.ok) {
