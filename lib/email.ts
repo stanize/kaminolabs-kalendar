@@ -289,7 +289,12 @@ export function ownerBookingNotificationHtml(input: {
     { label: "Cuándo", value: whenLabel },
     ...(providerName ? [{ label: "Profesional", value: providerName }] : []),
     { label: "Cliente", value: clientName },
-    { label: "Email", value: clientEmail },
+    // WhatsApp guest bookings carry a synthetic client_email (see
+    // WHATSAPP_SENTINEL_EMAIL_DOMAINS above) just to satisfy the DB's
+    // NOT NULL constraint — never a real address, so don't show it to the
+    // clinic owner as if it were one (matches sendEmail's own skip-sending
+    // logic for the same reason).
+    ...(isWhatsappSentinelEmail(clientEmail) ? [] : [{ label: "Email", value: clientEmail }]),
     ...(clientPhone ? [{ label: "Teléfono", value: clientPhone }] : []),
     ...(notes ? [{ label: "Comentarios", value: notes }] : []),
   ];

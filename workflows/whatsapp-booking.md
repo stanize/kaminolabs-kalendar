@@ -227,6 +227,19 @@ Criteria:
      real bug confirmed from a live Vercel log line
      (`[email] sent to=...@whatsapp.kalendar.invalid id=... subject="Cita
      confirmada..."`) that should no longer happen once this ships.
+  3b. **FOLLOW-UP FIX (2026-09-23, Arun caught via live test screenshot):**
+     the sentinel domain was still being SHOWN to the clinic owner inside
+     the owner-notification email's own content — `sendEmail` skipping the
+     *send* doesn't help the confirmation email that DOES legitimately go
+     out for a real (non-WhatsApp-guest) recipient elsewhere in the same
+     template, since `ownerBookingNotificationHtml`
+     (`lib/email.ts`) unconditionally rendered an "Email: <sentinel>" row.
+     Fixed: that row is now omitted entirely when `clientEmail` matches
+     `isWhatsappSentinelEmail()` (same detection function `sendEmail`
+     already uses, reused directly, not duplicated) — the owner just sees
+     Cliente/Teléfono with no confusing fake-looking email line. No other
+     email template in `lib/email.ts` renders `clientEmail` as a display
+     row, so this was the only spot needing the same fix.
   3. **WhatsApp guest bookings dedupe by phone number.** Unlike a
      guest-typed email (which `lib/booking/client-link.ts`'s
      `resolveClinicClientId` deliberately never dedupes — see its doc
