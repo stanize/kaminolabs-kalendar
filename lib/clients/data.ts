@@ -2,6 +2,15 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { getBusinessForUser } from "@/lib/business/data";
 import type { BookingStatus } from "@/lib/booking/owner-data";
+import { isWhatsappSentinelEmail } from "@/lib/whatsapp/sentinel-email";
+
+/** Never surface the synthetic WhatsApp guest email to the clinic — it's not
+ * a real address (see lib/whatsapp/sentinel-email.ts). Nulling it here, once,
+ * at the data layer covers the clients list, search, and the client detail
+ * view all at once. */
+function displayableEmail(email: string | null): string | null {
+  return email && !isWhatsappSentinelEmail(email) ? email : null;
+}
 
 export interface ClientListItem {
   id: string;
@@ -35,7 +44,7 @@ export async function getClientsForBusiness(userId: string): Promise<ClientListI
   }[] | null) ?? []).map((c) => ({
     id: c.id,
     name: c.name,
-    email: c.email,
+    email: displayableEmail(c.email),
     phone: c.phone,
     totalSessions: c.total_sessions,
     lastVisitAt: c.last_visit_at,
@@ -142,7 +151,7 @@ export async function getClientDetail(userId: string, clientId: string): Promise
     id: client.id,
     businessId: client.business_id,
     name: client.name,
-    email: client.email,
+    email: displayableEmail(client.email),
     phone: client.phone,
     totalSessions: client.total_sessions,
     completedCount: client.completed_count,

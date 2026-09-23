@@ -17,6 +17,7 @@ import { getActiveBonosForClientAction } from "@/lib/actions/bonos";
 import type { ClientActiveBono } from "@/lib/bonos/data";
 import type { CalendarDictionary } from "@/lib/i18n/dictionaries/calendar";
 import { clientStatusLabel, clientStatusBadgeClass, needsClinicFollowUp, type WeekBookingVM } from "@/components/panel/calendar-grid-view";
+import { isWhatsappSentinelEmail } from "@/lib/whatsapp/sentinel-email";
 
 const TZ = "Europe/Madrid";
 
@@ -144,7 +145,10 @@ export function BookingDetailModal({
   // bookings (2026-09) — a first-time patient is confirmed immediately
   // too, but is still someone the clinic hasn't met, same as a guest.
   const needsReview = needsClinicFollowUp(booking.clientStatus, booking.clinicReviewedAt) && booking.clientStatus !== "guest_unconfirmed";
-  const hasRealEmail = booking.clientEmail && !booking.clientEmail.startsWith("sin-email+");
+  const hasRealEmail =
+    booking.clientEmail &&
+    !booking.clientEmail.startsWith("sin-email+") &&
+    !isWhatsappSentinelEmail(booking.clientEmail);
 
   const dateTimeLabel = new Intl.DateTimeFormat(intlLocale, {
     timeZone: TZ, weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit",

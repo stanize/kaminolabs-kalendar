@@ -240,6 +240,31 @@ Criteria:
      Cliente/Teléfono with no confusing fake-looking email line. No other
      email template in `lib/email.ts` renders `clientEmail` as a display
      row, so this was the only spot needing the same fix.
+  3c. **FURTHER FOLLOW-UP (2026-09-23, Arun caught via three more live
+     screenshots): the sentinel email was also showing in the PANEL UI**,
+     not just email templates — the calendar's booking-detail modal, the
+     Clientes list, and a client's detail page all rendered it raw.
+     `isWhatsappSentinelEmail` was extracted out of `lib/email.ts` into a
+     new shared, non-server-only module,
+     `lib/whatsapp/sentinel-email.ts` (`lib/email.ts` now imports from
+     there instead of keeping its own copy), so both server email-sending
+     code and client UI components use the exact same check. Fixed at two
+     levels:
+     - `components/panel/booking-detail-modal.tsx` and
+       `components/panel/appointment-modal.tsx` (the booking edit form)
+       already had an existing, separate convention for this — a
+       `sin-email+<token>@kaminolabs.dev` placeholder used by the owner's
+       own manual-booking-creation flow (`lib/actions/booking-owner.ts`),
+       already correctly hidden in the UI. Extended both existing checks
+       to ALSO exclude the WhatsApp sentinel, rather than add a second
+       parallel pattern.
+     - `lib/clients/data.ts` (`getClientsForBusiness`/`getClientDetail`,
+       backing the Clientes list, its search, and the client detail page)
+       now nulls out a sentinel email at the data layer via a new
+       `displayableEmail()` helper — one fix point covers the list card,
+       the search box (searching by email no longer matches on the fake
+       address either, a side benefit), and the detail page's contact
+       card and its "Editar" prefill, all at once.
   3. **WhatsApp guest bookings dedupe by phone number.** Unlike a
      guest-typed email (which `lib/booking/client-link.ts`'s
      `resolveClinicClientId` deliberately never dedupes — see its doc

@@ -9,6 +9,7 @@ import { zonedTimeToUtc, dayIdInTz, tzDateParts, TZ } from "@/lib/calendar/clien
 import type { CalendarDictionary } from "@/lib/i18n/dictionaries/calendar";
 import type { DayId } from "@/lib/onboarding/types";
 import type { WeekBookingVM } from "@/components/panel/calendar-grid-view";
+import { isWhatsappSentinelEmail } from "@/lib/whatsapp/sentinel-email";
 
 interface ServiceVM {
   id: string;
@@ -101,9 +102,13 @@ export function AppointmentModal(props: AppointmentModalProps) {
   const initialTeamMemberId = isEdit ? (props.booking.teamMemberId ?? members[0]?.id ?? "") : props.slot.teamMemberId;
   const initialTimeStr = isEdit ? hhmmFromIso(props.booking.startIso) : props.slot.initialTime;
   const initialServiceId = isEdit ? (props.booking.serviceId ?? services[0]?.id ?? "") : (services[0]?.id ?? "");
-  const initialClientEmail = isEdit && props.booking.clientEmail && !props.booking.clientEmail.startsWith("sin-email+")
-    ? props.booking.clientEmail
-    : "";
+  const initialClientEmail =
+    isEdit &&
+    props.booking.clientEmail &&
+    !props.booking.clientEmail.startsWith("sin-email+") &&
+    !isWhatsappSentinelEmail(props.booking.clientEmail)
+      ? props.booking.clientEmail
+      : "";
 
   const [serviceId, setServiceId] = useState(initialServiceId);
   const [teamMemberId, setTeamMemberId] = useState(initialTeamMemberId);

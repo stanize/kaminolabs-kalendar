@@ -14,6 +14,11 @@
  *                       to the email address of the Resend account owner.
  */
 
+// Synthetic client_email detection for WhatsApp guest bookings — shared with
+// UI components (booking/client detail views) via lib/whatsapp/sentinel-email.ts
+// so both "don't send" and "don't display" use the exact same check.
+import { isWhatsappSentinelEmail } from "@/lib/whatsapp/sentinel-email";
+
 /**
  * TEMPORARY: guest-facing email content is pinned to Spanish for all guest
  * emails (confirmation, cancellation, under-review, reminders), regardless
@@ -25,23 +30,6 @@
  * with that per-business setting at each of this file's call sites.
  */
 export const EMAIL_LOCALE: "es" | "en" = "es";
-
-/**
- * Synthetic `client_email` domains used for WhatsApp guest bookings
- * (`kalendar_bookings.client_email` is NOT NULL, but a WhatsApp guest never
- * types a real email — see lib/whatsapp/conversation.ts's awaitingConfirmation).
- * Nothing should ever actually be sent to one of these — there's no real
- * inbox behind them. `@whatsapp.kalendar.dev` is the current sentinel
- * (renamed 2026-09-22 from the uglier `@whatsapp.kalendar.invalid`); the old
- * `.invalid` domain is kept here too so already-existing booking rows in the
- * live DB that still carry it are also skipped, not just new ones.
- */
-const WHATSAPP_SENTINEL_EMAIL_DOMAINS = ["@whatsapp.kalendar.dev", "@whatsapp.kalendar.invalid"];
-
-function isWhatsappSentinelEmail(to: string): boolean {
-  const lower = to.trim().toLowerCase();
-  return WHATSAPP_SENTINEL_EMAIL_DOMAINS.some((domain) => lower.endsWith(domain));
-}
 
 type SendEmailInput = {
   to: string;
