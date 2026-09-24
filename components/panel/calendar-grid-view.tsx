@@ -235,6 +235,7 @@ export function CalendarGridView({
   services,
   bookings,
   dict,
+  whatsappEnabled,
   onBookingCreated,
   onBookingClick,
 }: {
@@ -245,6 +246,7 @@ export function CalendarGridView({
   services: WeekServiceVM[];
   bookings: WeekBookingVM[];
   dict: CalendarDictionary;
+  whatsappEnabled: boolean;
   onBookingCreated: () => void;
   onBookingClick: (booking: WeekBookingVM) => void;
 }) {
@@ -406,6 +408,7 @@ export function CalendarGridView({
           members={members.map((m) => ({ id: m.id, name: m.name }))}
           dict={dict.modal}
           errorsDict={dict.manualErrors}
+          whatsappEnabled={whatsappEnabled}
           onClose={() => setModalSlot(null)}
           onSaved={handleCreated}
         />

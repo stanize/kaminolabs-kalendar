@@ -158,6 +158,7 @@ export function CalendarBookings({
   weekServices,
   weekInitialBookings,
   weekStartIso,
+  whatsappEnabled,
 }: {
   bookings: BookingVM[];
   // Separate from `bookings` — `bookings` is deliberately future-only
@@ -173,6 +174,7 @@ export function CalendarBookings({
   weekServices: WeekServiceVM[];
   weekInitialBookings: WeekBookingVM[];
   weekStartIso: string;
+  whatsappEnabled: boolean;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -458,6 +460,7 @@ export function CalendarBookings({
               services={weekServices}
               bookings={gridBookings}
               dict={dict}
+              whatsappEnabled={whatsappEnabled}
               onBookingCreated={handleGridBookingCreated}
               onBookingClick={(booking) => setSelectedBooking(booking)}
             />
@@ -494,6 +497,7 @@ export function CalendarBookings({
           members={weekMembers}
           dict={dict.modal}
           errorsDict={dict.manualErrors}
+          whatsappEnabled={whatsappEnabled}
           onClose={() => setEditingBooking(null)}
           onSaved={() => {
             setEditingBooking(null);

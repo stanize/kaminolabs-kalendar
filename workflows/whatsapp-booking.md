@@ -654,6 +654,66 @@ Criteria:
   Meta Business verification completes — no code change required, per
   original spec's §4.
 
+## Step: manual-booking-whatsapp-confirmation
+Status: in_progress
+Criteria:
+- DECISION (2026-09-24, Arun) — separate from the patient-facing WhatsApp
+  booking conversation above: the owner's manual-booking form
+  (`components/panel/appointment-modal.tsx`, the week-grid "Nueva
+  cita"/"Modificar cita" flow) already had one "Enviar confirmación por
+  email" checkbox, defaulted checked regardless of whether an email was
+  entered. Changed to two checkboxes:
+  - Both start **unchecked**. The email checkbox auto-checks itself the
+    moment `clientEmail` transitions from empty to non-empty (typing the
+    first character, or — in edit mode — already having a value at mount,
+    treated uniformly as the same empty->non-empty transition). Same
+    mechanism for the WhatsApp checkbox against `clientPhone`. Implemented
+    with a `useRef` per field tracking the previous emptiness (always
+    initialized `true`, so mount is itself a transition), so a manual
+    uncheck afterward is never fought by further typing in the same field
+    — only the transition re-triggers the auto-check.
+  - The WhatsApp checkbox only renders when the business has WhatsApp
+    booking enabled (`kalendar_whatsapp_config.enabled`), threaded down as
+    a new `whatsappEnabled: boolean` prop: `app/panel/calendar/page.tsx`
+    (queries `kalendar_whatsapp_config.enabled` for the business) ->
+    `CalendarBookings` -> `CalendarGridView` -> `AppointmentModal` (both
+    create and edit-mode instances).
+  - A new `sendConfirmationWhatsapp: boolean` field mirrors
+    `sendConfirmationEmail` through the payload to
+    `createBookingAsOwner`/`updateBookingAsOwner`
+    (`lib/actions/booking-owner.ts`). New dictionary key
+    `sendWhatsappLabel` added alongside the existing `sendEmailLabel` in
+    `lib/i18n/dictionaries/calendar.ts`'s `modal` section (es/en).
+  - Server-side send: when `sendConfirmationWhatsapp` is true and the
+    booking has a `client_phone`, `sendManualBookingWhatsappConfirmation`
+    (new helper in `lib/actions/booking-owner.ts`) looks up the business's
+    `kalendar_whatsapp_config` row, and if `enabled`, sends a plain-text
+    message via the existing `sendPlainMessage` (`lib/whatsapp/
+    twilio-client.ts`) — reused directly, no new Twilio call shape. Message
+    wording is deliberately distinct from the booking-conversation's own
+    confirmation copy ("Tu clínica ha creado una cita para ti: ...") since
+    this is a manually-created booking, not a WhatsApp-flow confirmation.
+    Fully best-effort: wrapped in try/catch, logs
+    `[whatsapp] manual booking confirmation send failed: ...` on error
+    (matching the webhook route's existing `[whatsapp] ... failed` log
+    style), and NEVER blocks or fails the booking create/update — same
+    degrade-gracefully pattern as the existing email confirmation send.
+  - **Same Sandbox/production limitation as `whatsapp-reminders` below**:
+    this is a genuine business-initiated message (the patient hasn't just
+    messaged the clinic first), which technically needs Meta template
+    pre-approval + a production WhatsApp number to reach an arbitrary real
+    patient. On the current Sandbox-only setup it will only actually
+    deliver to a phone number that has already joined that business's
+    sandbox — see `whatsapp-reminders`'s criteria for the full
+    explanation, not re-derived here. Usable today for Arun's own
+    demo/testing purposes (sandbox-joined numbers), not yet a general
+    production capability.
+  - No new schema or env vars — reuses the existing
+    `kalendar_whatsapp_config` table and `WHATSAPP_CONFIG_ENCRYPTION_KEY`.
+  - CODE IMPLEMENTED, TYPECHECKED, LINTED, BUILD PASSES (2026-09-24).
+    Pending Arun's manual/live testing per CLAUDE.md's workflow-file rule
+    — not `done` yet.
+
 ## Step: whatsapp-reminders
 Status: blocked
 Criteria:

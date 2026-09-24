@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { requireSession } from "@/lib/auth-session";
 import { getBusinessForUser } from "@/lib/business/data";
+import { createClient } from "@/lib/supabase/server";
 import {
   getClientRowBookings,
   getPendingCancellationRequests,
@@ -25,13 +26,20 @@ export default async function CalendarPage() {
 
   const { weekStartIso, weekEndIso } = await getDefaultCalendarWeekBounds(session.user.id);
 
-  const [bookings, cancellationRequests, weekData, hoyStats, weekStats] = await Promise.all([
+  const supabase = await createClient();
+  const [bookings, cancellationRequests, weekData, hoyStats, weekStats, whatsappConfig] = await Promise.all([
     getClientRowBookings(session.user.id),
     getPendingCancellationRequests(session.user.id),
     getWeekCalendarData(session.user.id, weekStartIso, weekEndIso),
     getHoyWidgetStats(session.user.id),
     getWeekWidgetStats(session.user.id),
+    supabase
+      .from("kalendar_whatsapp_config")
+      .select("enabled")
+      .eq("business_id", business.id)
+      .maybeSingle(),
   ]);
+  const whatsappEnabled = whatsappConfig.data?.enabled ?? false;
 
   const locale = await getLocale();
   const dict = getCalendarDictionary(locale);
@@ -126,6 +134,7 @@ export default async function CalendarPage() {
           clinicReviewedAt: b.clinicReviewedAt,
         }))}
         weekStartIso={weekStartIso}
+        whatsappEnabled={whatsappEnabled}
       />
     </div>
   );

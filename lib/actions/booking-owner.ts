@@ -16,6 +16,7 @@ import {
   bookingConfirmEmailHtml,
   EMAIL_LOCALE,
 } from "@/lib/email";
+import { sendPlainMessage, decryptConfigAuthToken, type WhatsappConfigRow } from "@/lib/whatsapp/twilio-client";
 
 export type OwnerBookingResult = { ok: true } | { ok: false; error: string };
 
@@ -532,6 +533,61 @@ async function applyResultToClientCounters(input: {
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+/**
+ * Best-effort WhatsApp confirmation for a manually-created/edited booking
+ * (appointment-modal's "Enviar confirmación por WhatsApp" checkbox). This is
+ * a genuine business-initiated message — same category as the `blocked`
+ * `whatsapp-reminders` workflow step (workflows/whatsapp-booking.md): it
+ * technically requires Meta template pre-approval + a production WhatsApp
+ * number to reach an arbitrary real patient, and on the current Sandbox
+ * setup will only actually deliver to a number that has already joined that
+ * business's sandbox. Fine for Arun's own demo/testing, not yet a general
+ * production capability — see workflows/whatsapp-booking.md. Never throws:
+ * any failure (config disabled, no phone, Twilio error) is caught/logged and
+ * the caller proceeds regardless, matching the existing email send's
+ * degrade-gracefully pattern.
+ */
+async function sendManualBookingWhatsappConfirmation(params: {
+  businessId: string;
+  businessName: string;
+  clientPhone: string | null | undefined;
+  serviceName: string;
+  startIso: string;
+}): Promise<void> {
+  const phone = (params.clientPhone ?? "").trim();
+  if (!phone) return;
+
+  try {
+    const supabase = await createClient();
+    const { data: config } = await supabase
+      .from("kalendar_whatsapp_config")
+      .select(
+        "id, business_id, enabled, twilio_account_sid, twilio_auth_token_encrypted, twilio_whatsapp_number, is_sandbox, quick_reply_content_sid, service_list_content_sid, date_list_content_sid, time_list_content_sid"
+      )
+      .eq("business_id", params.businessId)
+      .maybeSingle();
+
+    if (!config || !config.enabled || !config.twilio_whatsapp_number) return;
+
+    const typedConfig = config as WhatsappConfigRow;
+    const authToken = decryptConfigAuthToken(typedConfig);
+    if (!typedConfig.twilio_account_sid) return;
+
+    const whenLabel = formatBookingWhen(params.startIso, EMAIL_LOCALE);
+    const body = `Tu clínica ha creado una cita para ti:\n\nServicio: ${params.serviceName}\nFecha: ${whenLabel}\n\n${params.businessName}`;
+
+    await sendPlainMessage({
+      accountSid: typedConfig.twilio_account_sid,
+      authToken,
+      from: typedConfig.twilio_whatsapp_number as string,
+      to: phone,
+      body,
+    });
+  } catch (e) {
+    console.error("[whatsapp] manual booking confirmation send failed:", e);
+  }
+}
+
 /** The translation slice this action needs for its own error/validation messages. */
 export interface ManualBookingActionDict {
   errNoBusiness: string;
@@ -579,6 +635,7 @@ export const createBookingAsOwner = authedAction(
       clientPhone?: string;
       notes?: string;
       sendConfirmationEmail: boolean;
+      sendConfirmationWhatsapp: boolean;
       // client-linking-on-booking: when set (owner picked an existing
       // client from the search picker), the booking links to that row
       // directly instead of creating a new kalendar_clients row. Must
@@ -770,6 +827,16 @@ export const createBookingAsOwner = authedAction(
       });
     }
 
+    if (input.sendConfirmationWhatsapp) {
+      await sendManualBookingWhatsappConfirmation({
+        businessId: business.id,
+        businessName: business.name,
+        clientPhone: input.clientPhone,
+        serviceName: service.name,
+        startIso: start.toISOString(),
+      });
+    }
+
     revalidatePath("/panel/calendar");
     revalidatePath("/panel");
     return { ok: true };
@@ -795,6 +862,7 @@ export const updateBookingAsOwner = authedAction(
       clientPhone?: string;
       notes?: string;
       sendConfirmationEmail: boolean;
+      sendConfirmationWhatsapp: boolean;
     },
     dict?: Partial<ManualBookingActionDict>
   ): Promise<CreateManualBookingResult> => {
@@ -904,6 +972,16 @@ export const updateBookingAsOwner = authedAction(
           brandColor: business.brand_color,
         }),
         attachments: [{ filename: "cita-kalendar.ics", content: ics }],
+      });
+    }
+
+    if (input.sendConfirmationWhatsapp) {
+      await sendManualBookingWhatsappConfirmation({
+        businessId: business.id,
+        businessName: business.name,
+        clientPhone: input.clientPhone,
+        serviceName: service.name,
+        startIso: start.toISOString(),
       });
     }
 

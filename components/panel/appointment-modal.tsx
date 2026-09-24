@@ -75,6 +75,7 @@ type AppointmentModalProps =
       members: MemberVM[];
       dict: CalendarDictionary["modal"];
       errorsDict: CalendarDictionary["manualErrors"];
+      whatsappEnabled: boolean;
       onClose: () => void;
       onSaved: () => void;
     }
@@ -87,12 +88,13 @@ type AppointmentModalProps =
       members: MemberVM[];
       dict: CalendarDictionary["modal"];
       errorsDict: CalendarDictionary["manualErrors"];
+      whatsappEnabled: boolean;
       onClose: () => void;
       onSaved: () => void;
     };
 
 export function AppointmentModal(props: AppointmentModalProps) {
-  const { hoursByDay, allBookings, services, members, dict, errorsDict, onClose, onSaved } = props;
+  const { hoursByDay, allBookings, services, members, dict, errorsDict, whatsappEnabled, onClose, onSaved } = props;
   const isEdit = props.mode === "edit";
   const editBookingId = isEdit ? props.booking.id : null;
 
@@ -128,10 +130,34 @@ export function AppointmentModal(props: AppointmentModalProps) {
   const [showClientResults, setShowClientResults] = useState(false);
   const clientSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [notes, setNotes] = useState(isEdit ? props.booking.notes ?? "" : "");
-  const [sendEmail, setSendEmail] = useState(true);
+  const [sendEmail, setSendEmail] = useState(false);
+  const [sendWhatsapp, setSendWhatsapp] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [timeMenuOpen, setTimeMenuOpen] = useState(false);
+
+  // Auto-check behavior for the two confirmation checkboxes: each starts
+  // unchecked and auto-checks itself the moment its field transitions from
+  // empty to non-empty (typing the first character, or — in edit mode —
+  // already having a value at mount, which is itself an empty-ref->
+  // non-empty-value transition since the ref always starts "empty").
+  // Tracked with a ref (not derived from state) so a later manual uncheck
+  // is never fought — only the transition triggers the auto-check, not
+  // every keystroke afterward.
+  const prevEmailEmptyRef = useRef(true);
+  const prevPhoneEmptyRef = useRef(true);
+
+  useEffect(() => {
+    const isEmptyNow = clientEmail.trim().length === 0;
+    if (prevEmailEmptyRef.current && !isEmptyNow) setSendEmail(true);
+    prevEmailEmptyRef.current = isEmptyNow;
+  }, [clientEmail]);
+
+  useEffect(() => {
+    const isEmptyNow = clientPhone.trim().length === 0;
+    if (prevPhoneEmptyRef.current && !isEmptyNow) setSendWhatsapp(true);
+    prevPhoneEmptyRef.current = isEmptyNow;
+  }, [clientPhone]);
 
   // client-linking-on-booking: type-ahead search on the name field, new
   // bookings only. Debounced to avoid a request per keystroke; the "clear
@@ -241,6 +267,7 @@ export function AppointmentModal(props: AppointmentModalProps) {
         clientPhone: clientPhone || undefined,
         notes: notes || undefined,
         sendConfirmationEmail: sendEmail,
+        sendConfirmationWhatsapp: whatsappEnabled && sendWhatsapp,
         clinicClientId: clinicClientId || undefined,
       };
       const res = isEdit
@@ -449,6 +476,18 @@ export function AppointmentModal(props: AppointmentModalProps) {
             />
             {dict.sendEmailLabel}
           </label>
+
+          {whatsappEnabled && (
+            <label className="flex items-center gap-2 text-[13px] text-ink-soft">
+              <input
+                type="checkbox"
+                checked={sendWhatsapp}
+                onChange={(e) => setSendWhatsapp(e.target.checked)}
+                className="h-4 w-4 rounded border-line"
+              />
+              {dict.sendWhatsappLabel}
+            </label>
+          )}
         </div>
 
         <div className="mt-5 flex justify-end gap-2">

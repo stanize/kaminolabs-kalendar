@@ -81,6 +81,7 @@ export interface CalendarDictionary {
     notesLabel: string; // "Comentarios (opcional)"
     notesPlaceholder: string;
     sendEmailLabel: string; // checkbox: "Enviar confirmación por email"
+    sendWhatsappLabel: string; // checkbox: "Enviar confirmación por WhatsApp" — only rendered when the business has WhatsApp booking enabled
     cancel: string;
     submit: string;
     submitting: string;
@@ -207,6 +208,7 @@ const es: CalendarDictionary = {
     notesLabel: "Comentarios (opcional)",
     notesPlaceholder: "Notas internas sobre la cita",
     sendEmailLabel: "Enviar confirmación por email",
+    sendWhatsappLabel: "Enviar confirmación por WhatsApp",
     cancel: "Cancelar",
     submit: "Crear cita",
     submitting: "Creando…",
@@ -331,6 +333,7 @@ const en: CalendarDictionary = {
     notesLabel: "Comments (optional)",
     notesPlaceholder: "Internal notes about the appointment",
     sendEmailLabel: "Send confirmation email",
+    sendWhatsappLabel: "Send confirmation via WhatsApp",
     cancel: "Cancel",
     submit: "Create appointment",
     submitting: "Creating…",
