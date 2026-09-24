@@ -192,6 +192,7 @@ export interface GridDay {
   dayId: DayId;
   dateLabel: string; // short weekday + day, e.g. "lun 15"
   isToday: boolean;
+  isPast: boolean; // strictly before today — a booking can still be made here (e.g. a walk-in), just visually receded
 }
 
 function timeLabel(iso: string): string {
@@ -217,6 +218,10 @@ export function buildGridDays(startUtc: Date, count: number, intlLocale: string)
       dayId: dayIdInTz(noonUtc),
       dateLabel: label,
       isToday: year === todayKey.year && month === todayKey.month && day === todayKey.day,
+      isPast:
+        year < todayKey.year ||
+        (year === todayKey.year && month < todayKey.month) ||
+        (year === todayKey.year && month === todayKey.month && day < todayKey.day),
     });
   }
   return days;
@@ -484,7 +489,9 @@ function DayProviderColumn({
   return (
     <div className={`flex-1 ${members.length > 1 ? "border-r border-line/60 last:border-r-0" : ""}`}>
       <div className="flex h-12 flex-col items-center justify-center border-b border-line px-1">
-        <span className="text-[12px] font-semibold capitalize text-ink">{day.dateLabel}</span>
+        <span className={`text-[12px] font-semibold capitalize ${day.isPast ? "text-ink-soft" : "text-ink"}`}>
+          {day.dateLabel}
+        </span>
         {members.length > 1 && (
           <span className="truncate text-[10.5px] text-ink-soft">{member.name}</span>
         )}
@@ -523,6 +530,15 @@ function DayProviderColumn({
             />
           );
         })}
+
+        {/* Past-day wash: a uniform, subtle grey layer over the ENTIRE
+            column (both working-hours and outside-hours areas alike), so a
+            past day reads as visually receded at a glance without changing
+            its underlying working-hours/closed-day treatment above.
+            pointer-events-none + no onClick of its own — a past day is
+            still fully clickable to add a booking (e.g. a walk-in). Sits
+            below the gridlines/booking chips so those stay unaffected. */}
+        {day.isPast && <div className="pointer-events-none absolute inset-0 bg-ink/5" />}
 
         {/* Hour gridlines */}
         {Array.from({ length: Math.floor((gridEndMin - gridStartMin) / 60) + 1 }).map((_, i) => (
