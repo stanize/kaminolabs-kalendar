@@ -654,6 +654,48 @@ Criteria:
   Meta Business verification completes — no code change required, per
   original spec's §4.
 
+## Step: whatsapp-reminders
+Status: blocked
+Criteria:
+- DECISION (2026-09-24, Arun): send appointment reminders via WhatsApp for
+  bookings that originated on WhatsApp specifically — reuses the existing
+  `send-reminders` pg_cron-triggered cron (24h/1h windows, see CLAUDE.md's
+  Cron section) as the trigger point, adding a WhatsApp send alongside (or
+  instead of, for these bookings) the existing email reminder. Scope: only
+  bookings with a WhatsApp origin (i.e. that came through
+  `lib/whatsapp/conversation.ts`'s `awaitingConfirmation` — needs an actual
+  "origin" signal on the booking row to detect this at reminder time; check
+  whether one already exists implicitly via `client_email`'s sentinel
+  domain, `lib/whatsapp/sentinel-email.ts`, or whether a real
+  `booking_origin`/`channel` column is cleaner — the sentinel-email
+  approach is fragile to key behavior off since it's meant to be an
+  internal implementation detail, not a public signal, so lean toward an
+  explicit column if this gets built). Not extending to website bookings —
+  they only have a real email on file, no WhatsApp relationship at all.
+- **BLOCKED — cannot be built or tested yet.** Twilio's WhatsApp Sandbox
+  (the only thing currently configured, for the one test clinic) cannot
+  send business-initiated messages to real patients at all — only to
+  numbers that manually joined the sandbox. A reminder fires hours-to-a-day
+  after the booking conversation ended, almost certainly outside the 24h
+  free-reply window, which makes it a genuine business-initiated send —
+  the same category Sandbox can't do for arbitrary recipients. This
+  feature needs a clinic on a real, Meta-verified **production** WhatsApp
+  number before it can be built for real, which doesn't exist yet (see
+  `production-readiness` above, also `not_started`).
+- Two real requirements once unblocked, not just "send a message":
+  - **Cost**: business-initiated sends aren't covered by the free
+    patient-messaged-first window — this is a genuine per-message cost,
+    unlike everything else in this feature so far.
+  - **Meta template pre-approval**: unlike the booking conversation's
+    free-form replies, a reminder must be submitted to Meta as an approved
+    message template ahead of time (typically a few days' review) — not
+    something that can be sent as arbitrary text the way `sendPlainMessage`
+    works today.
+- Not scoped further than this (exact template wording, whether it fully
+  replaces or supplements the email reminder for these bookings, how the
+  1h/24h dual-window logic maps onto WhatsApp) — revisit once a production
+  clinic number actually exists.
+
 ## Notes / Deviations
 - **Shared-number model — considered, explicitly deferred, not built.**
   During design, discussed replacing per-clinic Twilio accounts with one
@@ -674,8 +716,12 @@ Criteria:
 - Non-goals carried over unchanged from the original spec: no
   cancel/reschedule via WhatsApp (new bookings only, v1), website stays
   fully unchanged as its own independent channel, no free-text NLP
-  (list/button taps only), no proactive WhatsApp reminders in this spec
-  (existing pg_cron reminder system is separate territory).
+  (list/button taps only, see `workflows/backlog.md` for a deferred
+  Gemini-based NLP spec Arun reviewed and declined for now). Proactive
+  WhatsApp reminders were originally out of scope entirely; now tracked as
+  a real, `blocked` step above (`whatsapp-reminders`) rather than a
+  non-goal — reuses the existing pg_cron reminder cron as its trigger
+  point, blocked on a production WhatsApp number existing.
 - Original spec source: user-uploaded "WhatsApp Booking — Requirements
   Spec" (2026-09-21), written by a planning session with no code access.
   Verified against `supabase/schema_001.sql` and `lib/actions/*.ts` at
