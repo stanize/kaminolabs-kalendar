@@ -798,6 +798,24 @@ export const createBookingAsOwner = authedAction(
       return { ok: false, error: t.errCreateFailed };
     }
 
+    // private-clinic-notes / client-linking-on-booking (clinic-clients-page.md,
+    // 2026-09-24): copy a non-empty note into the client's private note
+    // history, attributed to this specific appointment. Only on CREATE
+    // (updateBookingAsOwner deliberately does NOT get this, to avoid a
+    // duplicate note on every edit/re-save). Best-effort — never blocks the
+    // booking, which already succeeded above. author_id is the owner's own
+    // session id: this note was effectively entered by the clinic.
+    const trimmedNotes = (input.notes ?? "").trim();
+    if (trimmedNotes && clinicClientId) {
+      const { error: noteError } = await supabase.from("kalendar_client_notes").insert({
+        client_id: clinicClientId,
+        business_id: business.id,
+        author_id: session.user.id,
+        body: `Nota de la cita del ${formatBookingWhen(start.toISOString(), "es")} (${service.name}): ${trimmedNotes}`,
+      });
+      if (noteError) console.error("[createBookingAsOwner] client note copy failed", noteError);
+    }
+
     if (wantsEmail) {
       const base = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/+$/, "");
       const whenLabel = formatBookingWhen(start.toISOString(), "es");

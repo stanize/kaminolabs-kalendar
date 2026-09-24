@@ -456,6 +456,25 @@ async function submitBookingImpl(input: {
     return { ok: false, error: t.errCreateFailed, errorDetail: `${error.code}: ${error.message}` };
   }
 
+  // private-clinic-notes / client-linking-on-booking (clinic-clients-page.md,
+  // 2026-09-24): copy a non-empty guest/WhatsApp comment into the client's
+  // private note history, clearly attributed to this specific appointment.
+  // Only on CREATE (never on edit — there's no edit path here) and only
+  // best-effort: a failure here should never affect the booking that was
+  // already successfully created above. author_id is null — this note is
+  // system-generated from the guest/patient's own comment, not typed by a
+  // clinic staff member.
+  if (notes && clinicClientId) {
+    await supabase.from("kalendar_client_notes").insert({
+      client_id: clinicClientId,
+      business_id: data.business.id,
+      author_id: null,
+      body: `Nota de la cita del ${formatBookingWhen(start.toISOString(), "es")} (${service.name}): ${notes}`,
+    }).then(({ error: noteError }) => {
+      if (noteError) console.error("[submitBookingImpl] client note copy failed", noteError);
+    });
+  }
+
   const base = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/+$/, "");
   const cancelUrl = `${base}/bookings/cancel/${token}`;
   const providerName = teamMemberId
