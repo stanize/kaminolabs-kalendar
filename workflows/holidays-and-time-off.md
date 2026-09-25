@@ -17,8 +17,24 @@ per-provider dimension this engine will have, not just a new table bolted
 onto an existing per-provider layer.
 
 ## Step: recurring-public-holidays
-Status: not_started
+Status: in_progress
 Criteria:
+- BUILT (2026-09-25): code implemented, typechecked (`npx tsc --noEmit`
+  clean), linted (`npx eslint` clean) and `npm run build` succeeds. Pending
+  Arun's live testing before this flips to `done`.
+- Table: `kalendar_business_closures` (shared with `provider-time-off` below
+  — see that step's note), folded into `supabase/schema_001.sql` and added
+  standalone via `supabase/schema_subset_016.sql` (Arun still needs to run
+  this against the live DB).
+- Actions (`lib/actions/closures.ts`, `authedAction`-wrapped, business-scoped
+  via `getBusinessForUser`): `createFestivo({ month, day, label })`,
+  `deleteClosure({ id })` (shared with time off). Reads via
+  `getClosuresForUser(userId)` in `lib/closures/data.ts`.
+- UI: "Festivos" section (`components/panel/festivos-manager.tsx`) rendered
+  on `/panel/availability` below the existing weekly-hours editor —
+  day/month pickers + optional name, add/list/delete, immediate commit per
+  action (no batch save, unlike the weekly-hours grid). Spanish copy in
+  `lib/i18n/dictionaries/festivos.ts`.
 - DECISION (2026-09-25, Arun): clinic-wide, entered as `month + day` (no
   year) — a fixed date that auto-repeats every year with zero re-entry
   (e.g. "25 December" closes every Dec 25 going forward). Covers the
@@ -46,8 +62,32 @@ Criteria:
   annual date or a specific one-off date.
 
 ## Step: provider-time-off
-Status: not_started
+Status: in_progress
 Criteria:
+- BUILT (2026-09-25): code implemented, typechecked, linted, build passes
+  (same validation run as `recurring-public-holidays`, same commit). Pending
+  Arun's live testing before this flips to `done`.
+- Same table as `recurring-public-holidays` (`kalendar_business_closures`,
+  `recurring = false` rows here, `team_member_id` nullable — null =
+  clinic-wide one-off, set = scoped to that provider).
+- Actions (`lib/actions/closures.ts`): `createTimeOff({ teamMemberId,
+  startDate, endDate, startTime?, endTime?, label })` — validates the date
+  range, restricts the optional partial-hours window to a single-day entry
+  (v1 scope per this file's DECISION above), and verifies a passed
+  `teamMemberId` belongs to the caller's own business before inserting.
+  Deletes share `deleteClosure({ id })` with the festivos step.
+- UI: per-team-member "Vacaciones / ausencias" expandable section
+  (`components/panel/time-off-list.tsx`) wired into `TeamManager`
+  (`components/panel/team-manager.tsx`) on `/panel/team` — a toggle under
+  each *saved* member row (new, not-yet-saved rows have no id to scope
+  entries to, so the toggle only appears once a member exists) expands a
+  date-range + optional same-day time-window + reason form, with add/list/
+  delete, immediate commit per action. Renders identically for the owner's
+  own row in a solo business — no separate solo-only path, since a solo
+  owner is still a real `kalendar_team_members` row (matches the workflow
+  doc's framing that clinic-wide festivos cover the no-configuration case,
+  not that per-provider time off is hidden for solo). Spanish copy in
+  `lib/i18n/dictionaries/time-off.ts`.
 - DECISION (2026-09-25, Arun): per-provider, nullable scope — a time-off
   entry with `team_member_id = null` applies clinic-wide (equivalent to a
   one-off closure, distinct from the recurring festivos above only in that

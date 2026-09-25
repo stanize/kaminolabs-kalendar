@@ -43,6 +43,7 @@ drop table if exists public.kalendar_bono_purchases   cascade;
 drop table if exists public.kalendar_bono_types        cascade;
 drop table if exists public.kalendar_patients        cascade;
 drop table if exists public.user_roles               cascade;
+drop table if exists public.kalendar_business_closures cascade;
 drop table if exists public.kalendar_team_members    cascade;
 drop table if exists public.kalendar_business_hours  cascade;
 drop table if exists public.kalendar_services        cascade;
@@ -485,6 +486,78 @@ create policy "Team: public read"
   on public.kalendar_team_members for select using (true);
 create policy "Team: write"
   on public.kalendar_team_members for all using (true) with check (true);
+
+-- ----------------------------------------------------------------------------
+-- kalendar_business_closures
+-- workflows/holidays-and-time-off.md: recurring-public-holidays +
+-- provider-time-off steps. Both row shapes live in the same table so the UI
+-- and the (future) availability-lookup query stay simple:
+--   - recurring = true  -> annual "festivo" (public holiday): month + day
+--     only (no year), repeats every year. team_member_id is always null for
+--     these (clinic-wide only).
+--   - recurring = false -> one-off closure: a real start_date/end_date
+--     range. team_member_id null = clinic-wide one-off closure; set = that
+--     provider's time off. start_time/end_time are optional and only
+--     meaningful when start_date = end_date (a same-day partial-hours
+--     window) — both null means the day(s) are closed in full.
+-- Not yet consumed by the slot-computation engine (availability-engine-
+-- integration step, not built yet) — this pass is data model + settings UI
+-- only.
+-- ----------------------------------------------------------------------------
+create table public.kalendar_business_closures (
+  id             uuid        primary key default gen_random_uuid(),
+  business_id    uuid        not null references public.kalendar_businesses (id) on delete cascade,
+  -- NULL = clinic-wide. Set = scoped to that one provider (always a real
+  -- team_member row, even for a solo owner — see workflow doc).
+  team_member_id uuid        references public.kalendar_team_members (id) on delete cascade,
+  recurring      boolean     not null default false,
+  -- recurring = true rows only:
+  month          smallint    check (month between 1 and 12),
+  day            smallint    check (day between 1 and 31),
+  -- recurring = false rows only:
+  start_date     date,
+  end_date       date,
+  -- Optional same-day partial-hours window (recurring = false, single date
+  -- only). Both null = full day(s) closed. App layer enforces the
+  -- single-date-only rule; not worth a DB constraint alongside the ones
+  -- below (same judgement call as kalendar_business_hours's overlap note).
+  start_time     time,
+  end_time       time,
+  -- Clinic's own label for the entry, e.g. "Navidad", "Vacaciones verano".
+  label          text,
+  created_at     timestamptz not null default now(),
+  constraint kalendar_business_closures_recurring_shape check (
+    (recurring = true  and month is not null and day is not null
+                       and start_date is null and end_date is null)
+    or
+    (recurring = false and month is null and day is null
+                        and start_date is not null and end_date is not null)
+  ),
+  constraint kalendar_business_closures_date_order check (
+    start_date is null or end_date is null or end_date >= start_date
+  ),
+  constraint kalendar_business_closures_time_order check (
+    start_time is null or end_time is null or end_time > start_time
+  ),
+  -- Recurring festivos are always clinic-wide per the workflow decision.
+  constraint kalendar_business_closures_recurring_clinic_wide check (
+    recurring = false or team_member_id is null
+  )
+);
+
+create index kalendar_business_closures_business_id_idx
+  on public.kalendar_business_closures (business_id);
+create index kalendar_business_closures_team_member_idx
+  on public.kalendar_business_closures (team_member_id);
+
+alter table public.kalendar_business_closures enable row level security;
+
+-- Public read: the public booking page will need these to compute
+-- availability once availability-engine-integration is built.
+create policy "Closures: public read"
+  on public.kalendar_business_closures for select using (true);
+create policy "Closures: write"
+  on public.kalendar_business_closures for all using (true) with check (true);
 
 -- ----------------------------------------------------------------------------
 -- kalendar_clients

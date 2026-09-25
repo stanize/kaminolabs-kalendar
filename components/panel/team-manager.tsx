@@ -7,7 +7,10 @@ import { Btn } from "@/components/ui/button";
 import { SaveOverlay, useSaveOverlay } from "@/components/panel/save-overlay";
 import { saveTeam } from "@/lib/actions/team";
 import { reportClientError } from "@/lib/report-client-error";
+import { TimeOffList } from "@/components/panel/time-off-list";
 import type { TeamDictionary } from "@/lib/i18n/dictionaries/team";
+import type { TimeOffDictionary } from "@/lib/i18n/dictionaries/time-off";
+import type { BusinessClosure } from "@/lib/closures/data";
 
 type TeamMode = "solo" | "team";
 
@@ -50,11 +53,17 @@ export function TeamManager({
   initialMembers,
   returnToHome,
   dict,
+  timeOffByMember,
+  timeOffDict,
+  intlLocale,
 }: {
   teamMode: TeamMode;
   initialMembers: MemberItem[];
   returnToHome: boolean;
   dict: TeamDictionary;
+  timeOffByMember?: Record<string, BusinessClosure[]>;
+  timeOffDict?: TimeOffDictionary;
+  intlLocale?: string;
 }) {
   const router = useRouter();
   const m = dict.manager;
@@ -62,6 +71,7 @@ export function TeamManager({
   const [rows, setRows] = useState<Row[]>(toRows(initialMembers));
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const { overlay, setOverlay, flashSuccessThen } = useSaveOverlay();
 
   // ── Local roster edits ──────────────────────────────────────────────────────
@@ -203,57 +213,88 @@ export function TeamManager({
 
       {/* Members — inline editable rows */}
       <div className="flex flex-col gap-2">
-        {rows.map((r, index) => (
-          <div
-            key={r.key}
-            draggable={canDrag}
-            onDragStart={() => canDrag && setDragIndex(index)}
-            onDragOver={(e) => canDrag && e.preventDefault()}
-            onDrop={() => canDrag && handleDrop(index)}
-            className={`flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2.5 transition-colors sm:flex-nowrap ${
-              dragIndex === index ? "opacity-50" : ""
-            }`}
-          >
-            {canDrag && (
-              <span className="cursor-grab text-ink-soft active:cursor-grabbing" aria-hidden>
-                <Icon name="list" size={16} />
-              </span>
-            )}
-            <div className="min-w-[140px] flex-1">
-              <input
-                value={r.name}
-                onChange={(e) => updateRow(r.key, { name: e.target.value })}
-                placeholder={m.namePlaceholder}
-                aria-label={m.nameLabel}
-                maxLength={80}
-                className={inputBase}
-              />
-            </div>
-            <div className="min-w-[120px] flex-1">
-              <input
-                value={r.role}
-                onChange={(e) => updateRow(r.key, { role: e.target.value })}
-                placeholder={m.rolePlaceholder}
-                aria-label={m.roleLabel}
-                maxLength={60}
-                className={inputBase}
-              />
-            </div>
-            {r.isOwner ? (
-              <span className="shrink-0 rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-semibold text-ink-soft">
-                {m.you}
-              </span>
-            ) : (
-              <button
-                onClick={() => removeRow(r.key)}
-                className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-ink-soft hover:bg-error-weak hover:text-error"
-                aria-label={m.delete}
+        {rows.map((r, index) => {
+          const showTimeOff = timeOffDict && intlLocale && r.id !== null;
+          const isExpanded = expandedKey === r.key;
+          return (
+            <div key={r.key}>
+              <div
+                draggable={canDrag}
+                onDragStart={() => canDrag && setDragIndex(index)}
+                onDragOver={(e) => canDrag && e.preventDefault()}
+                onDrop={() => canDrag && handleDrop(index)}
+                className={`flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2.5 transition-colors sm:flex-nowrap ${
+                  dragIndex === index ? "opacity-50" : ""
+                }`}
               >
-                <Icon name="x" size={15} />
-              </button>
-            )}
-          </div>
-        ))}
+                {canDrag && (
+                  <span className="cursor-grab text-ink-soft active:cursor-grabbing" aria-hidden>
+                    <Icon name="list" size={16} />
+                  </span>
+                )}
+                <div className="min-w-[140px] flex-1">
+                  <input
+                    value={r.name}
+                    onChange={(e) => updateRow(r.key, { name: e.target.value })}
+                    placeholder={m.namePlaceholder}
+                    aria-label={m.nameLabel}
+                    maxLength={80}
+                    className={inputBase}
+                  />
+                </div>
+                <div className="min-w-[120px] flex-1">
+                  <input
+                    value={r.role}
+                    onChange={(e) => updateRow(r.key, { role: e.target.value })}
+                    placeholder={m.rolePlaceholder}
+                    aria-label={m.roleLabel}
+                    maxLength={60}
+                    className={inputBase}
+                  />
+                </div>
+                {r.isOwner ? (
+                  <span className="shrink-0 rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-semibold text-ink-soft">
+                    {m.you}
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => removeRow(r.key)}
+                    className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-ink-soft hover:bg-error-weak hover:text-error"
+                    aria-label={m.delete}
+                  >
+                    <Icon name="x" size={15} />
+                  </button>
+                )}
+              </div>
+
+              {/* Per-provider time off — only for already-saved members (a
+                  new local row has no id yet to scope entries to). */}
+              {showTimeOff && (
+                <div className="pl-1">
+                  <button
+                    type="button"
+                    onClick={() => setExpandedKey(isExpanded ? null : r.key)}
+                    className="mt-1 flex items-center gap-1.5 px-2 py-1 text-[12.5px] font-medium text-brand hover:bg-brand-weak rounded-lg"
+                  >
+                    <Icon name="calendar" size={13} />
+                    {isExpanded ? timeOffDict.toggleHide : timeOffDict.toggleShow}
+                    {(timeOffByMember?.[r.id!]?.length ?? 0) > 0 && !isExpanded
+                      ? ` (${timeOffByMember![r.id!].length})`
+                      : ""}
+                  </button>
+                  {isExpanded && (
+                    <TimeOffList
+                      teamMemberId={r.id!}
+                      initialEntries={timeOffByMember?.[r.id!] ?? []}
+                      intlLocale={intlLocale}
+                      dict={timeOffDict}
+                    />
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {/* Add member (team mode only — appends a local row) */}

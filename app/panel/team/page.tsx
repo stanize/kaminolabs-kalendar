@@ -2,9 +2,11 @@ import { redirect } from "next/navigation";
 import { requireSession } from "@/lib/auth-session";
 import { getBusinessForUser } from "@/lib/business/data";
 import { getTeamForUser, ensureOwnerSeeded } from "@/lib/team/data";
+import { getClosuresForUser } from "@/lib/closures/data";
 import { TeamManager } from "@/components/panel/team-manager";
 import { getLocale } from "@/lib/i18n/server";
 import { getTeamDictionary } from "@/lib/i18n/dictionaries/team";
+import { getTimeOffDictionary } from "@/lib/i18n/dictionaries/time-off";
 
 export default async function TeamPage({
   searchParams,
@@ -28,6 +30,18 @@ export default async function TeamPage({
 
   const team = await getTeamForUser(session.user.id);
 
+  const closures = await getClosuresForUser(session.user.id);
+  const timeOffByMember = new Map<string, typeof closures>();
+  for (const c of closures) {
+    if (!c.recurring && c.team_member_id) {
+      const list = timeOffByMember.get(c.team_member_id) ?? [];
+      list.push(c);
+      timeOffByMember.set(c.team_member_id, list);
+    }
+  }
+  const timeOffDict = getTimeOffDictionary(locale);
+  const intlLocale = locale === "es" ? "es-ES" : "en-GB";
+
   const { from } = await searchParams;
   const returnToHome = from === "home";
 
@@ -48,6 +62,9 @@ export default async function TeamPage({
           is_owner: m.is_owner,
         }))}
         returnToHome={returnToHome}
+        timeOffByMember={Object.fromEntries(timeOffByMember)}
+        timeOffDict={timeOffDict}
+        intlLocale={intlLocale}
       />
     </div>
   );

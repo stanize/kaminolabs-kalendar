@@ -2,9 +2,12 @@ import { redirect } from "next/navigation";
 import { requireSession } from "@/lib/auth-session";
 import { getBusinessForUser } from "@/lib/business/data";
 import { getBusinessHoursForUser } from "@/lib/availability/data";
+import { getClosuresForUser } from "@/lib/closures/data";
 import { AvailabilityManager } from "@/components/panel/availability-manager";
+import { FestivosManager } from "@/components/panel/festivos-manager";
 import { getLocale } from "@/lib/i18n/server";
 import { getAvailabilityDictionary } from "@/lib/i18n/dictionaries/availability";
+import { getFestivosDictionary } from "@/lib/i18n/dictionaries/festivos";
 
 export default async function AvailabilityPage({
   searchParams,
@@ -21,11 +24,15 @@ export default async function AvailabilityPage({
   const week = await getBusinessHoursForUser(session.user.id);
   const hasSavedHours = Object.keys(week).length > 0;
 
+  const closures = await getClosuresForUser(session.user.id);
+  const festivos = closures.filter((c) => c.recurring);
+
   const { from } = await searchParams;
   const returnToHome = from === "home";
 
   const locale = await getLocale();
   const dict = getAvailabilityDictionary(locale);
+  const festivosDict = getFestivosDictionary(locale);
 
   return (
     <div className="mx-auto max-w-[680px] px-4 py-6 sm:px-8 sm:py-8">
@@ -46,6 +53,14 @@ export default async function AvailabilityPage({
         bookingWindowMonths={business.booking_window_months}
         returnToHome={returnToHome}
       />
+
+      <div className="mt-6">
+        <FestivosManager
+          initialFestivos={festivos}
+          intlLocale={dict.intlLocale}
+          dict={festivosDict}
+        />
+      </div>
     </div>
   );
 }
