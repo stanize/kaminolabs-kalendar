@@ -167,11 +167,10 @@ export function FestivosManager({
 
   return (
     <div className="rounded-xl border border-line bg-surface px-4 py-4 sm:px-6">
-      <div className="mb-1 flex items-center gap-2">
+      <div className="mb-4 flex items-center gap-2">
         <Icon name="calendar" size={17} className="text-brand" />
         <h2 className="text-[16px] font-semibold text-ink">{dict.title}</h2>
       </div>
-      <p className="mb-4 text-[13px] text-ink-soft">{dict.subtitle}</p>
 
       {error && (
         <div className="mb-3 flex items-start gap-2 rounded-xl border border-error bg-error-weak px-3.5 py-2.5 text-[13px] text-error">
@@ -195,7 +194,7 @@ export function FestivosManager({
                 </div>
                 <div className="flex flex-col gap-1">
                   <label className="text-[11px] font-semibold text-ink-soft">{dict.monthLabel}</label>
-                  <select value={editMonth} onChange={(e) => setEditMonth(Number(e.target.value))} className={`${inputBase} w-[140px]`}>
+                  <select value={editMonth} onChange={(e) => setEditMonth(Number(e.target.value))} className={`${inputBase} w-[140px] capitalize`}>
                     {(intlLocale.startsWith("es") ? MONTHS_ES : MONTHS_EN).map((mName, i) => (
                       <option key={mName} value={i + 1}>{mName}</option>
                     ))}
@@ -268,7 +267,7 @@ export function FestivosManager({
         </div>
         <div className="flex flex-col gap-1">
           <label className="text-[12px] font-semibold text-ink-soft">{dict.monthLabel}</label>
-          <select value={month} onChange={(e) => setMonth(Number(e.target.value))} className={`${inputBase} w-[140px]`}>
+          <select value={month} onChange={(e) => setMonth(Number(e.target.value))} className={`${inputBase} w-[140px] capitalize`}>
             {(intlLocale.startsWith("es") ? MONTHS_ES : MONTHS_EN).map((mName, i) => (
               <option key={mName} value={i + 1}>{mName}</option>
             ))}

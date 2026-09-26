@@ -9,7 +9,6 @@ import type { Locale } from "../config";
  */
 export interface FestivosDictionary {
   title: string;
-  subtitle: string;
   dayLabel: string;
   monthLabel: string;
   nameLabel: string;
@@ -33,7 +32,6 @@ export interface FestivosDictionary {
 
 const es: FestivosDictionary = {
   title: "Festivos",
-  subtitle: "Días que tu negocio cierra cada año, como Navidad o Año Nuevo.",
   dayLabel: "Día",
   monthLabel: "Mes",
   nameLabel: "Nombre (opcional)",
@@ -57,7 +55,6 @@ const es: FestivosDictionary = {
 
 const en: FestivosDictionary = {
   title: "Holidays",
-  subtitle: "Days your business closes every year, like Christmas or New Year's.",
   dayLabel: "Day",
   monthLabel: "Month",
   nameLabel: "Name (optional)",

@@ -83,6 +83,16 @@ Criteria:
     add and edit now share one dialog instance.
   - New dictionary fields (`lib/i18n/dictionaries/festivos.ts`): `edit`
     (aria-label), `saveEdit`, `cancelEdit` (aria-label), es+en.
+- **Follow-up (2026-09-26, Arun tested live, UI polish):**
+  - Month `<select>` text was lowercase (`MONTHS_ES` array is correctly
+    lowercase Spanish grammar, but looked wrong as dropdown text) — added
+    Tailwind `capitalize` class to both month selects (add form + inline
+    edit form) in `festivos-manager.tsx`. Underlying data/labels unchanged.
+  - Removed the section subtitle ("Días que tu negocio cierra cada año...")
+    per Arun: "festivos is quite clear by itself, the description can be
+    considered biased to those not celebrating navidad." Dropped `subtitle`
+    from `FestivosDictionary` (es+en) and from the heading block in
+    `festivos-manager.tsx`.
 
 ## Step: provider-time-off
 Status: in_progress
@@ -153,6 +163,24 @@ Criteria:
   page — confirm exact placement at build time; a time-off list scoped to
   "this provider" reads more naturally attached to their team-member
   record than mixed into the clinic-wide hours editor.
+- **Follow-up (2026-09-26, Arun tested live): "Solo un día" checkbox.**
+  Arun's feedback: entering a single-day time-off forced filling in an end
+  date too, which felt redundant. Added a "Solo un día" checkbox to
+  `time-off-list.tsx`'s add form (`singleDay` state): when checked, the
+  "Desde" field relabels to "Día" (`dict.dayLabel`) and the "Hasta" field
+  is hidden entirely; `endDate` is kept in sync with `startDate`
+  automatically (on check, and on every startDate change while checked) so
+  the underlying tracking is unchanged — a single-day entry is still just
+  a `start_date === end_date` row, same as before. `handleAdd` derives
+  `effectiveEndDate = singleDay ? startDate : endDate` at submit time as a
+  belt-and-suspenders guard. The `partialHours` checkbox's `disabled`
+  condition changed from `startDate !== endDate || !startDate` to
+  `!singleDay || !startDate` (partial-hours only makes sense for a
+  single-day entry, matching the v1 "partial hours only on a single date"
+  decision above); unchecking "Solo un día" also resets `partialHours` to
+  `false` to avoid a stale partial-hours selection applying to what's now
+  a multi-day range. New dictionary fields (`lib/i18n/dictionaries/
+  time-off.ts`): `dayLabel`, `singleDay`, es+en.
 
 ## Step: availability-engine-integration
 Status: in_progress

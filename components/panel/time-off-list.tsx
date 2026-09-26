@@ -48,6 +48,7 @@ export function TimeOffList({
   const [entries, setEntries] = useState(initialEntries);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [singleDay, setSingleDay] = useState(false);
   const [partialHours, setPartialHours] = useState(false);
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
@@ -59,7 +60,11 @@ export function TimeOffList({
 
   async function handleAdd(confirmed?: boolean) {
     setError(null);
-    if (!startDate || !endDate) {
+    // singleDay drives the UI (hides Hasta, relabels Desde as "Día"), but
+    // the underlying tracking is unchanged — a single-day entry is just a
+    // range whose start and end are the same date.
+    const effectiveEndDate = singleDay ? startDate : endDate;
+    if (!startDate || !effectiveEndDate) {
       setError(dict.errors.errInvalidDateRange);
       return;
     }
@@ -68,7 +73,7 @@ export function TimeOffList({
       const result = await createTimeOff({
         teamMemberId,
         startDate,
-        endDate,
+        endDate: effectiveEndDate,
         startTime: partialHours ? startTime : null,
         endTime: partialHours ? endTime : null,
         label,
@@ -91,6 +96,7 @@ export function TimeOffList({
       );
       setStartDate("");
       setEndDate("");
+      setSingleDay(false);
       setPartialHours(false);
       setStartTime("");
       setEndTime("");
@@ -155,15 +161,42 @@ export function TimeOffList({
       )}
 
       <div className="flex flex-col gap-2">
+        <label className="flex w-fit cursor-pointer items-center gap-2">
+          <input
+            type="checkbox"
+            checked={singleDay}
+            onChange={(e) => {
+              const checked = e.target.checked;
+              setSingleDay(checked);
+              if (checked) setEndDate(startDate);
+              else setPartialHours(false);
+            }}
+            className="h-4 w-4 accent-brand"
+          />
+          <span className="text-[12.5px] text-ink-soft">{dict.singleDay}</span>
+        </label>
+
         <div className="flex flex-wrap items-end gap-2">
           <div className="flex flex-col gap-1">
-            <label className="text-[11.5px] font-semibold text-ink-soft">{dict.startDate}</label>
-            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className={`${inputBase} w-[150px]`} />
+            <label className="text-[11.5px] font-semibold text-ink-soft">
+              {singleDay ? dict.dayLabel : dict.startDate}
+            </label>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => {
+                setStartDate(e.target.value);
+                if (singleDay) setEndDate(e.target.value);
+              }}
+              className={`${inputBase} w-[150px]`}
+            />
           </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-[11.5px] font-semibold text-ink-soft">{dict.endDate}</label>
-            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className={`${inputBase} w-[150px]`} />
-          </div>
+          {!singleDay && (
+            <div className="flex flex-col gap-1">
+              <label className="text-[11.5px] font-semibold text-ink-soft">{dict.endDate}</label>
+              <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className={`${inputBase} w-[150px]`} />
+            </div>
+          )}
         </div>
 
         <label className="flex w-fit cursor-pointer items-center gap-2">
@@ -171,7 +204,7 @@ export function TimeOffList({
             type="checkbox"
             checked={partialHours}
             onChange={(e) => setPartialHours(e.target.checked)}
-            disabled={startDate !== endDate || !startDate}
+            disabled={!singleDay || !startDate}
             className="h-4 w-4 accent-brand"
           />
           <span className="text-[12.5px] text-ink-soft">{dict.partialHours}</span>

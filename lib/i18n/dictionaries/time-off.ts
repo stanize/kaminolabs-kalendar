@@ -14,6 +14,8 @@ export interface TimeOffDictionary {
   toggleHide: string;
   startDate: string;
   endDate: string;
+  dayLabel: string; // replaces startDate's label when singleDay is checked
+  singleDay: string; // "Solo un día" checkbox label
   partialHours: string; // checkbox label
   startTime: string;
   endTime: string;
@@ -40,6 +42,8 @@ const es: TimeOffDictionary = {
   toggleHide: "Ocultar vacaciones / ausencias",
   startDate: "Desde",
   endDate: "Hasta",
+  dayLabel: "Día",
+  singleDay: "Solo un día",
   partialHours: "Solo parte del día (mismo día)",
   startTime: "Desde las",
   endTime: "Hasta las",
@@ -66,6 +70,8 @@ const en: TimeOffDictionary = {
   toggleHide: "Hide time off",
   startDate: "From",
   endDate: "To",
+  dayLabel: "Day",
+  singleDay: "Single day only",
   partialHours: "Only part of the day (same day)",
   startTime: "From",
   endTime: "To",
