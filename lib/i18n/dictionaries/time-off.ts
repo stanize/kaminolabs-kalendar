@@ -25,6 +25,9 @@ export interface TimeOffDictionary {
   save: string; // "Guardar" — add form's submit button (once expanded)
   cancelAdd: string; // aria-label on the add form's collapse/X button
   delete: string; // aria-label
+  edit: string; // aria-label on the edit-pencil button
+  saveEdit: string; // inline-edit form's submit button
+  cancelEdit: string; // aria-label on the inline-edit form's cancel/X button
   errUnexpected: string;
   errors: {
     errNoBusiness: string;
@@ -55,6 +58,9 @@ const es: TimeOffDictionary = {
   save: "Guardar",
   cancelAdd: "Cancelar",
   delete: "Eliminar",
+  edit: "Editar",
+  saveEdit: "Guardar cambios",
+  cancelEdit: "Cancelar edición",
   errUnexpected: "Ocurrió un error inesperado. Inténtalo de nuevo.",
   errors: {
     errNoBusiness: "Primero configura tu negocio.",
@@ -85,6 +91,9 @@ const en: TimeOffDictionary = {
   save: "Save",
   cancelAdd: "Cancel",
   delete: "Delete",
+  edit: "Edit",
+  saveEdit: "Save changes",
+  cancelEdit: "Cancel editing",
   errUnexpected: "Something went wrong. Please try again.",
   errors: {
     errNoBusiness: "Set up your business first.",

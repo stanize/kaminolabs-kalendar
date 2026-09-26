@@ -221,6 +221,30 @@ Criteria:
   `timeOff`, es+en). No data-fetching or component logic changed — this
   is purely the page split; each subpage fetches exactly the same data its
   slice used to fetch inline on the old single page.
+- **Follow-up (2026-09-26, Arun requested): editing added to time off,
+  matching Festivos.** New `updateTimeOff({ id, startDate, endDate,
+  startTime?, endTime?, label, confirmed?, dict? })` in
+  `lib/actions/closures.ts` — `authedAction`-wrapped, scoped to the
+  caller's own business, validated the same way `createTimeOff` is (date
+  range, same-day-only partial hours, label length), re-verifies the row
+  belongs to the business AND is a one-off (`recurring = false`) closure
+  before touching it, and reads its existing `team_member_id` to preserve
+  it (not editable from this form — an entry stays attached to whichever
+  provider/list it was created under). Goes through the same
+  check-then-confirm conflict flow as create. `components/panel/
+  time-off-list.tsx` gained the same inline-edit pattern already used by
+  `festivos-manager.tsx`: a pencil button next to each entry's delete
+  button swaps that row for an inline edit form (singleDay checkbox,
+  date(s), partial-hours checkbox + times, label — same fields/behavior as
+  the add form, pre-filled from the entry, its own `editX` state so it
+  doesn't disturb whatever's half-typed into the add form) — "Guardar
+  cambios" saves via `updateTimeOff`, an X cancels back to the static row.
+  `pendingConfirm` (`{ kind: "add" } | { kind: "edit"; id }`) tracks which
+  save the shared conflict dialog's "Guardar de todas formas" should
+  retry, since add and edit now share one dialog instance (mirrors
+  `festivos-manager.tsx` exactly). New dictionary fields
+  (`lib/i18n/dictionaries/time-off.ts`): `edit` (aria-label), `saveEdit`,
+  `cancelEdit` (aria-label), es+en.
 
 ## Step: manual-booking-closure-warning
 Status: in_progress

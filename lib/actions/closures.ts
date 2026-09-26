@@ -298,6 +298,93 @@ export const createTimeOff = authedAction(
   }
 );
 
+/** Updates an existing one-off closure in place — same validation and
+ *  check-then-confirm conflict flow as createTimeOff, just an update instead
+ *  of an insert. Scoped to the caller's own business and re-verifies the row
+ *  is a one-off closure (never trusts a client-passed id without checking
+ *  ownership/kind). teamMemberId is NOT editable here (the row stays
+ *  attached to whichever provider/list it was created under). */
+export const updateTimeOff = authedAction(
+  async (
+    session,
+    payload: {
+      id: string;
+      startDate: string;
+      endDate: string;
+      startTime?: string | null;
+      endTime?: string | null;
+      label: string;
+      // existing-bookings-conflict-alert: see createFestivo's doc comment.
+      confirmed?: boolean;
+      dict?: Partial<ClosureActionDict>;
+    }
+  ): Promise<ClosureActionResult> => {
+    const d = { ...FALLBACK, ...payload.dict };
+
+    const business = await getBusinessForUser(session.user.id);
+    if (!business) return { ok: false, error: d.errNoBusiness };
+
+    const { id, startDate, endDate, label } = payload;
+    const startTime = payload.startTime || null;
+    const endTime = payload.endTime || null;
+
+    if (!startDate || !endDate || endDate < startDate) {
+      return { ok: false, error: d.errInvalidDateRange };
+    }
+    if ((startTime || endTime) && startDate !== endDate) {
+      return { ok: false, error: d.errInvalidTimeRange };
+    }
+    if (startTime && endTime && endTime <= startTime) {
+      return { ok: false, error: d.errInvalidTimeRange };
+    }
+    if (label.length > LABEL_MAX) {
+      return { ok: false, error: tmpl(d.errLabelTooLong, { max: String(LABEL_MAX) }) };
+    }
+
+    const supabase = await createClient();
+    const { data: existing } = await supabase
+      .from("kalendar_business_closures")
+      .select("team_member_id")
+      .eq("id", id)
+      .eq("business_id", business.id)
+      .eq("recurring", false)
+      .maybeSingle();
+    if (!existing) return { ok: false, error: d.errNoBusiness };
+    const teamMemberId = (existing as { team_member_id: string | null }).team_member_id;
+
+    if (!payload.confirmed) {
+      const horizonEnd = new Date(`${endDate}T23:59:59Z`);
+      horizonEnd.setUTCDate(horizonEnd.getUTCDate() + 1);
+      const conflicts = await findConflictingBookings(
+        business.id,
+        { recurring: false, startDate, endDate, startTime, endTime, teamMemberId },
+        horizonEnd
+      );
+      if (conflicts.length > 0) {
+        return {
+          ok: true,
+          needsConfirmation: true,
+          conflicts: { total: conflicts.length, sample: conflicts.slice(0, CONFLICT_LIST_CAP) },
+        };
+      }
+    }
+
+    const { data, error } = await supabase
+      .from("kalendar_business_closures")
+      .update({ start_date: startDate, end_date: endDate, start_time: startTime, end_time: endTime, label: label.trim() || null })
+      .eq("id", id)
+      .eq("business_id", business.id)
+      .select()
+      .single();
+
+    if (error) return { ok: false, error: `${d.errSaveFailed} ${error.message}` };
+
+    revalidatePath("/panel/availability");
+    revalidatePath("/panel/team");
+    return { ok: true, closure: data as BusinessClosure };
+  }
+);
+
 export const deleteClosure = authedAction(
   async (
     session,
