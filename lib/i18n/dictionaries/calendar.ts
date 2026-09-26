@@ -65,6 +65,10 @@ export interface CalendarDictionary {
     viewWeek: string;
     viewMonth: string;
     moreTemplate: string; // "+{n} más" overflow chip on a month-grid day cell, {n} replaced client-side
+    // holidays-and-time-off (2026-09-26): shown under a day column's date
+    // label, in parentheses, when that day is a recurring clinic-wide
+    // festivo — the closure's own label, or this fallback when it has none.
+    festivoFallbackLabel: string;
   };
   modal: {
     title: string; // "Nueva cita"
@@ -192,6 +196,7 @@ const es: CalendarDictionary = {
     noProviders: "Añade a tu equipo en Equipo para ver la semana.",
     addAppointment: "Añadir cita",
     weekRangeTemplate: "{from} – {to}",
+    festivoFallbackLabel: "Festivo",
     viewDay: "Día",
     viewWeek: "Semana",
     viewMonth: "Mes",
@@ -325,6 +330,7 @@ const en: CalendarDictionary = {
     viewWeek: "Week",
     viewMonth: "Month",
     moreTemplate: "+{n} more",
+    festivoFallbackLabel: "Holiday",
   },
   modal: {
     title: "New appointment",

@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { incrementRateLimitHit, getClientIp } from "@/lib/rate-limit";
 import { getPublicBookingData, getTakenIntervals } from "@/lib/booking/data";
 import { getClosuresForBusiness, type BusinessClosure } from "@/lib/closures/data";
-import { closureDateWindows, toClosureInput } from "@/lib/closures/conflicts";
+import { closureDateWindows, toClosureInput, festivoLabelsForRange } from "@/lib/closures/conflicts";
 import { buildBookingIcsBase64 } from "@/lib/booking/ics";
 import { formatBusinessAddress } from "@/lib/business/data";
 import { resolveClinicClientId } from "@/lib/booking/client-link";
@@ -135,7 +135,16 @@ export interface SlotDTO {
 }
 
 export type SlotsResult =
-  | { ok: true; slotsByDate: Record<string, SlotDTO[]> }
+  | {
+      ok: true;
+      slotsByDate: Record<string, SlotDTO[]>;
+      // holidays-and-time-off (2026-09-26): "YYYY-MM-DD" -> the recurring,
+      // clinic-wide festivo's label (or null if it has none) covering that
+      // date, absent for a date that isn't a festivo at all. A one-off
+      // provider vacation/time-off never appears here — see
+      // festivoLabelsForRange's doc comment.
+      festivoByDate: Record<string, string | null>;
+    }
   | { ok: false; error: string };
 
 /**
@@ -202,6 +211,10 @@ export async function getAvailableSlots(input: {
   // horizon for expanding a recurring festivo's yearly windows.
   const closures = await getClosuresForBusiness(data.business.id);
   const closureWindows = expandClosureWindows(closures, to);
+  // holidays-and-time-off (2026-09-26): recurring, clinic-wide festivos only
+  // — reuses the same closureDateWindows expansion, never a one-off
+  // provider vacation/time-off (see festivoLabelsForRange's doc comment).
+  const festivoByDate = festivoLabelsForRange(closures, to);
 
   // Solo, or a specific provider chosen: a single taken-intervals fetch,
   // then one generateSlotsForDay call per day in the range.
@@ -232,7 +245,7 @@ export async function getAvailableSlots(input: {
         providerId: provider, providerName,
       }));
     }
-    return { ok: true, slotsByDate };
+    return { ok: true, slotsByDate, festivoByDate };
   }
 
   // "Cualquiera": one taken-intervals fetch per member for the whole range,
@@ -276,7 +289,7 @@ export async function getAvailableSlots(input: {
     );
     slotsByDate[ds] = out;
   }
-  return { ok: true, slotsByDate };
+  return { ok: true, slotsByDate, festivoByDate };
 }
 
 // ── Submit a booking ───────────────────────────────────────────────────────

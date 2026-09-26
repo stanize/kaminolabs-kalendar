@@ -220,6 +220,35 @@ export async function getCurrentConflicts(
 }
 
 /**
+ * Per-date festivo labels for a queried range — RECURRING, clinic-wide
+ * closures only (never a one-off provider vacation/time-off: per Arun's
+ * explicit "vacations should show as not available as others" decision,
+ * those must render with the same generic unavailability messaging as any
+ * other fully-booked/closed day). Reuses `closureDateWindows` (the same
+ * yearly expansion the conflict-check/Conflictos-tab code already relies
+ * on) rather than a second "does this date match a festivo" implementation.
+ * Keyed by "YYYY-MM-DD" in the business tz; value is the closure's own
+ * label, or `null` when it has none (caller applies its own generic
+ * fallback copy, e.g. "Festivo").
+ */
+export function festivoLabelsForRange(
+  closures: BusinessClosure[],
+  horizonEnd: Date
+): Record<string, string | null> {
+  const out: Record<string, string | null> = {};
+  for (const c of closures) {
+    if (!c.recurring) continue;
+    const input = toClosureInput(c);
+    for (const w of closureDateWindows(input, horizonEnd)) {
+      const { year, month, day } = tzDateParts(w.start, BUSINESS_TZ);
+      const ds = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+      out[ds] = c.label || null;
+    }
+  }
+  return out;
+}
+
+/**
  * "Navidad" / "Vacaciones de Ana" style label — the clinic's own label when
  * set, otherwise a sensible fallback: a provider-scoped one-off closure
  * without a custom label falls back to "Vacaciones de {provider}" (needs

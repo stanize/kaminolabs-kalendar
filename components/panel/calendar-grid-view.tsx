@@ -193,6 +193,21 @@ export interface GridDay {
   dateLabel: string; // short weekday + day, e.g. "lun 15"
   isToday: boolean;
   isPast: boolean; // strictly before today — a booking can still be made here (e.g. a walk-in), just visually receded
+  // holidays-and-time-off (2026-09-26): true when this date matches a
+  // recurring, clinic-wide festivo (never a one-off provider vacation/time
+  // off — that's visible via the Conflictos tab instead, not this visual).
+  isFestivo: boolean;
+  // The matched festivo's own label, or null when it has none (caller shows
+  // a generic fallback, e.g. "Festivo"). Only meaningful when isFestivo.
+  festivoLabel: string | null;
+}
+
+/** A recurring, clinic-wide festivo as buildGridDays needs it — month/day
+ *  only (matches BusinessClosure's recurring shape), label optional. */
+export interface GridDayFestivo {
+  month: number;
+  day: number;
+  label: string | null;
 }
 
 function timeLabel(iso: string): string {
@@ -201,7 +216,12 @@ function timeLabel(iso: string): string {
   }).format(new Date(iso));
 }
 
-export function buildGridDays(startUtc: Date, count: number, intlLocale: string): GridDay[] {
+export function buildGridDays(
+  startUtc: Date,
+  count: number,
+  intlLocale: string,
+  festivos: GridDayFestivo[] = []
+): GridDay[] {
   const days: GridDay[] = [];
   const todayKey = tzDateParts(new Date());
   for (let i = 0; i < count; i++) {
@@ -213,6 +233,7 @@ export function buildGridDays(startUtc: Date, count: number, intlLocale: string)
     const label = new Intl.DateTimeFormat(intlLocale, {
       timeZone: TZ, weekday: "short", day: "numeric",
     }).format(noonUtc);
+    const festivo = festivos.find((f) => f.month === month && f.day === day);
     days.push({
       year, month, day,
       dayId: dayIdInTz(noonUtc),
@@ -222,6 +243,8 @@ export function buildGridDays(startUtc: Date, count: number, intlLocale: string)
         year < todayKey.year ||
         (year === todayKey.year && month < todayKey.month) ||
         (year === todayKey.year && month === todayKey.month && day < todayKey.day),
+      isFestivo: !!festivo,
+      festivoLabel: festivo?.label ?? null,
     });
   }
   return days;
@@ -495,6 +518,11 @@ function DayProviderColumn({
         <span className={`text-[12px] font-semibold capitalize ${day.isPast ? "text-ink-soft" : "text-ink"}`}>
           {day.dateLabel}
         </span>
+        {day.isFestivo && (
+          <span className="truncate text-[10px] font-medium text-amber-700">
+            ({day.festivoLabel || dict.week.festivoFallbackLabel})
+          </span>
+        )}
         {members.length > 1 && (
           <span className="truncate text-[10.5px] text-ink-soft">{member.name}</span>
         )}
@@ -542,6 +570,13 @@ function DayProviderColumn({
             still fully clickable to add a booking (e.g. a walk-in). Sits
             below the gridlines/booking chips so those stay unaffected. */}
         {day.isPast && <div className="pointer-events-none absolute inset-0 bg-ink/5" />}
+
+        {/* Festivo wash — same layering technique as the past-day wash above
+            (uniform, non-interactive overlay across the whole column, so
+            clicking to add a walk-in booking still works), reusing the same
+            amber tone chipClasses already uses for a "needs clinic
+            follow-up" booking, so the two amber cues read consistently. */}
+        {day.isFestivo && <div className="pointer-events-none absolute inset-0 bg-amber-50/60" />}
 
         {/* Hour gridlines */}
         {Array.from({ length: Math.floor((gridEndMin - gridStartMin) / 60) + 1 }).map((_, i) => (

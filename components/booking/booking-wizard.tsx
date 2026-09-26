@@ -929,6 +929,11 @@ function DateTimeStep({ slug, serviceId, providerId, openDays, bookingWindowMont
   const openSet = new Set(openDays);
   const [weekStart, setWeekStart] = useState<Date>(startOfWeekMon(today));
   const [slotsByDate, setSlotsByDate] = useState<Record<string, SlotDTO[]>>({});
+  // holidays-and-time-off (2026-09-26): "YYYY-MM-DD" -> the recurring,
+  // clinic-wide festivo's label covering that date (or null if it has none)
+  // — used to replace the generic "no slots" message with the festivo's
+  // name. Never set for a one-off provider vacation/time-off day.
+  const [festivoByDate, setFestivoByDate] = useState<Record<string, string | null>>({});
   const [loadingDates, setLoadingDates] = useState<Set<string>>(new Set());
   const [findingFirstAvailable, setFindingFirstAvailable] = useState(true);
 
@@ -987,8 +992,10 @@ function DateTimeStep({ slug, serviceId, providerId, openDays, bookingWindowMont
       if (!res.ok) {
         onError(res.error);
         setSlotsByDate({});
+        setFestivoByDate({});
       } else {
         setSlotsByDate(res.slotsByDate);
+        setFestivoByDate(res.festivoByDate);
       }
       setLoadingDates(new Set());
     })();
@@ -1038,7 +1045,11 @@ function DateTimeStep({ slug, serviceId, providerId, openDays, bookingWindowMont
                     <p className="pt-2 text-center text-[10px] leading-tight text-ink-soft/60">{w.closed}</p>
                   )}
                   {sel && slots?.length === 0 && (
-                    <p className="pt-2 text-center text-[10px] leading-tight text-ink-soft">{w.noSlotsThisDay}</p>
+                    <p className="pt-2 text-center text-[10px] leading-tight text-ink-soft">
+                      {ds in festivoByDate
+                        ? w.closedFestivoTemplate.replace("{name}", festivoByDate[ds] || w.festivoFallbackLabel)
+                        : w.noSlotsThisDay}
+                    </p>
                   )}
                   {sel && slots && slots.length > 0 && (
                     isTeamAny ? (

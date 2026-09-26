@@ -12,6 +12,7 @@ import {
   getConflictingBookingsForUser,
 } from "@/lib/booking/owner-data";
 import { CalendarBookings } from "@/components/panel/calendar-bookings";
+import { getClosuresForUser } from "@/lib/closures/data";
 import { TodayStatsWidget } from "@/components/panel/today-stats-widget";
 import { WeekStatsWidget } from "@/components/panel/week-stats-widget";
 import { getLocale } from "@/lib/i18n/server";
@@ -28,7 +29,7 @@ export default async function CalendarPage() {
   const { weekStartIso, weekEndIso } = await getDefaultCalendarWeekBounds(session.user.id);
 
   const supabase = await createClient();
-  const [bookings, cancellationRequests, weekData, hoyStats, weekStats, initialConflicts, whatsappConfig] = await Promise.all([
+  const [bookings, cancellationRequests, weekData, hoyStats, weekStats, initialConflicts, whatsappConfig, closures] = await Promise.all([
     getClientRowBookings(session.user.id),
     getPendingCancellationRequests(session.user.id),
     getWeekCalendarData(session.user.id, weekStartIso, weekEndIso),
@@ -40,8 +41,16 @@ export default async function CalendarPage() {
       .select("enabled")
       .eq("business_id", business.id)
       .maybeSingle(),
+    getClosuresForUser(session.user.id),
   ]);
   const whatsappEnabled = whatsappConfig.data?.enabled ?? false;
+  // holidays-and-time-off (2026-09-26): recurring, clinic-wide festivos only
+  // — the panel calendar's "festivo" column visual (background wash + name
+  // under the date) never applies to a one-off provider vacation/time-off,
+  // which stays visible only via the Conflictos tab as before.
+  const festivos = closures
+    .filter((c) => c.recurring)
+    .map((c) => ({ month: c.month!, day: c.day!, label: c.label }));
 
   const locale = await getLocale();
   const dict = getCalendarDictionary(locale);
@@ -138,6 +147,7 @@ export default async function CalendarPage() {
         weekStartIso={weekStartIso}
         whatsappEnabled={whatsappEnabled}
         initialConflicts={initialConflicts}
+        festivos={festivos}
       />
     </div>
   );

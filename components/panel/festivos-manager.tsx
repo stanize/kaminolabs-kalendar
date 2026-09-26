@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { Btn } from "@/components/ui/button";
-import { createFestivo, deleteClosure, type ConflictSummary } from "@/lib/actions/closures";
+import { createFestivo, updateFestivo, deleteClosure, type ConflictSummary } from "@/lib/actions/closures";
 import { reportClientError } from "@/lib/report-client-error";
 import { ClosureConflictDialog } from "@/components/panel/closure-conflict-dialog";
 import type { BusinessClosure } from "@/lib/closures/data";
@@ -56,6 +56,20 @@ export function FestivosManager({
   const [error, setError] = useState<string | null>(null);
   const [conflicts, setConflicts] = useState<ConflictSummary | null>(null);
 
+  // Inline edit — reuses the add form's day/month/label inputs, pre-filled,
+  // rendered in place of the row being edited. Only one row editable at a
+  // time. editMonth/editDay/editLabel are separate from the add form's own
+  // month/day/label state above so editing one doesn't disturb whatever the
+  // clinic has half-typed into the "add" row.
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editMonth, setEditMonth] = useState(1);
+  const [editDay, setEditDay] = useState(1);
+  const [editLabel, setEditLabel] = useState("");
+
+  // Which save the pending conflict dialog's "Guardar de todas formas"
+  // should retry — the add form, or an in-place edit of a specific festivo.
+  const [pendingConfirm, setPendingConfirm] = useState<{ kind: "add" } | { kind: "edit"; id: string } | null>(null);
+
   async function handleAdd(confirmed?: boolean) {
     setError(null);
     setSaving(true);
@@ -68,16 +82,63 @@ export function FestivosManager({
       }
       if ("needsConfirmation" in result) {
         setConflicts(result.conflicts);
+        setPendingConfirm({ kind: "add" });
         setSaving(false);
         return;
       }
       setConflicts(null);
+      setPendingConfirm(null);
       setFestivos((prev) => [...prev, result.closure].sort((a, b) => (a.month! - b.month!) || (a.day! - b.day!)));
       setLabel("");
       setSaving(false);
       router.refresh();
     } catch (e) {
       reportClientError("createFestivo", e);
+      setError(dict.errUnexpected);
+      setSaving(false);
+    }
+  }
+
+  function startEdit(f: BusinessClosure) {
+    setError(null);
+    setEditingId(f.id);
+    setEditMonth(f.month!);
+    setEditDay(f.day!);
+    setEditLabel(f.label ?? "");
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+  }
+
+  async function handleEditSave(id: string, confirmed?: boolean) {
+    setError(null);
+    setSaving(true);
+    try {
+      const result = await updateFestivo({ id, month: editMonth, day: editDay, label: editLabel, confirmed, dict: dict.errors });
+      if (!result.ok) {
+        setError(result.error);
+        setSaving(false);
+        return;
+      }
+      if ("needsConfirmation" in result) {
+        setConflicts(result.conflicts);
+        setPendingConfirm({ kind: "edit", id });
+        setSaving(false);
+        return;
+      }
+      setConflicts(null);
+      setPendingConfirm(null);
+      setFestivos((prev) =>
+        prev
+          .map((f) => (f.id === id ? result.closure : f))
+          .sort((a, b) => (a.month! - b.month!) || (a.day! - b.day!))
+      );
+      setEditingId(null);
+      setSaving(false);
+      router.refresh();
+    } catch (e) {
+      reportClientError("updateFestivo", e);
       setError(dict.errUnexpected);
       setSaving(false);
     }
@@ -94,6 +155,7 @@ export function FestivosManager({
         return;
       }
       setFestivos((prev) => prev.filter((f) => f.id !== id));
+      if (editingId === id) setEditingId(null);
       setDeletingId(null);
       router.refresh();
     } catch (e) {
@@ -120,27 +182,78 @@ export function FestivosManager({
 
       {festivos.length > 0 && (
         <div className="mb-4 flex flex-col gap-2">
-          {festivos.map((f) => (
-            <div
-              key={f.id}
-              className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line px-3 py-2.5"
-            >
-              <div className="flex flex-col">
-                <span className="text-[14px] font-medium text-ink">
-                  {formatMonthDay(f.month!, f.day!, intlLocale)}
-                </span>
-                {f.label && <span className="text-[12.5px] text-ink-soft">{f.label}</span>}
+          {festivos.map((f) =>
+            editingId === f.id ? (
+              <div key={f.id} className="flex flex-wrap items-end gap-2 rounded-lg border border-brand-line bg-brand-weak px-3 py-2.5">
+                <div className="flex flex-col gap-1">
+                  <label className="text-[11px] font-semibold text-ink-soft">{dict.dayLabel}</label>
+                  <select value={editDay} onChange={(e) => setEditDay(Number(e.target.value))} className={`${inputBase} w-[70px]`}>
+                    {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[11px] font-semibold text-ink-soft">{dict.monthLabel}</label>
+                  <select value={editMonth} onChange={(e) => setEditMonth(Number(e.target.value))} className={`${inputBase} w-[140px]`}>
+                    {(intlLocale.startsWith("es") ? MONTHS_ES : MONTHS_EN).map((mName, i) => (
+                      <option key={mName} value={i + 1}>{mName}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="min-w-[140px] flex-1">
+                  <label className="mb-1 block text-[11px] font-semibold text-ink-soft">{dict.nameLabel}</label>
+                  <input
+                    value={editLabel}
+                    onChange={(e) => setEditLabel(e.target.value)}
+                    placeholder={dict.namePlaceholder}
+                    maxLength={80}
+                    className={inputBase}
+                  />
+                </div>
+                <Btn variant="outline" onClick={() => handleEditSave(f.id)} disabled={saving}>
+                  {dict.saveEdit}
+                </Btn>
+                <button
+                  onClick={cancelEdit}
+                  disabled={saving}
+                  className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-ink-soft hover:bg-surface-2"
+                  aria-label={dict.cancelEdit}
+                >
+                  <Icon name="x" size={15} />
+                </button>
               </div>
-              <button
-                onClick={() => handleDelete(f.id)}
-                disabled={deletingId === f.id}
-                className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-ink-soft hover:bg-error-weak hover:text-error"
-                aria-label={dict.delete}
+            ) : (
+              <div
+                key={f.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line px-3 py-2.5"
               >
-                <Icon name="x" size={15} />
-              </button>
-            </div>
-          ))}
+                <div className="flex flex-col">
+                  <span className="text-[14px] font-medium text-ink">
+                    {formatMonthDay(f.month!, f.day!, intlLocale)}
+                  </span>
+                  {f.label && <span className="text-[12.5px] text-ink-soft">{f.label}</span>}
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
+                  <button
+                    onClick={() => startEdit(f)}
+                    className="grid h-8 w-8 place-items-center rounded-lg text-ink-soft hover:bg-brand-weak hover:text-brand"
+                    aria-label={dict.edit}
+                  >
+                    <Icon name="pencil" size={15} />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(f.id)}
+                    disabled={deletingId === f.id}
+                    className="grid h-8 w-8 place-items-center rounded-lg text-ink-soft hover:bg-error-weak hover:text-error"
+                    aria-label={dict.delete}
+                  >
+                    <Icon name="x" size={15} />
+                  </button>
+                </div>
+              </div>
+            )
+          )}
         </div>
       )}
 
@@ -176,14 +289,16 @@ export function FestivosManager({
         </Btn>
       </div>
 
-      {conflicts && (
+      {conflicts && pendingConfirm && (
         <ClosureConflictDialog
           conflicts={conflicts}
           intlLocale={intlLocale}
           dict={conflictDict}
           saving={saving}
-          onCancel={() => setConflicts(null)}
-          onConfirm={() => handleAdd(true)}
+          onCancel={() => { setConflicts(null); setPendingConfirm(null); }}
+          onConfirm={() =>
+            pendingConfirm.kind === "add" ? handleAdd(true) : handleEditSave(pendingConfirm.id, true)
+          }
         />
       )}
     </div>

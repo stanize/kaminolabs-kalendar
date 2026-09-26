@@ -121,6 +121,81 @@ export const createFestivo = authedAction(
   }
 );
 
+/** Updates an existing recurring festivo in place (day/month/label) — same
+ *  validation and check-then-confirm conflict flow as createFestivo, just an
+ *  update instead of an insert. Scoped to the caller's own business (never
+ *  trusts a client-passed id without an ownership check). */
+export const updateFestivo = authedAction(
+  async (
+    session,
+    payload: {
+      id: string;
+      month: number;
+      day: number;
+      label: string;
+      // existing-bookings-conflict-alert: see createFestivo's doc comment.
+      confirmed?: boolean;
+      dict?: Partial<ClosureActionDict>;
+    }
+  ): Promise<ClosureActionResult> => {
+    const d = { ...FALLBACK, ...payload.dict };
+
+    const business = await getBusinessForUser(session.user.id);
+    if (!business) return { ok: false, error: d.errNoBusiness };
+
+    const { id, month, day, label } = payload;
+    if (!Number.isInteger(month) || month < 1 || month > 12 || !Number.isInteger(day) || day < 1 || day > 31) {
+      return { ok: false, error: d.errInvalidRecurringDate };
+    }
+    if (label.length > LABEL_MAX) {
+      return { ok: false, error: tmpl(d.errLabelTooLong, { max: String(LABEL_MAX) }) };
+    }
+
+    const supabase = await createClient();
+    const { data: existing } = await supabase
+      .from("kalendar_business_closures")
+      .select("id")
+      .eq("id", id)
+      .eq("business_id", business.id)
+      .eq("recurring", true)
+      .maybeSingle();
+    if (!existing) return { ok: false, error: d.errNoBusiness };
+
+    if (!payload.confirmed) {
+      // Checked against the NEW day/month being saved — same reasoning as
+      // createFestivo's own check (the horizon is the business's own
+      // booking window, nothing can be booked further out than that).
+      const horizonEnd = new Date();
+      horizonEnd.setUTCMonth(horizonEnd.getUTCMonth() + business.booking_window_months);
+      const conflicts = await findConflictingBookings(
+        business.id,
+        { recurring: true, month, day, teamMemberId: null },
+        horizonEnd
+      );
+      if (conflicts.length > 0) {
+        return {
+          ok: true,
+          needsConfirmation: true,
+          conflicts: { total: conflicts.length, sample: conflicts.slice(0, CONFLICT_LIST_CAP) },
+        };
+      }
+    }
+
+    const { data, error } = await supabase
+      .from("kalendar_business_closures")
+      .update({ month, day, label: label.trim() || null })
+      .eq("id", id)
+      .eq("business_id", business.id)
+      .select()
+      .single();
+
+    if (error) return { ok: false, error: `${d.errSaveFailed} ${error.message}` };
+
+    revalidatePath("/panel/availability");
+    return { ok: true, closure: data as BusinessClosure };
+  }
+);
+
 /** Creates a one-off closure: a real date range, optional same-day
  *  partial-hours window, optionally scoped to one team member (null =
  *  clinic-wide). Used for both the Equipo per-provider time off UI and any

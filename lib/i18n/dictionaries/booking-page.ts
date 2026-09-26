@@ -91,6 +91,15 @@ export interface BookingPageDictionary {
     searchingSlots: string;
     noSlotsThisDay: string;
     closed: string; // shown under a non-open weekday column, e.g. "Cerrado"
+    // holidays-and-time-off (2026-09-26): shown instead of noSlotsThisDay/closed
+    // when the day is closed specifically for a recurring, clinic-wide festivo
+    // (never for a one-off provider vacation/time-off — those keep the
+    // generic messaging above). Contains "{name}", the festivo's own label
+    // (or a generic fallback when it has none — see festivoFallbackLabel).
+    closedFestivoTemplate: string;
+    // Fallback used in place of "{name}" above when the festivo itself has
+    // no label set.
+    festivoFallbackLabel: string;
     yourDetails: string;
     namePlaceholder: string;
     emailPlaceholder: string;
@@ -212,6 +221,8 @@ const es: BookingPageDictionary = {
     searchingSlots: "Buscando horarios…",
     noSlotsThisDay: "No hay horarios disponibles este día.",
     closed: "Cerrado",
+    closedFestivoTemplate: "Cerrado — {name}",
+    festivoFallbackLabel: "Festivo",
     yourDetails: "Tus datos",
     namePlaceholder: "Nombre y apellido",
     emailPlaceholder: "Email",
@@ -324,6 +335,8 @@ const en: BookingPageDictionary = {
     searchingSlots: "Looking for times…",
     noSlotsThisDay: "No times available this day.",
     closed: "Closed",
+    closedFestivoTemplate: "Closed — {name}",
+    festivoFallbackLabel: "Holiday",
     yourDetails: "Your details",
     namePlaceholder: "First and last name",
     emailPlaceholder: "Email",

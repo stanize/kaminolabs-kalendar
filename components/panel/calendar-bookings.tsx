@@ -15,6 +15,7 @@ import {
   type WeekServiceVM,
   type TimeRangeVM,
   type ClientStatusValue,
+  type GridDayFestivo,
   CLIENT_STATUS_LABEL,
   clientStatusLabel,
   clientStatusBadgeClass,
@@ -171,6 +172,7 @@ export function CalendarBookings({
   weekStartIso,
   whatsappEnabled,
   initialConflicts,
+  festivos,
 }: {
   bookings: BookingVM[];
   // Separate from `bookings` — `bookings` is deliberately future-only
@@ -188,6 +190,11 @@ export function CalendarBookings({
   weekStartIso: string;
   whatsappEnabled: boolean;
   initialConflicts: ConflictRowVM[];
+  // holidays-and-time-off (2026-09-26): recurring, clinic-wide festivos only
+  // (month/day + optional label) — fetched once at the page level and
+  // matched against whichever week/day is currently in view, since
+  // navigation between weeks happens client-side without a refetch.
+  festivos: GridDayFestivo[];
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -324,8 +331,8 @@ export function CalendarBookings({
   }, [refreshConflicts]);
 
   const gridDays = useMemo(
-    () => buildGridDays(range.start, view === "day" ? 1 : 7, dict.intlLocale),
-    [range.start, view, dict.intlLocale]
+    () => buildGridDays(range.start, view === "day" ? 1 : 7, dict.intlLocale, festivos),
+    [range.start, view, dict.intlLocale, festivos]
   );
 
   // ── Clientes tab ─────────────────────────────────────────────────────────

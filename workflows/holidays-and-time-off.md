@@ -60,6 +60,29 @@ Criteria:
   editor at `/panel/availability` (confirm exact current route/component at
   build time) — "Festivos" list with add/remove, each entry either a fixed
   annual date or a specific one-off date.
+- **Follow-up (2026-09-26, Arun tested live): editing added, not just
+  add/delete.** New `updateFestivo({ id, month, day, label, confirmed?,
+  dict? })` in `lib/actions/closures.ts` — `authedAction`-wrapped, scoped to
+  the caller's own business, validated the same way `createFestivo` is
+  (month/day range, label length), and re-verifies the row both belongs to
+  the business AND is a recurring closure before touching it. Goes through
+  the SAME check-then-confirm conflict flow as create (`findConflictingBookings`
+  against the NEW day/month being saved, `needsConfirmation`/`conflicts`
+  shape, same `ClosureConflictDialog`) — an edit that would newly overlap
+  existing bookings is gated exactly like a create, per this task's explicit
+  instruction not to skip that check just because it's an edit.
+  - UI (`components/panel/festivos-manager.tsx`): clicking a new pencil icon
+    next to an existing festivo's delete button swaps that row for an
+    inline edit form (day/month/label selects, pre-filled, styled with a
+    `brand-weak` background to stand out) — reuses the same input markup as
+    the add form, not a separate modal. "Guardar cambios" saves (routes
+    through `updateFestivo`); an X button cancels back to the static row.
+    Only one row editable at a time (`editingId` state).
+  - `pendingConfirm` (`{ kind: "add" } | { kind: "edit"; id }`) tracks which
+    save the conflict dialog's "Guardar de todas formas" should retry, since
+    add and edit now share one dialog instance.
+  - New dictionary fields (`lib/i18n/dictionaries/festivos.ts`): `edit`
+    (aria-label), `saveEdit`, `cancelEdit` (aria-label), es+en.
 
 ## Step: provider-time-off
 Status: in_progress
@@ -217,6 +240,30 @@ Criteria:
   a future reader rather than something exercised today.
 - No schema change — reuses `kalendar_business_closures` exactly as it
   already exists from `recurring-public-holidays`/`provider-time-off`.
+- **Follow-up (2026-09-26, Arun tested live): public page now names the
+  festivo on a closed day.** `getAvailableSlots` returns a new sibling field,
+  `festivoByDate: Record<string, string | null>` ("YYYY-MM-DD" -> the
+  recurring festivo's own label, or `null` when it has none) alongside
+  `slotsByDate`. Built by a new `festivoLabelsForRange` helper
+  (`lib/closures/conflicts.ts`), filtered to `recurring === true` closures
+  only and reusing the exact same `closureDateWindows` yearly expansion
+  already used for slot-exclusion and the conflict checks — no second
+  "does this date match a festivo" implementation. A one-off provider
+  vacation/time-off is NEVER in this map, matching Arun's explicit "vacations
+  should show as not available as others" — those dates keep the fully
+  generic messaging.
+  - Threaded through `booking-wizard.tsx`'s `DateTimeStep` (new
+    `festivoByDate` state, set alongside `slotsByDate` from the action's
+    result) and used ONLY in the `sel && slots?.length === 0` branch (the
+    `!sel` "Cerrado" branch is for non-open weekdays by the regular
+    schedule, which a date-specific festivo can't cause — verified this is
+    the branch that actually fires for a festivo day before wiring it in,
+    per this task's own instruction to check rather than guess).
+  - Copy: `w.closedFestivoTemplate` ("Cerrado — {name}" / "Closed — {name}")
+    replaces `w.noSlotsThisDay` for a festivo date; `{name}` is the
+    festivo's label, or `w.festivoFallbackLabel` ("Festivo"/"Holiday") when
+    it has none. New strings in `lib/i18n/dictionaries/booking-page.ts`
+    (`wizard.closedFestivoTemplate`, `wizard.festivoFallbackLabel`), es+en.
 
 ## Step: existing-bookings-conflict-alert
 Status: in_progress
@@ -320,6 +367,36 @@ Criteria:
   in flight.
 - No schema change — reuses `kalendar_business_closures` and
   `kalendar_bookings` exactly as they already exist.
+- **Follow-up (2026-09-26, Arun tested live): festivo day columns now get a
+  visual treatment on `/panel/calendar`.** `GridDay`
+  (`components/panel/calendar-grid-view.tsx`) gained `isFestivo: boolean` +
+  `festivoLabel: string | null`; `buildGridDays` takes a new optional
+  `festivos: GridDayFestivo[]` param (`{ month, day, label }`, matched
+  directly against each day's own month/day — no year/window math needed
+  here, unlike the conflict-check/public-page uses of `closureDateWindows`,
+  since a recurring festivo's month+day pattern applies to any year by
+  definition). Recurring, clinic-wide festivos ONLY — a one-off provider
+  vacation/time-off never sets `isFestivo`, matching every other place this
+  distinction is enforced in this feature; that stays visible only via the
+  Conflictos tab, unchanged.
+  - Fetched once at the page level (`app/panel/calendar/page.tsx`, via the
+    existing `getClosuresForUser`, filtered to `recurring`) and passed down
+    through `CalendarBookings` as a new `festivos` prop, since week/day
+    navigation happens client-side (`buildGridDays` re-called locally, no
+    refetch per week) — a plain month/day list works for any week/date the
+    clinic navigates to without re-fetching.
+  - Visual: a `pointer-events-none absolute inset-0 bg-amber-50/60` wash
+    over the whole day column, same layering technique as the existing
+    `isPast` wash right above it in `DayProviderColumn` (non-interactive,
+    doesn't block clicking to add a walk-in booking) — reuses the same
+    amber family `chipClasses` already uses for a "needs clinic follow-up"
+    booking (`bg-amber-50 text-amber-900 border-l-4 border-amber-500`), per
+    Arun's ask that this "look similar to the pending color."
+  - Label: `(festivo name)` rendered under the day's `dateLabel` in the
+    column header, e.g. "lun 15" / "(Navidad)" — falls back to
+    `dict.week.festivoFallbackLabel` ("Festivo"/"Holiday") when the closure
+    has no custom label. New dictionary field in
+    `lib/i18n/dictionaries/calendar.ts` (`week.festivoFallbackLabel`), es+en.
 
 ## Notes / Deviations
 - Two genuinely separate features got requested together and must stay
