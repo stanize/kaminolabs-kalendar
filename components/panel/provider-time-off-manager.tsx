@@ -39,8 +39,6 @@ export function ProviderTimeOffManager({
 
   return (
     <div className="rounded-2xl border border-line bg-surface p-4 sm:p-5">
-      <h2 className="mb-1 text-[15px] font-bold text-ink">{dict.title}</h2>
-      <p className="mb-3 text-[13px] text-ink-soft">{dict.subtitle}</p>
       <div className="flex flex-col gap-1">
         {members.map((member) => {
           const isExpanded = expandedId === member.id;
