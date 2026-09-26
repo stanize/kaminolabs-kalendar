@@ -25,6 +25,7 @@ export interface TimeOffDictionary {
   save: string; // "Guardar" — add form's submit button (once expanded)
   cancelAdd: string; // aria-label on the add form's collapse/X button
   delete: string; // aria-label
+  confirmDelete: string; // window.confirm() prompt before deleting an entry
   noEntries: string; // shown in the saved-entries box when there are none yet
   edit: string; // aria-label on the edit-pencil button
   saveEdit: string; // inline-edit form's submit button
@@ -59,6 +60,7 @@ const es: TimeOffDictionary = {
   save: "Guardar",
   cancelAdd: "Cancelar",
   delete: "Eliminar",
+  confirmDelete: "¿Eliminar esta entrada?",
   noEntries: "Sin vacaciones ni ausencias registradas.",
   edit: "Editar",
   saveEdit: "Guardar cambios",
@@ -93,6 +95,7 @@ const en: TimeOffDictionary = {
   save: "Save",
   cancelAdd: "Cancel",
   delete: "Delete",
+  confirmDelete: "Delete this entry?",
   noEntries: "No time off recorded.",
   edit: "Edit",
   saveEdit: "Save changes",

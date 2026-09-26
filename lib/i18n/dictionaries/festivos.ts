@@ -16,6 +16,7 @@ export interface FestivosDictionary {
   add: string; // "+ Añadir festivo" — collapsed trigger button that reveals the add form
   save: string; // "Guardar" — add form's submit button (once expanded)
   delete: string; // aria-label
+  confirmDelete: string; // window.confirm() prompt before deleting a festivo
   noEntries: string; // shown in the saved-entries box when there are none yet
   edit: string; // aria-label on the edit-pencil button
   saveEdit: string; // "Guardar cambios" — inline-edit form's submit button
@@ -41,6 +42,7 @@ const es: FestivosDictionary = {
   add: "Añadir festivo",
   save: "Guardar",
   delete: "Eliminar festivo",
+  confirmDelete: "¿Eliminar este festivo?",
   noEntries: "Sin festivos registrados.",
   edit: "Editar festivo",
   saveEdit: "Guardar cambios",
@@ -66,6 +68,7 @@ const en: FestivosDictionary = {
   add: "Add holiday",
   save: "Save",
   delete: "Delete holiday",
+  confirmDelete: "Delete this holiday?",
   noEntries: "No holidays recorded.",
   edit: "Edit holiday",
   saveEdit: "Save changes",

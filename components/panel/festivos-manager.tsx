@@ -148,6 +148,7 @@ export function FestivosManager({
   }
 
   async function handleDelete(id: string) {
+    if (!window.confirm(dict.confirmDelete)) return;
     setError(null);
     setDeletingId(id);
     try {
