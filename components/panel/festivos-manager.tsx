@@ -261,44 +261,48 @@ export function FestivosManager({
 
       <div className="rounded-xl border border-line bg-surface px-4 py-4 sm:px-6">
         {showAddForm ? (
-          <div className="flex flex-wrap items-end gap-2">
-            <div className="flex flex-col gap-1">
-              <label className="text-[12px] font-semibold text-ink-soft">{dict.dayLabel}</label>
-              <select value={day} onChange={(e) => setDay(Number(e.target.value))} className={`${inputBase} w-[70px]`}>
-                {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
-                  <option key={d} value={d}>{d}</option>
-                ))}
-              </select>
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-wrap items-end gap-2">
+              <div className="flex flex-col gap-1">
+                <label className="text-[12px] font-semibold text-ink-soft">{dict.dayLabel}</label>
+                <select value={day} onChange={(e) => setDay(Number(e.target.value))} className={`${inputBase} w-[70px]`}>
+                  {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[12px] font-semibold text-ink-soft">{dict.monthLabel}</label>
+                <select value={month} onChange={(e) => setMonth(Number(e.target.value))} className={`${inputBase} w-[140px] capitalize`}>
+                  {(intlLocale.startsWith("es") ? MONTHS_ES : MONTHS_EN).map((mName, i) => (
+                    <option key={mName} value={i + 1}>{mName}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="min-w-[140px] flex-1">
+                <label className="mb-1 block text-[12px] font-semibold text-ink-soft">{dict.nameLabel}</label>
+                <input
+                  value={label}
+                  onChange={(e) => setLabel(e.target.value)}
+                  placeholder={dict.namePlaceholder}
+                  maxLength={80}
+                  className={inputBase}
+                />
+              </div>
             </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-[12px] font-semibold text-ink-soft">{dict.monthLabel}</label>
-              <select value={month} onChange={(e) => setMonth(Number(e.target.value))} className={`${inputBase} w-[140px] capitalize`}>
-                {(intlLocale.startsWith("es") ? MONTHS_ES : MONTHS_EN).map((mName, i) => (
-                  <option key={mName} value={i + 1}>{mName}</option>
-                ))}
-              </select>
+            <div className="flex items-center gap-2">
+              <Btn variant="outline" onClick={() => handleAdd()} disabled={saving}>
+                {dict.save}
+              </Btn>
+              <button
+                onClick={() => setShowAddForm(false)}
+                disabled={saving}
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-ink-soft hover:bg-surface-2"
+                aria-label={dict.cancelEdit}
+              >
+                <Icon name="x" size={15} />
+              </button>
             </div>
-            <div className="min-w-[140px] flex-1">
-              <label className="mb-1 block text-[12px] font-semibold text-ink-soft">{dict.nameLabel}</label>
-              <input
-                value={label}
-                onChange={(e) => setLabel(e.target.value)}
-                placeholder={dict.namePlaceholder}
-                maxLength={80}
-                className={inputBase}
-              />
-            </div>
-            <Btn variant="outline" onClick={() => handleAdd()} disabled={saving}>
-              {dict.save}
-            </Btn>
-            <button
-              onClick={() => setShowAddForm(false)}
-              disabled={saving}
-              className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-ink-soft hover:bg-surface-2"
-              aria-label={dict.cancelEdit}
-            >
-              <Icon name="x" size={15} />
-            </button>
           </div>
         ) : (
           <Btn variant="outline" onClick={() => setShowAddForm(true)}>

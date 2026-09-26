@@ -38,40 +38,38 @@ export function ProviderTimeOffManager({
   if (members.length === 0) return null;
 
   return (
-    <div className="rounded-2xl border border-line bg-surface p-4 sm:p-5">
-      <div className="flex flex-col gap-1">
-        {members.map((member) => {
-          const isExpanded = expandedId === member.id;
-          const entries = timeOffByMember[member.id] ?? [];
-          return (
-            <div key={member.id} className="border-t border-line/60 pt-2 first:border-t-0 first:pt-0">
-              <button
-                type="button"
-                onClick={() => setExpandedId(isExpanded ? null : member.id)}
-                className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-[13.5px] font-semibold text-ink hover:bg-surface-2"
-              >
-                <Icon name="calendar" size={14} className="shrink-0 text-brand" />
-                {member.name}
-                <span className="ml-auto text-[12px] font-medium text-brand">
-                  {isExpanded ? dict.toggleHide : dict.toggleShow}
-                  {entries.length > 0 && !isExpanded ? ` (${entries.length})` : ""}
-                </span>
-              </button>
-              {isExpanded && (
-                <div className="pl-1">
-                  <TimeOffList
-                    teamMemberId={member.id}
-                    initialEntries={entries}
-                    intlLocale={intlLocale}
-                    dict={dict}
-                    conflictDict={conflictDict}
-                  />
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+    <div className="flex flex-col gap-3">
+      {members.map((member) => {
+        const isExpanded = expandedId === member.id;
+        const entries = timeOffByMember[member.id] ?? [];
+        return (
+          <div key={member.id} className="rounded-2xl border border-line bg-surface p-4 sm:p-5">
+            <button
+              type="button"
+              onClick={() => setExpandedId(isExpanded ? null : member.id)}
+              className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-[13.5px] font-semibold text-ink hover:bg-surface-2"
+            >
+              <Icon name="calendar" size={14} className="shrink-0 text-brand" />
+              {member.name}
+              <span className="ml-auto text-[12px] font-medium text-brand">
+                {isExpanded ? dict.toggleHide : dict.toggleShow}
+                {entries.length > 0 && !isExpanded ? ` (${entries.length})` : ""}
+              </span>
+            </button>
+            {isExpanded && (
+              <div className="pl-1">
+                <TimeOffList
+                  teamMemberId={member.id}
+                  initialEntries={entries}
+                  intlLocale={intlLocale}
+                  dict={dict}
+                  conflictDict={conflictDict}
+                />
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

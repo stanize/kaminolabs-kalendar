@@ -433,17 +433,17 @@ export function TimeOffList({
               </div>
             )}
 
-            <div className="flex flex-wrap items-end gap-2">
-              <div className="min-w-[140px] flex-1">
-                <label className="mb-1 block text-[11.5px] font-semibold text-ink-soft">{dict.nameLabel}</label>
-                <input
-                  value={label}
-                  onChange={(e) => setLabel(e.target.value)}
-                  placeholder={dict.namePlaceholder}
-                  maxLength={80}
-                  className={inputBase}
-                />
-              </div>
+            <div className="min-w-[140px] flex-1">
+              <label className="mb-1 block text-[11.5px] font-semibold text-ink-soft">{dict.nameLabel}</label>
+              <input
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                placeholder={dict.namePlaceholder}
+                maxLength={80}
+                className={inputBase}
+              />
+            </div>
+            <div className="flex items-center gap-2">
               <Btn variant="outline" size="sm" onClick={() => handleAdd()} disabled={saving}>
                 {dict.save}
               </Btn>
