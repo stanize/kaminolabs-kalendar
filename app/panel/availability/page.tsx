@@ -8,6 +8,7 @@ import { FestivosManager } from "@/components/panel/festivos-manager";
 import { getLocale } from "@/lib/i18n/server";
 import { getAvailabilityDictionary } from "@/lib/i18n/dictionaries/availability";
 import { getFestivosDictionary } from "@/lib/i18n/dictionaries/festivos";
+import { getClosureConflictDictionary } from "@/lib/i18n/dictionaries/closure-conflict";
 
 export default async function AvailabilityPage({
   searchParams,
@@ -33,6 +34,7 @@ export default async function AvailabilityPage({
   const locale = await getLocale();
   const dict = getAvailabilityDictionary(locale);
   const festivosDict = getFestivosDictionary(locale);
+  const conflictDict = getClosureConflictDictionary(locale);
 
   return (
     <div className="mx-auto max-w-[680px] px-4 py-6 sm:px-8 sm:py-8">
@@ -59,6 +61,7 @@ export default async function AvailabilityPage({
           initialFestivos={festivos}
           intlLocale={dict.intlLocale}
           dict={festivosDict}
+          conflictDict={conflictDict}
         />
       </div>
     </div>

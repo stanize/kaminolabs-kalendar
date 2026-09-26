@@ -6,7 +6,7 @@ import { authedAction } from "@/lib/auth-action";
 import { createClient } from "@/lib/supabase/server";
 import { getBusinessForUser } from "@/lib/business/data";
 import { notifyCancellation, notifyCancellationRequestDenied } from "@/lib/actions/booking";
-import { getWeekBookings, type WeekViewBooking } from "@/lib/booking/owner-data";
+import { getWeekBookings, getConflictingBookingsForUser, type WeekViewBooking, type ConflictRow } from "@/lib/booking/owner-data";
 import { findVerifiedPatientIdByEmail, claimExistingClientHistory } from "@/lib/booking/patient-claim";
 import { buildBookingIcsBase64 } from "@/lib/booking/ics";
 import { formatBusinessAddress } from "@/lib/business/data";
@@ -1019,5 +1019,16 @@ export const updateBookingAsOwner = authedAction(
 export const fetchWeekBookings = authedAction(
   async (session, weekStartIso: string, weekEndIso: string): Promise<WeekViewBooking[]> => {
     return getWeekBookings(session.user.id, weekStartIso, weekEndIso);
+  }
+);
+
+/**
+ * Conflictos tab (conflicts-tab): refetches the live/derived conflict list —
+ * called on tab open and after a Cancelar/Modificar action resolves a row,
+ * since there's no stored state to update, only a fresh query.
+ */
+export const fetchConflictingBookings = authedAction(
+  async (session): Promise<ConflictRow[]> => {
+    return getConflictingBookingsForUser(session.user.id);
   }
 );

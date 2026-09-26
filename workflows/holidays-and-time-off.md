@@ -149,8 +149,41 @@ Criteria:
   (confirm this holds at build time rather than assuming).
 
 ## Step: existing-bookings-conflict-alert
-Status: not_started
+Status: in_progress
 Criteria:
+- BUILT (2026-09-26): code implemented, typechecked (`npx tsc --noEmit`
+  clean), linted (`npx eslint` clean) and `npm run build` succeeds. Pending
+  Arun's live testing before this flips to `done`.
+- Shared overlap-detection helper: `lib/closures/conflicts.ts` —
+  `findConflictingBookings(businessId, closure, horizonEnd)` expands a
+  closure definition (recurring festivo or one-off/provider time off) into
+  its concrete UTC date/time window(s) and queries
+  `pending_confirmation`/`confirmed` `kalendar_bookings` overlapping them,
+  provider-scoped when the closure is. Used by BOTH this step and the new
+  `conflicts-tab` step below, so "does this booking fall inside this
+  closure" has one implementation.
+- Recurring-festivo scoping (Arun's explicit decision): checked only across
+  years from now through the business's `booking_window_months` horizon —
+  never further out, since nothing can be booked beyond that anyway.
+  One-off time off/closures check only their own real date range (and
+  provider, if scoped).
+- Check-then-confirm flow: `createFestivo`/`createTimeOff`
+  (`lib/actions/closures.ts`) take an optional `confirmed?: boolean`
+  (default false/omitted). First call with `confirmed` unset runs the
+  conflict check; if conflicts exist, returns
+  `{ ok: true, needsConfirmation: true, conflicts: { total, sample } }`
+  WITHOUT inserting. The UI (`FestivosManager`/`TimeOffList`) shows
+  `components/panel/closure-conflict-dialog.tsx` (shared between both) —
+  "⚠️ N citas se ven afectadas" + up to **8** affected bookings (client,
+  service, date/time), "+N more" beyond that cap — and only inserts once
+  the clinic clicks "Guardar de todas formas" (re-calls with
+  `confirmed: true`). Zero conflicts on the first call saves straight
+  through, no dialog. No stored conflict state, no bulk action on the
+  affected bookings — purely a save gate, per the original decision.
+- Shared dictionary: `lib/i18n/dictionaries/closure-conflict.ts`
+  (`ClosureConflictDictionary`), threaded through both
+  `/panel/availability` (Festivos) and `/panel/team` → `TeamManager` →
+  `TimeOffList` pages.
 - DECISION (2026-09-25, Arun): "alert only, no automatic action." When the
   clinic saves a new closure/time-off entry that overlaps one or more
   existing `pending_confirmation`/`confirmed` bookings, show a confirmation
@@ -170,6 +203,53 @@ Criteria:
   `kalendar_bookings` rows with `status in ('pending_confirmation',
   'confirmed')` whose `starts_at` falls within the closure's range (and,
   for a partial-day closure, within the specific time window too).
+
+## Step: conflicts-tab
+Status: in_progress
+Criteria:
+- BUILT (2026-09-26), same commit/validation as `existing-bookings-conflict-alert`
+  above. Pending Arun's live testing before this flips to `done`. Added
+  mid-session (2026-09-26 follow-up, not in the original design pass) —
+  Arun asked for a persistent, always-checkable view of conflicts, not just
+  a one-time save-time alert.
+- New "Conflictos" tab on `/panel/calendar`
+  (`components/panel/calendar-bookings.tsx`), alongside the existing
+  Semana/Clientes/Cancelaciones tabs.
+- LIVE/DERIVED, not stored: no flag is written when the alert above is
+  confirmed. Every tab open (and after any Cancelar/Modificar action taken
+  from it) refetches fresh via the `fetchConflictingBookings` server
+  action (`lib/actions/booking-owner.ts`) →
+  `getConflictingBookingsForUser` (`lib/booking/owner-data.ts`), which
+  loads the business's closures and calls the SAME
+  `lib/closures/conflicts.ts` overlap helper used by the pre-save check
+  above (`getCurrentConflicts`), then hydrates the matched booking ids into
+  full `WeekViewBooking` rows (so the existing `BookingDetailModal`/
+  `AppointmentModal` can be reused unmodified).
+- Each row shows patient name, date/time, service, and which closure it
+  matches — "Coincide con: {closure label}" (`conflictMatchesTemplate` in
+  `lib/i18n/dictionaries/calendar.ts`); a provider-scoped time-off entry
+  without a custom label falls back to "Vacaciones de {provider}"
+  (`closureDisplayLabel` in conflicts.ts), a recurring festivo without a
+  label falls back to its day/month, everything else falls back to
+  "Cierre".
+- Two actions per row, both reusing existing plumbing: **Cancelar** →
+  `cancelBookingAsOwner` directly (optimistic removal from the tab's local
+  list + refetch); **Modificar** → opens the same `AppointmentModal`
+  instance the other tabs already share, in edit mode.
+- Refresh convention: matches Cancelaciones's existing
+  optimistic-removal/refetch pattern. `refreshConflicts()` (refetches via
+  `fetchConflictingBookings`) is called on tab-open AND from
+  `handleGridBookingCreated` (the same handler `AppointmentModal`'s
+  `onSaved` and the grid's `onBookingCreated` already call) — a save from
+  ANY tab can create or resolve a conflict, so the Conflictos list is kept
+  in sync regardless of which tab triggered the change, not just when
+  opened from Conflictos itself.
+- Empty state matches the existing Clientes/Cancelaciones tabs' style
+  (`emptyConflictsTitle` + shared `emptySubtitle`); a distinct
+  `loadingConflicts` string shows while the first fetch for a tab-open is
+  in flight.
+- No schema change — reuses `kalendar_business_closures` and
+  `kalendar_bookings` exactly as they already exist.
 
 ## Notes / Deviations
 - Two genuinely separate features got requested together and must stay

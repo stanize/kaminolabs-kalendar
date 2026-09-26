@@ -10,6 +10,7 @@ import { reportClientError } from "@/lib/report-client-error";
 import { TimeOffList } from "@/components/panel/time-off-list";
 import type { TeamDictionary } from "@/lib/i18n/dictionaries/team";
 import type { TimeOffDictionary } from "@/lib/i18n/dictionaries/time-off";
+import type { ClosureConflictDictionary } from "@/lib/i18n/dictionaries/closure-conflict";
 import type { BusinessClosure } from "@/lib/closures/data";
 
 type TeamMode = "solo" | "team";
@@ -55,6 +56,7 @@ export function TeamManager({
   dict,
   timeOffByMember,
   timeOffDict,
+  conflictDict,
   intlLocale,
 }: {
   teamMode: TeamMode;
@@ -63,6 +65,7 @@ export function TeamManager({
   dict: TeamDictionary;
   timeOffByMember?: Record<string, BusinessClosure[]>;
   timeOffDict?: TimeOffDictionary;
+  conflictDict?: ClosureConflictDictionary;
   intlLocale?: string;
 }) {
   const router = useRouter();
@@ -214,7 +217,7 @@ export function TeamManager({
       {/* Members — inline editable rows */}
       <div className="flex flex-col gap-2">
         {rows.map((r, index) => {
-          const showTimeOff = timeOffDict && intlLocale && r.id !== null;
+          const showTimeOff = timeOffDict && conflictDict && intlLocale && r.id !== null;
           const isExpanded = expandedKey === r.key;
           return (
             <div key={r.key}>
@@ -288,6 +291,7 @@ export function TeamManager({
                       initialEntries={timeOffByMember?.[r.id!] ?? []}
                       intlLocale={intlLocale}
                       dict={timeOffDict}
+                      conflictDict={conflictDict}
                     />
                   )}
                 </div>

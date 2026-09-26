@@ -5,6 +5,8 @@ import { getTeamForUser } from "@/lib/team/data";
 import { getServicesForUser } from "@/lib/services/data";
 import { dayIdInTz, tzDateParts, zonedTimeToUtc, BUSINESS_TZ } from "@/lib/booking/slots";
 import { attachClientStatus, type ClientStatus } from "@/lib/booking/client-status";
+import { getClosuresForUser } from "@/lib/closures/data";
+import { getCurrentConflicts } from "@/lib/closures/conflicts";
 import type { DayId } from "@/lib/onboarding/types";
 import type { TimeRange } from "@/lib/booking/slots";
 
@@ -529,4 +531,110 @@ export function getWeekBounds(date: Date = new Date()): { weekStartIso: string; 
   const weekEnd = new Date(weekStart);
   weekEnd.setUTCDate(weekEnd.getUTCDate() + 7);
   return { weekStartIso: weekStart.toISOString(), weekEndIso: weekEnd.toISOString() };
+}
+
+// ── Conflictos tab (conflicts-tab, holidays-and-time-off.md) ────────────────
+
+export interface ConflictRow {
+  closureId: string;
+  closureLabel: string;
+  booking: WeekViewBooking;
+}
+
+/**
+ * Live, derived: every currently-active (pending_confirmation/confirmed)
+ * booking that currently falls inside any of the business's closures
+ * (recurring festivos, evaluated across the booking window; one-off
+ * provider/clinic-wide time off) — recomputed fresh on every call, no
+ * stored "resolved" flag. Shares the overlap-detection logic with the
+ * pre-save conflict check (lib/closures/conflicts.ts) so "does this booking
+ * fall inside this closure" has one implementation, not two.
+ */
+export async function getConflictingBookingsForUser(userId: string): Promise<ConflictRow[]> {
+  const business = await getBusinessForUser(userId);
+  if (!business) return [];
+
+  const closures = await getClosuresForUser(userId);
+  const conflicts = await getCurrentConflicts(business.id, business.booking_window_months, closures);
+  if (conflicts.length === 0) return [];
+
+  const bookingIds = [...new Set(conflicts.map((c) => c.booking.id))];
+
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("kalendar_bookings")
+    .select(
+      "id, service_id, service_name, service_duration_min, starts_at, ends_at, status, payment_status, payment_method, bono_purchase_id, clinic_client_id, client_name, client_email, client_phone, notes, team_member_id, patient_id, pending_expiry_at, guest_locale, reminder_send_failed, last_reminder_error, cancellation_requested_at, clinic_reviewed_at"
+    )
+    .eq("business_id", business.id)
+    .in("id", bookingIds);
+
+  const rawBookings =
+    (data as
+      | {
+          id: string;
+          service_id: string | null;
+          service_name: string;
+          service_duration_min: number;
+          starts_at: string;
+          ends_at: string;
+          status: BookingStatus;
+          payment_status: PaymentStatus;
+          payment_method: "cash" | "card" | "bono" | null;
+          bono_purchase_id: string | null;
+          clinic_client_id: string | null;
+          client_name: string;
+          client_email: string;
+          client_phone: string | null;
+          notes: string | null;
+          team_member_id: string | null;
+          patient_id: string | null;
+          pending_expiry_at: string | null;
+          guest_locale: string | null;
+          reminder_send_failed: boolean | null;
+          last_reminder_error: string | null;
+          cancellation_requested_at: string | null;
+          clinic_reviewed_at: string | null;
+        }[]
+      | null) ?? [];
+
+  const withStatus = await attachClientStatus(business.id, rawBookings);
+  const byId = new Map(
+    withStatus.map((b) => [
+      b.id,
+      {
+        id: b.id,
+        serviceId: b.service_id,
+        serviceName: b.service_name,
+        startIso: b.starts_at,
+        endIso: b.ends_at,
+        durationMin: b.service_duration_min,
+        status: b.status,
+        paymentStatus: b.payment_status,
+        paymentMethod: b.payment_method,
+        bonoPurchaseId: b.bono_purchase_id,
+        clinicClientId: b.clinic_client_id,
+        clientName: b.client_name,
+        clientEmail: b.client_email,
+        clientPhone: b.client_phone,
+        notes: b.notes,
+        teamMemberId: b.team_member_id,
+        pendingExpiryAt: b.pending_expiry_at,
+        guestLocale: b.guest_locale,
+        reminderSendFailed: b.reminder_send_failed ?? false,
+        lastReminderError: b.last_reminder_error,
+        cancellationRequestedAt: b.cancellation_requested_at,
+        clientStatus: b.clientStatus,
+        clinicReviewedAt: b.clinic_reviewed_at,
+      } satisfies WeekViewBooking,
+    ])
+  );
+
+  const rows: ConflictRow[] = [];
+  for (const c of conflicts) {
+    const booking = byId.get(c.booking.id);
+    if (!booking) continue; // shouldn't happen — row disappeared between the two queries
+    rows.push({ closureId: c.closureId, closureLabel: c.closureLabel, booking });
+  }
+  return rows;
 }

@@ -4,10 +4,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { Btn } from "@/components/ui/button";
-import { createTimeOff, deleteClosure } from "@/lib/actions/closures";
+import { createTimeOff, deleteClosure, type ConflictSummary } from "@/lib/actions/closures";
 import { reportClientError } from "@/lib/report-client-error";
+import { ClosureConflictDialog } from "@/components/panel/closure-conflict-dialog";
 import type { BusinessClosure } from "@/lib/closures/data";
 import type { TimeOffDictionary } from "@/lib/i18n/dictionaries/time-off";
+import type { ClosureConflictDictionary } from "@/lib/i18n/dictionaries/closure-conflict";
 
 const inputBase =
   "w-full rounded-[10px] border border-line bg-surface px-3 py-2.5 text-[14px] text-ink outline-none transition-all focus:border-brand focus:shadow-[0_0_0_3px_var(--color-brand-weak)] placeholder:text-ink-soft/60";
@@ -34,11 +36,13 @@ export function TimeOffList({
   initialEntries,
   intlLocale,
   dict,
+  conflictDict,
 }: {
   teamMemberId: string;
   initialEntries: BusinessClosure[];
   intlLocale: string;
   dict: TimeOffDictionary;
+  conflictDict: ClosureConflictDictionary;
 }) {
   const router = useRouter();
   const [entries, setEntries] = useState(initialEntries);
@@ -51,8 +55,9 @@ export function TimeOffList({
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [conflicts, setConflicts] = useState<ConflictSummary | null>(null);
 
-  async function handleAdd() {
+  async function handleAdd(confirmed?: boolean) {
     setError(null);
     if (!startDate || !endDate) {
       setError(dict.errors.errInvalidDateRange);
@@ -67,6 +72,7 @@ export function TimeOffList({
         startTime: partialHours ? startTime : null,
         endTime: partialHours ? endTime : null,
         label,
+        confirmed,
         dict: dict.errors,
       });
       if (!result.ok) {
@@ -74,6 +80,12 @@ export function TimeOffList({
         setSaving(false);
         return;
       }
+      if ("needsConfirmation" in result) {
+        setConflicts(result.conflicts);
+        setSaving(false);
+        return;
+      }
+      setConflicts(null);
       setEntries((prev) =>
         [...prev, result.closure].sort((a, b) => (a.start_date ?? "").localeCompare(b.start_date ?? ""))
       );
@@ -189,11 +201,22 @@ export function TimeOffList({
               className={inputBase}
             />
           </div>
-          <Btn variant="outline" size="sm" onClick={handleAdd} disabled={saving}>
+          <Btn variant="outline" size="sm" onClick={() => handleAdd()} disabled={saving}>
             <Icon name="plus" size={14} /> {dict.add}
           </Btn>
         </div>
       </div>
+
+      {conflicts && (
+        <ClosureConflictDialog
+          conflicts={conflicts}
+          intlLocale={intlLocale}
+          dict={conflictDict}
+          saving={saving}
+          onCancel={() => setConflicts(null)}
+          onConfirm={() => handleAdd(true)}
+        />
+      )}
     </div>
   );
 }

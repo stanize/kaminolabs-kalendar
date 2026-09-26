@@ -17,12 +17,16 @@ export interface CalendarDictionary {
     tabUpcoming: string;
     tabClients: string;
     tabCancellations: string;
+    tabConflicts: string; // conflicts-tab: live/derived closure-vs-booking overlaps
     filterAll: string; // "Todos" filter chip on the Clientes tab
     cancellationRequestedLabel: string; // the small badge on a cancellation-request row
+    conflictMatchesTemplate: string; // "Coincide con: {closure}" — contains "{closure}"
     today: string;
     tomorrow: string;
     emptyClientsTitle: string;
     emptyCancellationsTitle: string;
+    emptyConflictsTitle: string;
+    loadingConflicts: string;
     emptyUpcomingTitle: string;
     emptySubtitle: string;
     cancel: string;
@@ -145,12 +149,16 @@ const es: CalendarDictionary = {
     tabUpcoming: "Próximas",
     tabClients: "Clientes",
     tabCancellations: "Cancelaciones",
+    tabConflicts: "Conflictos",
     filterAll: "Todos",
     cancellationRequestedLabel: "Cancelación solicitada",
+    conflictMatchesTemplate: "Coincide con: {closure}",
     today: "Hoy",
     tomorrow: "Mañana",
     emptyClientsTitle: "No hay reservas próximas",
     emptyCancellationsTitle: "No hay solicitudes de cancelación",
+    emptyConflictsTitle: "No hay conflictos con citas existentes",
+    loadingConflicts: "Buscando conflictos…",
     emptyUpcomingTitle: "No tienes reservas próximas",
     emptySubtitle: "Las reservas de tu página aparecerán aquí.",
     cancel: "Cancelar",
@@ -270,12 +278,16 @@ const en: CalendarDictionary = {
     tabUpcoming: "Upcoming",
     tabClients: "Clients",
     tabCancellations: "Cancellations",
+    tabConflicts: "Conflicts",
     filterAll: "All",
     cancellationRequestedLabel: "Cancellation requested",
+    conflictMatchesTemplate: "Matches: {closure}",
     today: "Today",
     tomorrow: "Tomorrow",
     emptyClientsTitle: "No upcoming bookings",
     emptyCancellationsTitle: "No cancellation requests",
+    emptyConflictsTitle: "No conflicts with existing bookings",
+    loadingConflicts: "Checking for conflicts…",
     emptyUpcomingTitle: "You have no upcoming bookings",
     emptySubtitle: "Bookings from your page will show up here.",
     cancel: "Cancel",

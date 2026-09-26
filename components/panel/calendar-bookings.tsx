@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { Btn } from "@/components/ui/button";
-import { cancelBookingAsOwner, confirmBookingAsOwner, markBookingReviewedAsOwner, fetchWeekBookings, reviewCancellationRequest } from "@/lib/actions/booking-owner";
+import { cancelBookingAsOwner, confirmBookingAsOwner, markBookingReviewedAsOwner, fetchWeekBookings, fetchConflictingBookings, reviewCancellationRequest } from "@/lib/actions/booking-owner";
 import { reportClientError } from "@/lib/report-client-error";
 import { CalendarHeader, type CalendarViewMode } from "@/components/panel/calendar-header";
 import {
@@ -37,6 +37,17 @@ import type { CalendarDictionary } from "@/lib/i18n/dictionaries/calendar";
 import type { DayId } from "@/lib/onboarding/types";
 
 type Status = "pending_confirmation" | "confirmed" | "cancelled" | "completed" | "no_show";
+
+// conflicts-tab: one currently-active booking that falls inside one of the
+// business's closures, and which closure it matches — fully derived,
+// recomputed by fetchConflictingBookings on every tab open/refresh (no
+// stored "resolved" flag; see lib/booking/owner-data.ts's
+// getConflictingBookingsForUser).
+export interface ConflictRowVM {
+  closureId: string;
+  closureLabel: string;
+  booking: WeekBookingVM;
+}
 
 interface BookingVM {
   id: string;
@@ -159,6 +170,7 @@ export function CalendarBookings({
   weekInitialBookings,
   weekStartIso,
   whatsappEnabled,
+  initialConflicts,
 }: {
   bookings: BookingVM[];
   // Separate from `bookings` — `bookings` is deliberately future-only
@@ -175,6 +187,7 @@ export function CalendarBookings({
   weekInitialBookings: WeekBookingVM[];
   weekStartIso: string;
   whatsappEnabled: boolean;
+  initialConflicts: ConflictRowVM[];
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -184,9 +197,11 @@ export function CalendarBookings({
   // once on mount, not reactively, so the URL doesn't fight the user if they
   // switch tabs afterward.
   const initialTab = searchParams.get("tab") === "cancellations" ? "cancellations" : "week";
-  const [tab, setTab] = useState<"week" | "clients" | "cancellations">(initialTab);
+  const [tab, setTab] = useState<"week" | "clients" | "cancellations" | "conflicts">(initialTab);
   const [list, setList] = useState<BookingVM[]>(bookings);
   const [cancellationList, setCancellationList] = useState<BookingVM[]>(cancellationRequests);
+  const [conflictList, setConflictList] = useState<ConflictRowVM[]>(initialConflicts);
+  const [conflictsLoading, setConflictsLoading] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -279,7 +294,34 @@ export function CalendarBookings({
     navigateTo("day", zonedTimeToUtc(year, month, day, 12, 0));
   };
 
-  const handleGridBookingCreated = () => navigateTo(view, focusDate); // force a refetch of the current range
+  // conflicts-tab: fully derived, no stored state — refetch on open and
+  // after any action that might have resolved (or newly created) a
+  // conflict. Never throws to the caller: a refresh failure just leaves the
+  // previous list showing, same graceful-degradation as elsewhere.
+  const refreshConflicts = useCallback(async () => {
+    setConflictsLoading(true);
+    try {
+      const rows = await fetchConflictingBookings();
+      setConflictList(rows as ConflictRowVM[]);
+    } catch (e) {
+      reportClientError("fetchConflictingBookings", e);
+    } finally {
+      setConflictsLoading(false);
+    }
+  }, []);
+
+  const handleGridBookingCreated = useCallback(() => {
+    navigateTo(view, focusDate); // force a refetch of the current range
+    // A newly-created/modified booking can create OR resolve a conflict —
+    // keep the Conflictos tab's derived list in sync regardless of which
+    // tab triggered the save.
+    refreshConflicts();
+  }, [navigateTo, view, focusDate, refreshConflicts]);
+
+  const handleTabChange = useCallback((next: "week" | "clients" | "cancellations" | "conflicts") => {
+    setTab(next);
+    if (next === "conflicts") refreshConflicts();
+  }, [refreshConflicts]);
 
   const gridDays = useMemo(
     () => buildGridDays(range.start, view === "day" ? 1 : 7, dict.intlLocale),
@@ -315,6 +357,23 @@ export function CalendarBookings({
     (a, b) =>
       new Date(a.cancellationRequestedAt!).getTime() - new Date(b.cancellationRequestedAt!).getTime()
   );
+
+  const handleConflictCancel = useCallback(async (bookingId: string) => {
+    setError(null);
+    setBusyId(bookingId);
+    const prev = conflictList;
+    setConflictList((l) => l.filter((row) => row.booking.id !== bookingId));
+    try {
+      const res = await cancelBookingAsOwner(bookingId, dict.errors);
+      if (!res.ok) { setConflictList(prev); setError(res.error); }
+    } catch (e) {
+      reportClientError("cancelBookingAsOwner", e);
+      setConflictList(prev); setError(m.errCancelFailed);
+    } finally {
+      setBusyId(null);
+      router.refresh();
+    }
+  }, [conflictList, dict.errors, m.errCancelFailed, router]);
 
   const handleCancel = useCallback(async (id: string) => {
     setError(null);
@@ -409,18 +468,24 @@ export function CalendarBookings({
     <div className="flex flex-col gap-5">
       {/* Tabs */}
       <div className="flex gap-2">
-        <TabBtn active={tab === "week"} onClick={() => setTab("week")} label={m.tabWeek} />
+        <TabBtn active={tab === "week"} onClick={() => handleTabChange("week")} label={m.tabWeek} />
         <TabBtn
           active={tab === "clients"}
-          onClick={() => setTab("clients")}
+          onClick={() => handleTabChange("clients")}
           label={m.tabClients}
           badge={needsAttentionCount > 0 ? needsAttentionCount : undefined}
         />
         <TabBtn
           active={tab === "cancellations"}
-          onClick={() => setTab("cancellations")}
+          onClick={() => handleTabChange("cancellations")}
           label={m.tabCancellations}
           badge={cancellationCount > 0 ? cancellationCount : undefined}
+        />
+        <TabBtn
+          active={tab === "conflicts"}
+          onClick={() => handleTabChange("conflicts")}
+          label={m.tabConflicts}
+          badge={conflictList.length > 0 ? conflictList.length : undefined}
         />
       </div>
 
@@ -678,6 +743,69 @@ export function CalendarBookings({
                     disabled={busyId === b.id}
                   >
                     {m.denyCancellation}
+                  </Btn>
+                </div>
+              </div>
+            ))}
+          </div>
+        )
+      )}
+
+      {tab === "conflicts" && (
+        conflictList.length === 0 ? (
+          <div className="rounded-2xl border border-line bg-surface px-6 py-12 text-center">
+            <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-full bg-surface-2 text-ink-soft">
+              <Icon name="calendar" size={22} />
+            </div>
+            <p className="text-[14.5px] font-semibold text-ink">
+              {conflictsLoading ? m.loadingConflicts : m.emptyConflictsTitle}
+            </p>
+            {!conflictsLoading && <p className="mt-1 text-[13px] text-ink-soft">{m.emptySubtitle}</p>}
+          </div>
+        ) : (
+          <div className="overflow-hidden rounded-xl border border-line bg-surface">
+            {conflictList.map((row, i) => (
+              <div
+                key={`${row.closureId}-${row.booking.id}`}
+                onClick={() => setSelectedBooking(row.booking)}
+                className={`flex cursor-pointer flex-col gap-3 px-4 py-3.5 transition-colors hover:bg-surface-2 sm:flex-row sm:items-center ${i > 0 ? "border-t border-line" : ""}`}
+              >
+                <div className="flex items-start gap-3 sm:flex-1 sm:items-center">
+                  <div className="w-[70px] shrink-0">
+                    <p className="text-[15px] font-semibold text-ink">{timeLabel(row.booking.startIso)}</p>
+                    <p className="text-[11.5px] capitalize text-ink-soft">{dateLabel(row.booking.startIso, dict.intlLocale)}</p>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="flex flex-wrap items-center gap-1.5 text-[14px] font-semibold text-ink">
+                      <span className="truncate">{row.booking.serviceName}</span>
+                      <span className="shrink-0 rounded-full bg-orange-50 px-2 py-0.5 text-[11px] font-semibold text-orange-600">
+                        {m.conflictMatchesTemplate.replace("{closure}", row.closureLabel)}
+                      </span>
+                    </p>
+                    <p className="truncate text-[12.5px] text-ink-soft">{row.booking.clientName}</p>
+                  </div>
+                </div>
+
+                <div
+                  className="flex shrink-0 items-center gap-2 pl-[82px] sm:pl-0"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Btn
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setEditingBooking(row.booking)}
+                    disabled={busyId === row.booking.id}
+                  >
+                    {dict.detailModal.modifyButton}
+                  </Btn>
+                  <Btn
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => handleConflictCancel(row.booking.id)}
+                    disabled={busyId === row.booking.id}
+                    className="!text-error hover:!bg-error-weak"
+                  >
+                    {busyId === row.booking.id ? m.reviewing : m.cancel}
                   </Btn>
                 </div>
               </div>

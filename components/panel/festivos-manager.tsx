@@ -4,10 +4,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { Btn } from "@/components/ui/button";
-import { createFestivo, deleteClosure } from "@/lib/actions/closures";
+import { createFestivo, deleteClosure, type ConflictSummary } from "@/lib/actions/closures";
 import { reportClientError } from "@/lib/report-client-error";
+import { ClosureConflictDialog } from "@/components/panel/closure-conflict-dialog";
 import type { BusinessClosure } from "@/lib/closures/data";
 import type { FestivosDictionary } from "@/lib/i18n/dictionaries/festivos";
+import type { ClosureConflictDictionary } from "@/lib/i18n/dictionaries/closure-conflict";
 
 const MONTHS_ES = [
   "enero", "febrero", "marzo", "abril", "mayo", "junio",
@@ -37,10 +39,12 @@ export function FestivosManager({
   initialFestivos,
   intlLocale,
   dict,
+  conflictDict,
 }: {
   initialFestivos: BusinessClosure[];
   intlLocale: string;
   dict: FestivosDictionary;
+  conflictDict: ClosureConflictDictionary;
 }) {
   const router = useRouter();
   const [festivos, setFestivos] = useState(initialFestivos);
@@ -50,17 +54,24 @@ export function FestivosManager({
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [conflicts, setConflicts] = useState<ConflictSummary | null>(null);
 
-  async function handleAdd() {
+  async function handleAdd(confirmed?: boolean) {
     setError(null);
     setSaving(true);
     try {
-      const result = await createFestivo({ month, day, label, dict: dict.errors });
+      const result = await createFestivo({ month, day, label, confirmed, dict: dict.errors });
       if (!result.ok) {
         setError(result.error);
         setSaving(false);
         return;
       }
+      if ("needsConfirmation" in result) {
+        setConflicts(result.conflicts);
+        setSaving(false);
+        return;
+      }
+      setConflicts(null);
       setFestivos((prev) => [...prev, result.closure].sort((a, b) => (a.month! - b.month!) || (a.day! - b.day!)));
       setLabel("");
       setSaving(false);
@@ -160,10 +171,21 @@ export function FestivosManager({
             className={inputBase}
           />
         </div>
-        <Btn variant="outline" onClick={handleAdd} disabled={saving}>
+        <Btn variant="outline" onClick={() => handleAdd()} disabled={saving}>
           <Icon name="plus" size={15} /> {dict.add}
         </Btn>
       </div>
+
+      {conflicts && (
+        <ClosureConflictDialog
+          conflicts={conflicts}
+          intlLocale={intlLocale}
+          dict={conflictDict}
+          saving={saving}
+          onCancel={() => setConflicts(null)}
+          onConfirm={() => handleAdd(true)}
+        />
+      )}
     </div>
   );
 }

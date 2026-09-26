@@ -9,6 +9,7 @@ import {
   getDefaultCalendarWeekBounds,
   getHoyWidgetStats,
   getWeekWidgetStats,
+  getConflictingBookingsForUser,
 } from "@/lib/booking/owner-data";
 import { CalendarBookings } from "@/components/panel/calendar-bookings";
 import { TodayStatsWidget } from "@/components/panel/today-stats-widget";
@@ -27,12 +28,13 @@ export default async function CalendarPage() {
   const { weekStartIso, weekEndIso } = await getDefaultCalendarWeekBounds(session.user.id);
 
   const supabase = await createClient();
-  const [bookings, cancellationRequests, weekData, hoyStats, weekStats, whatsappConfig] = await Promise.all([
+  const [bookings, cancellationRequests, weekData, hoyStats, weekStats, initialConflicts, whatsappConfig] = await Promise.all([
     getClientRowBookings(session.user.id),
     getPendingCancellationRequests(session.user.id),
     getWeekCalendarData(session.user.id, weekStartIso, weekEndIso),
     getHoyWidgetStats(session.user.id),
     getWeekWidgetStats(session.user.id),
+    getConflictingBookingsForUser(session.user.id),
     supabase
       .from("kalendar_whatsapp_config")
       .select("enabled")
@@ -135,6 +137,7 @@ export default async function CalendarPage() {
         }))}
         weekStartIso={weekStartIso}
         whatsappEnabled={whatsappEnabled}
+        initialConflicts={initialConflicts}
       />
     </div>
   );

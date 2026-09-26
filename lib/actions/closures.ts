@@ -5,9 +5,22 @@ import { authedAction } from "@/lib/auth-action";
 import { createClient } from "@/lib/supabase/server";
 import { getBusinessForUser } from "@/lib/business/data";
 import type { BusinessClosure } from "@/lib/closures/data";
+import { findConflictingBookings, CONFLICT_LIST_CAP, type ConflictingBooking } from "@/lib/closures/conflicts";
+
+/** A capped preview of the existing bookings a proposed closure would overlap —
+ *  shown in the "N citas se ven afectadas" confirmation dialog before saving. */
+export interface ConflictSummary {
+  total: number;
+  sample: ConflictingBooking[]; // capped at CONFLICT_LIST_CAP; `total - sample.length` more exist beyond it
+}
 
 export type ClosureActionResult =
   | { ok: true; closure: BusinessClosure }
+  // existing-bookings-conflict-alert: returned instead of saving when the
+  // proposed closure overlaps existing pending/confirmed bookings and the
+  // caller hasn't yet passed `confirmed: true`. The UI shows this summary in
+  // a dialog and, if the clinic confirms, re-calls with `confirmed: true`.
+  | { ok: true; needsConfirmation: true; conflicts: ConflictSummary }
   | { ok: false; error: string };
 
 export type DeleteClosureResult = { ok: true } | { ok: false; error: string };
@@ -43,7 +56,16 @@ function tmpl(s: string, vars: Record<string, string>): string {
 export const createFestivo = authedAction(
   async (
     session,
-    payload: { month: number; day: number; label: string; dict?: Partial<ClosureActionDict> }
+    payload: {
+      month: number;
+      day: number;
+      label: string;
+      // existing-bookings-conflict-alert: false (default) checks for
+      // conflicts first and returns them instead of saving; the UI re-calls
+      // with true once the clinic confirms "Guardar de todas formas".
+      confirmed?: boolean;
+      dict?: Partial<ClosureActionDict>;
+    }
   ): Promise<ClosureActionResult> => {
     const d = { ...FALLBACK, ...payload.dict };
 
@@ -56,6 +78,26 @@ export const createFestivo = authedAction(
     }
     if (label.length > LABEL_MAX) {
       return { ok: false, error: tmpl(d.errLabelTooLong, { max: String(LABEL_MAX) }) };
+    }
+
+    if (!payload.confirmed) {
+      // Recurring festivos only need checking within the business's actual
+      // booking window — nothing can be booked further out than that, so
+      // checking beyond it is pointless.
+      const horizonEnd = new Date();
+      horizonEnd.setUTCMonth(horizonEnd.getUTCMonth() + business.booking_window_months);
+      const conflicts = await findConflictingBookings(
+        business.id,
+        { recurring: true, month, day, teamMemberId: null },
+        horizonEnd
+      );
+      if (conflicts.length > 0) {
+        return {
+          ok: true,
+          needsConfirmation: true,
+          conflicts: { total: conflicts.length, sample: conflicts.slice(0, CONFLICT_LIST_CAP) },
+        };
+      }
     }
 
     const supabase = await createClient();
@@ -93,6 +135,8 @@ export const createTimeOff = authedAction(
       startTime?: string | null;
       endTime?: string | null;
       label: string;
+      // existing-bookings-conflict-alert: see createFestivo's doc comment.
+      confirmed?: boolean;
       dict?: Partial<ClosureActionDict>;
     }
   ): Promise<ClosureActionResult> => {
@@ -131,6 +175,28 @@ export const createTimeOff = authedAction(
         .eq("business_id", business.id)
         .maybeSingle();
       if (!member) return { ok: false, error: d.errNoBusiness };
+    }
+
+    if (!payload.confirmed) {
+      // One-off closure: check only within its own date/time range (and,
+      // when provider-scoped, only that provider's bookings) — the horizon
+      // arg is irrelevant here since the closure already carries a real
+      // date range, but the shared window builder wants one; pass the end
+      // date itself so it's a no-op ceiling.
+      const horizonEnd = new Date(`${endDate}T23:59:59Z`);
+      horizonEnd.setUTCDate(horizonEnd.getUTCDate() + 1);
+      const conflicts = await findConflictingBookings(
+        business.id,
+        { recurring: false, startDate, endDate, startTime, endTime, teamMemberId },
+        horizonEnd
+      );
+      if (conflicts.length > 0) {
+        return {
+          ok: true,
+          needsConfirmation: true,
+          conflicts: { total: conflicts.length, sample: conflicts.slice(0, CONFLICT_LIST_CAP) },
+        };
+      }
     }
 
     const supabase = await createClient();

@@ -7,6 +7,7 @@ import { TeamManager } from "@/components/panel/team-manager";
 import { getLocale } from "@/lib/i18n/server";
 import { getTeamDictionary } from "@/lib/i18n/dictionaries/team";
 import { getTimeOffDictionary } from "@/lib/i18n/dictionaries/time-off";
+import { getClosureConflictDictionary } from "@/lib/i18n/dictionaries/closure-conflict";
 
 export default async function TeamPage({
   searchParams,
@@ -40,6 +41,7 @@ export default async function TeamPage({
     }
   }
   const timeOffDict = getTimeOffDictionary(locale);
+  const conflictDict = getClosureConflictDictionary(locale);
   const intlLocale = locale === "es" ? "es-ES" : "en-GB";
 
   const { from } = await searchParams;
@@ -64,6 +66,7 @@ export default async function TeamPage({
         returnToHome={returnToHome}
         timeOffByMember={Object.fromEntries(timeOffByMember)}
         timeOffDict={timeOffDict}
+        conflictDict={conflictDict}
         intlLocale={intlLocale}
       />
     </div>
