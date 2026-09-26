@@ -7,47 +7,152 @@ Status: done
 Criteria:
 - /admin/customers exists and lists clinic businesses
 
-## Step: customer-usage-stats
+## Step: customer-dashboard
 Status: not_started
 Criteria:
-- DESIGN SETTLED (2026-09-26, Arun) — a support/ops dashboard extension to
-  `customer-overview` above (same `/admin/customers` list/detail, add
-  columns/fields rather than a new page), showing per-clinic usage signals
-  so Arun can spot inactive or struggling accounts without asking them.
+- DESIGN SETTLED (2026-09-26, Arun) — a full support/ops dashboard,
+  extending `customer-overview` above (same `/admin/customers` list/detail
+  in the admin repo, add columns/fields and one new sub-page rather than a
+  separate top-level page) so Arun can support clinics and spot at-risk or
+  inactive accounts without asking them. SUPERSEDES the smaller
+  `customer-usage-stats` step this replaces (last-login + appointment-count
+  only) — that scope is now fully subsumed here, nothing from it is lost.
 - **Row granularity: one row per business/clinic**, not per login. Team
   members aren't separate Better Auth accounts today (just data rows on
   `kalendar_team_members`), so "the account" for this purpose is the
   business's `owner_id` → `"user"` row.
-- **Last login**: `max(session."createdAt")` for that `owner_id`, joined
-  from the main app's own `session` table (`supabase/schema_better_auth_001.sql`)
-  — a session row's creation IS a login, no new tracking needed, this
-  data already exists today.
-- **Last logout: explicitly NOT built.** Better Auth has no logout-event
-  concept — signing out just deletes the session row, there's nothing to
-  read `max()` of. DECISION (2026-09-26, Arun, agreed): don't build an
-  explicit sign-out event log for this. A recent last-login already tells
-  Arun the account is active; logout timestamps add real build cost
-  (instrumenting all three auth forms' sign-out paths, redirects, and
-  session-expiry) for a less actionable signal. Revisit only if a real
-  support need for it comes up later.
-- **Appointment count**: a plain `count(*)` of `kalendar_bookings` for that
-  `business_id` — all-time total, no status filter, no breakdown/chart per
-  Arun's "number only" framing. (Open question for the build session: does
-  "number only" mean literally just a single lifetime total, or would a
-  simple all-time-vs-this-month pair still count as "a number, not a
-  chart"? Default to the single lifetime total unless Arun says otherwise
-  when this is actually built.)
-- **Cross-repo data**: this reads from the MAIN app's database
-  (`session`, `kalendar_bookings`, `kalendar_businesses`) but the page
-  lives in the ADMIN repo — confirm at build time how the admin repo
+
+### 1. Clinic overview
+- Name, type, plan (`plan_type`: solo/multi), subscription status
+  (mirrors Stripe's own status string 1:1 on `kalendar_businesses.
+  subscription_status` — trialing/active/past_due/canceled/etc., already
+  tracked), trial end date (from Stripe, same source `getSubscriptionDetail`
+  in `lib/billing/stripe-data.ts` already reads for the clinic's own
+  `/panel/settings` page — reuse that function, don't re-derive), owner's
+  contact email, `created_at`.
+
+### 2. Appointments count
+- Three separate numbers, all scoped to `business_id`, no single collapsed
+  total: **live** (upcoming, `status in ('pending_confirmation',
+  'confirmed')` and `starts_at` in the future), **past confirmed**
+  (`status = 'completed'`, or `starts_at` in the past with `status =
+  'confirmed'` if the clinic never explicitly marked it — check which
+  read this codebase's own `lib/booking/client-status.ts`/calendar-
+  management-past.md conventions already use for "past confirmed" so this
+  matches the clinic-facing panel's own definition exactly rather than
+  inventing a second one), **past cancelled** (`status = 'cancelled'`).
+
+### 3. Booking slug — admin-editable, with a real delink/relink lifecycle
+- DECISION (2026-09-26, Arun): changing a slug requires the admin to also
+  enter a short note (why) — becomes support-ticket history, costs
+  nothing to add. On save, the clinic's `contact_email` gets an automatic
+  notification email (new template needed in `lib/email.ts`, plain
+  "your booking page address changed to X" copy, Spanish, matching this
+  file's existing guest/owner email conventions).
+- DECISION (2026-09-26, Arun) — **the old slug must NOT be deleted or
+  silently freed** when changed/removed from a clinic. A slug has its own
+  lifecycle, independent of which business currently holds it:
+  1. **Delink**: business loses the slug (its booking page is no longer
+     reachable at that address), but the slug string itself stays
+     reserved — nobody else can claim it, it isn't recycled automatically.
+  2. **Relink or delete**: from that reserved state, an admin either links
+     the slug to another business (possibly a different one than
+     originally), or explicitly deletes the reservation to truly free the
+     string for reuse.
+- This needs a real (small) schema change — today `slug` lives directly on
+  `kalendar_businesses` as a `unique not null` column, which can't express
+  "exists but unlinked." Proposed shape (finalize exact column/constraint
+  details at build time):
+  ```sql
+  create table kalendar_slug_registry (
+    slug        text primary key,
+    business_id uuid references kalendar_businesses(id) on delete set null, -- null = delinked, held in reserve
+    created_at  timestamptz not null default now(),
+    updated_at  timestamptz not null default now()
+  );
+  ```
+  `kalendar_businesses.slug` becomes **nullable** (null = "no active slug
+  right now"); `slug_status`/`slug_flag_reason`/`slug_reviewed_at`/
+  `slug_reviewed_by` (the existing moderation columns) likely move onto
+  the registry row too, since moderation is really a property of the slug
+  string's current claim, not the business — confirm this migration shape
+  carefully at build time since `slug` is read pervasively across the
+  codebase (public routing, `getPublicBookingData`, onboarding, the
+  existing `/admin/slugs` review queue) — this is real, non-trivial
+  surface area to update consistently, flagged explicitly as the biggest
+  single piece of build risk in this whole dashboard design.
+
+### 4. Additional signals (Arun agreed, beyond the original 3-item ask)
+- **Slug moderation status** (`pending_review`/`rejected`/`active`, per
+  #3's registry) — surfaces "this clinic's booking page isn't even live"
+  at a glance.
+- **Onboarding completion** (`onboarding_completed_at` null vs set) —
+  flags a clinic that signed up but never finished Negocio/Servicios/
+  Equipo/Disponibilidad setup.
+- **Is-demo flag** (`is_demo`) — excludes/flags presales demo accounts so
+  they don't get confused with real paying customers in this dashboard.
+- **WhatsApp enabled** (`kalendar_whatsapp_config.enabled`) — adoption
+  signal for the newer channel.
+- **Open support tickets count** (`kalendar_support_tickets`, already
+  exists) — so an open ticket is visible right on the clinic's row, no
+  cross-referencing a separate screen.
+
+### 5. Activity tracking (Arun's follow-up ask — multiple signals, not just login)
+- DECISION (2026-09-26, Arun + Claude, agreed): a single login is a weak
+  proxy for real usage — a clinic that logs in but never touches a
+  booking is a materially different problem than one that's fully dark.
+  Track (and surface separately, not collapsed into one flag) THREE
+  distinct signals:
+  1. **Last login** — `max(session."createdAt")` for the business's
+     `owner_id`, already fully derivable today, zero new tracking.
+  2. **Last appointment manually created** — needs a NEW column,
+     `booking_channel` on `kalendar_bookings`
+     (`'public_web' | 'whatsapp' | 'panel_manual'`), set once at insert
+     time in each of the three existing creation paths (`submitBookingImpl`
+     in `lib/actions/booking.ts` for both web and WhatsApp — the WhatsApp
+     path is already distinguishable there via context, confirm exact
+     signal at build time — and `createBookingAsOwner` in
+     `lib/actions/booking-owner.ts` for the manual path). Today there is
+     NO way to distinguish "clinic manually created this via the panel"
+     from "a guest booked it themselves" — both produce a `patient_id`-null
+     row with a name/email/phone — this column closes that gap. Then
+     `last_manual_booking_at` = `max(created_at) where booking_channel =
+     'panel_manual'`.
+  3. **Last appointment status updated** — needs a NEW column,
+     `status_updated_at timestamptz`, touched ONLY by the explicit
+     clinic actions that change a booking's `status` (confirm, cancel,
+     mark completed/no-show — via `booking-owner.ts`'s existing status-
+     changing actions), deliberately NOT the generic `updated_at` (which
+     also changes on unrelated edits like notes or payment marking) — so
+     this is a clean "are they actually managing appointments" signal,
+     not a noisy one.
+  - Both new columns are additive (`schema_subset_NNN.sql`, standalone,
+    non-destructive per this file's usual migration convention — check
+    `ls supabase/` for the next number at build time) plus folded into
+    `schema_001.sql`.
+  - Arun flagged wanting to extend this signal set further later (more
+    activity types beyond these three) — this design intentionally keeps
+    each signal as its own column/query rather than a single computed
+    "active/inactive" boolean, specifically so more signals can be added
+    later without restructuring what's already there.
+- These three signals surface on the main `/admin/customers` list (so
+  Arun can eyeball inactivity across all clinics at a glance) as well as
+  each clinic's own detail view.
+
+### Cross-repo notes
+- This reads from the MAIN app's database (`session`, `kalendar_bookings`,
+  `kalendar_businesses`, `kalendar_whatsapp_config`,
+  `kalendar_support_tickets`, the new `kalendar_slug_registry`) but the
+  page lives in the ADMIN repo — confirm at build time how the admin repo
   already connects to the main app's Supabase project (it must already do
   this for `customer-overview` to work at all) and reuse that exact
   connection, not a new one.
 - NOT VERIFIED AGAINST ACTUAL ADMIN-REPO CODE — same caveat as
   `manual-role-grant-tool` below: `kaminolabs-kalendar-admin` wasn't
   cloned for this design pass. Sanity-check `/admin/customers`'s actual
-  current columns/query before building, rather than assuming this slots
-  in cleanly.
+  current columns/query, and `/admin/slugs`'s actual current
+  implementation (since #3 above restructures the data it reads), before
+  building, rather than assuming either slots in cleanly.
 
 ## Step: slug-reviews
 Status: done
