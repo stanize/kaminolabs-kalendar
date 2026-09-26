@@ -140,7 +140,7 @@ export function TimeOffList({
       )}
 
       {entries.length > 0 && (
-        <div className="mb-3 flex flex-col gap-1.5">
+        <div className="mb-3 flex flex-col gap-1.5 border-b border-line pb-3">
           {entries.map((e) => (
             <div key={e.id} className="flex items-center justify-between gap-2 rounded-lg bg-surface px-2.5 py-2">
               <div className="flex flex-col">
