@@ -16,6 +16,11 @@ export interface AvailabilityDictionary {
     title: string;
     subtitle: string;
   };
+  tabs: {
+    hours: string;
+    holidays: string;
+    timeOff: string;
+  };
   manager: {
     closed: string;
     removeRange: string; // aria-label
@@ -73,6 +78,11 @@ const es: AvailabilityDictionary = {
   page: {
     title: "Tu disponibilidad",
     subtitle: "Define los días y las horas en que aceptas citas.",
+  },
+  tabs: {
+    hours: "Horario",
+    holidays: "Festivos",
+    timeOff: "Vacaciones y ausencias",
   },
   manager: {
     closed: "Cerrado",
@@ -144,6 +154,11 @@ const en: AvailabilityDictionary = {
   page: {
     title: "Your availability",
     subtitle: "Set the days and hours you accept appointments.",
+  },
+  tabs: {
+    hours: "Hours",
+    holidays: "Holidays",
+    timeOff: "Time off",
   },
   manager: {
     closed: "Closed",

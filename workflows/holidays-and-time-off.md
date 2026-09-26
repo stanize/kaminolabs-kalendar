@@ -201,6 +201,26 @@ Criteria:
   belonged to a different, edit-only flow that doesn't exist in the
   time-off form). Inline editing an existing festivo (the pencil icon) is
   unaffected — that flow was already separate from this add form.
+- **Follow-up (2026-09-26, Arun requested): tabbed layout.** `/panel/
+  availability` restructured from one long page (hours, then Festivos,
+  then per-provider time off, stacked) into a tabbed layout matching
+  `/panel/settings`'s pattern: `app/panel/availability/layout.tsx` (new,
+  mirrors `app/panel/settings/layout.tsx`) does the session/business guard
+  + shared page header + renders `AvailabilityTabs` (new,
+  `components/panel/availability-tabs.tsx`, mirrors `SettingsTabs`) above
+  `{children}`. Three real routes, each a thin page that assumes the
+  layout's guard already ran (`if (!business) return null;`, same pattern
+  as every settings subpage):
+  - `/panel/availability` (tab "Horario"/"Hours") — `AvailabilityManager`
+    only, unchanged behavior (weekly hours + booking window).
+  - `/panel/availability/holidays` (tab "Festivos"/"Holidays") —
+    `FestivosManager` only.
+  - `/panel/availability/time-off` (tab "Vacaciones y ausencias"/"Time
+    off") — `ProviderTimeOffManager` only.
+  New `tabs` field on `AvailabilityDictionary` (`hours`/`holidays`/
+  `timeOff`, es+en). No data-fetching or component logic changed — this
+  is purely the page split; each subpage fetches exactly the same data its
+  slice used to fetch inline on the old single page.
 
 ## Step: manual-booking-closure-warning
 Status: in_progress
