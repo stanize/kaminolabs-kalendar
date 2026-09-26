@@ -124,29 +124,91 @@ Criteria:
   record than mixed into the clinic-wide hours editor.
 
 ## Step: availability-engine-integration
-Status: not_started
+Status: in_progress
 Criteria:
-- `lib/booking/data.ts`'s slot-computation logic must additionally exclude:
-  (a) any date matching a `recurring-public-holidays` entry (clinic-wide,
-  every year), (b) any date/time range covered by a `provider-time-off`
-  entry scoped to the specific provider being queried (or all providers,
-  if `team_member_id` is null on the time-off row) — layered on top of the
-  existing weekly-hours-minus-existing-bookings logic, not replacing it.
-- Must correctly handle the "any provider" booking mode (`providerId: null`
-  — used by the public wizard and the WhatsApp flow when a patient doesn't
-  pick a specific provider): a day should only show as fully unavailable
-  if EVERY provider is closed that day (business closure, or every
-  individual provider on time off) — if even one provider is working, the
-  day/slot should still show up in the "any provider" pool. Confirm this
-  aggregation logic explicitly at build time against how `providerId: null`
-  currently aggregates across `kalendar_team_members`.
-- Applies identically to the public booking page, the panel's manual
-  booking modal (`appointment-modal.tsx`), and the WhatsApp bot's date/time
-  listing (`lib/whatsapp/conversation.ts`) — all three already share the
-  same underlying `getAvailableSlots`/`getPublicBookingData` functions per
-  earlier features in this codebase, so a single fix at the data layer
-  should cover all three call sites without touching each individually
-  (confirm this holds at build time rather than assuming).
+- BUILT (2026-09-26): code implemented, typechecked (`npx tsc --noEmit`
+  clean), linted (`npx eslint` clean) and `npm run build` succeeds. Pending
+  Arun's live testing before this flips to `done`.
+- **Confirmed consuming surfaces**: `getAvailableSlots` in
+  `lib/actions/booking.ts` is the ONE shared slot-computation entry point —
+  it's what both the public website wizard (`components/booking/booking-wizard.tsx`)
+  and the WhatsApp bot (`lib/whatsapp/conversation.ts`) call to list
+  bookable times; both were verified by grepping their imports before
+  changing anything. The panel's manual booking modal
+  (`components/panel/appointment-modal.tsx`) was ALSO checked and does NOT
+  call `getAvailableSlots`/`getPublicBookingData`/`generateSlotsForDay` at
+  all — it has its own client-side `isTimeTaken` conflict check against the
+  bookings already loaded into the calendar week view, entirely separate
+  from this engine. So this change reaches exactly the two public-facing
+  surfaces and cannot touch the manual modal's behavior even incidentally.
+- **What changed**: `getAvailableSlots` now fetches the business's closures
+  (`getClosuresForBusiness`, new in `lib/closures/data.ts` — a
+  business-id-scoped read, since this is a public/unauthenticated code path
+  with no user to scope by; same trust level as the other public queries in
+  `getPublicBookingData`) and expands them into concrete UTC windows via
+  `closureDateWindows` (reused as-is from `lib/closures/conflicts.ts`,
+  exported for this — no second "is this date closed" implementation).
+  Each window is then treated exactly like an existing booking: appended to
+  the `taken` interval list passed into `generateSlotsForDay`, so a closed
+  slot is excluded by the same overlap check that already excludes a
+  booked one. `toClosureInput` (`lib/closures/conflicts.ts`) was exported
+  (was previously private) so this reuses the exact same
+  BusinessClosure -> ClosureInput mapping the conflict-check/Conflictos-tab
+  code already uses.
+- **Recurring festivos**: `closureDateWindows` already expands a recurring
+  month+day closure into one window per year from now through a passed
+  `horizonEnd`; `getAvailableSlots` passes its own already-computed `to`
+  (the end of the queried date range, which is exactly the concrete window
+  a slot search ever needs) as that horizon — no new expansion logic
+  needed, no change to `closureDateWindows` itself.
+- **"Any provider" aggregation — confirmed correct by tracing the existing
+  code, not just assumed**: `getAvailableSlots`'s `providerId: null` path
+  already worked by computing each team member's own slots independently
+  (their own taken-intervals fetch + their own `generateSlotsForDay` call)
+  and then unioning the results into one labelled list. Closure exclusion
+  was added at exactly that same per-member step — each member's own
+  `taken` list gets that member's applicable closures appended (clinic-wide
+  closures, `team_member_id = null`, apply to every member; a
+  provider-scoped closure only appends to that one member's list) BEFORE
+  their own `generateSlotsForDay` call runs. Because the union across
+  members happens one level higher (unchanged), a member who is fully
+  closed for a given slot simply contributes nothing to that slot from
+  their own call, while any other member not covered by a closure still
+  contributes normally — the pool is only empty when EVERY member's own
+  call excludes it. No separate "is everyone closed" aggregation step was
+  written or needed; reusing the existing per-member-then-union shape gets
+  this right by construction.
+- **Solo businesses**: `getPublicBookingData` only populates `members` for
+  team-mode businesses, so there's no member id available to match a
+  closure's `team_member_id` against in the solo path. Since a solo
+  business has exactly one provider (the owner's own single
+  `kalendar_team_members` row) either way, ANY closure — clinic-wide or one
+  scoped to a specific team_member_id — necessarily applies to that one
+  provider; there is no other provider it could be scoped away from. So the
+  solo path treats every closure as applicable regardless of its
+  `team_member_id`, rather than adding a second query just to resolve the
+  owner's own row id for a comparison that couldn't come out differently.
+- **DECISION + reasoning (2026-09-26, confirmed against actual code, not
+  just assumed): the panel's manual booking modal keeps its full override
+  and was NOT touched.** As found above, `appointment-modal.tsx` never
+  calls the shared availability engine at all — it doesn't even read
+  closures — so there was nothing to "carve out" a manual-override path
+  from; the modal's submit path was already, and remains, completely
+  independent of this change. This matches the framing already established
+  by this workflow file's earlier steps and by this codebase's existing
+  pattern elsewhere in the same modal (it already lets the clinic book into
+  a past date or outside business hours — both are shown as a warning, not
+  blocked): closures are a PATIENT-facing availability rule, not a hard
+  scheduling constraint, and the clinic retains full manual authority over
+  its own calendar (e.g. a walk-in on a day marked closed, or a provider on
+  vacation who comes in anyway). Suggested-times dropdowns in the panel, if
+  ever wired to `getAvailableSlots` in the future, would legitimately omit
+  closed times as a suggestion without that constituting a hard block,
+  since the modal's actual save action doesn't gate on that list — but as
+  of this build the modal doesn't call it at all, so this is documented for
+  a future reader rather than something exercised today.
+- No schema change — reuses `kalendar_business_closures` exactly as it
+  already exists from `recurring-public-holidays`/`provider-time-off`.
 
 ## Step: existing-bookings-conflict-alert
 Status: in_progress

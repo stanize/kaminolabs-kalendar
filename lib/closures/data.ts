@@ -42,3 +42,20 @@ export async function getClosuresForUser(userId: string): Promise<BusinessClosur
 
   return (data as BusinessClosure[] | null) ?? [];
 }
+
+/**
+ * All closures for a given business id directly — used by the public
+ * availability engine (`lib/actions/booking.ts`'s `getAvailableSlots`),
+ * where there's no authenticated user to scope by; the business id itself
+ * is already resolved from an active public slug before this is called
+ * (same trust level as the other public queries in `getPublicBookingData`).
+ */
+export async function getClosuresForBusiness(businessId: string): Promise<BusinessClosure[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("kalendar_business_closures")
+    .select(CLOSURE_COLUMNS)
+    .eq("business_id", businessId);
+
+  return (data as BusinessClosure[] | null) ?? [];
+}

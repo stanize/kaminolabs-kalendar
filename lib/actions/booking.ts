@@ -6,6 +6,8 @@ import { getSession } from "@/lib/auth-session";
 import { createClient } from "@/lib/supabase/server";
 import { incrementRateLimitHit, getClientIp } from "@/lib/rate-limit";
 import { getPublicBookingData, getTakenIntervals } from "@/lib/booking/data";
+import { getClosuresForBusiness, type BusinessClosure } from "@/lib/closures/data";
+import { closureDateWindows, toClosureInput } from "@/lib/closures/conflicts";
 import { buildBookingIcsBase64 } from "@/lib/booking/ics";
 import { formatBusinessAddress } from "@/lib/business/data";
 import { resolveClinicClientId } from "@/lib/booking/client-link";
@@ -71,6 +73,58 @@ const RATE_LIMIT_CODE: Record<"guest" | "patient", string> = {
   guest: "BK-4029",
   patient: "BK-4030",
 };
+
+// ── Closures (holidays-and-time-off / availability-engine-integration) ─────
+// A closure window paired with the provider it applies to (null =
+// clinic-wide, applies to every provider — a recurring festivo, or a
+// one-off closure with no team_member_id).
+interface ClosureWindow {
+  start: Date;
+  end: Date;
+  teamMemberId: string | null;
+}
+
+/**
+ * Expands every closure row into its concrete UTC windows within the
+ * queried range, reusing `closureDateWindows` (the same expansion the
+ * pre-save conflict check and Conflictos tab already rely on) so a
+ * recurring festivo's month+day is turned into real per-year windows here
+ * too, rather than a second implementation of that logic.
+ */
+function expandClosureWindows(closures: BusinessClosure[], horizonEnd: Date): ClosureWindow[] {
+  const windows: ClosureWindow[] = [];
+  for (const c of closures) {
+    const input = toClosureInput(c);
+    for (const w of closureDateWindows(input, horizonEnd)) {
+      windows.push({ start: w.start, end: w.end, teamMemberId: c.team_member_id });
+    }
+  }
+  return windows;
+}
+
+/**
+ * The closure windows that block a given provider's availability, as
+ * plain {start, end} intervals — same shape as `TakenInterval`, so they can
+ * just be concatenated onto the existing-bookings `taken` list before
+ * `generateSlotsForDay` runs; a closed slot is treated exactly like an
+ * already-booked one for slot-computation purposes.
+ *
+ * `isSolo`: a solo business has exactly one provider (the owner's own
+ * `kalendar_team_members` row), which `getPublicBookingData` doesn't
+ * surface in `members` for solo businesses (team-mode only). Rather than
+ * a second query to resolve that row's id, ANY closure — clinic-wide or
+ * scoped to a specific team_member_id — necessarily applies to that one
+ * provider, so scoping is irrelevant and every closure counts.
+ */
+function closureIntervalsForProvider(
+  windows: ClosureWindow[],
+  providerId: string | null,
+  isSolo: boolean
+): { start: Date; end: Date }[] {
+  return windows
+    .filter((w) => isSolo || w.teamMemberId === null || w.teamMemberId === providerId)
+    .map((w) => ({ start: w.start, end: w.end }));
+}
 
 // ── Available slots for a service/provider/date ────────────────────────────
 export interface SlotDTO {
@@ -142,6 +196,13 @@ export async function getAvailableSlots(input: {
 
   const isTeam = data.business.team_mode === "team";
 
+  // Closures (recurring festivos + provider time off) — expanded once for
+  // the whole queried range, then filtered per-provider below. `to` already
+  // covers the full queried window (plus buffer), so it also works as the
+  // horizon for expanding a recurring festivo's yearly windows.
+  const closures = await getClosuresForBusiness(data.business.id);
+  const closureWindows = expandClosureWindows(closures, to);
+
   // Solo, or a specific provider chosen: a single taken-intervals fetch,
   // then one generateSlotsForDay call per day in the range.
   if (!isTeam || input.providerId) {
@@ -155,6 +216,8 @@ export async function getAvailableSlots(input: {
       to,
       teamMemberId: provider,
     });
+    const closed = closureIntervalsForProvider(closureWindows, provider, !isTeam);
+    const blocked = [...taken, ...closed];
     const slotsByDate: Record<string, SlotDTO[]> = {};
     for (const { y, m, d, ds } of days) {
       const day = dayIdInTz(new Date(Date.UTC(y, m - 1, d, 12, 0, 0)), BUSINESS_TZ);
@@ -162,7 +225,7 @@ export async function getAvailableSlots(input: {
       if (ranges.length === 0) { slotsByDate[ds] = []; continue; }
       const slots = generateSlotsForDay({
         dateInTz: { year: y, month: m, day: d },
-        ranges, durationMin: service.duration_min, taken, now,
+        ranges, durationMin: service.duration_min, taken: blocked, now,
       });
       slotsByDate[ds] = slots.map((s) => ({
         startIso: s.start.toISOString(), label: s.label,
@@ -173,13 +236,19 @@ export async function getAvailableSlots(input: {
   }
 
   // "Cualquiera": one taken-intervals fetch per member for the whole range,
-  // then one slot per (day, time, free member), labelled with provider.
+  // then one slot per (day, time, free member), labelled with provider. A
+  // member on time off (or during a clinic-wide closure) simply contributes
+  // no slots for that window in their own generateSlotsForDay call below —
+  // any OTHER member still working that day still shows up in the union, so
+  // the "any provider" pool is only empty when every member is excluded,
+  // with no separate aggregation step needed.
   const perMember = await Promise.all(
     data.members.map(async (mem) => {
       const taken = await getTakenIntervals({
         businessId: data.business.id, from, to, teamMemberId: mem.id,
       });
-      return { mem, taken };
+      const closed = closureIntervalsForProvider(closureWindows, mem.id, false);
+      return { mem, taken: [...taken, ...closed] };
     })
   );
 

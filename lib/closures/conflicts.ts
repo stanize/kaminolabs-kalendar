@@ -164,8 +164,13 @@ export async function findConflictingBookings(
   }));
 }
 
-/** Converts a stored BusinessClosure row into the shared ClosureInput shape. */
-function toClosureInput(c: BusinessClosure): ClosureInput {
+/**
+ * Converts a stored BusinessClosure row into the shared ClosureInput shape.
+ * Exported so the availability engine (`lib/actions/booking.ts`) can reuse
+ * the same expansion (`closureDateWindows`) it's built on, rather than
+ * re-deriving this mapping a second time.
+ */
+export function toClosureInput(c: BusinessClosure): ClosureInput {
   return {
     recurring: c.recurring,
     month: c.month,
