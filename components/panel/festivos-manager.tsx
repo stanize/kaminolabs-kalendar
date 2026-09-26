@@ -253,7 +253,9 @@ export function FestivosManager({
             )
           )}
         </div>
-      ) : null}
+      ) : (
+        <p className="px-1 py-1 text-[12.5px] text-ink-soft">{dict.noEntries}</p>
+      )}
       </div>
 
       <div className="rounded-xl border border-line bg-surface px-4 py-4 sm:px-6">

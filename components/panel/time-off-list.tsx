@@ -360,7 +360,9 @@ export function TimeOffList({
               )
             )}
           </div>
-        ) : null}
+        ) : (
+          <p className="px-1 py-1 text-[12.5px] text-ink-soft">{dict.noEntries}</p>
+        )}
       </div>
 
       <div className="rounded-lg border border-line bg-surface-2/50 p-3">
