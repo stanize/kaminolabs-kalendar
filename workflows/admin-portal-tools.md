@@ -7,6 +7,48 @@ Status: done
 Criteria:
 - /admin/customers exists and lists clinic businesses
 
+## Step: customer-usage-stats
+Status: not_started
+Criteria:
+- DESIGN SETTLED (2026-09-26, Arun) — a support/ops dashboard extension to
+  `customer-overview` above (same `/admin/customers` list/detail, add
+  columns/fields rather than a new page), showing per-clinic usage signals
+  so Arun can spot inactive or struggling accounts without asking them.
+- **Row granularity: one row per business/clinic**, not per login. Team
+  members aren't separate Better Auth accounts today (just data rows on
+  `kalendar_team_members`), so "the account" for this purpose is the
+  business's `owner_id` → `"user"` row.
+- **Last login**: `max(session."createdAt")` for that `owner_id`, joined
+  from the main app's own `session` table (`supabase/schema_better_auth_001.sql`)
+  — a session row's creation IS a login, no new tracking needed, this
+  data already exists today.
+- **Last logout: explicitly NOT built.** Better Auth has no logout-event
+  concept — signing out just deletes the session row, there's nothing to
+  read `max()` of. DECISION (2026-09-26, Arun, agreed): don't build an
+  explicit sign-out event log for this. A recent last-login already tells
+  Arun the account is active; logout timestamps add real build cost
+  (instrumenting all three auth forms' sign-out paths, redirects, and
+  session-expiry) for a less actionable signal. Revisit only if a real
+  support need for it comes up later.
+- **Appointment count**: a plain `count(*)` of `kalendar_bookings` for that
+  `business_id` — all-time total, no status filter, no breakdown/chart per
+  Arun's "number only" framing. (Open question for the build session: does
+  "number only" mean literally just a single lifetime total, or would a
+  simple all-time-vs-this-month pair still count as "a number, not a
+  chart"? Default to the single lifetime total unless Arun says otherwise
+  when this is actually built.)
+- **Cross-repo data**: this reads from the MAIN app's database
+  (`session`, `kalendar_bookings`, `kalendar_businesses`) but the page
+  lives in the ADMIN repo — confirm at build time how the admin repo
+  already connects to the main app's Supabase project (it must already do
+  this for `customer-overview` to work at all) and reuse that exact
+  connection, not a new one.
+- NOT VERIFIED AGAINST ACTUAL ADMIN-REPO CODE — same caveat as
+  `manual-role-grant-tool` below: `kaminolabs-kalendar-admin` wasn't
+  cloned for this design pass. Sanity-check `/admin/customers`'s actual
+  current columns/query before building, rather than assuming this slots
+  in cleanly.
+
 ## Step: slug-reviews
 Status: done
 Criteria:
