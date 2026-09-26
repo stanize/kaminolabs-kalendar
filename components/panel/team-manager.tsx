@@ -7,11 +7,7 @@ import { Btn } from "@/components/ui/button";
 import { SaveOverlay, useSaveOverlay } from "@/components/panel/save-overlay";
 import { saveTeam } from "@/lib/actions/team";
 import { reportClientError } from "@/lib/report-client-error";
-import { TimeOffList } from "@/components/panel/time-off-list";
 import type { TeamDictionary } from "@/lib/i18n/dictionaries/team";
-import type { TimeOffDictionary } from "@/lib/i18n/dictionaries/time-off";
-import type { ClosureConflictDictionary } from "@/lib/i18n/dictionaries/closure-conflict";
-import type { BusinessClosure } from "@/lib/closures/data";
 
 type TeamMode = "solo" | "team";
 
@@ -54,19 +50,11 @@ export function TeamManager({
   initialMembers,
   returnToHome,
   dict,
-  timeOffByMember,
-  timeOffDict,
-  conflictDict,
-  intlLocale,
 }: {
   teamMode: TeamMode;
   initialMembers: MemberItem[];
   returnToHome: boolean;
   dict: TeamDictionary;
-  timeOffByMember?: Record<string, BusinessClosure[]>;
-  timeOffDict?: TimeOffDictionary;
-  conflictDict?: ClosureConflictDictionary;
-  intlLocale?: string;
 }) {
   const router = useRouter();
   const m = dict.manager;
@@ -74,7 +62,6 @@ export function TeamManager({
   const [rows, setRows] = useState<Row[]>(toRows(initialMembers));
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const { overlay, setOverlay, flashSuccessThen } = useSaveOverlay();
 
   // ── Local roster edits ──────────────────────────────────────────────────────
@@ -217,8 +204,6 @@ export function TeamManager({
       {/* Members — inline editable rows */}
       <div className="flex flex-col gap-2">
         {rows.map((r, index) => {
-          const showTimeOff = timeOffDict && conflictDict && intlLocale && r.id !== null;
-          const isExpanded = expandedKey === r.key;
           return (
             <div key={r.key}>
               <div
@@ -269,33 +254,6 @@ export function TeamManager({
                   </button>
                 )}
               </div>
-
-              {/* Per-provider time off — only for already-saved members (a
-                  new local row has no id yet to scope entries to). */}
-              {showTimeOff && (
-                <div className="pl-1">
-                  <button
-                    type="button"
-                    onClick={() => setExpandedKey(isExpanded ? null : r.key)}
-                    className="mt-1 flex items-center gap-1.5 px-2 py-1 text-[12.5px] font-medium text-brand hover:bg-brand-weak rounded-lg"
-                  >
-                    <Icon name="calendar" size={13} />
-                    {isExpanded ? timeOffDict.toggleHide : timeOffDict.toggleShow}
-                    {(timeOffByMember?.[r.id!]?.length ?? 0) > 0 && !isExpanded
-                      ? ` (${timeOffByMember![r.id!].length})`
-                      : ""}
-                  </button>
-                  {isExpanded && (
-                    <TimeOffList
-                      teamMemberId={r.id!}
-                      initialEntries={timeOffByMember?.[r.id!] ?? []}
-                      intlLocale={intlLocale}
-                      dict={timeOffDict}
-                      conflictDict={conflictDict}
-                    />
-                  )}
-                </div>
-              )}
             </div>
           );
         })}

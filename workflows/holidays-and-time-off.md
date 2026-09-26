@@ -76,13 +76,21 @@ Criteria:
   (v1 scope per this file's DECISION above), and verifies a passed
   `teamMemberId` belongs to the caller's own business before inserting.
   Deletes share `deleteClosure({ id })` with the festivos step.
+- **RELOCATED (2026-09-26, Arun):** originally wired into `TeamManager`
+  on `/panel/team`; moved to `/panel/availability` instead (new
+  `components/panel/provider-time-off-manager.tsx`, replacing the
+  team-page attachment) so everything schedule-related — weekly hours,
+  festivos, and per-provider time off — is managed in one place. Equipo
+  (`/panel/team`) goes back to being roster-only (add/rename/remove
+  members), no longer fetches or renders any closures data.
+  `TimeOffDictionary` gained `title`/`subtitle` fields for the new
+  section's own heading, matching `FestivosDictionary`'s existing pattern.
+  Functionally unchanged otherwise — same `TimeOffList` component, same
+  data/actions, just a different page and a name-only (not inline-
+  editable) list of members to expand.
 - UI: per-team-member "Vacaciones / ausencias" expandable section
-  (`components/panel/time-off-list.tsx`) wired into `TeamManager`
-  (`components/panel/team-manager.tsx`) on `/panel/team` — a toggle under
-  each *saved* member row (new, not-yet-saved rows have no id to scope
-  entries to, so the toggle only appears once a member exists) expands a
-  date-range + optional same-day time-window + reason form, with add/list/
-  delete, immediate commit per action. Renders identically for the owner's
+  (`components/panel/time-off-list.tsx`), with add/list/delete, immediate
+  commit per action. Renders identically for the owner's
   own row in a solo business — no separate solo-only path, since a solo
   owner is still a real `kalendar_team_members` row (matches the workflow
   doc's framing that clinic-wide festivos cover the no-configuration case,

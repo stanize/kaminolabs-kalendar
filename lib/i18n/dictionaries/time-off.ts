@@ -8,6 +8,8 @@ import type { Locale } from "../config";
  * workflows/holidays-and-time-off.md -> provider-time-off.
  */
 export interface TimeOffDictionary {
+  title: string; // section heading on /panel/availability
+  subtitle: string;
   toggleShow: string; // "Vacaciones / ausencias"
   toggleHide: string;
   startDate: string;
@@ -32,6 +34,8 @@ export interface TimeOffDictionary {
 }
 
 const es: TimeOffDictionary = {
+  title: "Vacaciones y ausencias del equipo",
+  subtitle: "Días u horas concretas en que un profesional no está disponible.",
   toggleShow: "Vacaciones / ausencias",
   toggleHide: "Ocultar vacaciones / ausencias",
   startDate: "Desde",
@@ -56,6 +60,8 @@ const es: TimeOffDictionary = {
 };
 
 const en: TimeOffDictionary = {
+  title: "Team time off",
+  subtitle: "Specific days or hours when a provider is unavailable.",
   toggleShow: "Time off",
   toggleHide: "Hide time off",
   startDate: "From",
