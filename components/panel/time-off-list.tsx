@@ -199,16 +199,18 @@ export function TimeOffList({
           )}
         </div>
 
-        <label className="flex w-fit cursor-pointer items-center gap-2">
-          <input
-            type="checkbox"
-            checked={partialHours}
-            onChange={(e) => setPartialHours(e.target.checked)}
-            disabled={!singleDay || !startDate}
-            className="h-4 w-4 accent-brand"
-          />
-          <span className="text-[12.5px] text-ink-soft">{dict.partialHours}</span>
-        </label>
+        {singleDay && (
+          <label className="flex w-fit cursor-pointer items-center gap-2">
+            <input
+              type="checkbox"
+              checked={partialHours}
+              onChange={(e) => setPartialHours(e.target.checked)}
+              disabled={!startDate}
+              className="h-4 w-4 accent-brand"
+            />
+            <span className="text-[12.5px] text-ink-soft">{dict.partialHours}</span>
+          </label>
+        )}
 
         {partialHours && (
           <div className="flex flex-wrap items-end gap-2">
