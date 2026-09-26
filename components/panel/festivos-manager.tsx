@@ -181,7 +181,7 @@ export function FestivosManager({
       )}
 
       {festivos.length > 0 && (
-        <div className="mb-4 flex flex-col gap-2">
+        <div className="mb-4 flex flex-col gap-2 border-b border-line pb-4">
           {festivos.map((f) =>
             editingId === f.id ? (
               <div key={f.id} className="flex flex-wrap items-end gap-2 rounded-lg border border-brand-line bg-brand-weak px-3 py-2.5">
