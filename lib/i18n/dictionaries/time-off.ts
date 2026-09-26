@@ -21,7 +21,9 @@ export interface TimeOffDictionary {
   endTime: string;
   nameLabel: string;
   namePlaceholder: string;
-  add: string;
+  add: string; // collapsed trigger button that reveals the add form
+  save: string; // "Guardar" — add form's submit button (once expanded)
+  cancelAdd: string; // aria-label on the add form's collapse/X button
   delete: string; // aria-label
   errUnexpected: string;
   errors: {
@@ -50,6 +52,8 @@ const es: TimeOffDictionary = {
   nameLabel: "Motivo (opcional)",
   namePlaceholder: "Ej. Vacaciones",
   add: "Añadir",
+  save: "Guardar",
+  cancelAdd: "Cancelar",
   delete: "Eliminar",
   errUnexpected: "Ocurrió un error inesperado. Inténtalo de nuevo.",
   errors: {
@@ -78,6 +82,8 @@ const en: TimeOffDictionary = {
   nameLabel: "Reason (optional)",
   namePlaceholder: "E.g. Vacation",
   add: "Add",
+  save: "Save",
+  cancelAdd: "Cancel",
   delete: "Delete",
   errUnexpected: "Something went wrong. Please try again.",
   errors: {

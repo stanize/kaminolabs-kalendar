@@ -13,7 +13,8 @@ export interface FestivosDictionary {
   monthLabel: string;
   nameLabel: string;
   namePlaceholder: string;
-  add: string;
+  add: string; // "+ Añadir festivo" — collapsed trigger button that reveals the add form
+  save: string; // "Guardar" — add form's submit button (once expanded)
   delete: string; // aria-label
   edit: string; // aria-label on the edit-pencil button
   saveEdit: string; // "Guardar cambios" — inline-edit form's submit button
@@ -37,6 +38,7 @@ const es: FestivosDictionary = {
   nameLabel: "Nombre (opcional)",
   namePlaceholder: "Ej. Navidad",
   add: "Añadir festivo",
+  save: "Guardar",
   delete: "Eliminar festivo",
   edit: "Editar festivo",
   saveEdit: "Guardar cambios",
@@ -60,6 +62,7 @@ const en: FestivosDictionary = {
   nameLabel: "Name (optional)",
   namePlaceholder: "E.g. Christmas",
   add: "Add holiday",
+  save: "Save",
   delete: "Delete holiday",
   edit: "Edit holiday",
   saveEdit: "Save changes",

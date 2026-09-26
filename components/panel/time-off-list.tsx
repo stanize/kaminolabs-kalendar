@@ -46,6 +46,7 @@ export function TimeOffList({
 }) {
   const router = useRouter();
   const [entries, setEntries] = useState(initialEntries);
+  const [showAddForm, setShowAddForm] = useState(false);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [singleDay, setSingleDay] = useState(false);
@@ -101,6 +102,7 @@ export function TimeOffList({
       setStartTime("");
       setEndTime("");
       setLabel("");
+      setShowAddForm(false);
       setSaving(false);
       router.refresh();
     } catch (e) {
@@ -131,115 +133,133 @@ export function TimeOffList({
   }
 
   return (
-    <div className="mt-2 rounded-lg border border-line bg-surface-2/50 p-3">
-      {error && (
-        <div className="mb-2 flex items-start gap-2 rounded-lg border border-error bg-error-weak px-3 py-2 text-[12.5px] text-error">
-          <Icon name="x" size={14} className="mt-0.5 shrink-0" />
-          <span>{error}</span>
-        </div>
-      )}
+    <div className="mt-2 flex flex-col gap-2">
+      <div className="rounded-lg border border-line bg-surface-2/50 p-3">
+        {error && (
+          <div className="mb-2 flex items-start gap-2 rounded-lg border border-error bg-error-weak px-3 py-2 text-[12.5px] text-error">
+            <Icon name="x" size={14} className="mt-0.5 shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
 
-      {entries.length > 0 && (
-        <div className="mb-3 flex flex-col gap-1.5 border-b border-line pb-3">
-          {entries.map((e) => (
-            <div key={e.id} className="flex items-center justify-between gap-2 rounded-lg bg-surface px-2.5 py-2">
-              <div className="flex flex-col">
-                <span className="text-[13px] font-medium text-ink">{formatRange(e, intlLocale)}</span>
-                {e.label && <span className="text-[12px] text-ink-soft">{e.label}</span>}
+        {entries.length > 0 ? (
+          <div className="flex flex-col gap-1.5">
+            {entries.map((e) => (
+              <div key={e.id} className="flex items-center justify-between gap-2 rounded-lg bg-surface px-2.5 py-2">
+                <div className="flex flex-col">
+                  <span className="text-[13px] font-medium text-ink">{formatRange(e, intlLocale)}</span>
+                  {e.label && <span className="text-[12px] text-ink-soft">{e.label}</span>}
+                </div>
+                <button
+                  onClick={() => handleDelete(e.id)}
+                  disabled={deletingId === e.id}
+                  className="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-ink-soft hover:bg-error-weak hover:text-error"
+                  aria-label={dict.delete}
+                >
+                  <Icon name="x" size={14} />
+                </button>
               </div>
+            ))}
+          </div>
+        ) : null}
+      </div>
+
+      <div className="rounded-lg border border-line bg-surface-2/50 p-3">
+        {showAddForm ? (
+          <div className="flex flex-col gap-2">
+            <label className="flex w-fit cursor-pointer items-center gap-2">
+              <input
+                type="checkbox"
+                checked={singleDay}
+                onChange={(e) => {
+                  const checked = e.target.checked;
+                  setSingleDay(checked);
+                  if (checked) setEndDate(startDate);
+                  else setPartialHours(false);
+                }}
+                className="h-4 w-4 accent-brand"
+              />
+              <span className="text-[12.5px] text-ink-soft">{dict.singleDay}</span>
+            </label>
+
+            <div className="flex flex-wrap items-end gap-2">
+              <div className="flex flex-col gap-1">
+                <label className="text-[11.5px] font-semibold text-ink-soft">
+                  {singleDay ? dict.dayLabel : dict.startDate}
+                </label>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => {
+                    setStartDate(e.target.value);
+                    if (singleDay) setEndDate(e.target.value);
+                  }}
+                  className={`${inputBase} w-[150px]`}
+                />
+              </div>
+              {!singleDay && (
+                <div className="flex flex-col gap-1">
+                  <label className="text-[11.5px] font-semibold text-ink-soft">{dict.endDate}</label>
+                  <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className={`${inputBase} w-[150px]`} />
+                </div>
+              )}
+            </div>
+
+            {singleDay && (
+              <label className="flex w-fit cursor-pointer items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={partialHours}
+                  onChange={(e) => setPartialHours(e.target.checked)}
+                  disabled={!startDate}
+                  className="h-4 w-4 accent-brand"
+                />
+                <span className="text-[12.5px] text-ink-soft">{dict.partialHours}</span>
+              </label>
+            )}
+
+            {partialHours && (
+              <div className="flex flex-wrap items-end gap-2">
+                <div className="flex flex-col gap-1">
+                  <label className="text-[11.5px] font-semibold text-ink-soft">{dict.startTime}</label>
+                  <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className={`${inputBase} w-[110px]`} />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[11.5px] font-semibold text-ink-soft">{dict.endTime}</label>
+                  <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className={`${inputBase} w-[110px]`} />
+                </div>
+              </div>
+            )}
+
+            <div className="flex flex-wrap items-end gap-2">
+              <div className="min-w-[140px] flex-1">
+                <label className="mb-1 block text-[11.5px] font-semibold text-ink-soft">{dict.nameLabel}</label>
+                <input
+                  value={label}
+                  onChange={(e) => setLabel(e.target.value)}
+                  placeholder={dict.namePlaceholder}
+                  maxLength={80}
+                  className={inputBase}
+                />
+              </div>
+              <Btn variant="outline" size="sm" onClick={() => handleAdd()} disabled={saving}>
+                {dict.save}
+              </Btn>
               <button
-                onClick={() => handleDelete(e.id)}
-                disabled={deletingId === e.id}
-                className="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-ink-soft hover:bg-error-weak hover:text-error"
-                aria-label={dict.delete}
+                onClick={() => setShowAddForm(false)}
+                disabled={saving}
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-ink-soft hover:bg-surface-2"
+                aria-label={dict.cancelAdd}
               >
-                <Icon name="x" size={14} />
+                <Icon name="x" size={15} />
               </button>
             </div>
-          ))}
-        </div>
-      )}
-
-      <div className="flex flex-col gap-2">
-        <label className="flex w-fit cursor-pointer items-center gap-2">
-          <input
-            type="checkbox"
-            checked={singleDay}
-            onChange={(e) => {
-              const checked = e.target.checked;
-              setSingleDay(checked);
-              if (checked) setEndDate(startDate);
-              else setPartialHours(false);
-            }}
-            className="h-4 w-4 accent-brand"
-          />
-          <span className="text-[12.5px] text-ink-soft">{dict.singleDay}</span>
-        </label>
-
-        <div className="flex flex-wrap items-end gap-2">
-          <div className="flex flex-col gap-1">
-            <label className="text-[11.5px] font-semibold text-ink-soft">
-              {singleDay ? dict.dayLabel : dict.startDate}
-            </label>
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => {
-                setStartDate(e.target.value);
-                if (singleDay) setEndDate(e.target.value);
-              }}
-              className={`${inputBase} w-[150px]`}
-            />
           </div>
-          {!singleDay && (
-            <div className="flex flex-col gap-1">
-              <label className="text-[11.5px] font-semibold text-ink-soft">{dict.endDate}</label>
-              <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className={`${inputBase} w-[150px]`} />
-            </div>
-          )}
-        </div>
-
-        {singleDay && (
-          <label className="flex w-fit cursor-pointer items-center gap-2">
-            <input
-              type="checkbox"
-              checked={partialHours}
-              onChange={(e) => setPartialHours(e.target.checked)}
-              disabled={!startDate}
-              className="h-4 w-4 accent-brand"
-            />
-            <span className="text-[12.5px] text-ink-soft">{dict.partialHours}</span>
-          </label>
-        )}
-
-        {partialHours && (
-          <div className="flex flex-wrap items-end gap-2">
-            <div className="flex flex-col gap-1">
-              <label className="text-[11.5px] font-semibold text-ink-soft">{dict.startTime}</label>
-              <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className={`${inputBase} w-[110px]`} />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-[11.5px] font-semibold text-ink-soft">{dict.endTime}</label>
-              <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className={`${inputBase} w-[110px]`} />
-            </div>
-          </div>
-        )}
-
-        <div className="flex flex-wrap items-end gap-2">
-          <div className="min-w-[140px] flex-1">
-            <label className="mb-1 block text-[11.5px] font-semibold text-ink-soft">{dict.nameLabel}</label>
-            <input
-              value={label}
-              onChange={(e) => setLabel(e.target.value)}
-              placeholder={dict.namePlaceholder}
-              maxLength={80}
-              className={inputBase}
-            />
-          </div>
-          <Btn variant="outline" size="sm" onClick={() => handleAdd()} disabled={saving}>
+        ) : (
+          <Btn variant="outline" size="sm" onClick={() => setShowAddForm(true)}>
             <Icon name="plus" size={14} /> {dict.add}
           </Btn>
-        </div>
+        )}
       </div>
 
       {conflicts && (

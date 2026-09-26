@@ -181,6 +181,26 @@ Criteria:
   `false` to avoid a stale partial-hours selection applying to what's now
   a multi-day range. New dictionary fields (`lib/i18n/dictionaries/
   time-off.ts`): `dayLabel`, `singleDay`, es+en.
+- **Follow-up (2026-09-26, Arun tested live, UI restructure):** the
+  always-visible add form (day/month/name fields inline right under the
+  list) read as unclear about what was already saved vs. what was being
+  entered. Both `festivos-manager.tsx` and `time-off-list.tsx` now render
+  as two separate bordered boxes: box 1 is the existing-entries list only
+  (unchanged otherwise); box 2 starts collapsed to a single
+  "+ Añadir festivo"/"+ Añadir" trigger button, and only reveals the
+  add-fields when clicked (`showAddForm` state). The form's submit button
+  is now labeled "Guardar" (new dict key `save`, es+en, both dictionaries)
+  instead of the old "+ Añadir festivo"/"+ Añadir" — and successfully
+  saving now also collapses the form back to the trigger button
+  (`setShowAddForm(false)` added to both `handleAdd` success paths), so
+  the box returns to its default collapsed state instead of staying open
+  with cleared fields. An X button next to "Guardar" lets the clinic
+  collapse the form manually without saving (`festivos-manager.tsx` reuses
+  its existing `cancelEdit` dict string; `time-off-list.tsx` gained a new
+  `cancelAdd` aria-label key, es+en, since its "Cancelar edición" string
+  belonged to a different, edit-only flow that doesn't exist in the
+  time-off form). Inline editing an existing festivo (the pencil icon) is
+  unaffected — that flow was already separate from this add form.
 
 ## Step: manual-booking-closure-warning
 Status: in_progress

@@ -49,6 +49,7 @@ export function FestivosManager({
 }) {
   const router = useRouter();
   const [festivos, setFestivos] = useState(initialFestivos);
+  const [showAddForm, setShowAddForm] = useState(false);
   const [month, setMonth] = useState(1);
   const [day, setDay] = useState(1);
   const [label, setLabel] = useState("");
@@ -91,6 +92,7 @@ export function FestivosManager({
       setPendingConfirm(null);
       setFestivos((prev) => [...prev, result.closure].sort((a, b) => (a.month! - b.month!) || (a.day! - b.day!)));
       setLabel("");
+      setShowAddForm(false);
       setSaving(false);
       router.refresh();
     } catch (e) {
@@ -167,21 +169,22 @@ export function FestivosManager({
   }
 
   return (
-    <div className="rounded-xl border border-line bg-surface px-4 py-4 sm:px-6">
-      <div className="mb-4 flex items-center gap-2">
-        <Icon name="calendar" size={17} className="text-brand" />
-        <h2 className="text-[16px] font-semibold text-ink">{dict.title}</h2>
-      </div>
-
-      {error && (
-        <div className="mb-3 flex items-start gap-2 rounded-xl border border-error bg-error-weak px-3.5 py-2.5 text-[13px] text-error">
-          <Icon name="x" size={15} className="mt-0.5 shrink-0" />
-          <span>{error}</span>
+    <div className="flex flex-col gap-4">
+      <div className="rounded-xl border border-line bg-surface px-4 py-4 sm:px-6">
+        <div className="mb-4 flex items-center gap-2">
+          <Icon name="calendar" size={17} className="text-brand" />
+          <h2 className="text-[16px] font-semibold text-ink">{dict.title}</h2>
         </div>
-      )}
 
-      {festivos.length > 0 && (
-        <div className="mb-4 flex flex-col gap-2 border-b border-line pb-4">
+        {error && (
+          <div className="mb-3 flex items-start gap-2 rounded-xl border border-error bg-error-weak px-3.5 py-2.5 text-[13px] text-error">
+            <Icon name="x" size={15} className="mt-0.5 shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
+
+      {festivos.length > 0 ? (
+        <div className="flex flex-col gap-2">
           {festivos.map((f) =>
             editingId === f.id ? (
               <div key={f.id} className="flex flex-wrap items-end gap-2 rounded-lg border border-brand-line bg-brand-weak px-3 py-2.5">
@@ -255,38 +258,55 @@ export function FestivosManager({
             )
           )}
         </div>
-      )}
+      ) : null}
+      </div>
 
-      <div className="flex flex-wrap items-end gap-2">
-        <div className="flex flex-col gap-1">
-          <label className="text-[12px] font-semibold text-ink-soft">{dict.dayLabel}</label>
-          <select value={day} onChange={(e) => setDay(Number(e.target.value))} className={`${inputBase} w-[70px]`}>
-            {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
-              <option key={d} value={d}>{d}</option>
-            ))}
-          </select>
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-[12px] font-semibold text-ink-soft">{dict.monthLabel}</label>
-          <select value={month} onChange={(e) => setMonth(Number(e.target.value))} className={`${inputBase} w-[140px] capitalize`}>
-            {(intlLocale.startsWith("es") ? MONTHS_ES : MONTHS_EN).map((mName, i) => (
-              <option key={mName} value={i + 1}>{mName}</option>
-            ))}
-          </select>
-        </div>
-        <div className="min-w-[140px] flex-1">
-          <label className="mb-1 block text-[12px] font-semibold text-ink-soft">{dict.nameLabel}</label>
-          <input
-            value={label}
-            onChange={(e) => setLabel(e.target.value)}
-            placeholder={dict.namePlaceholder}
-            maxLength={80}
-            className={inputBase}
-          />
-        </div>
-        <Btn variant="outline" onClick={() => handleAdd()} disabled={saving}>
-          <Icon name="plus" size={15} /> {dict.add}
-        </Btn>
+      <div className="rounded-xl border border-line bg-surface px-4 py-4 sm:px-6">
+        {showAddForm ? (
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="flex flex-col gap-1">
+              <label className="text-[12px] font-semibold text-ink-soft">{dict.dayLabel}</label>
+              <select value={day} onChange={(e) => setDay(Number(e.target.value))} className={`${inputBase} w-[70px]`}>
+                {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[12px] font-semibold text-ink-soft">{dict.monthLabel}</label>
+              <select value={month} onChange={(e) => setMonth(Number(e.target.value))} className={`${inputBase} w-[140px] capitalize`}>
+                {(intlLocale.startsWith("es") ? MONTHS_ES : MONTHS_EN).map((mName, i) => (
+                  <option key={mName} value={i + 1}>{mName}</option>
+                ))}
+              </select>
+            </div>
+            <div className="min-w-[140px] flex-1">
+              <label className="mb-1 block text-[12px] font-semibold text-ink-soft">{dict.nameLabel}</label>
+              <input
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                placeholder={dict.namePlaceholder}
+                maxLength={80}
+                className={inputBase}
+              />
+            </div>
+            <Btn variant="outline" onClick={() => handleAdd()} disabled={saving}>
+              {dict.save}
+            </Btn>
+            <button
+              onClick={() => setShowAddForm(false)}
+              disabled={saving}
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-ink-soft hover:bg-surface-2"
+              aria-label={dict.cancelEdit}
+            >
+              <Icon name="x" size={15} />
+            </button>
+          </div>
+        ) : (
+          <Btn variant="outline" onClick={() => setShowAddForm(true)}>
+            <Icon name="plus" size={15} /> {dict.add}
+          </Btn>
+        )}
       </div>
 
       {conflicts && pendingConfirm && (
