@@ -23,6 +23,26 @@ interface MemberVM {
   name: string;
 }
 
+// A client-safe projection of BusinessClosure (lib/closures/data.ts) — just
+// the fields needed to check whether a picked date/time falls on a festivo
+// or provider time off. Fetched once at the page level, same as hoursByDay.
+export interface ClosureRuleVM {
+  teamMemberId: string | null; // null = clinic-wide
+  recurring: boolean;
+  month: number | null;
+  day: number | null;
+  startDate: string | null; // "YYYY-MM-DD"
+  endDate: string | null;
+  startTime: string | null; // "HH:MM" or "HH:MM:SS"
+  endTime: string | null;
+  label: string | null;
+}
+
+function toMinutes(t: string): number {
+  const [h, m] = t.slice(0, 5).split(":").map(Number);
+  return h * 60 + m;
+}
+
 interface TimeRangeVM {
   start: string; // "HH:MM"
   end: string; // "HH:MM"
@@ -73,6 +93,7 @@ type AppointmentModalProps =
       allBookings: WeekBookingVM[];
       services: ServiceVM[];
       members: MemberVM[];
+      closures: ClosureRuleVM[];
       dict: CalendarDictionary["modal"];
       errorsDict: CalendarDictionary["manualErrors"];
       whatsappEnabled: boolean;
@@ -86,6 +107,7 @@ type AppointmentModalProps =
       allBookings: WeekBookingVM[];
       services: ServiceVM[];
       members: MemberVM[];
+      closures: ClosureRuleVM[];
       dict: CalendarDictionary["modal"];
       errorsDict: CalendarDictionary["manualErrors"];
       whatsappEnabled: boolean;
@@ -94,7 +116,7 @@ type AppointmentModalProps =
     };
 
 export function AppointmentModal(props: AppointmentModalProps) {
-  const { hoursByDay, allBookings, services, members, dict, errorsDict, whatsappEnabled, onClose, onSaved } = props;
+  const { hoursByDay, allBookings, services, members, closures, dict, errorsDict, whatsappEnabled, onClose, onSaved } = props;
   const isEdit = props.mode === "edit";
   const editBookingId = isEdit ? props.booking.id : null;
 
@@ -253,6 +275,38 @@ export function AppointmentModal(props: AppointmentModalProps) {
 
   const conflict = timeValid ? isTimeTaken(timeStr) : false;
 
+  // holidays-and-time-off: a manual booking is still ALLOWED to override a
+  // festivo/provider-time-off (unlike `conflict` above, which blocks a
+  // double-booking) — this is a non-blocking heads-up only, matching the
+  // Conflictos tab's "clinic can override" decision. Checked against the
+  // whole closures list (not just the currently-conflicting ones from the
+  // Conflictos tab) since this is picking a NEW date/time, possibly one
+  // that has no existing bookings yet.
+  const closureWarningLabel = useMemo(() => {
+    if (!selectedDateParts) return null;
+    const dateStr = ymd(selectedDateParts.year, selectedDateParts.month, selectedDateParts.day);
+    const apptStart = timeValid ? toMinutes(timeStr) : null;
+    const apptEnd = apptStart !== null ? apptStart + durationMin : null;
+    for (const c of closures) {
+      if (c.teamMemberId && c.teamMemberId !== teamMemberId) continue;
+      if (c.recurring) {
+        if (c.month === selectedDateParts.month && c.day === selectedDateParts.day) {
+          return c.label || dict.closureGenericLabel;
+        }
+        continue;
+      }
+      if (!c.startDate || !c.endDate) continue;
+      if (dateStr < c.startDate || dateStr > c.endDate) continue;
+      if (c.startTime && c.endTime && apptStart !== null && apptEnd !== null) {
+        const cStart = toMinutes(c.startTime);
+        const cEnd = toMinutes(c.endTime);
+        if (apptStart >= cEnd || apptEnd <= cStart) continue; // no overlap
+      }
+      return c.label || dict.closureGenericLabel;
+    }
+    return null;
+  }, [selectedDateParts, timeStr, timeValid, durationMin, teamMemberId, closures, dict.closureGenericLabel]);
+
   const handleSubmit = async () => {
     setError(null);
     if (!serviceId || !startDate || conflict) return;
@@ -394,6 +448,11 @@ export function AppointmentModal(props: AppointmentModalProps) {
           </div>
           {isOutsideHours && !conflict && (
             <span className="-mt-2 text-[12px] text-ink-soft">{dict.outsideHoursNote}</span>
+          )}
+          {closureWarningLabel && !conflict && (
+            <span className="-mt-2 text-[12px] text-amber-600">
+              {dict.closureWarningNote.replace("{label}", closureWarningLabel)}
+            </span>
           )}
 
           <Field label={dict.clientNameLabel}>

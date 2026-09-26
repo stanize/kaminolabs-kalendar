@@ -80,6 +80,8 @@ export interface CalendarDictionary {
     dateLabel: string; // "Fecha" — editable date field
     timeLabel: string; // "Hora" — editable time field (combobox: dropdown + free typing)
     outsideHoursNote: string; // non-blocking note shown when the picked time falls outside business hours
+    closureWarningNote: string; // non-blocking note shown when the picked date/time falls on a festivo or provider time off; "{label}" is replaced with the closure's name
+    closureGenericLabel: string; // "{label}" fallback when the matched closure has no custom label
     clientNameLabel: string;
     clientNamePlaceholder: string;
     clientEmailLabel: string;
@@ -212,6 +214,8 @@ const es: CalendarDictionary = {
     dateLabel: "Fecha",
     timeLabel: "Hora",
     outsideHoursNote: "Fuera de horario laboral",
+    closureWarningNote: "Este día/horario está marcado como no disponible ({label}). Puedes crear la cita igualmente.",
+    closureGenericLabel: "festivo o ausencia",
     clientNameLabel: "Nombre del cliente",
     clientNamePlaceholder: "Nombre y apellidos",
     clientEmailLabel: "Email (opcional)",
@@ -342,6 +346,8 @@ const en: CalendarDictionary = {
     dateLabel: "Date",
     timeLabel: "Time",
     outsideHoursNote: "Outside business hours",
+    closureWarningNote: "This day/time is marked as unavailable ({label}). You can still create the appointment.",
+    closureGenericLabel: "holiday or time off",
     clientNameLabel: "Client name",
     clientNamePlaceholder: "Full name",
     clientEmailLabel: "Email (optional)",

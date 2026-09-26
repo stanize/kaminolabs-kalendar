@@ -182,6 +182,41 @@ Criteria:
   a multi-day range. New dictionary fields (`lib/i18n/dictionaries/
   time-off.ts`): `dayLabel`, `singleDay`, es+en.
 
+## Step: manual-booking-closure-warning
+Status: in_progress
+Criteria:
+- BUILT (2026-09-26): code implemented, typechecked, linted, build passes.
+  Pending Arun's live testing before this flips to `done`.
+- **Reported live (Arun):** the panel's manual booking modal
+  (`appointment-modal.tsx`) showed no warning when creating/editing an
+  appointment on a festivo or a provider's time-off day — it only showed up
+  afterward, on the Conflictos tab. The clinic must still be ABLE to
+  override (matches `availability-engine-integration`'s deliberate
+  "clinic can override a closure via the manual modal" decision — this
+  step only adds a heads-up, never a block), but flying blind wasn't
+  intended; a warning should surface at creation time too.
+- **What changed**: a client-safe `ClosureRuleVM` projection of
+  `BusinessClosure` (`teamMemberId`, `recurring`, `month`/`day`,
+  `startDate`/`endDate`, `startTime`/`endTime`, `label`) is now fetched
+  once at `/panel/calendar`'s page level (already fetching the full
+  closures list for `festivos`) and threaded down: `page.tsx` →
+  `CalendarBookings` → `CalendarGridView` (create-mode modal) and directly
+  into the edit-mode modal invocation in `calendar-bookings.tsx`. Both
+  `AppointmentModal` variants now take a `closures: ClosureRuleVM[]` prop.
+- Inside `appointment-modal.tsx`, a new `closureWarningLabel` memo
+  (parallel to the existing `isTimeTaken`/`conflict` check, but
+  non-blocking) walks the closures list against the currently-picked
+  date/time/provider: skips a closure scoped to a different provider,
+  matches a recurring festivo by month+day (any year, whole day), matches
+  a one-off closure by date range and — when it carries a same-day
+  partial-hours window — only when the appointment's time range actually
+  overlaps that window. Rendered as an amber note (new dict keys
+  `closureWarningNote`/`closureGenericLabel` in
+  `lib/i18n/dictionaries/calendar.ts`, es+en) right below the existing
+  "outside business hours" note, showing the closure's own label or a
+  generic fallback. Submitting is NOT disabled by this warning — only the
+  real `conflict` (double-booking) check still blocks submit.
+
 ## Step: availability-engine-integration
 Status: in_progress
 Criteria:

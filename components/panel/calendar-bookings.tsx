@@ -23,7 +23,7 @@ import {
 } from "@/components/panel/calendar-grid-view";
 import { CalendarMonthView } from "@/components/panel/calendar-month-view";
 import { BookingDetailModal } from "@/components/panel/booking-detail-modal";
-import { AppointmentModal } from "@/components/panel/appointment-modal";
+import { AppointmentModal, type ClosureRuleVM } from "@/components/panel/appointment-modal";
 import {
   dayStart,
   mondayStart,
@@ -173,6 +173,7 @@ export function CalendarBookings({
   whatsappEnabled,
   initialConflicts,
   festivos,
+  closures,
 }: {
   bookings: BookingVM[];
   // Separate from `bookings` — `bookings` is deliberately future-only
@@ -195,6 +196,11 @@ export function CalendarBookings({
   // matched against whichever week/day is currently in view, since
   // navigation between weeks happens client-side without a refetch.
   festivos: GridDayFestivo[];
+  // Full closures list (festivos + provider time off), client-safe subset —
+  // used only for the manual-booking modal's non-blocking "this day/time is
+  // unavailable" warning (holidays-and-time-off's existing-bookings-
+  // conflict-alert never blocks the clinic's own manual override).
+  closures: ClosureRuleVM[];
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -531,6 +537,7 @@ export function CalendarBookings({
               hoursByDay={weekHoursByDay}
               services={weekServices}
               bookings={gridBookings}
+              closures={closures}
               dict={dict}
               whatsappEnabled={whatsappEnabled}
               onBookingCreated={handleGridBookingCreated}
@@ -567,6 +574,7 @@ export function CalendarBookings({
           allBookings={gridBookings}
           services={weekServices}
           members={weekMembers}
+          closures={closures}
           dict={dict.modal}
           errorsDict={dict.manualErrors}
           whatsappEnabled={whatsappEnabled}

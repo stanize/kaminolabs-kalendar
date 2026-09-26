@@ -51,6 +51,19 @@ export default async function CalendarPage() {
   const festivos = closures
     .filter((c) => c.recurring)
     .map((c) => ({ month: c.month!, day: c.day!, label: c.label }));
+  // Client-safe projection of every closure (festivos + provider time off)
+  // for the manual booking modal's non-blocking closure-warning check.
+  const closureRules = closures.map((c) => ({
+    teamMemberId: c.team_member_id,
+    recurring: c.recurring,
+    month: c.month,
+    day: c.day,
+    startDate: c.start_date,
+    endDate: c.end_date,
+    startTime: c.start_time,
+    endTime: c.end_time,
+    label: c.label,
+  }));
 
   const locale = await getLocale();
   const dict = getCalendarDictionary(locale);
@@ -148,6 +161,7 @@ export default async function CalendarPage() {
         whatsappEnabled={whatsappEnabled}
         initialConflicts={initialConflicts}
         festivos={festivos}
+        closures={closureRules}
       />
     </div>
   );

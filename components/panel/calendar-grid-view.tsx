@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { CalendarDictionary } from "@/lib/i18n/dictionaries/calendar";
 import type { DayId } from "@/lib/onboarding/types";
-import { AppointmentModal, type SlotSelection } from "@/components/panel/appointment-modal";
+import { AppointmentModal, type SlotSelection, type ClosureRuleVM } from "@/components/panel/appointment-modal";
 import {
   TZ,
   tzDateParts,
@@ -257,6 +257,7 @@ export function CalendarGridView({
   hoursByDay,
   services,
   bookings,
+  closures,
   dict,
   whatsappEnabled,
   onBookingCreated,
@@ -268,6 +269,7 @@ export function CalendarGridView({
   hoursByDay: Partial<Record<DayId, TimeRangeVM[]>>;
   services: WeekServiceVM[];
   bookings: WeekBookingVM[];
+  closures: ClosureRuleVM[];
   dict: CalendarDictionary;
   whatsappEnabled: boolean;
   onBookingCreated: () => void;
@@ -429,6 +431,7 @@ export function CalendarGridView({
           allBookings={bookings}
           services={services.map((s) => ({ id: s.id, name: s.name, durationMin: s.durationMin, price: s.price }))}
           members={members.map((m) => ({ id: m.id, name: m.name }))}
+          closures={closures}
           dict={dict.modal}
           errorsDict={dict.manualErrors}
           whatsappEnabled={whatsappEnabled}
