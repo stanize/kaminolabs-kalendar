@@ -76,7 +76,7 @@ export interface AvailabilityDictionary {
 
 const es: AvailabilityDictionary = {
   page: {
-    title: "Tu disponibilidad",
+    title: "Disponibilidad",
     subtitle: "Define los días y las horas en que aceptas citas.",
   },
   tabs: {
@@ -152,7 +152,7 @@ const es: AvailabilityDictionary = {
 
 const en: AvailabilityDictionary = {
   page: {
-    title: "Your availability",
+    title: "Availability",
     subtitle: "Set the days and hours you accept appointments.",
   },
   tabs: {

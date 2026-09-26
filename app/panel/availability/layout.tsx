@@ -20,8 +20,7 @@ export default async function AvailabilityLayout({ children }: { children: React
   return (
     <div className="mx-auto max-w-[680px] px-4 py-6 sm:px-8 sm:py-8">
       <div className="mb-6">
-        <h1 className="mb-1 text-[24px]">{dict.page.title}</h1>
-        <p className="text-[15px] text-ink-soft">{dict.page.subtitle}</p>
+        <h1 className="text-[24px]">{dict.page.title}</h1>
       </div>
 
       <AvailabilityTabs dict={dict} />
