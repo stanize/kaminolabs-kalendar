@@ -22,7 +22,8 @@ const MONTHS_EN = [
 
 function formatMonthDay(month: number, day: number, intlLocale: string): string {
   const months = intlLocale.startsWith("es") ? MONTHS_ES : MONTHS_EN;
-  return `${day} ${months[month - 1]}`;
+  const monthName = months[month - 1];
+  return `${day} ${monthName.charAt(0).toUpperCase()}${monthName.slice(1)}`;
 }
 
 const inputBase =
