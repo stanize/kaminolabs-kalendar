@@ -91,6 +91,7 @@ export async function sendEmail({ to, subject, html, attachments }: SendEmailInp
           ? String((payload as { message: unknown }).message)
           : "") || `HTTP ${res.status}`;
       console.error(`[email] Resend send failed: ${detail} (to=${to})`);
+      void logEvent("email", "error", "Resend send failed", { data: { to, subject, detail } });
       return { ok: false, error: detail };
     }
 
@@ -103,6 +104,7 @@ export async function sendEmail({ to, subject, html, attachments }: SendEmailInp
   } catch (err) {
     const msg = err instanceof Error ? err.message : "unknown error";
     console.error(`[email] Failed to send to=${to}: ${msg}`);
+    void logEvent("email", "error", "send threw an exception", { data: { to, subject, error: msg } });
     return { ok: false, error: msg };
   }
 }
