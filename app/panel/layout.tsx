@@ -6,6 +6,7 @@ import { PanelSidebar } from "@/components/panel/sidebar";
 import { EmailVerificationGate } from "@/components/panel/email-verification-gate";
 import { RoleUpgradeGate } from "@/components/panel/role-upgrade-gate";
 import { getPanelShellServerDictionary } from "@/lib/i18n/server";
+import { logEvent } from "@/lib/server-error-log";
 
 export default async function PanelLayout({ children }: { children: ReactNode }) {
   const t0 = Date.now();
@@ -14,6 +15,9 @@ export default async function PanelLayout({ children }: { children: ReactNode })
     session = await getSession();
   } catch (e) {
     console.error("[panel-layout] getSession failed", { ms: Date.now() - t0, error: e instanceof Error ? e.message : e });
+    void logEvent("panel-layout", "critical", "getSession failed", {
+      data: { ms: Date.now() - t0, error: e instanceof Error ? e.message : String(e) },
+    });
     throw e;
   }
   if (!session?.user) redirect("/signin");
@@ -36,10 +40,16 @@ export default async function PanelLayout({ children }: { children: ReactNode })
     roles = await getUserRoles(session.user.id);
   } catch (e) {
     console.error("[panel-layout] getUserRoles failed", { userId: session.user.id, ms: Date.now() - t1, error: e instanceof Error ? e.message : e });
+    void logEvent("panel-layout", "critical", "getUserRoles failed", {
+      data: { userId: session.user.id, ms: Date.now() - t1, error: e instanceof Error ? e.message : String(e) },
+    });
     throw e;
   }
   if (Date.now() - t1 > 3000) {
     console.error("[panel-layout] getUserRoles slow", { userId: session.user.id, ms: Date.now() - t1 });
+    void logEvent("panel-layout", "warning", "getUserRoles slow", {
+      data: { userId: session.user.id, ms: Date.now() - t1 },
+    });
   }
   if (roles.includes("patient") && !roles.includes("clinic")) {
     return (
@@ -58,10 +68,16 @@ export default async function PanelLayout({ children }: { children: ReactNode })
     await assignRole(session.user.id, "clinic");
   } catch (e) {
     console.error("[panel-layout] assignRole failed", { userId: session.user.id, ms: Date.now() - t2, error: e instanceof Error ? e.message : e });
+    void logEvent("panel-layout", "critical", "assignRole failed", {
+      data: { userId: session.user.id, ms: Date.now() - t2, error: e instanceof Error ? e.message : String(e) },
+    });
     throw e;
   }
   if (Date.now() - t2 > 3000) {
     console.error("[panel-layout] assignRole slow", { userId: session.user.id, ms: Date.now() - t2 });
+    void logEvent("panel-layout", "warning", "assignRole slow", {
+      data: { userId: session.user.id, ms: Date.now() - t2 },
+    });
   }
 
   // Email/password sign-ups land here unverified — the panel renders but is

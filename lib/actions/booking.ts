@@ -11,6 +11,7 @@ import { closureDateWindows, toClosureInput, festivoLabelsForRange } from "@/lib
 import { buildBookingIcsBase64 } from "@/lib/booking/ics";
 import { formatBusinessAddress } from "@/lib/business/data";
 import { resolveClinicClientId } from "@/lib/booking/client-link";
+import { logEvent } from "@/lib/server-error-log";
 import {
   sendEmail,
   bookingConfirmEmailHtml,
@@ -553,7 +554,13 @@ async function submitBookingImpl(input: {
       author_id: null,
       body: `Nota de la cita del ${formatBookingWhen(start.toISOString(), "es")} (${service.name}): ${notes}`,
     }).then(({ error: noteError }) => {
-      if (noteError) console.error("[submitBookingImpl] client note copy failed", noteError);
+      if (noteError) {
+        console.error("[submitBookingImpl] client note copy failed", noteError);
+        void logEvent("submitBookingImpl", "warning", "client note copy failed", {
+          businessId: data.business.id,
+          data: { clinicClientId, error: noteError.message },
+        });
+      }
     });
   }
 

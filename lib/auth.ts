@@ -2,6 +2,7 @@ import { betterAuth } from "better-auth";
 import { Pool } from "pg";
 import { sendEmail, verificationEmailHtml, resetPasswordEmailHtml } from "@/lib/email";
 import { LOCALE_COOKIE, DEFAULT_LOCALE, isLocale } from "@/lib/i18n/config";
+import { logEvent } from "@/lib/server-error-log";
 
 // Reads the `kalendar_locale` cookie off the raw sign-up request (Better Auth
 // hands the callback a cloned Request, not Next's cookies() helper) so the
@@ -28,6 +29,7 @@ export const auth = betterAuth({
     });
     pool.on("error", (err) => {
       console.error("[auth-pool] idle client error", { error: err.message });
+      void logEvent("auth-pool", "critical", "idle client error", { data: { error: err.message } });
     });
     return pool;
   })(),

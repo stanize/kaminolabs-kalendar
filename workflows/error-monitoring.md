@@ -74,8 +74,33 @@ Criteria:
   incident-contact-path step.
 
 ## Step: structured-event-log
-Status: not_started
+Status: in_progress
 Criteria:
+- WRITE-SIDE BUILT (2026-09-27): `kalendar_error_log` table
+  (`schema_001.sql` + standalone `schema_subset_017.sql`, Arun to run
+  against the live DB — not yet confirmed live as of this note), shared
+  `logEvent()` helper (`lib/server-error-log.ts`), and every bracketed-tag
+  call site listed below retrofitted, PLUS `[panel-layout]`
+  (`app/panel/layout.tsx`) which the initial grep missed. Typechecked,
+  linted (aside from a pre-existing, unrelated `react-hooks/purity`
+  failure on `app/panel/layout.tsx`'s `Date.now()` calls — confirmed via
+  `git stash` that this predates this step's changes, and confirmed via
+  `npm run build` that it doesn't gate the actual build), and built
+  clean. This is now also written into `CLAUDE.md`'s Key Conventions as
+  the STANDING convention going forward (per Arun: "I want this to be
+  the new way of working for errors and logs") — any new failure/notable-
+  event log site added to the codebase from here on should get a
+  `logEvent()` call too, not just the sites retrofitted in this pass.
+- STILL OPEN: (1) confirm `schema_subset_017.sql` has run against the
+  live DB (same "code done, live-DB status unconfirmed" pattern this
+  file's review re-flags elsewhere — don't let this one sit unconfirmed
+  the way the rate-limit/holidays migrations did); (2) the read-side
+  admin dashboard in `kaminolabs-kalendar-admin` (filters: tag, severity,
+  business, environment, resolved, date range, free-text search on
+  message; bulk delete AND bulk mark-resolved, both filter-driven per
+  Arun, not just per-row checkboxes) — not started; (3) the bono-trigger
+  logging gap noted below (DB-side, needs its own small design pass, not
+  solved by this app-layer helper).
 - DESIGN SETTLED (2026-09-27, discussion with Arun following the
   2026-09-27 review's "recommended next 3" #3). Supersedes the
   "scheduled digest" half of sentry-integration's two options above —

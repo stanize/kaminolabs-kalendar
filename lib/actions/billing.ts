@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getStripeClient, isStripeConfigured, nextBillingCycleAnchorUnix, trialEndFromSignup } from "@/lib/billing/stripe";
 import { getBusinessPricing } from "@/lib/pricing/data";
 import { getBusinessForUser } from "@/lib/business/data";
+import { logEvent } from "@/lib/server-error-log";
 
 export type BillingActionResult =
   | { ok: true; url: string }
@@ -317,6 +318,17 @@ export const createSubscriptionIntent = authedAction(
       invoiceTotal: invoice?.total ?? null,
       hasConfirmationSecret: Boolean(confirmationSecret),
       setupIntentId,
+    });
+    void logEvent("createSubscriptionIntent", "critical", "no usable client secret found", {
+      businessId: business.id,
+      data: {
+        subscriptionId: subscription.id,
+        subscriptionStatus: subscription.status,
+        invoiceId,
+        invoiceStatus: invoice?.status ?? null,
+        hasConfirmationSecret: Boolean(confirmationSecret),
+        setupIntentId,
+      },
     });
 
     return { ok: false, error: "No se pudo iniciar la suscripción." };
