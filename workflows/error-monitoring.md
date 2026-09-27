@@ -91,16 +91,40 @@ Criteria:
   the new way of working for errors and logs") — any new failure/notable-
   event log site added to the codebase from here on should get a
   `logEvent()` call too, not just the sites retrofitted in this pass.
-- STILL OPEN: (1) confirm `schema_subset_017.sql` has run against the
-  live DB (same "code done, live-DB status unconfirmed" pattern this
-  file's review re-flags elsewhere — don't let this one sit unconfirmed
-  the way the rate-limit/holidays migrations did); (2) the read-side
-  admin dashboard in `kaminolabs-kalendar-admin` (filters: tag, severity,
-  business, environment, resolved, date range, free-text search on
-  message; bulk delete AND bulk mark-resolved, both filter-driven per
-  Arun, not just per-row checkboxes) — not started; (3) the bono-trigger
-  logging gap noted below (DB-side, needs its own small design pass, not
-  solved by this app-layer helper).
+- MIGRATION CONFIRMED LIVE (2026-09-27): Arun ran `schema_subset_017.sql`
+  against the live DB — verified directly via a read-only query against
+  the real table, AND live end-to-end: `pg_cron`'s `send-reminders` run
+  at 18:00 UTC the same day produced a real `tag: "reminders"`,
+  `severity: "info"` row, confirming `logEvent()` is reachable and
+  writing correctly from an actual Vercel serverless invocation, not
+  just in theory.
+- READ-SIDE DASHBOARD BUILT (2026-09-27, `stanize/kaminolabs-kalendar-admin`
+  commit 1939aba): `/admin/error-log` — new `lib/admin/error-log.ts`
+  (server-side-filtered `listErrorLog`, joined to `kalendar_businesses`
+  for the business-name filter/display), `app/admin/error-log/actions.ts`
+  (`authedAdminAction`-gated, matching every other admin mutation),
+  `components/admin/error-log-dashboard.tsx`, and a new sidebar nav
+  entry. Filters (tag, severity, business name, environment,
+  resolved/unresolved, date range, message text) are URL-search-param
+  driven so they're server-side queries, not a client-side filter over
+  an unbounded fetch — matters once debug-session logging can generate
+  many rows. Bulk delete AND bulk mark-resolved both work two ways, per
+  Arun: on an explicit checkbox selection, and on "everything matching
+  the current filter" (re-applies the same filter server-side rather
+  than trusting a client-supplied id list, so it's never limited to just
+  the current page). Expandable rows show the full message/stack/context
+  JSON/request URL. Typechecked, linted, and built clean in the admin
+  repo (confirmed via `npx tsc --noEmit`, `npx eslint`, `npm run build`
+  — all clean; two unrelated auto-generated `tsconfig.json`/
+  `package-lock.json` changes from running the build were reverted
+  before committing, not part of this feature).
+- STILL OPEN: (1) the bono-trigger logging gap noted below (DB-side,
+  needs its own small design pass, not solved by this app-layer helper);
+  (2) Arun hasn't yet live-tested the dashboard itself (opening
+  `/admin/error-log`, trying the filters, a real bulk delete) — the
+  write side is confirmed live, the read side is code-complete but
+  unverified in the running admin app, so this step stays `in_progress`
+  until that happens, per this repo's own "code merged ≠ done" rule.
 - DESIGN SETTLED (2026-09-27, discussion with Arun following the
   2026-09-27 review's "recommended next 3" #3). Supersedes the
   "scheduled digest" half of sentry-integration's two options above —
