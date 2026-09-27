@@ -118,13 +118,32 @@ Criteria:
   — all clean; two unrelated auto-generated `tsconfig.json`/
   `package-lock.json` changes from running the build were reverted
   before committing, not part of this feature).
-- STILL OPEN: (1) the bono-trigger logging gap noted below (DB-side,
-  needs its own small design pass, not solved by this app-layer helper);
-  (2) Arun hasn't yet live-tested the dashboard itself (opening
-  `/admin/error-log`, trying the filters, a real bulk delete) — the
-  write side is confirmed live, the read side is code-complete but
-  unverified in the running admin app, so this step stays `in_progress`
-  until that happens, per this repo's own "code merged ≠ done" rule.
+- ERROR CODE CATALOG ADDED (2026-09-27, Arun): `lib/error-codes.ts` — a
+  curated registry, one permanent `KLNDR-NNNN` code per REGISTERED
+  failure/event kind (KLNDR-0001 through KLNDR-0040, one per call site),
+  assigned once and reused every time that kind recurs. Deliberately NOT
+  a per-row incrementing ticket number (the row's own `id` already
+  serves that) — the point is a stable reference usable in support
+  conversations/docs ("that's KLNDR-0019 again"), which only works if
+  the same failure kind always gets the same code. Ad-hoc debug
+  `logEvent()` calls are never assigned one — `kalendar_error_log.code`
+  is nullable for exactly that case. New nullable `code text` column +
+  index (`schema_001.sql` + standalone `schema_subset_018.sql`, Arun to
+  run against the live DB — not yet confirmed live). Admin dashboard
+  (commit 2e3cf9d) got a Code filter field, a Code column, and the code
+  shown in the expanded row detail. `lib/error-codes.ts` documents its
+  own rules at the top: never renumber/reuse a retired code, always
+  append new ones at the end.
+- STILL OPEN: (1) confirm `schema_subset_018.sql` (the new `code`
+  column) has run against the live DB — same discipline as every other
+  migration in this file; (2) the bono-trigger logging gap noted below
+  (DB-side, needs its own small design pass, not solved by this
+  app-layer helper); (3) Arun hasn't yet live-tested the dashboard
+  itself (opening `/admin/error-log`, trying the filters, a real bulk
+  delete) — the write side is confirmed live, the read side is
+  code-complete but unverified in the running admin app, so this step
+  stays `in_progress` until that happens, per this repo's own "code
+  merged ≠ done" rule.
 - DESIGN SETTLED (2026-09-27, discussion with Arun following the
   2026-09-27 review's "recommended next 3" #3). Supersedes the
   "scheduled digest" half of sentry-integration's two options above —
