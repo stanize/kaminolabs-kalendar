@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getStripeClient } from "@/lib/billing/stripe";
+import { logEvent } from "@/lib/server-error-log";
 
 /**
  * Cron endpoint — runs daily. Backup safety net, NOT the primary sync
@@ -33,6 +34,7 @@ export async function GET(request: Request) {
 
   if (error) {
     console.error("[stripe-reconcile] fetch error:", error.message);
+    void logEvent("stripe-reconcile", "critical", "fetch error", { data: { message: error.message } });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
@@ -50,12 +52,23 @@ export async function GET(request: Request) {
         console.error(
           `[stripe-reconcile] MISMATCH business=${biz.id} stored=${biz.subscription_status} stripe=${subscription.status} — a webhook was likely missed`
         );
+        void logEvent("stripe-reconcile", "warning", "subscription status mismatch — a webhook was likely missed", {
+          businessId: biz.id,
+          data: { stored: biz.subscription_status, stripe: subscription.status },
+        });
       }
     } catch (e) {
       console.error(`[stripe-reconcile] fetch failed for business=${biz.id}:`, e);
+      void logEvent("stripe-reconcile", "error", "Stripe subscription fetch failed", {
+        businessId: biz.id,
+        data: { stripeSubscriptionId: biz.stripe_subscription_id, error: String(e) },
+      });
     }
   }
 
   console.log(`[stripe-reconcile] checked ${checked}, ${mismatches} mismatches found`);
+  void logEvent("stripe-reconcile", mismatches > 0 ? "warning" : "info", `checked ${checked}, ${mismatches} mismatches found`, {
+    data: { checked, mismatches },
+  });
   return NextResponse.json({ checked, mismatches });
 }

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type Stripe from "stripe";
 import { createClient } from "@/lib/supabase/server";
 import { getStripeClient } from "@/lib/billing/stripe";
+import { logEvent } from "@/lib/server-error-log";
 
 /**
  * Stripe webhook receiver. See docs/specs/stripe-subscription-billing-spec.md
@@ -26,6 +27,7 @@ export async function POST(request: Request) {
 
   if (!stripe || !webhookSecret) {
     console.error("[stripe-webhook] Stripe not configured");
+    void logEvent("stripe-webhook", "critical", "Stripe not configured", {});
     return NextResponse.json({ error: "Not configured" }, { status: 503 });
   }
 
@@ -41,6 +43,9 @@ export async function POST(request: Request) {
     event = stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
   } catch (err) {
     console.error("[stripe-webhook] signature verification failed:", err);
+    void logEvent("stripe-webhook", "error", "signature verification failed", {
+      data: { err: String(err) },
+    });
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
 
@@ -78,6 +83,9 @@ export async function POST(request: Request) {
             .eq("id", businessId);
         } else {
           console.error("[stripe-webhook] checkout.session.completed missing client_reference_id");
+          void logEvent("stripe-webhook", "critical", "checkout.session.completed missing client_reference_id", {
+            data: { eventId: event.id },
+          });
         }
         break;
       }
@@ -117,6 +125,9 @@ export async function POST(request: Request) {
         // Logged for visibility/confirmation of renewal; status sync itself
         // is driven by customer.subscription.updated, not required here.
         console.log("[stripe-webhook] invoice.payment_succeeded", event.id);
+        void logEvent("stripe-webhook", "info", "invoice.payment_succeeded", {
+          data: { eventId: event.id },
+        });
         break;
       }
 
@@ -134,6 +145,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ received: true });
   } catch (err) {
     console.error("[stripe-webhook] processing error:", event.type, err);
+    void logEvent("stripe-webhook", "critical", "processing error", {
+      data: { eventType: event.type, eventId: event.id, err: String(err) },
+    });
     // Not marked as processed — Stripe will retry, and the idempotency check
     // above will correctly treat the retry as a fresh attempt.
     return NextResponse.json({ error: "Processing error" }, { status: 500 });

@@ -66,6 +66,15 @@ Criteria:
 - No edit/void/re-issue actions in this pass — a wrong invoice is handled manually/offline for now, by explicit design decision
 
 ## Notes / Deviations
+- FUTURE DEPENDENCY (2026-09-27): `workflows/verifactu-compliance.md` (Spain's
+  anti-fraud invoicing regulation — hash-chained records, QR codes,
+  possible AEAT submission) extends this feature and depends on at least
+  `kalendar-invoices-schema` + `sequential-numbering-allocation` existing
+  first. Arun's plan is to design/build that WITH Kalendar's first real
+  client rather than speculatively now — see that file. Worth keeping in
+  mind that a later VERI*FACTU pass will likely add columns to
+  `kalendar_invoices` and touch the PDF-generation payload, so avoid
+  assuming this schema is permanently final once it ships.
 - OUT OF SCOPE for this pass, confirmed explicitly by the spec (not oversights): automatic invoicing on booking completion (stays manual/deliberate for MVP); editing/voiding/re-issuing a sent invoice; per-clinic template customization; multi-line-item/itemized invoices (v1 is strictly one invoice per one booking).
 - Testing checklist for whoever builds this (not itself a step, but should gate calling send-invoice-action/sequential-numbering-allocation done): send a real test invoice and confirm email + PDF content match; send two invoices same session same business, confirm sequential no-gap numbering; simulate a PDF-portal-call failure (e.g. point PDF_PORTAL_URL at an invalid endpoint) and confirm the number is still allocated, a clear retryable error is shown, and retry reuses the same row rather than allocating a new number; confirm two different businesses' "first" invoices both correctly get 0001 (per-business scoping, not global); confirm the history view's download link keeps working after the fact via portal-side caching.
 - This spec supersedes admin-template-editor from this file's earlier version — per-clinic template customization is explicitly out of scope for this pass, not just unbuilt. Removed as a step; revisit only if that scope changes later.

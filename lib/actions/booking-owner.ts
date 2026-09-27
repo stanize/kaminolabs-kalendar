@@ -17,6 +17,7 @@ import {
   EMAIL_LOCALE,
 } from "@/lib/email";
 import { sendPlainMessage, decryptConfigAuthToken, type WhatsappConfigRow } from "@/lib/whatsapp/twilio-client";
+import { logEvent } from "@/lib/server-error-log";
 
 export type OwnerBookingResult = { ok: true } | { ok: false; error: string };
 
@@ -433,7 +434,17 @@ export const updateBookingResult = authedAction(
     // raising (capacity exceeded in the narrow race the precheck above
     // didn't catch, or a wrong-business bono id) — either way this write
     // didn't happen, booking is unchanged, safe to just report failure.
-    if (error) return { ok: false, error: t.errUpdateFailed };
+    if (error) {
+      // Covers a genuine bono-trigger failure (sync_bono_session_usage
+      // raising) as well as a plain DB error — logged either way since a
+      // trigger-side failure here would otherwise be completely invisible
+      // (no app-code console.error call site existed for it before this).
+      void logEvent("booking-status-update", "error", "kalendar_bookings status/payment update failed", {
+        businessId: business.id,
+        data: { bookingId: input.bookingId, status: input.status, error: error.message },
+      });
+      return { ok: false, error: t.errUpdateFailed };
+    }
 
     if (booking.clinic_client_id) {
       await applyResultToClientCounters({
@@ -448,6 +459,10 @@ export const updateBookingResult = authedAction(
         // drift, the future clients-list-page/client-detail-view is the
         // place that would surface it visibly, not a silent background op.
         console.error("[updateBookingResult] counters update failed", e);
+        void logEvent("updateBookingResult", "warning", "counters update failed", {
+          businessId: business.id,
+          data: { bookingId: input.bookingId, clinicClientId: booking.clinic_client_id, error: String(e) },
+        });
       });
     }
 
@@ -585,6 +600,10 @@ async function sendManualBookingWhatsappConfirmation(params: {
     });
   } catch (e) {
     console.error("[whatsapp] manual booking confirmation send failed:", e);
+    void logEvent("whatsapp", "error", "manual booking confirmation send failed", {
+      businessId: params.businessId,
+      data: { phone, error: String(e) },
+    });
   }
 }
 
@@ -813,7 +832,13 @@ export const createBookingAsOwner = authedAction(
         author_id: session.user.id,
         body: `Nota de la cita del ${formatBookingWhen(start.toISOString(), "es")} (${service.name}): ${trimmedNotes}`,
       });
-      if (noteError) console.error("[createBookingAsOwner] client note copy failed", noteError);
+      if (noteError) {
+        console.error("[createBookingAsOwner] client note copy failed", noteError);
+        void logEvent("createBookingAsOwner", "warning", "client note copy failed", {
+          businessId: business.id,
+          data: { clinicClientId, error: noteError.message },
+        });
+      }
     }
 
     if (wantsEmail) {

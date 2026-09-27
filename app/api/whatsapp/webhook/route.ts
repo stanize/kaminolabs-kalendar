@@ -13,6 +13,7 @@ import {
   type WhatsappConfigRow,
 } from "@/lib/whatsapp/twilio-client";
 import { handleIncomingMessage } from "@/lib/whatsapp/conversation";
+import { logEvent } from "@/lib/server-error-log";
 
 /**
  * Single webhook route for ALL clinics (workflows/whatsapp-booking.md —
@@ -147,6 +148,10 @@ export async function POST(request: Request): Promise<Response> {
       // no response at all. Logged (not silently swallowed) so a failure
       // mode is actually diagnosable from Vercel logs.
       console.error("[whatsapp] sendServiceListMessage failed, falling back to text:", err);
+      void logEvent("whatsapp", "error", "sendServiceListMessage failed, falling back to text", {
+        businessId: typedConfig.business_id,
+        data: { fromNumber, err: String(err) },
+      });
     }
   }
 
@@ -174,6 +179,10 @@ export async function POST(request: Request): Promise<Response> {
         });
       } catch (err) {
         console.error("[whatsapp] sendPlainMessage (plainTextBefore) failed:", err);
+        void logEvent("whatsapp", "warning", "sendPlainMessage (plainTextBefore) failed", {
+          businessId: typedConfig.business_id,
+          data: { fromNumber, err: String(err) },
+        });
       }
     }
 
@@ -195,6 +204,10 @@ export async function POST(request: Request): Promise<Response> {
     } catch (err) {
       // Content API call failed — fall back to the plain-text reply below.
       console.error("[whatsapp] sendDateListMessage failed, falling back to text:", err);
+      void logEvent("whatsapp", "error", "sendDateListMessage failed, falling back to text", {
+        businessId: typedConfig.business_id,
+        data: { fromNumber, err: String(err) },
+      });
     }
   }
 
@@ -217,6 +230,10 @@ export async function POST(request: Request): Promise<Response> {
     } catch (err) {
       // Content API call failed — fall back to the plain-text reply below.
       console.error("[whatsapp] sendTimeListMessage failed, falling back to text:", err);
+      void logEvent("whatsapp", "error", "sendTimeListMessage failed, falling back to text", {
+        businessId: typedConfig.business_id,
+        data: { fromNumber, err: String(err) },
+      });
     }
   }
 
@@ -244,6 +261,10 @@ export async function POST(request: Request): Promise<Response> {
       // no response at all. Logged (not silently swallowed) so a failure
       // mode is actually diagnosable from Vercel logs.
       console.error("[whatsapp] sendQuickReplyMessage failed, falling back to text:", err);
+      void logEvent("whatsapp", "error", "sendQuickReplyMessage failed, falling back to text", {
+        businessId: typedConfig.business_id,
+        data: { fromNumber, err: String(err) },
+      });
     }
   }
 

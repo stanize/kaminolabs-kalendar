@@ -1,11 +1,15 @@
 import { createClient } from "@/lib/supabase/server";
+import { logEvent } from "@/lib/server-error-log";
 
 // One value per endpoint that gets its own counter (public-booking.md's
 // booking-abuse-protection design: every account/booking-creating endpoint
 // gets an independent budget on the same shared mechanism, never a pooled
-// one). Only "submit_booking" is wired up today — clinic/patient signup are
+// one). "log_client_error" reuses the same mechanism for
+// error-monitoring.md's structured-event-log step (2026-09-27) — protects
+// the now-persisted kalendar_error_log table from being flooded via the
+// unauthenticated /api/log-client-error route. Clinic/patient signup are
 // tracked separately as their own not_started steps.
-export type RateLimitEndpoint = "submit_booking";
+export type RateLimitEndpoint = "submit_booking" | "log_client_error";
 
 /**
  * Atomically bumps today's (endpoint, ipKey) hit counter and returns the new
@@ -31,6 +35,9 @@ export async function incrementRateLimitHit(
   });
   if (error) {
     console.error("[rate-limit] increment failed", { endpoint, ipKey, error: error.message });
+    void logEvent("rate-limit", "error", "increment_rate_limit_hit failed", {
+      data: { endpoint, ipKey, error: error.message },
+    });
     return 0;
   }
   return (data as number) ?? 0;

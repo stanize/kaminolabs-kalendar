@@ -1221,6 +1221,39 @@ alter table public.kalendar_whatsapp_sessions enable row level security;
 create policy "WhatsappSessions: write"
   on public.kalendar_whatsapp_sessions for all using (true) with check (true);
 
+-- structured-event-log (workflows/error-monitoring.md, 2026-09-27): a
+-- general-purpose structured log — every existing bracketed-tag
+-- console.error/console.log call site writes here too (alongside, not
+-- instead of, the console call), AND it doubles as an ad-hoc debug log
+-- Arun can write to directly while troubleshooting something live. Read
+-- from the admin portal's error-log dashboard (kaminolabs-kalendar-admin),
+-- filterable and bulk-deletable there. (schema_subset_017.sql)
+create table public.kalendar_error_log (
+  id           uuid        primary key default gen_random_uuid(),
+  source       text        not null check (source in ('server', 'client')),
+  tag          text        not null, -- e.g. 'whatsapp', 'stripe-webhook', or an ad-hoc debug tag
+  severity     text        not null check (severity in ('debug', 'info', 'warning', 'error', 'critical')),
+  message      text        not null,
+  stack        text,       -- populated for client JS errors; rarely for server-side logs
+  business_id  uuid        references public.kalendar_businesses (id) on delete set null,
+  context      jsonb,      -- catch-all per-call-site detail (booking id, IP, Stripe event id, etc.)
+  environment  text,       -- 'production' | 'preview' | 'development', from VERCEL_ENV
+  request_url  text,
+  resolved     boolean     not null default false,
+  created_at   timestamptz not null default now()
+);
+
+create index kalendar_error_log_tag_idx on public.kalendar_error_log (tag);
+create index kalendar_error_log_severity_idx on public.kalendar_error_log (severity);
+create index kalendar_error_log_business_idx on public.kalendar_error_log (business_id);
+create index kalendar_error_log_created_idx on public.kalendar_error_log (created_at);
+create index kalendar_error_log_resolved_idx on public.kalendar_error_log (resolved);
+
+alter table public.kalendar_error_log enable row level security;
+
+create policy "ErrorLog: write"
+  on public.kalendar_error_log for all using (true) with check (true);
+
 -- ============================================================================
 -- End of schema.
 -- ============================================================================

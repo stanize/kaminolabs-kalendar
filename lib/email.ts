@@ -18,6 +18,7 @@
 // UI components (booking/client detail views) via lib/whatsapp/sentinel-email.ts
 // so both "don't send" and "don't display" use the exact same check.
 import { isWhatsappSentinelEmail } from "@/lib/whatsapp/sentinel-email";
+import { logEvent } from "@/lib/server-error-log";
 
 /**
  * TEMPORARY: guest-facing email content is pinned to Spanish for all guest
@@ -50,6 +51,10 @@ export async function sendEmail({ to, subject, html, attachments }: SendEmailInp
     // WhatsApp guest booking's synthetic email — no real inbox behind it,
     // skip the send (see WHATSAPP_SENTINEL_EMAIL_DOMAINS above).
     console.warn(`[email] skipping send to WhatsApp sentinel address to=${to} subject="${subject}"`);
+    // debug, not warning/error: this is expected/intentional behavior that
+    // happens on every WhatsApp guest booking's internal emails — logging it
+    // higher than debug would drown real send failures in routine noise.
+    void logEvent("email", "debug", "skipping send to WhatsApp sentinel address", { data: { to, subject } });
     return { ok: false, error: "skipped: WhatsApp sentinel email address" };
   }
 
@@ -61,6 +66,7 @@ export async function sendEmail({ to, subject, html, attachments }: SendEmailInp
     console.warn(
       `[email] RESEND_API_KEY not set — skipping send. to=${to} subject="${subject}"`
     );
+    void logEvent("email", "debug", "RESEND_API_KEY not set — skipping send", { data: { to, subject } });
     return { ok: false, error: "RESEND_API_KEY not configured" };
   }
 
