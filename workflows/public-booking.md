@@ -139,15 +139,15 @@ Criteria:
 ## Step: booking-abuse-protection
 Status: in_progress
 Criteria:
-- RE-FLAGGED (docs/reviews/2026-09-27-review.md, "recommended next 3" #1):
-  this step's live-migration/live-test status hadn't moved since the
-  2026-09-19 note below — still unconfirmed as of the review. Called out
-  as the single highest-leverage thing to close, paired with getting the
-  brand-new holidays feature (workflows/holidays-and-time-off.md)
-  live-tested, since both are "code done, live-DB status unconfirmed"
-  right before/during a client demo. Confirm with Arun whether
-  schema_subset_008.sql has now been run against the live DB before
-  trusting this note further.
+- RE-FLAGGED (docs/reviews/2026-09-27-review.md, "recommended next 3" #1),
+  MIGRATION CONFIRMED LIVE (2026-09-27, checked directly against Supabase
+  project `rlxfcmijbesoblissmtd` via `information_schema` — read-only
+  query, no DDL run): both `kalendar_rate_limit_hits` (table) and
+  `increment_rate_limit_hit` (function) exist in `public` on the live DB.
+  `schema_subset_008.sql` has run. What's still open: the flow hasn't
+  been exercised for real (a live booking attempt that actually trips the
+  per-IP limit) — that part of this step needs Arun's live test, not just
+  a schema check, before flipping to `done`.
 - PENDING TESTING + PENDING LIVE MIGRATION (2026-09-19): code implemented
   and typechecked/linted clean, but not yet exercised in a running app —
   AND supabase/schema_subset_008.sql (kalendar_rate_limit_hits table +
@@ -155,6 +155,9 @@ Criteria:
   yet. Nothing in this step works in production until Arun runs that file
   in the Supabase SQL editor. Don't flip to `done` until both the
   migration has run AND the flow's been exercised for real.
+  **UPDATE (2026-09-27): the migration half of this note is now stale —
+  see the RE-FLAGGED entry above, migration confirmed live. Live-testing
+  the flow is the only remaining gap.**
 - IMPLEMENTED (2026-09-19) — Phase 1 honeypot: a `website` text input in
   the guest-details view of booking-wizard.tsx (ConfirmAuthModal), kept
   off-screen via `absolute h-0 w-0 opacity-0` (not display:none/

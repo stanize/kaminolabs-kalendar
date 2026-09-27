@@ -295,6 +295,18 @@ Criteria:
   migration ran AND actually exercise the holidays flow against real data
   before/immediately after the demo, not after — this protects
   demo-critical code, not just a nice-to-have.
+- MIGRATION CONFIRMED LIVE (2026-09-27, checked directly against Supabase
+  project `rlxfcmijbesoblissmtd` via `information_schema` — read-only
+  query, no DDL run): `kalendar_business_closures` exists in `public` on
+  the live DB with exactly the columns `lib/closures/data.ts`'s
+  `BusinessClosure` type expects (id, business_id, team_member_id,
+  recurring, month, day, start_date, end_date, start_time, end_time,
+  label, created_at). `schema_subset_016.sql` has run. What's still
+  open, unchanged by this check: nobody has yet exercised the actual
+  availability-engine behavior against real bookings/closures data —
+  that's the live-testing this step (and the five other in_progress
+  steps in this file) is still pending before any of them flip to
+  `done`.
 - BUILT (2026-09-26): code implemented, typechecked (`npx tsc --noEmit`
   clean), linted (`npx eslint` clean) and `npm run build` succeeds. Pending
   Arun's live testing before this flips to `done`.
