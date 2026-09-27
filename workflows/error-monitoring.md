@@ -48,6 +48,15 @@ Criteria:
     silently corrupt session counts; per bonos.md this is now the sole
     source of truth for that bookkeeping, so a silent failure here is
     higher-stakes than it would have been under the old split-write design.
+- RE-FLAGGED (2026-09-27, docs/reviews/2026-09-27-review.md): zero change
+  since 2026-09-14 — no `sentry` package anywhere in `package.json`, still
+  only the pre-existing `console.error` forwarding. Review's "recommended
+  next 3" #3: ship the cheap interim option first (a scheduled digest of
+  the `[client-error]`/`[whatsapp]`/`[rate-limit]` logs), not necessarily
+  full Sentry — three separate silent-fail-by-design systems (WhatsApp
+  sends, the bono trigger, rate-limiting) are now live with nothing
+  reading their logs systematically, so "someone happens to check Vercel
+  logs" is no longer a reasonable safety net.
 - NOW TRACKED SEPARATELY (2026-09-14, follow-up to Arun's request to turn
   the review's remaining findings into workflows too): the owner-facing
   failure surface and the backup/PITR story below are now their own steps

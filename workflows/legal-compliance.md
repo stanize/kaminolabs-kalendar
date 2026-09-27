@@ -48,5 +48,12 @@ Criteria:
 ## Notes / Deviations
 - This gap was surfaced by an independent code review session explicitly checking MVP readiness without reference to these workflow files — worth treating as a genuinely fresh finding rather than something previously tracked and missed.
 - CORROBORATED (2026-09-14, docs/reviews/2026-09-14-review.md): a second independent review reached the same conclusion — flagged in both the 2026-07-26 and 2026-09-14 reviews as a blind spot that "still hasn't moved." Called out there as the single item to treat as a hard blocker before a real clinic sends real patients through the booking flow, given the product now handles physiotherapy (health-adjacent) patient data under GDPR.
+- CORROBORATED AGAIN (2026-09-27, docs/reviews/2026-09-27-review.md): third
+  review running with zero content movement — the shell is done, the only
+  remaining work is the external GDPR legal review itself, which Arun
+  hasn't commissioned/returned yet. Review explicitly calls this out as
+  "recommended next 3" #2: get that legal review moving independently of
+  any engineering work, since the lead time is external and more
+  engineering effort doesn't shorten it.
 - Legal review lead time makes this different from the other MVP-blocking items (subscription-billing.md's calendar-aligned-billing/trial-period-mechanism/feature-gating) — those are pure engineering work Arun can time-box directly; this one depends on an external review Arun doesn't fully control the timeline of, so starting it early matters more than usual.
 - Design session (2026-09-14): Arun explicitly wanted the access/plumbing designed and built ahead of the content, specifically so the legal-review lead time doesn't block shipping the shell — see Design section above. `react-markdown` will be a new dependency; verify it's actually added (`package.json`) when this step's status changes, not just assumed from this note.

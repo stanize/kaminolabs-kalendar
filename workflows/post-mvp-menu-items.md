@@ -36,6 +36,16 @@ Status: not_started
 Criteria:
 - REMOVED (commit ce5f610): both nav link and route deleted outright
 - Scope undecided — likely business-analytics style (bookings over time, revenue, no-show rates) but nothing designed yet; revisit if/when this becomes a real priority
+- RE-FLAGGED, THIRD REVIEW RUNNING (docs/reviews/2026-07-26-review.md,
+  2026-09-14-review.md, 2026-09-27-review.md): ranked #3 in the latest
+  review's "gaps that block revenue or retention" — a clinic owner today
+  has no way to see their own booking volume, no-show rate, or bono usage
+  trends without Arun building it ad hoc. Framed there as a stickiness
+  gap, not just a missing nice-to-have: an owner who can't see the
+  platform is actually helping them has one less reason to keep paying
+  once the novelty wears off. Still nothing designed — this note doesn't
+  change that, just records that it's now unmoved across three
+  consecutive reviews.
 
 ## Step: integrations-page
 Status: not_started

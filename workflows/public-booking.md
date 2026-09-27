@@ -139,6 +139,15 @@ Criteria:
 ## Step: booking-abuse-protection
 Status: in_progress
 Criteria:
+- RE-FLAGGED (docs/reviews/2026-09-27-review.md, "recommended next 3" #1):
+  this step's live-migration/live-test status hadn't moved since the
+  2026-09-19 note below — still unconfirmed as of the review. Called out
+  as the single highest-leverage thing to close, paired with getting the
+  brand-new holidays feature (workflows/holidays-and-time-off.md)
+  live-tested, since both are "code done, live-DB status unconfirmed"
+  right before/during a client demo. Confirm with Arun whether
+  schema_subset_008.sql has now been run against the live DB before
+  trusting this note further.
 - PENDING TESTING + PENDING LIVE MIGRATION (2026-09-19): code implemented
   and typechecked/linted clean, but not yet exercised in a running app —
   AND supabase/schema_subset_008.sql (kalendar_rate_limit_hits table +

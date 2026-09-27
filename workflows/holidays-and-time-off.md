@@ -284,6 +284,17 @@ Criteria:
 ## Step: availability-engine-integration
 Status: in_progress
 Criteria:
+- RE-FLAGGED (docs/reviews/2026-09-27-review.md, "recommended next 3"
+  #1): this whole feature (six interlocking `in_progress` steps in this
+  file, most still pending the `schema_subset_016.sql` live migration)
+  was built in ~2 days specifically ahead of a client demo and is called
+  out as "the largest block of unexercised production code in the repo
+  right now." This step in particular is the one where a bug is most
+  directly patient-facing — a real slot showing as bookable when it
+  shouldn't be, or vice versa. Review's recommendation: confirm the
+  migration ran AND actually exercise the holidays flow against real data
+  before/immediately after the demo, not after — this protects
+  demo-critical code, not just a nice-to-have.
 - BUILT (2026-09-26): code implemented, typechecked (`npx tsc --noEmit`
   clean), linted (`npx eslint` clean) and `npm run build` succeeds. Pending
   Arun's live testing before this flips to `done`.
