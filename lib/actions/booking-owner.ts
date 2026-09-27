@@ -18,6 +18,7 @@ import {
 } from "@/lib/email";
 import { sendPlainMessage, decryptConfigAuthToken, type WhatsappConfigRow } from "@/lib/whatsapp/twilio-client";
 import { logEvent } from "@/lib/server-error-log";
+import { ERROR_CODES } from "@/lib/error-codes";
 
 export type OwnerBookingResult = { ok: true } | { ok: false; error: string };
 
@@ -440,6 +441,7 @@ export const updateBookingResult = authedAction(
       // trigger-side failure here would otherwise be completely invisible
       // (no app-code console.error call site existed for it before this).
       void logEvent("booking-status-update", "error", "kalendar_bookings status/payment update failed", {
+        code: ERROR_CODES.BOOKING_STATUS_UPDATE_FAILED,
         businessId: business.id,
         data: { bookingId: input.bookingId, status: input.status, error: error.message },
       });
@@ -460,6 +462,7 @@ export const updateBookingResult = authedAction(
         // place that would surface it visibly, not a silent background op.
         console.error("[updateBookingResult] counters update failed", e);
         void logEvent("updateBookingResult", "warning", "counters update failed", {
+          code: ERROR_CODES.BOOKING_COUNTERS_UPDATE_FAILED,
           businessId: business.id,
           data: { bookingId: input.bookingId, clinicClientId: booking.clinic_client_id, error: String(e) },
         });
@@ -601,6 +604,7 @@ async function sendManualBookingWhatsappConfirmation(params: {
   } catch (e) {
     console.error("[whatsapp] manual booking confirmation send failed:", e);
     void logEvent("whatsapp", "error", "manual booking confirmation send failed", {
+      code: ERROR_CODES.WHATSAPP_MANUAL_CONFIRMATION_FAILED,
       businessId: params.businessId,
       data: { phone, error: String(e) },
     });
@@ -835,6 +839,7 @@ export const createBookingAsOwner = authedAction(
       if (noteError) {
         console.error("[createBookingAsOwner] client note copy failed", noteError);
         void logEvent("createBookingAsOwner", "warning", "client note copy failed", {
+          code: ERROR_CODES.BOOKING_NOTE_COPY_FAILED_OWNER,
           businessId: business.id,
           data: { clinicClientId, error: noteError.message },
         });

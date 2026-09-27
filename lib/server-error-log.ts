@@ -13,12 +13,17 @@ export type LogSeverity = "debug" | "info" | "warning" | "error" | "critical";
  *
  * Fails silently on insert failure (logged to console, never thrown) — a
  * logging outage must never break the thing it's trying to observe.
+ *
+ * `context.code` is the KLNDR-NNNN catalog code (lib/error-codes.ts) for
+ * this call site, when one is registered — omit it only for genuinely
+ * ad-hoc debug logging that was never assigned a permanent code.
  */
 export async function logEvent(
   tag: string,
   severity: LogSeverity,
   message: string,
   context?: {
+    code?: string;
     source?: "server" | "client";
     businessId?: string | null;
     stack?: string | null;
@@ -32,6 +37,7 @@ export async function logEvent(
       source: context?.source ?? "server",
       tag,
       severity,
+      code: context?.code ?? null,
       message: message.slice(0, 2000),
       stack: context?.stack?.slice(0, 4000) ?? null,
       business_id: context?.businessId ?? null,

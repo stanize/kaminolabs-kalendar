@@ -12,6 +12,7 @@ import { buildBookingIcsBase64 } from "@/lib/booking/ics";
 import { formatBusinessAddress } from "@/lib/business/data";
 import { resolveClinicClientId } from "@/lib/booking/client-link";
 import { logEvent } from "@/lib/server-error-log";
+import { ERROR_CODES } from "@/lib/error-codes";
 import {
   sendEmail,
   bookingConfirmEmailHtml,
@@ -557,6 +558,7 @@ async function submitBookingImpl(input: {
       if (noteError) {
         console.error("[submitBookingImpl] client note copy failed", noteError);
         void logEvent("submitBookingImpl", "warning", "client note copy failed", {
+          code: ERROR_CODES.BOOKING_NOTE_COPY_FAILED_GUEST,
           businessId: data.business.id,
           data: { clinicClientId, error: noteError.message },
         });

@@ -19,6 +19,7 @@
 // so both "don't send" and "don't display" use the exact same check.
 import { isWhatsappSentinelEmail } from "@/lib/whatsapp/sentinel-email";
 import { logEvent } from "@/lib/server-error-log";
+import { ERROR_CODES } from "@/lib/error-codes";
 
 /**
  * TEMPORARY: guest-facing email content is pinned to Spanish for all guest
@@ -54,7 +55,10 @@ export async function sendEmail({ to, subject, html, attachments }: SendEmailInp
     // debug, not warning/error: this is expected/intentional behavior that
     // happens on every WhatsApp guest booking's internal emails — logging it
     // higher than debug would drown real send failures in routine noise.
-    void logEvent("email", "debug", "skipping send to WhatsApp sentinel address", { data: { to, subject } });
+    void logEvent("email", "debug", "skipping send to WhatsApp sentinel address", {
+      code: ERROR_CODES.EMAIL_SKIPPED_WHATSAPP_SENTINEL,
+      data: { to, subject },
+    });
     return { ok: false, error: "skipped: WhatsApp sentinel email address" };
   }
 
@@ -66,7 +70,10 @@ export async function sendEmail({ to, subject, html, attachments }: SendEmailInp
     console.warn(
       `[email] RESEND_API_KEY not set — skipping send. to=${to} subject="${subject}"`
     );
-    void logEvent("email", "debug", "RESEND_API_KEY not set — skipping send", { data: { to, subject } });
+    void logEvent("email", "debug", "RESEND_API_KEY not set — skipping send", {
+      code: ERROR_CODES.EMAIL_SKIPPED_NOT_CONFIGURED,
+      data: { to, subject },
+    });
     return { ok: false, error: "RESEND_API_KEY not configured" };
   }
 
@@ -91,7 +98,10 @@ export async function sendEmail({ to, subject, html, attachments }: SendEmailInp
           ? String((payload as { message: unknown }).message)
           : "") || `HTTP ${res.status}`;
       console.error(`[email] Resend send failed: ${detail} (to=${to})`);
-      void logEvent("email", "error", "Resend send failed", { data: { to, subject, detail } });
+      void logEvent("email", "error", "Resend send failed", {
+        code: ERROR_CODES.EMAIL_SEND_FAILED,
+        data: { to, subject, detail },
+      });
       return { ok: false, error: detail };
     }
 
@@ -104,7 +114,10 @@ export async function sendEmail({ to, subject, html, attachments }: SendEmailInp
   } catch (err) {
     const msg = err instanceof Error ? err.message : "unknown error";
     console.error(`[email] Failed to send to=${to}: ${msg}`);
-    void logEvent("email", "error", "send threw an exception", { data: { to, subject, error: msg } });
+    void logEvent("email", "error", "send threw an exception", {
+      code: ERROR_CODES.EMAIL_SEND_EXCEPTION,
+      data: { to, subject, error: msg },
+    });
     return { ok: false, error: msg };
   }
 }

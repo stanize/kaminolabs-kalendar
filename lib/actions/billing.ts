@@ -6,6 +6,7 @@ import { getStripeClient, isStripeConfigured, nextBillingCycleAnchorUnix, trialE
 import { getBusinessPricing } from "@/lib/pricing/data";
 import { getBusinessForUser } from "@/lib/business/data";
 import { logEvent } from "@/lib/server-error-log";
+import { ERROR_CODES } from "@/lib/error-codes";
 
 export type BillingActionResult =
   | { ok: true; url: string }
@@ -320,6 +321,7 @@ export const createSubscriptionIntent = authedAction(
       setupIntentId,
     });
     void logEvent("createSubscriptionIntent", "critical", "no usable client secret found", {
+      code: ERROR_CODES.SUBSCRIPTION_INTENT_NO_CLIENT_SECRET,
       businessId: business.id,
       data: {
         subscriptionId: subscription.id,

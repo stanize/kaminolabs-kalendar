@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { logEvent } from "@/lib/server-error-log";
+import { ERROR_CODES } from "@/lib/error-codes";
 
 // One value per endpoint that gets its own counter (public-booking.md's
 // booking-abuse-protection design: every account/booking-creating endpoint
@@ -36,6 +37,7 @@ export async function incrementRateLimitHit(
   if (error) {
     console.error("[rate-limit] increment failed", { endpoint, ipKey, error: error.message });
     void logEvent("rate-limit", "error", "increment_rate_limit_hit failed", {
+      code: ERROR_CODES.RATE_LIMIT_INCREMENT_FAILED,
       data: { endpoint, ipKey, error: error.message },
     });
     return 0;

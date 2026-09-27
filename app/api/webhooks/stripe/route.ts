@@ -3,6 +3,7 @@ import type Stripe from "stripe";
 import { createClient } from "@/lib/supabase/server";
 import { getStripeClient } from "@/lib/billing/stripe";
 import { logEvent } from "@/lib/server-error-log";
+import { ERROR_CODES } from "@/lib/error-codes";
 
 /**
  * Stripe webhook receiver. See docs/specs/stripe-subscription-billing-spec.md
@@ -27,7 +28,9 @@ export async function POST(request: Request) {
 
   if (!stripe || !webhookSecret) {
     console.error("[stripe-webhook] Stripe not configured");
-    void logEvent("stripe-webhook", "critical", "Stripe not configured", {});
+    void logEvent("stripe-webhook", "critical", "Stripe not configured", {
+      code: ERROR_CODES.STRIPE_WEBHOOK_NOT_CONFIGURED,
+    });
     return NextResponse.json({ error: "Not configured" }, { status: 503 });
   }
 
@@ -44,6 +47,7 @@ export async function POST(request: Request) {
   } catch (err) {
     console.error("[stripe-webhook] signature verification failed:", err);
     void logEvent("stripe-webhook", "error", "signature verification failed", {
+      code: ERROR_CODES.STRIPE_WEBHOOK_SIGNATURE_INVALID,
       data: { err: String(err) },
     });
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
@@ -84,6 +88,7 @@ export async function POST(request: Request) {
         } else {
           console.error("[stripe-webhook] checkout.session.completed missing client_reference_id");
           void logEvent("stripe-webhook", "critical", "checkout.session.completed missing client_reference_id", {
+            code: ERROR_CODES.STRIPE_WEBHOOK_MISSING_BUSINESS_REF,
             data: { eventId: event.id },
           });
         }
@@ -126,6 +131,7 @@ export async function POST(request: Request) {
         // is driven by customer.subscription.updated, not required here.
         console.log("[stripe-webhook] invoice.payment_succeeded", event.id);
         void logEvent("stripe-webhook", "info", "invoice.payment_succeeded", {
+          code: ERROR_CODES.STRIPE_WEBHOOK_PAYMENT_SUCCEEDED,
           data: { eventId: event.id },
         });
         break;
@@ -146,6 +152,7 @@ export async function POST(request: Request) {
   } catch (err) {
     console.error("[stripe-webhook] processing error:", event.type, err);
     void logEvent("stripe-webhook", "critical", "processing error", {
+      code: ERROR_CODES.STRIPE_WEBHOOK_PROCESSING_ERROR,
       data: { eventType: event.type, eventId: event.id, err: String(err) },
     });
     // Not marked as processed — Stripe will retry, and the idempotency check

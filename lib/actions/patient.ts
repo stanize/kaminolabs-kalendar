@@ -7,6 +7,7 @@ import { requireSession } from "@/lib/auth-session";
 import { notifyCancellation, notifyCancellationRequested } from "@/lib/actions/booking";
 import { claimExistingClientHistory } from "@/lib/booking/patient-claim";
 import { logEvent } from "@/lib/server-error-log";
+import { ERROR_CODES } from "@/lib/error-codes";
 
 export type ProvisionResult =
   | { ok: true; patientId: string }
@@ -71,6 +72,7 @@ export async function provisionPatient(phone?: string): Promise<ProvisionResult>
   if (fetchError) {
     console.error("[provisionPatient] fetch error:", fetchError.message, fetchError.code);
     void logEvent("provisionPatient", "error", "fetch error", {
+      code: ERROR_CODES.PROVISION_PATIENT_FETCH_FAILED,
       data: { userId, error: fetchError.message, code: fetchError.code },
     });
     return { ok: false, error: `No se pudo obtener el perfil. (${fetchError.message})` };
@@ -78,7 +80,10 @@ export async function provisionPatient(phone?: string): Promise<ProvisionResult>
 
   if (!data) {
     console.error("[provisionPatient] no row found for userId:", userId);
-    void logEvent("provisionPatient", "critical", "no row found after insert+fetch", { data: { userId } });
+    void logEvent("provisionPatient", "critical", "no row found after insert+fetch", {
+      code: ERROR_CODES.PROVISION_PATIENT_NO_ROW,
+      data: { userId },
+    });
     return { ok: false, error: "No se pudo crear el perfil de cliente." };
   }
 

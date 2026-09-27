@@ -4,6 +4,7 @@ import { sendEmail } from "@/lib/email";
 import { currentDiscountPercent } from "@/lib/pricing/compute";
 import { resolvePhases } from "@/lib/pricing/data";
 import { logEvent } from "@/lib/server-error-log";
+import { ERROR_CODES } from "@/lib/error-codes";
 
 /**
  * Cron endpoint — runs daily. Compares yesterday's currentDiscountPercent to
@@ -38,7 +39,10 @@ export async function GET(request: Request) {
 
   if (error) {
     console.error("[pricing-phase-notify] fetch error:", error.message);
-    void logEvent("pricing-phase-notify", "critical", "fetch error", { data: { message: error.message } });
+    void logEvent("pricing-phase-notify", "critical", "fetch error", {
+      code: ERROR_CODES.PRICING_PHASE_NOTIFY_FETCH_FAILED,
+      data: { message: error.message },
+    });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
@@ -68,6 +72,7 @@ export async function GET(request: Request) {
     } catch (e) {
       console.error("[pricing-phase-notify] failed for business", biz.id, e);
       void logEvent("pricing-phase-notify", "error", "failed for business", {
+        code: ERROR_CODES.PRICING_PHASE_NOTIFY_BUSINESS_FAILED,
         businessId: biz.id,
         data: { error: String(e) },
       });
@@ -75,6 +80,9 @@ export async function GET(request: Request) {
   }
 
   console.log(`[pricing-phase-notify] notified ${notified} businesses`);
-  void logEvent("pricing-phase-notify", "info", `notified ${notified} businesses`, { data: { notified } });
+  void logEvent("pricing-phase-notify", "info", `notified ${notified} businesses`, {
+    code: ERROR_CODES.PRICING_PHASE_NOTIFY_RUN_SUMMARY,
+    data: { notified },
+  });
   return NextResponse.json({ notified });
 }

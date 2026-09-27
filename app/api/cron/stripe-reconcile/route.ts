@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getStripeClient } from "@/lib/billing/stripe";
 import { logEvent } from "@/lib/server-error-log";
+import { ERROR_CODES } from "@/lib/error-codes";
 
 /**
  * Cron endpoint — runs daily. Backup safety net, NOT the primary sync
@@ -34,7 +35,10 @@ export async function GET(request: Request) {
 
   if (error) {
     console.error("[stripe-reconcile] fetch error:", error.message);
-    void logEvent("stripe-reconcile", "critical", "fetch error", { data: { message: error.message } });
+    void logEvent("stripe-reconcile", "critical", "fetch error", {
+      code: ERROR_CODES.STRIPE_RECONCILE_FETCH_FAILED,
+      data: { message: error.message },
+    });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
@@ -53,6 +57,7 @@ export async function GET(request: Request) {
           `[stripe-reconcile] MISMATCH business=${biz.id} stored=${biz.subscription_status} stripe=${subscription.status} — a webhook was likely missed`
         );
         void logEvent("stripe-reconcile", "warning", "subscription status mismatch — a webhook was likely missed", {
+          code: ERROR_CODES.STRIPE_RECONCILE_MISMATCH,
           businessId: biz.id,
           data: { stored: biz.subscription_status, stripe: subscription.status },
         });
@@ -60,6 +65,7 @@ export async function GET(request: Request) {
     } catch (e) {
       console.error(`[stripe-reconcile] fetch failed for business=${biz.id}:`, e);
       void logEvent("stripe-reconcile", "error", "Stripe subscription fetch failed", {
+        code: ERROR_CODES.STRIPE_RECONCILE_BUSINESS_FETCH_FAILED,
         businessId: biz.id,
         data: { stripeSubscriptionId: biz.stripe_subscription_id, error: String(e) },
       });
@@ -68,6 +74,7 @@ export async function GET(request: Request) {
 
   console.log(`[stripe-reconcile] checked ${checked}, ${mismatches} mismatches found`);
   void logEvent("stripe-reconcile", mismatches > 0 ? "warning" : "info", `checked ${checked}, ${mismatches} mismatches found`, {
+    code: ERROR_CODES.STRIPE_RECONCILE_RUN_SUMMARY,
     data: { checked, mismatches },
   });
   return NextResponse.json({ checked, mismatches });

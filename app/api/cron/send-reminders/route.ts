@@ -10,6 +10,7 @@ import {
   EMAIL_LOCALE,
 } from "@/lib/email";
 import { logEvent } from "@/lib/server-error-log";
+import { ERROR_CODES } from "@/lib/error-codes";
 
 /**
  * Cron endpoint — primary scheduler is Supabase pg_cron (job
@@ -96,7 +97,10 @@ export async function GET(request: Request) {
   if (due24.error || due1.error) {
     const message = due24.error?.message ?? due1.error?.message ?? "unknown error";
     console.error("[reminders] fetch error:", message);
-    void logEvent("reminders", "critical", "fetch error", { data: { message } });
+    void logEvent("reminders", "critical", "fetch error", {
+      code: ERROR_CODES.REMINDERS_FETCH_FAILED,
+      data: { message },
+    });
     return NextResponse.json({ error: message }, { status: 500 });
   }
 
@@ -118,6 +122,7 @@ export async function GET(request: Request) {
 
   console.log(`[reminders] sent24=${sent24} sent1=${sent1} failed=${failed}`);
   void logEvent("reminders", failed > 0 ? "warning" : "info", `sent24=${sent24} sent1=${sent1} failed=${failed}`, {
+    code: ERROR_CODES.REMINDERS_RUN_SUMMARY,
     data: { sent24, sent1, failed },
   });
   return NextResponse.json({ sent24, sent1, failed });
@@ -218,6 +223,7 @@ async function sendReminder(
   if (!result.ok) {
     console.error(`[reminders] ${variant} send failed for booking ${booking.id}: ${result.error}`);
     void logEvent("reminders", "error", `${variant} send failed`, {
+      code: ERROR_CODES.REMINDERS_SEND_FAILED,
       businessId: booking.business_id,
       data: { bookingId: booking.id, variant, error: result.error },
     });

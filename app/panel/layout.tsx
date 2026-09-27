@@ -7,6 +7,7 @@ import { EmailVerificationGate } from "@/components/panel/email-verification-gat
 import { RoleUpgradeGate } from "@/components/panel/role-upgrade-gate";
 import { getPanelShellServerDictionary } from "@/lib/i18n/server";
 import { logEvent } from "@/lib/server-error-log";
+import { ERROR_CODES } from "@/lib/error-codes";
 
 export default async function PanelLayout({ children }: { children: ReactNode }) {
   const t0 = Date.now();
@@ -16,6 +17,7 @@ export default async function PanelLayout({ children }: { children: ReactNode })
   } catch (e) {
     console.error("[panel-layout] getSession failed", { ms: Date.now() - t0, error: e instanceof Error ? e.message : e });
     void logEvent("panel-layout", "critical", "getSession failed", {
+      code: ERROR_CODES.PANEL_SESSION_FAILED,
       data: { ms: Date.now() - t0, error: e instanceof Error ? e.message : String(e) },
     });
     throw e;
@@ -41,6 +43,7 @@ export default async function PanelLayout({ children }: { children: ReactNode })
   } catch (e) {
     console.error("[panel-layout] getUserRoles failed", { userId: session.user.id, ms: Date.now() - t1, error: e instanceof Error ? e.message : e });
     void logEvent("panel-layout", "critical", "getUserRoles failed", {
+      code: ERROR_CODES.PANEL_ROLES_FAILED,
       data: { userId: session.user.id, ms: Date.now() - t1, error: e instanceof Error ? e.message : String(e) },
     });
     throw e;
@@ -48,6 +51,7 @@ export default async function PanelLayout({ children }: { children: ReactNode })
   if (Date.now() - t1 > 3000) {
     console.error("[panel-layout] getUserRoles slow", { userId: session.user.id, ms: Date.now() - t1 });
     void logEvent("panel-layout", "warning", "getUserRoles slow", {
+      code: ERROR_CODES.PANEL_ROLES_SLOW,
       data: { userId: session.user.id, ms: Date.now() - t1 },
     });
   }
@@ -69,6 +73,7 @@ export default async function PanelLayout({ children }: { children: ReactNode })
   } catch (e) {
     console.error("[panel-layout] assignRole failed", { userId: session.user.id, ms: Date.now() - t2, error: e instanceof Error ? e.message : e });
     void logEvent("panel-layout", "critical", "assignRole failed", {
+      code: ERROR_CODES.PANEL_ASSIGN_ROLE_FAILED,
       data: { userId: session.user.id, ms: Date.now() - t2, error: e instanceof Error ? e.message : String(e) },
     });
     throw e;
@@ -76,6 +81,7 @@ export default async function PanelLayout({ children }: { children: ReactNode })
   if (Date.now() - t2 > 3000) {
     console.error("[panel-layout] assignRole slow", { userId: session.user.id, ms: Date.now() - t2 });
     void logEvent("panel-layout", "warning", "assignRole slow", {
+      code: ERROR_CODES.PANEL_ASSIGN_ROLE_SLOW,
       data: { userId: session.user.id, ms: Date.now() - t2 },
     });
   }

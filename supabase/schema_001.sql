@@ -1233,6 +1233,11 @@ create table public.kalendar_error_log (
   source       text        not null check (source in ('server', 'client')),
   tag          text        not null, -- e.g. 'whatsapp', 'stripe-webhook', or an ad-hoc debug tag
   severity     text        not null check (severity in ('debug', 'info', 'warning', 'error', 'critical')),
+  -- Curated catalog code (lib/error-codes.ts, e.g. "KLNDR-0007") identifying
+  -- WHICH registered failure/event this is — one fixed code per call site,
+  -- reused every time that same kind recurs (schema_subset_018.sql). Null
+  -- for ad-hoc debug logEvent() calls that were never assigned a code.
+  code         text,
   message      text        not null,
   stack        text,       -- populated for client JS errors; rarely for server-side logs
   business_id  uuid        references public.kalendar_businesses (id) on delete set null,
@@ -1248,6 +1253,7 @@ create index kalendar_error_log_severity_idx on public.kalendar_error_log (sever
 create index kalendar_error_log_business_idx on public.kalendar_error_log (business_id);
 create index kalendar_error_log_created_idx on public.kalendar_error_log (created_at);
 create index kalendar_error_log_resolved_idx on public.kalendar_error_log (resolved);
+create index kalendar_error_log_code_idx on public.kalendar_error_log (code);
 
 alter table public.kalendar_error_log enable row level security;
 

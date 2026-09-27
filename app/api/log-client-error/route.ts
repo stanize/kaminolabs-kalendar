@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { logEvent } from "@/lib/server-error-log";
 import { incrementRateLimitHit, getClientIp } from "@/lib/rate-limit";
+import { ERROR_CODES } from "@/lib/error-codes";
 
 // structured-event-log (workflows/error-monitoring.md): generous per-IP daily
 // cap. A real browser session hitting a real bug won't come close to this;
@@ -53,6 +54,7 @@ export async function POST(request: Request) {
     const hits = await incrementRateLimitHit("log_client_error", ip);
     if (hits <= DAILY_LIMIT) {
       void logEvent(labelStr, "error", messageStr, {
+        code: ERROR_CODES.CLIENT_REPORTED_ERROR,
         source: "client",
         stack: stackStr,
         requestUrl: url,
