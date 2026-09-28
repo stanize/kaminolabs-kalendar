@@ -11,7 +11,7 @@ import {
   screenSlug,
 } from "@/lib/business/slug-screen";
 import { lookupPostalCode as lookupPostalCodeData } from "@/lib/business/postal-codes";
-import { getBusinessForUser } from "@/lib/business/data";
+import { getBusinessForUser, isSlugAvailable } from "@/lib/business/data";
 
 const VALID_TYPES = new Set<string>(BUSINESS_TYPES.map((t) => t.id));
 
@@ -78,6 +78,11 @@ export const checkSlugAvailability = authedAction(
       .maybeSingle();
 
     if (data && data.owner_id !== session.user.id) {
+      return { status: "taken" };
+    }
+    if (!data && !(await isSlugAvailable(slug))) {
+      // Not held by a current business, but retired — never silently
+      // reclaimable (see kalendar_slug_history).
       return { status: "taken" };
     }
     return { status: "available" };
@@ -238,14 +243,9 @@ export const saveBusinessSettings = authedAction(
     const slugStatus = screen.clean ? "active" : "pending_review";
     const slugFlagReason = screen.clean ? null : screen.reason;
 
-    // Authoritative uniqueness check (the live check is advisory only).
-    const { data: clash } = await supabase
-      .from("kalendar_businesses")
-      .select("id")
-      .eq("slug", slug)
-      .maybeSingle();
-
-    if (clash) {
+    // Authoritative uniqueness check (the live check is advisory only) —
+    // against both the current businesses table and retired slugs.
+    if (!(await isSlugAvailable(slug))) {
       return {
         ok: false,
         error: dict?.errSlugTaken ?? "Ese enlace ya está en uso. Elige otro.",

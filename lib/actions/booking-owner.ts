@@ -75,7 +75,7 @@ export const cancelBookingAsOwner = authedAction(
 
     const { error } = await supabase
       .from("kalendar_bookings")
-      .update({ status: "cancelled" })
+      .update({ status: "cancelled", status_updated_at: new Date().toISOString() })
       .eq("id", bookingId)
       .eq("business_id", business.id)
       .in("status", ["pending_confirmation", "confirmed"]);
@@ -188,7 +188,11 @@ export const confirmBookingAsOwner = authedAction(
 
     const { error } = await supabase
       .from("kalendar_bookings")
-      .update({ status: "confirmed", pending_expiry_at: null })
+      .update({
+        status: "confirmed",
+        pending_expiry_at: null,
+        status_updated_at: new Date().toISOString(),
+      })
       .eq("id", bookingId)
       .eq("business_id", business.id)
       .eq("status", "pending_confirmation");
@@ -427,6 +431,7 @@ export const updateBookingResult = authedAction(
         payment_status: input.paymentStatus,
         payment_method: newPaymentMethod,
         bono_purchase_id: newBonoPurchaseId,
+        status_updated_at: new Date().toISOString(),
       })
       .eq("id", input.bookingId)
       .eq("business_id", business.id);
@@ -814,6 +819,7 @@ export const createBookingAsOwner = authedAction(
       notes: (input.notes ?? "").trim() || null,
       guest_locale: "es",
       confirm_token: token,
+      booking_channel: "panel_manual",
     });
 
     if (error) {

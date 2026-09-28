@@ -328,6 +328,11 @@ async function submitBookingImpl(input: {
   // Never set by the website wizard (submitBooking). See client-link.ts's
   // doc comment for the full rationale.
   matchByPhone?: boolean;
+  // Activity-tracking signal (admin-portal-tools.md customer-dashboard,
+  // section 5) — which channel this booking came in through. Defaults to
+  // 'public_web' (the wizard's own submitBooking entry point); the WhatsApp
+  // conversation flow passes 'whatsapp' explicitly via submitBookingInternal.
+  channel?: "public_web" | "whatsapp";
   // When set, the booking is for an authenticated patient: status is 'confirmed'
   // immediately, pending_expiry_at is null, and patient_id is stored.
   patientId?: string | null;
@@ -530,6 +535,7 @@ async function submitBookingImpl(input: {
     notes: notes || null,
     guest_locale: input.guestLocale,
     confirm_token: token,
+    booking_channel: input.channel ?? "public_web",
   });
 
   if (error) {

@@ -554,6 +554,7 @@ async function awaitingConfirmation(
     clientPhone: session.phone_number,
     guestLocale: "es",
     matchByPhone: true,
+    channel: "whatsapp",
   });
 
   if (!result.ok) {

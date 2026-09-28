@@ -451,6 +451,38 @@ export function cancellationRequestDeniedClientHtml(input: {
   return emailShell(body, "Kalendar · Reservas y agenda para tu clínica", businessName, brandColor);
 }
 
+/**
+ * To the OWNER: an admin changed this business's booking-page slug
+ * (admin-portal-tools.md customer-dashboard, section 3 — every slug change
+ * requires an admin note and triggers this notice). Always Spanish —
+ * owner-facing product notifications aren't locale-branched (see
+ * EMAIL_LOCALE usage above).
+ */
+export function slugChangedOwnerHtml(input: {
+  businessName: string;
+  oldSlug: string;
+  newSlug: string;
+  newUrl: string;
+}): string {
+  const { businessName, oldSlug, newSlug, newUrl } = input;
+  const rows = [
+    { label: "Enlace anterior", value: oldSlug },
+    { label: "Enlace nuevo", value: newSlug },
+  ];
+  const body = `
+    <h1 style="font-size:19px;margin:0 0 12px;">La dirección de tu página de reservas ha cambiado</h1>
+    <p style="font-size:15px;line-height:1.6;margin:0 0 18px;">
+      El equipo de Kalendar ha actualizado el enlace de reservas de <strong>${escapeHtml(businessName)}</strong>.
+      El enlace anterior ya no funciona — actualiza cualquier sitio donde lo hayas compartido
+      (redes sociales, tarjetas, tu web) con la nueva dirección.
+    </p>
+    ${emailInfoBox(rows)}
+    <p style="font-size:14px;line-height:1.6;margin:18px 0 0;">
+      Tu nuevo enlace: <a href="${newUrl}" style="color:${BRAND_TEAL};">${escapeHtml(newUrl)}</a>
+    </p>`;
+  return emailShell(body, "Kalendar · Reservas y agenda para tu clínica", "Kalendar");
+}
+
 function escapeHtml(s: string): string {
   return s
     .replace(/&/g, "&amp;")

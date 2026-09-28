@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { headers } from "next/headers";
 import { getPublicBookingData } from "@/lib/booking/data";
-import { formatBusinessAddress } from "@/lib/business/data";
+import { formatBusinessAddress, resolvePublicSlugRouting } from "@/lib/business/data";
 import { WEEKDAY_ORDER } from "@/lib/availability/constants";
 import { BookingPageShell } from "@/components/booking/booking-page-shell";
 import { auth } from "@/lib/auth";
@@ -20,6 +20,11 @@ export default async function BusinessPublicPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
+
+  const routing = await resolvePublicSlugRouting(slug);
+  if (routing.kind === "not_found") notFound();
+  if (routing.kind === "retired") return <RetiredSlugMessage />;
+  if (routing.kind === "inactive") return <SlugInactiveMessage />;
 
   const data = await getPublicBookingData(slug);
   if (!data) notFound();
@@ -76,6 +81,40 @@ export default async function BusinessPublicPage({
       isTeam={isTeam}
       initialLocale={INITIAL_LOCALE}
       initialPatient={initialPatient}
+    />
+  );
+}
+
+// ── Slug-lifecycle messaging (admin-portal-tools.md customer-dashboard,
+// section 3 and section 4's slug_active flag) — deliberately distinct copy
+// on purpose: "retired" is a link that's gone for good (old bookmark/
+// business-card), "inactive" is a page that may come back (non-payment
+// enforcement's public-page-down tier), so telling a visitor the link
+// "doesn't exist" there would be actively misleading.
+
+function MessagePage({ title, body }: { title: string; body: string }) {
+  return (
+    <div className="mx-auto flex min-h-[60vh] max-w-md flex-col items-center justify-center px-6 text-center">
+      <h1 className="mb-3 text-xl font-semibold text-ink">{title}</h1>
+      <p className="text-sm leading-relaxed text-ink-soft">{body}</p>
+    </div>
+  );
+}
+
+function RetiredSlugMessage() {
+  return (
+    <MessagePage
+      title="Este enlace ya no está activo"
+      body="El enlace de reserva al que has accedido ya no corresponde a ningún negocio. Si lo tienes guardado de una tarjeta o publicación antigua, pide al negocio su enlace actual."
+    />
+  );
+}
+
+function SlugInactiveMessage() {
+  return (
+    <MessagePage
+      title="Este negocio no está disponible temporalmente"
+      body="La página de reservas de este negocio está temporalmente fuera de servicio. Vuelve a intentarlo más adelante."
     />
   );
 }
