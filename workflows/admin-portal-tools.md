@@ -21,6 +21,27 @@ Criteria:
   members aren't separate Better Auth accounts today (just data rows on
   `kalendar_team_members`), so "the account" for this purpose is the
   business's `owner_id` → `"user"` row.
+- STILL OPEN before this is fully build-ready (found 2026-09-28, a
+  subagent cross-check of this whole design against the real current
+  code in both repos — everything else below checked out; the slug
+  redesign in #3 has since been resolved, these two haven't yet):
+  1. **`getSubscriptionDetail` (`lib/billing/stripe-data.ts`) can't
+     actually be "reused" by the admin repo as originally phrased** — the
+     two repos are separate Next.js deployments with no cross-repo
+     import path, and that function calls Stripe directly from the main
+     app. Needs a decision: either the admin repo gets its own copy of
+     the Stripe call (+ its own Stripe env vars), or the main app exposes
+     an internal API route the admin repo calls (precedent already
+     exists for this shape — `INTERNAL_SCHEMA_API_SECRET` /
+     `app/api/internal/schema/route.ts`).
+  2. **"Past confirmed" appointment status has no existing definition to
+     mirror.** Section 2 below originally cited `lib/booking/
+     client-status.ts` as the precedent to match — that file actually
+     defines something unrelated (guest vs. returning CLIENT
+     relationship, not booking status). There's no existing "past
+     confirmed" query anywhere in the codebase today; this needs to be
+     designed fresh at build time, not copied from a panel query that
+     doesn't exist.
 
 ### 1. Clinic overview
 - Name, type, plan (`plan_type`: solo/multi), subscription status
@@ -50,37 +71,75 @@ Criteria:
   "your booking page address changed to X" copy, Spanish, matching this
   file's existing guest/owner email conventions).
 - DECISION (2026-09-26, Arun) — **the old slug must NOT be deleted or
-  silently freed** when changed/removed from a clinic. A slug has its own
-  lifecycle, independent of which business currently holds it:
-  1. **Delink**: business loses the slug (its booking page is no longer
-     reachable at that address), but the slug string itself stays
-     reserved — nobody else can claim it, it isn't recycled automatically.
-  2. **Relink or delete**: from that reserved state, an admin either links
-     the slug to another business (possibly a different one than
-     originally), or explicitly deletes the reservation to truly free the
-     string for reuse.
-- This needs a real (small) schema change — today `slug` lives directly on
-  `kalendar_businesses` as a `unique not null` column, which can't express
-  "exists but unlinked." Proposed shape (finalize exact column/constraint
-  details at build time):
-  ```sql
-  create table kalendar_slug_registry (
-    slug        text primary key,
-    business_id uuid references kalendar_businesses(id) on delete set null, -- null = delinked, held in reserve
-    created_at  timestamptz not null default now(),
-    updated_at  timestamptz not null default now()
-  );
-  ```
-  `kalendar_businesses.slug` becomes **nullable** (null = "no active slug
-  right now"); `slug_status`/`slug_flag_reason`/`slug_reviewed_at`/
-  `slug_reviewed_by` (the existing moderation columns) likely move onto
-  the registry row too, since moderation is really a property of the slug
-  string's current claim, not the business — confirm this migration shape
-  carefully at build time since `slug` is read pervasively across the
-  codebase (public routing, `getPublicBookingData`, onboarding, the
-  existing `/admin/slugs` review queue) — this is real, non-trivial
-  surface area to update consistently, flagged explicitly as the biggest
-  single piece of build risk in this whole dashboard design.
+  silently freed** when changed/removed from a clinic — a slug string,
+  once used, should never become quietly claimable by an unrelated future
+  signup.
+- REDESIGNED — SIMPLER APPROACH (2026-09-28, Arun, verified against real
+  code before this revision — see "verified against code" note below):
+  supersedes the `kalendar_slug_registry` shape above (nullable
+  `businesses.slug`, moderation columns moved off the business row). That
+  version was flagged as this dashboard's single biggest build risk —
+  `slug` is read pervasively (public routing, `getPublicBookingData`,
+  onboarding, `/admin/slugs`'s existing review queue), and making it
+  nullable + relocating `slug_status`/`slug_flag_reason`/
+  `slug_reviewed_at`/`slug_reviewed_by` would have meant rewriting
+  `/admin/slugs.ts`'s three working functions
+  (`listPendingSlugReviews`/`approveSlug`/`rejectSlug`), not just adding
+  fields. Arun's simpler version needs none of that:
+  - `kalendar_businesses.slug` stays **exactly as it is today** —
+    `text not null unique`, same column, same lookup, same moderation
+    columns untouched, `/admin/slugs.ts` untouched.
+  - New table, purely additive, records what used to exist — naming TBD
+    at build time (Arun said "used slugs," `kalendar_slug_history` is a
+    reasonable working name):
+    ```sql
+    create table kalendar_slug_history (
+      id          uuid primary key default gen_random_uuid(),
+      slug        text not null, -- the retired string
+      business_id uuid references kalendar_businesses(id) on delete set null, -- who it used to belong to
+      note        text not null, -- admin's reason, required (see decision above)
+      changed_by  uuid, -- admin user id who made the change
+      created_at  timestamptz not null default now()
+    );
+    create unique index on kalendar_slug_history (slug) where business_id is not null; -- adjust at build time: only one "currently retired, not yet reclaimed" row per slug string makes sense; exact constraint shape TBD
+    ```
+  - **Slug creation/change** (both admin-side and clinic onboarding):
+    check uniqueness against `kalendar_businesses.slug` **and**
+    `kalendar_slug_history.slug` — a retired string can never be silently
+    reclaimed by an unrelated new signup.
+  - **On change**: write a row into `kalendar_slug_history` for the OLD
+    slug (with the required note), then update
+    `kalendar_businesses.slug` to the new value — same single-column
+    update mechanism as today, unchanged.
+  - **Public routing** (`/bookings/[slug]`): look up
+    `kalendar_businesses.slug` first (normal case, unchanged). On a miss,
+    check `kalendar_slug_history` — if found there, show a distinct "this
+    link is no longer active" page instead of the generic not-found page
+    (a visitor with an old bookmark/business-card link gets a clear
+    explanation, not silence).
+  - **Relink** (give a retired string back to a business, same one or a
+    different one): admin sets that business's `slug` to the retired
+    string directly (after the uniqueness check above confirms it's still
+    only in history), then the matching `kalendar_slug_history` row is
+    deleted/archived so it stops reading as "retired" once it's active
+    again.
+  - **Delete-forever** (truly free a retired string for reuse by anyone):
+    just delete its `kalendar_slug_history` row.
+  - OPEN QUESTION EXPLICITLY RESOLVED, NOT DEFERRED: does "delink" ever
+    need to leave a business with NO active slug (public page fully
+    unreachable, no replacement assigned)? Arun: no — `slug` stays
+    `not null`, a business always has exactly one active slug. What
+    prompted the original nullable-slug idea (suspending a non-paying
+    clinic's public page) is handled by a SEPARATE mechanism instead —
+    see the new `slug_active` flag in "additional signals" below.
+- VERIFIED AGAINST CODE (2026-09-28, subagent cross-check before this
+  revision): confirmed `kalendar_businesses.slug` is `text not null
+  unique` today (schema_001.sql), confirmed `/admin/slugs.ts`'s
+  `listPendingSlugReviews`/`approveSlug`/`rejectSlug` currently read/write
+  `slug_status`/`slug_flag_reason`/`slug_reviewed_at`/`slug_reviewed_by`
+  directly on `kalendar_businesses` with real working logic — this
+  redesign leaves all of that alone, which is the whole point of the
+  simplification.
 
 ### 4. Additional signals (Arun agreed, beyond the original 3-item ask)
 - **Slug moderation status** (`pending_review`/`rejected`/`active`, per
@@ -96,6 +155,31 @@ Criteria:
 - **Open support tickets count** (`kalendar_support_tickets`, already
   exists) — so an open ticket is visible right on the clinic's row, no
   cross-referencing a separate screen.
+- **`slug_active` flag** (2026-09-28, Arun, new — resolves the
+  "delink with no replacement" question from #3 above): new
+  `kalendar_businesses.slug_active boolean not null default true`.
+  Deliberately SLUG-SCOPED, not a general business `active`/`disabled`
+  flag — Arun's planned graduated non-payment enforcement is multi-tier
+  (a grace period where the panel stays reachable even after a
+  subscription lapses, THEN the public booking page goes down after
+  ~1-2 months, THEN, later, the panel itself locks after ~3-6 months) —
+  this flag is specifically the middle tier. The eventual panel-lockout
+  tier needs its own separate mechanism, not this column, so it's never
+  overloaded to mean two different things.
+  - When `false`: the public booking page shows "este negocio no está
+    disponible temporalmente" (clinic booking page temporarily down) —
+    DELIBERATELY DIFFERENT COPY from the retired-slug page in #3 (Arun:
+    a "link no longer exists" message on a link that might come back is
+    actively misleading — a visitor who sees "doesn't exist" won't try
+    that link again later, even once the clinic's subscription is
+    current and the page is back). The slug itself, and the business's
+    claim on it, are completely unaffected — this only gates whether the
+    public page renders, same slug throughout.
+  - THIS PASS: manual admin toggle only, surfaced as a column/action on
+    the dashboard row. Arun explicitly wants this wired to automatic
+    subscription-status-based enforcement LATER, once the graduated
+    non-payment ladder above is actually designed/built — not assumed or
+    half-wired in this pass.
 
 ### 5. Activity tracking (Arun's follow-up ask — multiple signals, not just login)
 - DECISION (2026-09-26, Arun + Claude, agreed): a single login is a weak
@@ -108,24 +192,28 @@ Criteria:
   2. **Last appointment manually created** — needs a NEW column,
      `booking_channel` on `kalendar_bookings`
      (`'public_web' | 'whatsapp' | 'panel_manual'`), set once at insert
-     time in each of the three existing creation paths (`submitBookingImpl`
-     in `lib/actions/booking.ts` for both web and WhatsApp — the WhatsApp
-     path is already distinguishable there via context, confirm exact
-     signal at build time — and `createBookingAsOwner` in
-     `lib/actions/booking-owner.ts` for the manual path). Today there is
-     NO way to distinguish "clinic manually created this via the panel"
-     from "a guest booked it themselves" — both produce a `patient_id`-null
-     row with a name/email/phone — this column closes that gap. Then
+     time in each of the three existing creation paths (`submitBooking`/
+     `submitBookingInternal` in `lib/actions/booking.ts:706,721` — NAME
+     CORRECTED 2026-09-28, was previously misnamed `submitBookingImpl` in
+     this doc — for both web and WhatsApp — the WhatsApp path is already
+     distinguishable there via context, confirm exact signal at build
+     time — and `createBookingAsOwner` in `lib/actions/
+     booking-owner.ts:649` for the manual path). Today there is NO way to
+     distinguish "clinic manually created this via the panel" from "a
+     guest booked it themselves" — both produce a `patient_id`-null row
+     with a name/email/phone — this column closes that gap. Then
      `last_manual_booking_at` = `max(created_at) where booking_channel =
      'panel_manual'`.
   3. **Last appointment status updated** — needs a NEW column,
      `status_updated_at timestamptz`, touched ONLY by the explicit
-     clinic actions that change a booking's `status` (confirm, cancel,
-     mark completed/no-show — via `booking-owner.ts`'s existing status-
-     changing actions), deliberately NOT the generic `updated_at` (which
-     also changes on unrelated edits like notes or payment marking) — so
-     this is a clean "are they actually managing appointments" signal,
-     not a noisy one.
+     clinic actions that change a booking's `status` — CONFIRMED 2026-09-28
+     the specific functions are `cancelBookingAsOwner` (booking-owner.ts:48),
+     `confirmBookingAsOwner` (booking-owner.ts:162), and
+     `updateBookingResult` (booking-owner.ts:320, sets completed/no_show/
+     cancelled) — deliberately NOT the generic `updated_at` (which also
+     changes on unrelated edits like notes or payment marking) — so this
+     is a clean "are they actually managing appointments" signal, not a
+     noisy one.
   - Both new columns are additive (`schema_subset_NNN.sql`, standalone,
     non-destructive per this file's usual migration convention — check
     `ls supabase/` for the next number at build time) plus folded into
