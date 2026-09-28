@@ -21,10 +21,12 @@ Criteria:
   members aren't separate Better Auth accounts today (just data rows on
   `kalendar_team_members`), so "the account" for this purpose is the
   business's `owner_id` → `"user"` row.
-- STILL OPEN before this is fully build-ready (found 2026-09-28, a
-  subagent cross-check of this whole design against the real current
-  code in both repos — everything else below checked out; the slug
-  redesign in #3 has since been resolved, these two haven't yet):
+- DEFERRED TO NEXT CYCLE (2026-09-28, Arun) — everything else in this step
+  is settled and Arun is happy with the design as-is; these two remaining
+  gaps (found by a subagent cross-check against real current code in both
+  repos — everything else checked out, and the slug redesign in #3 has
+  since been resolved) are explicitly put on hold, not resolved now, and
+  will be designed at the start of the next build cycle for this step:
   1. **`getSubscriptionDetail` (`lib/billing/stripe-data.ts`) can't
      actually be "reused" by the admin repo as originally phrased** — the
      two repos are separate Next.js deployments with no cross-repo
