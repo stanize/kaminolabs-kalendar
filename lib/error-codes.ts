@@ -60,6 +60,8 @@ export const ERROR_CODES = {
   PROVISION_PATIENT_FETCH_FAILED: "KLNDR-0038", // lib/actions/patient.ts — patient-row fetch failed
   PROVISION_PATIENT_NO_ROW: "KLNDR-0039", // lib/actions/patient.ts — no row found after insert+fetch
   SUBSCRIPTION_INTENT_NO_CLIENT_SECRET: "KLNDR-0040", // lib/actions/billing.ts — createSubscriptionIntent found no usable client secret
+  SLUG_CHANGE_NOTIFY_UNAUTHORIZED: "KLNDR-0041", // app/api/internal/notify-slug-change — bad/missing INTERNAL_SLUG_NOTIFY_SECRET
+  SLUG_CHANGE_NOTIFY_EMAIL_FAILED: "KLNDR-0042", // app/api/internal/notify-slug-change — sendEmail failed for the slug-change notice
 } as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES];

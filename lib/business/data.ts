@@ -31,6 +31,7 @@ export interface Business {
   cancellation_window_hours: number;
   onboarding_completed_at: string | null;
   created_at: string;
+  slug_active: boolean;
 }
 
 /**
@@ -49,7 +50,7 @@ export function formatBusinessAddress(
 
 const BUSINESS_TABLE = "kalendar_businesses";
 const BUSINESS_COLUMNS =
-  "id, owner_id, name, type, legal_id, address_street, address_number, address_additional, city, address_postal_code, address_province, address_country, phone_country_code, phone_number, contact_email, slug, slug_status, slug_flag_reason, slug_reviewed_at, brand_color, logo_url, team_mode, booking_window_months, cancellation_window_hours, onboarding_completed_at, created_at";
+  "id, owner_id, name, type, legal_id, address_street, address_number, address_additional, city, address_postal_code, address_province, address_country, phone_country_code, phone_number, contact_email, slug, slug_status, slug_flag_reason, slug_reviewed_at, brand_color, logo_url, team_mode, booking_window_months, cancellation_window_hours, onboarding_completed_at, created_at, slug_active";
 
 /**
  * The business owned by a given user, or null. Always scoped by the userId
@@ -102,8 +103,67 @@ export async function getActiveBusinesses(): Promise<PublicBusinessListing[]> {
     .from(BUSINESS_TABLE)
     .select("name, type, city, slug")
     .eq("slug_status", "active")
+    .eq("slug_active", true)
     .order("created_at", { ascending: false });
   return (data as PublicBusinessListing[] | null) ?? [];
+}
+
+/**
+ * Full public-routing resolution for /bookings/[slug] (admin-portal-tools.md
+ * customer-dashboard, section 3 — the kalendar_slug_history lifecycle).
+ * Distinguishes three outcomes a plain 404 can't:
+ *  - "active": normal case, render the booking page.
+ *  - "inactive": the slug belongs to a real business (moderation-active) but
+ *    slug_active is false (admin toggle, non-payment enforcement's public-
+ *    page-down tier) — show "temporarily down", deliberately different copy
+ *    from "retired" below since this slug may come back.
+ *  - "retired": no current business owns this slug, but it's in
+ *    kalendar_slug_history — show "no longer active" rather than a bare 404.
+ *  - "not_found": neither — genuine 404.
+ */
+export type PublicSlugRouting =
+  | { kind: "active"; business: Business }
+  | { kind: "inactive" }
+  | { kind: "retired" }
+  | { kind: "not_found" };
+
+export async function resolvePublicSlugRouting(slug: string): Promise<PublicSlugRouting> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from(BUSINESS_TABLE)
+    .select(BUSINESS_COLUMNS)
+    .eq("slug", slug)
+    .eq("slug_status", "active")
+    .maybeSingle();
+
+  const business = (data as Business | null) ?? null;
+  if (business) {
+    return business.slug_active ? { kind: "active", business } : { kind: "inactive" };
+  }
+
+  const { data: retired } = await supabase
+    .from("kalendar_slug_history")
+    .select("id")
+    .eq("slug", slug)
+    .maybeSingle();
+
+  return retired ? { kind: "retired" } : { kind: "not_found" };
+}
+
+/**
+ * True if `slug` is free to claim — not held by any current business, and
+ * not sitting in kalendar_slug_history (a retired string can never be
+ * silently reclaimed by an unrelated new signup). Used at every slug
+ * creation/change point (onboarding, panel business settings, demo
+ * provisioning, and the admin dashboard's slug editor).
+ */
+export async function isSlugAvailable(slug: string): Promise<boolean> {
+  const supabase = await createClient();
+  const [{ data: businessClash }, { data: historyClash }] = await Promise.all([
+    supabase.from(BUSINESS_TABLE).select("id").eq("slug", slug).maybeSingle(),
+    supabase.from("kalendar_slug_history").select("id").eq("slug", slug).maybeSingle(),
+  ]);
+  return !businessClash && !historyClash;
 }
 
 export interface SetupProgress {

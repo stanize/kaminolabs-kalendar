@@ -302,7 +302,13 @@ create table public.kalendar_businesses (
     )
   ),
   subscription_current_period_end timestamptz,
-  created_at              timestamptz not null default now()
+  created_at              timestamptz not null default now(),
+  -- Slug-scoped public-page visibility toggle (schema_subset_019.sql,
+  -- admin-portal-tools.md customer-dashboard). Deliberately NOT a general
+  -- business active/disabled flag — see that file's "additional signals"
+  -- section. When false, the public booking page shows a "temporarily
+  -- down" message instead of rendering; the slug itself is unaffected.
+  slug_active             boolean     not null default true
 );
 
 create index kalendar_businesses_owner_id_idx on public.kalendar_businesses (owner_id);
@@ -317,6 +323,32 @@ create policy "Businesses: public read"
   on public.kalendar_businesses for select using (true);
 create policy "Businesses: write"
   on public.kalendar_businesses for all using (true) with check (true);
+
+-- ----------------------------------------------------------------------------
+-- kalendar_slug_history (schema_subset_019.sql, admin-portal-tools.md
+-- customer-dashboard, section 3). Retired slug strings — written whenever an
+-- admin changes a business's slug, so the old string can never be silently
+-- reclaimed by an unrelated future signup. Purely additive: kalendar_businesses
+-- .slug stays exactly as it is above, unchanged by this table's existence.
+-- ----------------------------------------------------------------------------
+create table public.kalendar_slug_history (
+  id          uuid        primary key default gen_random_uuid(),
+  slug        text        not null, -- the retired string
+  business_id uuid        references public.kalendar_businesses (id) on delete set null, -- who it used to belong to
+  note        text        not null, -- admin's reason, required
+  changed_by  text,                 -- admin user id who made the change
+  created_at  timestamptz not null default now()
+);
+
+-- Only one "currently retired, not yet reclaimed" row per slug string —
+-- relink/delete-forever delete the row, so a slug can be retired again later
+-- without violating this.
+create unique index kalendar_slug_history_slug_idx on public.kalendar_slug_history (slug);
+
+alter table public.kalendar_slug_history enable row level security;
+
+create policy "SlugHistory: write"
+  on public.kalendar_slug_history for all using (true) with check (true);
 
 -- ----------------------------------------------------------------------------
 -- kalendar_presales_codes
@@ -868,6 +900,17 @@ create table public.kalendar_bookings (
   -- lib/booking/client-status.ts's guest_confirmed/first_time, which stay
   -- true for the booking's whole lifetime regardless of this flag).
   clinic_reviewed_at   timestamptz,
+  -- Activity-tracking signals (schema_subset_019.sql, admin-portal-tools.md
+  -- customer-dashboard). booking_channel distinguishes a clinic's own
+  -- manually-created booking from a guest self-service one — set once at
+  -- insert time, never changed after. status_updated_at is touched ONLY by
+  -- the explicit clinic actions that change `status` (cancel/confirm/mark
+  -- result) — deliberately not the same as updated_at below, which also
+  -- moves on unrelated edits like notes or payment marking.
+  booking_channel      text                  check (
+    booking_channel in ('public_web', 'whatsapp', 'panel_manual')
+  ),
+  status_updated_at    timestamptz,
   created_at           timestamptz           not null default now(),
   updated_at           timestamptz           not null default now()
 );

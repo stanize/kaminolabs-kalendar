@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { sanitizeSlug, suggestSlug, screenSlug } from "@/lib/business/slug-screen";
+import { isSlugAvailable } from "@/lib/business/data";
 import { BUSINESS_TYPES } from "@/lib/onboarding/data";
 import type { BusinessType } from "@/lib/onboarding/types";
 
@@ -135,12 +136,7 @@ export async function POST(request: Request) {
   const baseSlug = sanitizeSlug(suggestSlug(input.business.name));
   let slug = baseSlug;
   for (let i = 0; i < 5; i++) {
-    const { data: clash } = await supabase
-      .from("kalendar_businesses")
-      .select("id")
-      .eq("slug", slug)
-      .maybeSingle();
-    if (!clash) break;
+    if (await isSlugAvailable(slug)) break;
     slug = `${baseSlug}-${Math.floor(Math.random() * 1000)}`;
   }
   const screen = screenSlug(slug);
