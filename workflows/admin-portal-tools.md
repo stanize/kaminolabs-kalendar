@@ -8,8 +8,32 @@ Criteria:
 - /admin/customers exists and lists clinic businesses
 
 ## Step: customer-dashboard
-Status: not_started
+Status: in_progress
 Criteria:
+- CODE IMPLEMENTED 2026-09-28 (both repos, typechecked/linted/built clean),
+  PENDING MANUAL TESTING — not yet verified working live, per this file's
+  own "workflow-file status after coding" convention. Built:
+  - Main repo: kalendar_slug_history table + slug_active/booking_channel/
+    status_updated_at columns (schema_subset_019.sql, folded into
+    schema_001.sql); isSlugAvailable()/resolvePublicSlugRouting() in
+    lib/business/data.ts wired into onboarding, panel business settings,
+    demo provisioning, and /bookings/[slug]'s three-way messaging;
+    booking_channel set at all 3 booking-creation paths; status_updated_at
+    set by cancelBookingAsOwner/confirmBookingAsOwner/updateBookingResult;
+    new app/api/internal/notify-slug-change route + slugChangedOwnerHtml
+    email template (INTERNAL_SLUG_NOTIFY_SECRET).
+  - Admin repo: /admin/customers/business/[businessId] dashboard
+    (lib/admin/customer-dashboard.ts + business-dashboard-panel.tsx),
+    linked from the customers table's Business column — clinic overview,
+    appointment counts, slug editor (change/relink/delete-forever/
+    slug_active toggle), additional signals, activity tracking.
+  - Both DEFERRED items (Stripe trial-end-date reuse, "past confirmed"
+    count) are still not built — the dashboard shows explicit placeholders
+    for them ("— (next cycle)") rather than a guessed definition.
+  - NOT YET DONE: schema_subset_019.sql has NOT been run against the live
+    DB — Arun runs schema_subset_*.sql files himself via the Supabase SQL
+    editor per this file's migrations convention. The code above will
+    error against the live DB (missing columns/table) until that runs.
 - DESIGN SETTLED (2026-09-26, Arun) — a full support/ops dashboard,
   extending `customer-overview` above (same `/admin/customers` list/detail
   in the admin repo, add columns/fields and one new sub-page rather than a
