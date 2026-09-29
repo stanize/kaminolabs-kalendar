@@ -301,5 +301,87 @@ Criteria:
 - Reschedule does not require cancel + rebook
 - Reschedule preserves booking identity/history (not a new row)
 
+## Step: repeat-appointment
+Status: not_started
+Criteria:
+- DESIGN SETTLED (2026-09-29, Arun, voice memo while walking — brainstorm,
+  not yet built). Distinct from `rescheduling` above on purpose: reschedule
+  moves an EXISTING booking to a new slot in place (same row, same
+  identity/history); repeat CREATES A NEW BOOKING that copies most fields
+  from an old one — the original booking is completely untouched. The two
+  should never be conflated or share one implementation.
+- **The scenario**: a patient finishes an in-person session and, on the
+  spot, agrees with the clinic on their next appointment ("same time next
+  Thursday?"). Today the clinic's only path is a fresh manual booking,
+  re-typing everything. This step lets them start from the appointment
+  that just happened instead.
+- **Two entry points, both understated** — a small secondary link, not a
+  prominent button (Arun's own words: "not very prominently, more like a
+  link, somewhere down below"):
+  1. **Clinic calendar** (`calendar-management-past.md`'s booking-detail
+     modal, `components/panel/calendar-bookings.tsx` /
+     `appointment-modal.tsx`) — on ANY existing appointment (any status:
+     upcoming, past, cancelled), a "Repetir cita" link.
+  2. **Patient portal** (`patient-portal.md`'s `full-booking-history` /
+     dashboard) — same link on an existing booking. Only reachable for a
+     booking tied to an authenticated patient (`patient_id` set) — a guest
+     booking has no portal to repeat it from; that case is covered by
+     entry point 1 only.
+- **Clinic-side flow**: clicking "Repetir cita" opens the manual-booking
+  modal (`createBookingAsOwner`'s fields —
+  `lib/actions/booking-owner.ts:649`) pre-filled from the original
+  booking: service, provider/team member, and the client (existing
+  `clinicClientId` if linked, else name/email/phone) — but explicitly
+  **NOT notes** (Arun: "not the notes... would be copied"). Only
+  date/time is left for the clinic to pick.
+- **Clinic-side date/time picker must show REAL availability** — this is
+  the one new piece of behavior this step needs, and it's a deliberate,
+  scoped exception to an existing decision:
+  `holidays-and-time-off.md`'s `availability-engine-integration` step
+  found that `appointment-modal.tsx` does NOT call the shared
+  `getAvailableSlots` engine today — it has its own free-text time field
+  with a same-day `isTimeTaken` dropdown, and keeps full manual override
+  on purpose (the clinic can book a walk-in on a day marked closed, book
+  in the past, etc.). That override stays true for the modal's NORMAL
+  create/edit path — this step does not change it. But for the repeat
+  flow specifically, Arun wants the opposite: if tomorrow is a festivo,
+  repeating today's 10:00 appointment should NOT let Thursday be picked
+  at all — only real open slots (e.g. "only two hours free that day, only
+  two slots shown") should be selectable, same as a patient booking fresh.
+  So the repeat flow's date/time step should call `getAvailableSlots`
+  (`lib/actions/booking.ts`, the same engine the public wizard and
+  WhatsApp bot already use, closures-aware since
+  `availability-engine-integration`) rather than reusing
+  `appointment-modal.tsx`'s own freeform time field — likely a distinct,
+  simpler picker (pick a date, see that date's real open slots, pick one)
+  rather than the full modal. TO DECIDE AT BUILD TIME: whether this is a
+  new lightweight component, or the existing modal gains a "repeat mode"
+  that swaps its date/time section for a slot-engine-backed picker while
+  keeping the rest of the form (service/provider/client, read-only or
+  editable — also TO DECIDE) as-is.
+- **Patient-side flow is a hand-off, not a new component**: clicking
+  "Repetir cita" in the portal does NOT try to rebuild slot-picking UI —
+  it loads the original booking's business (slug), service, and provider
+  (if team), then sends the patient to the existing public booking wizard
+  (`components/booking/booking-wizard.tsx`) pre-seeded on that
+  service/provider so they land straight on step 3 (date/time,
+  `wizard-service-provider-time` above) instead of re-picking service and
+  provider from scratch. The wizard's own existing slot engine
+  (`getAvailableSlots`) already handles availability correctly with no
+  new work — this is purely a pre-fill/skip-ahead entry into the wizard
+  that already exists, same booking-creation path a fresh visit would use
+  (new row, patient already authenticated so no auth-gate step needed).
+- **Out of scope for this step / not decided yet**:
+  - Exact UI mechanics for the pre-seeded wizard entry (a query param on
+    `/bookings/[slug]`? a dedicated route?) — not designed yet.
+  - Whether the clinic-side repeat flow lets the service/provider be
+    changed before picking a new date/time, or locks them to match the
+    original (simpler first version, matches "repeat" literally) — leaning
+    toward locked/read-only for v1, not settled.
+  - Whether repeating a `cancelled` booking is allowed from the clinic side
+    (probably yes — it's still a legitimate "let's do this again" source)
+    — not explicitly discussed, default to allowing it unless a reason
+    turns up at build time.
+
 ## Notes / Deviations
 (freeform — anything found in code that doesn't map to a defined step)
