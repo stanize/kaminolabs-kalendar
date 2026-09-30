@@ -408,5 +408,61 @@ Criteria:
   actual need per the review is "a real human can be reached fast when
   something's badly broken," not a formal SLA/status-page product.
 
+## Step: testing-tracker
+Status: not_started
+Criteria:
+- DESIGN SETTLED (2026-09-30, Arun, voice memo — brainstorm, not yet
+  built). A manual regression-testing tracker, living in the admin portal
+  as its own new sidebar section (separated by a divider, same pattern the
+  dev-only tools already use at the bottom of `components/admin/
+  sidebar.tsx`) — NOT a support/ticketing feature, purely for Arun to run
+  himself through a checklist after a batch of changes.
+- **Two-level model**:
+  1. **Test case templates** — a reusable catalog, each with: title/steps
+     (what to do), a URL to go to (or none — "use any generic page" is a
+     valid case), test data to use (free text, or none = "use generic
+     data"), and a priority Arun assigns himself: `low` / `medium` /
+     `high` / unranked (default). Templates live independently of any one
+     testing run — edited/added to over time, not recreated per project.
+  2. **Testing projects** — a named batch Arun starts before a testing
+     session ("dedicate one afternoon"). Created by picking which
+     templates to include, filtered by priority — "all" (every priority
+     including unranked) is today's only real option and should be the
+     default, but the picker should support narrowing by priority since
+     that's clearly where this is headed. Creating a project snapshots in
+     which templates are included as a checklist; each item starts
+     untested and Arun marks it `successful` / `unsuccessful` as he goes
+     (a third "not yet tested" state, even though the UI only surfaces a
+     binary pass/fail action — needed so the checklist can show progress).
+     Explicitly NOT scoped for v1: richer per-result detail (notes,
+     screenshots, bug links) — Arun flagged this as a later addition, not
+     now.
+- **Two ways templates get populated**:
+  1. **Manual CRUD** — an admin page ("Test cases") to add/edit a
+     template by hand, set its priority.
+  2. **Bulk-generated** — Arun will separately ask a future session to
+     scan the whole main repo and produce a full test-case catalog
+     covering the app's scope, which he then uploads/imports here.
+     EXPLICITLY NOT PART OF THIS STEP'S BUILD — Arun was clear this is a
+     later, separate ask ("not now"). This step should still make the
+     bulk-import path itself easy (e.g. paste/import a batch of cases in
+     one action) so that future catalog has somewhere to land, but
+     generating the catalog's actual content is out of scope here.
+- **Automating test execution** (running these checks without a human
+  clicking through them) is explicitly a future idea, not part of this
+  step — noted so a later session doesn't try to scope it in.
+- Data model, TO DECIDE AT BUILD TIME (not settled in the voice memo):
+  whether a testing project's checklist rows hold a live reference to the
+  template (simplest — project detail just joins against the current
+  template row) or a snapshot of the template's fields at the time the
+  project was created (protects a testing project's history if a template
+  is later edited or removed) — lean toward live reference for v1 given
+  how lightweight everything else here is meant to be, but flagging since
+  it affects the schema shape.
+- Cross-repo note: this is entirely admin-repo code/schema (its own new
+  `kalendar_test_cases`/`kalendar_testing_projects`/(junction) tables) —
+  same shape as this file's other admin-portal steps, tracked here per
+  this repo's centralized-workflow-tracking convention.
+
 ## Notes / Deviations
 - All admin portal pages are worth spot-checking for the same mobile-table pattern as schema-reset-tool, since this may not be an isolated instance (e.g. customer-overview and orphaned-bookings likely also render tabular data) — flagging for a future pass rather than assuming it's fixed by fixing schema-reset alone.
