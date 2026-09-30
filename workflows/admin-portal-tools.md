@@ -409,8 +409,19 @@ Criteria:
   something's badly broken," not a formal SLA/status-page product.
 
 ## Step: testing-tracker
-Status: not_started
+Status: in_progress
 Criteria:
+- CODE IMPLEMENTED 2026-09-30 (admin repo, typechecked/linted/built clean),
+  PENDING MANUAL TESTING — not yet verified working live. Built: schema
+  (schema_subset_020.sql, folded into schema_001.sql) for
+  kalendar_test_cases / kalendar_testing_projects /
+  kalendar_testing_project_cases; admin repo's `lib/admin/testing.ts` (CRUD
+  + bulk import + project-creation-with-priority-filter + checklist status
+  updates); new sidebar "Testing" section with Test cases
+  (`/admin/testing/cases`) and Testing projects (`/admin/testing/projects`
+  + `/admin/testing/projects/[projectId]`'s checklist) pages. NOT YET
+  RUN against the live DB — same as this file's other schema_subset_*.sql
+  entries, Arun runs these himself via the Supabase SQL editor.
 - DESIGN SETTLED (2026-09-30, Arun, voice memo — brainstorm, not yet
   built). A manual regression-testing tracker, living in the admin portal
   as its own new sidebar section (separated by a divider, same pattern the
