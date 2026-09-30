@@ -422,6 +422,16 @@ Criteria:
   + `/admin/testing/projects/[projectId]`'s checklist) pages. NOT YET
   RUN against the live DB — same as this file's other schema_subset_*.sql
   entries, Arun runs these himself via the Supabase SQL editor.
+- REPO SNAPSHOT (2026-09-30, Arun): `docs/test-cases/test-cases.md` is a
+  git-tracked handoff copy of the catalog — same pipe-delimited format
+  the bulk-import box reads and "Download all (.md)" exports, so it's
+  always directly re-importable. `docs/test-cases/README.md` documents
+  the convention: before overwriting `test-cases.md` with a new version,
+  back up the current one into `docs/test-cases/history/` first, named
+  `test-cases-<UTC-timestamp>.md`, so there's a real history of how the
+  catalog changed over time, not just whatever `git log` shows. Initial
+  137-case catalog (from a full repo scan of every `done`/`in_progress`
+  workflow step) landed there as the first version.
 - DESIGN SETTLED (2026-09-30, Arun, voice memo — brainstorm, not yet
   built). A manual regression-testing tracker, living in the admin portal
   as its own new sidebar section (separated by a divider, same pattern the
