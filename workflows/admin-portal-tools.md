@@ -422,6 +422,26 @@ Criteria:
   + `/admin/testing/projects/[projectId]`'s checklist) pages. NOT YET
   RUN against the live DB — same as this file's other schema_subset_*.sql
   entries, Arun runs these himself via the Supabase SQL editor.
+- EXTENDED (2026-09-30, Arun feedback on the first build): fixed the new
+  testing project not appearing in the list until reload (optimistic
+  insert, now returns/shows the real included-case count immediately).
+  Steps are now entered as discrete, addable/removable inputs rather than
+  one free-text box, rendered as a numbered list wherever shown once
+  there's more than one. Test-case URLs render as real links (opening on
+  `kalendar.kaminolabs.dev`, not this admin portal). Added `category`/
+  `subcategory` (free text, not a fixed taxonomy — same pattern as
+  `priority`), `expected_result` (what should happen, distinct from the
+  steps), and `automatable` (flags a future-automation candidate) to
+  `kalendar_test_cases` (`schema_subset_021.sql`, folded into
+  `schema_001.sql` — NOT yet run against the live DB). Testing-project
+  creation, and the checklist view itself, can now filter by category/
+  subcategory in addition to priority — "a workable testing plan" per
+  Arun's ask, e.g. scoping a session to just Bonos/high-priority cases.
+  Also added a stable `seq_no` (generated-identity column, distinct from
+  the uuid `id`) so the bulk-import/export round-trip can UPDATE an
+  existing case by `seq_no` instead of always inserting a duplicate on
+  re-import, and so two exports are diffable by `seq_no` to see exactly
+  what changed — Arun's own stated reason for wanting it.
 - REPO SNAPSHOT (2026-09-30, Arun): `docs/test-cases/test-cases.md` is a
   git-tracked handoff copy of the catalog — same pipe-delimited format
   the bulk-import box reads and "Download all (.md)" exports, so it's
