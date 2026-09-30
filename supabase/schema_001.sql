@@ -1310,18 +1310,38 @@ create policy "ErrorLog: write"
 -- grouped into named testing projects, each with a live-referenced checklist.
 -- ----------------------------------------------------------------------------
 create table public.kalendar_test_cases (
-  id          uuid        primary key default gen_random_uuid(),
-  title       text        not null,
-  description text,                 -- steps to follow; free text
-  url         text,                 -- where to go; null = no specific page
-  test_data   text,                 -- what to use; null = use generic data
-  priority    text        check (priority in ('low', 'medium', 'high')), -- null = unranked
-  created_by  text,                 -- admin user id who added it
-  created_at  timestamptz not null default now(),
-  updated_at  timestamptz not null default now()
+  id              uuid        primary key default gen_random_uuid(),
+  -- Stable internal sequence number (schema_subset_021.sql), distinct from
+  -- the uuid id — the bulk-import/export round-trip carries this so a
+  -- re-imported file UPDATES the matching row instead of duplicating it,
+  -- and so two exports can be diffed by seq_no to see what changed.
+  seq_no          integer     generated always as identity,
+  title           text        not null,
+  description     text,                 -- steps to follow; free text (newline-joined steps)
+  url             text,                 -- where to go; null = no specific page
+  test_data       text,                 -- what to use; null = use generic data
+  priority        text        check (priority in ('low', 'medium', 'high')), -- null = unranked
+  -- Free-text grouping (schema_subset_021.sql) for browsing/filtering a
+  -- growing catalog and for narrowing a testing project's included cases —
+  -- deliberately not a fixed taxonomy, same low-ceremony pattern as priority.
+  category        text,
+  subcategory     text,
+  -- What should happen, distinct from the steps above — lets a case be
+  -- verified at a glance instead of judgment-called from the steps alone.
+  expected_result text,
+  -- Flags a candidate for future automated execution (testing-tracker's
+  -- noted future idea) — tagged now so a later automation pass doesn't
+  -- need to re-triage the whole catalog from scratch.
+  automatable     boolean     not null default false,
+  created_by      text,                 -- admin user id who added it
+  created_at      timestamptz not null default now(),
+  updated_at      timestamptz not null default now()
 );
 
+create unique index kalendar_test_cases_seq_no_idx on public.kalendar_test_cases (seq_no);
 create index kalendar_test_cases_priority_idx on public.kalendar_test_cases (priority);
+create index kalendar_test_cases_category_idx on public.kalendar_test_cases (category);
+create index kalendar_test_cases_subcategory_idx on public.kalendar_test_cases (subcategory);
 
 alter table public.kalendar_test_cases enable row level security;
 
