@@ -1303,6 +1303,64 @@ alter table public.kalendar_error_log enable row level security;
 create policy "ErrorLog: write"
   on public.kalendar_error_log for all using (true) with check (true);
 
+-- ----------------------------------------------------------------------------
+-- kalendar_test_cases / kalendar_testing_projects / kalendar_testing_project_cases
+-- (schema_subset_020.sql, admin-portal-tools.md testing-tracker). Admin-repo-
+-- only manual regression-testing checklist — reusable test-case templates,
+-- grouped into named testing projects, each with a live-referenced checklist.
+-- ----------------------------------------------------------------------------
+create table public.kalendar_test_cases (
+  id          uuid        primary key default gen_random_uuid(),
+  title       text        not null,
+  description text,                 -- steps to follow; free text
+  url         text,                 -- where to go; null = no specific page
+  test_data   text,                 -- what to use; null = use generic data
+  priority    text        check (priority in ('low', 'medium', 'high')), -- null = unranked
+  created_by  text,                 -- admin user id who added it
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+
+create index kalendar_test_cases_priority_idx on public.kalendar_test_cases (priority);
+
+alter table public.kalendar_test_cases enable row level security;
+
+create policy "TestCases: write"
+  on public.kalendar_test_cases for all using (true) with check (true);
+
+create table public.kalendar_testing_projects (
+  id         uuid        primary key default gen_random_uuid(),
+  name       text        not null,
+  created_by text,
+  created_at timestamptz not null default now()
+);
+
+alter table public.kalendar_testing_projects enable row level security;
+
+create policy "TestingProjects: write"
+  on public.kalendar_testing_projects for all using (true) with check (true);
+
+-- ON DELETE RESTRICT on test_case_id: a template that's ever been included
+-- in a testing project can't be silently deleted out from under its history.
+create table public.kalendar_testing_project_cases (
+  id           uuid        primary key default gen_random_uuid(),
+  project_id   uuid        not null references public.kalendar_testing_projects (id) on delete cascade,
+  test_case_id uuid        not null references public.kalendar_test_cases (id) on delete restrict,
+  status       text        not null default 'untested' check (status in ('untested', 'pass', 'fail')),
+  tested_at    timestamptz,
+  created_at   timestamptz not null default now()
+);
+
+create unique index kalendar_testing_project_cases_unique_idx
+  on public.kalendar_testing_project_cases (project_id, test_case_id);
+create index kalendar_testing_project_cases_project_idx
+  on public.kalendar_testing_project_cases (project_id);
+
+alter table public.kalendar_testing_project_cases enable row level security;
+
+create policy "TestingProjectCases: write"
+  on public.kalendar_testing_project_cases for all using (true) with check (true);
+
 -- ============================================================================
 -- End of schema.
 -- ============================================================================
