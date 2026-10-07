@@ -12,9 +12,10 @@ Criteria:
 - Bounds enforced both client-side (form validation, 0–720 with a clear Spanish error message) and at the DB level (CHECK constraint)
 
 ## Step: bonos-visibility-toggle
-Status: in_progress
+Status: done
 Criteria:
-- CODE IMPLEMENTED, TYPECHECKED, LINTED, BUILD PASSES (2026-10-07). MIGRATION RUN against the live DB (2026-10-07, Arun confirmed). Still pending Arun's manual/live testing of the actual feature — not `done` yet.
+- TESTED (2026-10-07, Arun, live): confirmed working — "works well."
+- CODE IMPLEMENTED, TYPECHECKED, LINTED, BUILD PASSES (2026-10-07). MIGRATION RUN against the live DB (2026-10-07, Arun confirmed).
 - `bonos_enabled` added to `kalendar_businesses` (`supabase/schema_subset_022.sql`, folded into `schema_001.sql`).
 - Toggle implemented on `/panel/services` (`components/panel/services-manager.tsx`), saved via `saveBonosEnabled` (`lib/actions/business.ts`) — lives there rather than a dedicated bonos action file since the column is on `kalendar_businesses` alongside the other business-level flags.
 - Sidebar nav item hidden via a new `bonosEnabled` prop threaded `app/panel/layout.tsx` -> `PanelSidebar` (`components/panel/sidebar.tsx`); `/panel/bonos` itself route-guarded (`app/panel/bonos/page.tsx`, redirects to `/panel` when `bonos_enabled` is false) so a direct URL visit respects the flag too, not just the nav.

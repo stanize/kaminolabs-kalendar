@@ -31,9 +31,10 @@ Criteria:
 - RESOLVED (2026-09-18, verified against code — previously read "KNOWN GAP: switching an already-paid booking's method after the fact by flipping it back to unpaid clears the payment_method/bono_purchase_id link but does NOT restore a deducted session"): this was fixed by the sync_bono_session_usage trigger (supabase/schema_001.sql:942-1001, also lib/actions/booking-owner.ts:386-394) — any write that clears/changes bono_purchase_id now symmetrically restores the old bono's session, regardless of code path. No longer a gap.
 
 ## Step: cobrar-button-and-paid-at
-Status: in_progress
+Status: done
 Criteria:
-- CODE IMPLEMENTED, TYPECHECKED, LINTED, BUILD PASSES (2026-10-07). MIGRATION RUN against the live DB (2026-10-07, Arun confirmed). Still pending Arun's manual/live testing of the actual feature — not `done` yet.
+- TESTED (2026-10-07, Arun, live, after the four follow-up passes and the No-show/Editar bug fix below): confirmed working — "works well."
+- CODE IMPLEMENTED, TYPECHECKED, LINTED, BUILD PASSES (2026-10-07). MIGRATION RUN against the live DB (2026-10-07, Arun confirmed).
 - FURTHER SIMPLIFICATION (2026-10-07, second pass, Arun — "too busy", screenshot-driven): the separate Resultado section (Completada/No-show/Cancelada buttons + a Guardar step) is removed entirely from the past-booking modal. Arun's reasoning, confirmed: once an appointment's time has passed, it only ever ends up in one of three terminal states — paid, no-show, or already cancelled (via the pre-existing, unrelated cancel flow) — so there's nothing left to separately "choose" once one of those happens.
   - **Cobrar** (`variant="primary"`, now visibly styled as a real button — Arun's screenshot showed it rendering as plain text, flagged and fixed) and a smaller **No-show** button (`variant="outline" size="sm"`) render side by side when a past booking is unresolved (not yet paid, not no-show, not cancelled).
   - DECIDED: tapping Cobrar (Efectivo/Tarjeta/bono, same modal as before) now sets BOTH `payment_status = 'paid'` AND `status = 'completed'` in the same write (`handleCobrar`) — paying a past appointment implies it happened, no separate completed choice needed.
