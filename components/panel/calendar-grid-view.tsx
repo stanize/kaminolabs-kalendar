@@ -478,6 +478,24 @@ export function chipClasses(
     : "bg-rose-50 text-rose-900 border-l-4 border-rose-500";
 }
 
+/**
+ * Quick-overview label shown on a past booking's week-grid chip — "Pagado",
+ * "No-show", or "Cancelada" — so the clinic can scan payment/outcome state
+ * without opening each chip. Null for a past booking that's still
+ * unreviewed (rose chipClasses already carries that signal on its own).
+ * Reuses the exact same detailModal copy the booking-detail modal itself
+ * shows, so the wording never drifts between the two surfaces.
+ */
+export function pastResultLabel(
+  booking: Pick<WeekBookingVM, "status" | "paymentStatus">,
+  dict: CalendarDictionary
+): string | null {
+  if (booking.status === "cancelled") return dict.detailModal.resultCancelled;
+  if (booking.status === "no_show") return dict.detailModal.resultNoShow;
+  if (booking.paymentStatus === "paid") return dict.detailModal.paymentPaid;
+  return null;
+}
+
 function DayProviderColumn({
   day,
   member,
@@ -627,7 +645,10 @@ function DayProviderColumn({
                 ) : null}
                 {b.serviceName}
               </div>
-              <div className="truncate opacity-90">{timeLabel(b.startIso)} · {b.clientName}</div>
+              <div className="truncate opacity-90">
+                {timeLabel(b.startIso)} · {b.clientName}
+                {isPast && pastResultLabel(b, dict) && <> · <span className="font-semibold">{pastResultLabel(b, dict)}</span></>}
+              </div>
             </div>
           );
         })}
