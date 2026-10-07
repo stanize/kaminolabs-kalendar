@@ -24,10 +24,16 @@ export function PanelSidebar({
   user,
   dict,
   locale,
+  bonosEnabled,
 }: {
   user: { name?: string | null; email?: string | null; image?: string | null };
   dict: SidebarDict;
   locale: Locale;
+  // clinic-configuration.md's bonos-visibility-toggle — hides the Bonos nav
+  // item entirely when the clinic hasn't opted in. Defaults to false (never
+  // shows the item) so a caller that hasn't threaded this through yet fails
+  // closed, not open.
+  bonosEnabled?: boolean;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -52,7 +58,7 @@ export function PanelSidebar({
     { href: "/panel", label: dict.home, icon: "home", exact: true },
     { href: "/panel/calendar", label: dict.calendar, icon: "calendar" },
     { href: "/panel/clients", label: dict.clients, icon: "users" },
-    { href: "/panel/bonos", label: dict.bonos, icon: "creditCard" },
+    ...(bonosEnabled ? [{ href: "/panel/bonos", label: dict.bonos, icon: "creditCard" }] : []),
     { href: "/panel/business", label: dict.business, icon: "building" },
     { href: "/panel/services", label: dict.services, icon: "sparkles" },
     { href: "/panel/team", label: dict.team, icon: "user" },

@@ -10,7 +10,6 @@ import {
   updateBookingResult,
   reviewCancellationRequest,
   type BookingResultStatus,
-  type BookingPaymentStatus,
   type BookingPaymentMethod,
 } from "@/lib/actions/booking-owner";
 import { getActiveBonosForClientAction } from "@/lib/actions/bonos";
@@ -25,6 +24,7 @@ export function BookingDetailModal({
   booking,
   intlLocale,
   dict,
+  bonosEnabled,
   onClose,
   onUpdated,
   onModify,
@@ -33,6 +33,10 @@ export function BookingDetailModal({
   booking: WeekBookingVM;
   intlLocale: string;
   dict: CalendarDictionary;
+  // clinic-configuration.md's bonos-visibility-toggle — gates the bono
+  // option(s) in the Cobrar modal below, forward-looking only (an already
+  // bono-paid booking keeps showing its real payment summary regardless).
+  bonosEnabled: boolean;
   onClose: () => void;
   onUpdated: () => void;
   onModify: (booking: WeekBookingVM) => void;
@@ -54,37 +58,28 @@ export function BookingDetailModal({
       ? booking.status
       : null;
   const [result, setResult] = useState<BookingResultStatus | null>(initialResult);
-  const [payment, setPayment] = useState<BookingPaymentStatus>(booking.paymentStatus);
 
-  // ── Payment method (session-deduction-on-payment, bonos.md) ──────────────
-  // "" = not chosen yet, "cash" / "card", or `bono:<purchaseId>`. Derived
-  // from the booking's CURRENT saved method — this is also what "locked"
-  // compares against, since the lock is about the value already saved on
-  // this booking, not whatever the owner is mid-editing.
-  const initialMethod: string =
-    booking.paymentMethod === "cash"
-      ? "cash"
-      : booking.paymentMethod === "card"
-        ? "card"
-        : booking.paymentMethod === "bono" && booking.bonoPurchaseId
-          ? `bono:${booking.bonoPurchaseId}`
-          : "";
-  // Switching AWAY from an already-applied bono (to cash, card, or a
-  // different bono) can only happen from the Bonos page — see
-  // session-deduction-on-payment. Switching INTO a bono, or between
-  // cash/card, stays freely editable here.
-  const locked = booking.paymentMethod === "bono" && !!booking.bonoPurchaseId;
-
-  const [methodChoice, setMethodChoice] = useState<string>(initialMethod);
-  const [methodTouched, setMethodTouched] = useState(false);
+  // ── Payment (cobrar-button-and-paid-at, calendar-management-past.md) ────
+  // Payment is no longer part of this Resultado/Guardar edit flow — Cobrar
+  // charges immediately on selection (handleCobrar below), independent of
+  // whatever Resultado the owner has/hasn't chosen. Once a booking is
+  // already paid, the modal only ever shows the static paidSummaryText
+  // below — no further payment UI at all here, so the old bono "locked"
+  // (switching AWAY from a bono is Bonos-page-only) has nothing left to
+  // gate in this component; it's enforced server-side in
+  // updateBookingResult regardless.
   const [activeBonos, setActiveBonos] = useState<ClientActiveBono[] | null>(null);
   const [bonosLoading, setBonosLoading] = useState(false);
+  // The Cobrar modal (Efectivo/Tarjeta/bono buttons), opened instead of the
+  // old inline toggle+selector.
+  const [cobrarModalOpen, setCobrarModalOpen] = useState(false);
 
-  // Fetched lazily — only once payment is actually toggled to "paid" (or
-  // was already paid on open), never for the common unpaid case, and only
-  // once per modal open.
+  // Fetched lazily — only while the Cobrar modal is open, and only when the
+  // clinic has bonos enabled at all (bonos-visibility-flag-interaction,
+  // bonos.md) — a disabled flag means no bono option should ever appear
+  // going forward, so there's no reason to fetch the list.
   useEffect(() => {
-    if (payment !== "paid" || !booking.clinicClientId || activeBonos !== null || bonosLoading) return;
+    if (!bonosEnabled || !cobrarModalOpen || !booking.clinicClientId || activeBonos !== null || bonosLoading) return;
     let cancelled = false;
     async function loadBonos(clientId: string) {
       setBonosLoading(true);
@@ -97,30 +92,9 @@ export function BookingDetailModal({
     return () => {
       cancelled = true;
     };
-  }, [payment, booking.clinicClientId, activeBonos, bonosLoading]);
+  }, [bonosEnabled, cobrarModalOpen, booking.clinicClientId, activeBonos, bonosLoading]);
 
-  // DECIDED default: if the client has an active bono, the OLDEST one
-  // (activeBonos is already ordered oldest-first) is pre-selected — but
-  // only when the owner hasn't chosen anything yet (fresh "mark as paid",
-  // not re-opening an already cash/card/bono-paid booking) and hasn't
-  // manually touched the dropdown themselves. Derived rather than synced
-  // via an effect, since it's a pure function of already-known state.
-  const effectiveMethodChoice =
-    methodTouched || initialMethod !== "" || locked
-      ? methodChoice
-      : activeBonos === null
-        ? ""
-        : activeBonos.length > 0
-          ? `bono:${activeBonos[0].id}`
-          : "cash";
-
-  const isDirty =
-    result !== initialResult ||
-    payment !== booking.paymentStatus ||
-    (payment === "paid" && effectiveMethodChoice !== initialMethod);
-  // Can't save a "paid" state until a method is actually resolved (covers
-  // the brief window while activeBonos is still loading).
-  const methodReady = payment !== "paid" || effectiveMethodChoice !== "";
+  const isDirty = result !== initialResult;
 
   const isFuture = new Date(booking.startIso) > new Date();
   // Only a GUEST booking can still be pending_confirmation in the normal
@@ -153,6 +127,29 @@ export function BookingDetailModal({
   const dateTimeLabel = new Intl.DateTimeFormat(intlLocale, {
     timeZone: TZ, weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit",
   }).format(new Date(booking.startIso));
+
+  // cobrar-button-and-paid-at: "Pagado con {método} · {hora}" — only shown
+  // for a booking that's ALREADY saved as paid (booking.paymentStatus, not
+  // the mid-edit `payment`/effectiveMethodChoice state), using the real
+  // persisted payment_method + paid_at rather than whatever's being edited.
+  const paidSummaryText =
+    booking.paymentStatus === "paid" && booking.paidAt
+      ? d.paidWithTemplate
+          .replace(
+            "{method}",
+            booking.paymentMethod === "cash"
+              ? d.paymentMethodCash
+              : booking.paymentMethod === "card"
+                ? d.paymentMethodCard
+                : d.paymentMethodBono
+          )
+          .replace(
+            "{time}",
+            new Intl.DateTimeFormat(intlLocale, { timeZone: TZ, hour: "2-digit", minute: "2-digit" }).format(
+              new Date(booking.paidAt)
+            )
+          )
+      : null;
 
   const handleCancel = async () => {
     setBusy(true);
@@ -195,18 +192,42 @@ export function BookingDetailModal({
     onClose();
   };
 
+  // cobrar-button-and-paid-at: charges immediately on selection (no separate
+  // Guardar step) — the Cobrar button replaces the old toggle+inline
+  // selector entirely, and payment is independent of whatever Resultado the
+  // owner has/hasn't chosen yet (status omitted — see updateBookingResult).
+  const handleCobrar = async (methodValue: string) => {
+    setBusy(true);
+    setError(null);
+    const paymentMethod: BookingPaymentMethod = methodValue.startsWith("bono:")
+      ? { bonoPurchaseId: methodValue.slice("bono:".length) }
+      : (methodValue as "cash" | "card");
+    const res = await updateBookingResult(
+      { bookingId: booking.id, paymentStatus: "paid", paymentMethod },
+      dict.errors
+    );
+    setBusy(false);
+    setCobrarModalOpen(false);
+    if (!res.ok) { setError(res.error); return; }
+    onUpdated();
+    onClose();
+  };
+
   const handleSaveResult = async () => {
     if (!result) return;
     setBusy(true);
     setError(null);
+    // Payment is saved separately via Cobrar (handleCobrar) — this write
+    // only ever changes Resultado, so it just re-sends the booking's
+    // current (unchanged) payment state rather than touching it.
     let paymentMethod: BookingPaymentMethod | undefined;
-    if (payment === "paid") {
-      paymentMethod = effectiveMethodChoice.startsWith("bono:")
-        ? { bonoPurchaseId: effectiveMethodChoice.slice("bono:".length) }
-        : (effectiveMethodChoice as "cash" | "card");
+    if (booking.paymentMethod === "bono" && booking.bonoPurchaseId) {
+      paymentMethod = { bonoPurchaseId: booking.bonoPurchaseId };
+    } else if (booking.paymentMethod === "cash" || booking.paymentMethod === "card") {
+      paymentMethod = booking.paymentMethod;
     }
     const res = await updateBookingResult(
-      { bookingId: booking.id, status: result, paymentStatus: payment, paymentMethod },
+      { bookingId: booking.id, status: result, paymentStatus: booking.paymentStatus, paymentMethod },
       dict.errors
     );
     setBusy(false);
@@ -367,55 +388,84 @@ export function BookingDetailModal({
               <p className="mb-1.5 text-[12px] font-bold uppercase tracking-[.05em] text-ink-soft">
                 {d.paymentLabel}
               </p>
-              <div className="flex gap-1.5">
-                <ChoiceBtn active={payment === "paid"} onClick={() => setPayment("paid")} label={d.paymentPaid} />
-                <ChoiceBtn active={payment === "unpaid"} onClick={() => setPayment("unpaid")} label={d.paymentPending} />
-              </div>
-              {payment === "paid" && (
-                <div className="mt-2.5">
-                  <p className="mb-1.5 text-[12px] font-bold uppercase tracking-[.05em] text-ink-soft">
-                    {d.paymentMethodLabel}
-                  </p>
-                  {locked ? (
-                    <p className="rounded-lg border border-line bg-surface-2/50 px-3 py-2 text-[12.5px] text-ink-soft">
-                      {d.paymentMethodLockedNote}
-                    </p>
-                  ) : (
-                    <select
-                      value={effectiveMethodChoice}
-                      disabled={bonosLoading}
-                      onChange={(e) => {
-                        setMethodTouched(true);
-                        setMethodChoice(e.target.value);
-                      }}
-                      className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[13px] text-ink disabled:opacity-60"
-                    >
-                      {effectiveMethodChoice === "" && <option value="" disabled>{"…"}</option>}
-                      <option value="cash">{d.paymentMethodCash}</option>
-                      <option value="card">{d.paymentMethodCard}</option>
-                      {(activeBonos ?? []).map((b) => (
-                        <option key={b.id} value={`bono:${b.id}`}>
-                          {d.paymentMethodBonoTemplate
-                            .replace("{bonoName}", b.bonoTypeName)
-                            .replace("{n}", String(b.sessionsRemaining))}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </div>
+              {paidSummaryText ? (
+                <p className="rounded-lg border border-line bg-surface-2/50 px-3 py-2 text-[12.5px] font-medium text-ink">
+                  {paidSummaryText}
+                </p>
+              ) : (
+                <Btn variant="outline" onClick={() => setCobrarModalOpen(true)} disabled={busy}>
+                  {d.cobrarButton}
+                </Btn>
               )}
             </div>
             <div className="flex justify-end gap-2">
               <Btn variant="ghost" onClick={onClose} disabled={busy}>
                 {d.dismissButton}
               </Btn>
-              <Btn onClick={handleSaveResult} disabled={busy || !result || !isDirty || !methodReady}>
+              <Btn onClick={handleSaveResult} disabled={busy || !result || !isDirty}>
                 {busy ? d.saving : d.saveButton}
               </Btn>
             </div>
           </div>
         )}
       </div>
+
+      {cobrarModalOpen && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 px-4"
+          onClick={() => !busy && setCobrarModalOpen(false)}
+        >
+          <div
+            className="w-full max-w-[340px] rounded-2xl bg-surface p-5 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="mb-4 text-[15px] font-bold text-ink">{d.cobrarModalTitle}</h3>
+            <div className="flex flex-col gap-2.5">
+              <button
+                type="button"
+                onClick={() => handleCobrar("cash")}
+                disabled={busy}
+                className="rounded-xl border border-line bg-surface px-4 py-4 text-[15px] font-semibold text-ink transition-colors hover:border-brand-line hover:bg-brand-weak disabled:opacity-60"
+              >
+                {d.paymentMethodCash}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleCobrar("card")}
+                disabled={busy}
+                className="rounded-xl border border-line bg-surface px-4 py-4 text-[15px] font-semibold text-ink transition-colors hover:border-brand-line hover:bg-brand-weak disabled:opacity-60"
+              >
+                {d.paymentMethodCard}
+              </button>
+              {/* bonos-visibility-flag-interaction (bonos.md): only ever
+                  offered when the clinic has bonos enabled AND the client
+                  has at least one active bono. */}
+              {bonosEnabled &&
+                (activeBonos ?? []).map((b) => (
+                  <button
+                    key={b.id}
+                    type="button"
+                    onClick={() => handleCobrar(`bono:${b.id}`)}
+                    disabled={busy}
+                    className="rounded-xl border border-line bg-surface px-4 py-4 text-[15px] font-semibold text-ink transition-colors hover:border-brand-line hover:bg-brand-weak disabled:opacity-60"
+                  >
+                    {d.paymentMethodBonoTemplate
+                      .replace("{bonoName}", b.bonoTypeName)
+                      .replace("{n}", String(b.sessionsRemaining))}
+                  </button>
+                ))}
+              {bonosEnabled && bonosLoading && (
+                <p className="text-center text-[12.5px] text-ink-soft">…</p>
+              )}
+            </div>
+            <div className="mt-4 flex justify-end">
+              <Btn variant="ghost" onClick={() => setCobrarModalOpen(false)} disabled={busy}>
+                {d.cobrarCancel}
+              </Btn>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -54,6 +54,7 @@ export default async function ServicesPage({
           price,
         }))}
         returnToHome={returnToHome}
+        initialBonosEnabled={business.bonos_enabled}
       />
     </div>
   );

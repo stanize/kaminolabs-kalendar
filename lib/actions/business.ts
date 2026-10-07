@@ -394,3 +394,43 @@ export const removeBusinessLogo = authedAction(
     return { ok: true };
   }
 );
+
+// ── Bonos visibility toggle (clinic-configuration.md's bonos-visibility-toggle) ──
+// Controlled from the Servicios page ("Activar bonos"), not /panel/business —
+// but the column lives on kalendar_businesses alongside the other
+// clinic-level flags, so the action lives here next to the others that
+// write to this table. Purely a visibility flag: never touches
+// kalendar_bono_types/kalendar_bono_purchases, never hides already-recorded
+// bono history (bonos.md's bonos-visibility-flag-interaction).
+export type SaveBonosEnabledResult = { ok: true } | { ok: false; error: string };
+
+export const saveBonosEnabled = authedAction(
+  async (
+    session,
+    enabled: boolean,
+    dict?: { errNoBusiness: string; errSaveFailed: string }
+  ): Promise<SaveBonosEnabledResult> => {
+    const t = {
+      errNoBusiness: dict?.errNoBusiness ?? "No se encontró tu negocio.",
+      errSaveFailed: dict?.errSaveFailed ?? "No se pudo guardar el cambio.",
+    };
+
+    const business = await getBusinessForUser(session.user.id);
+    if (!business) return { ok: false, error: t.errNoBusiness };
+
+    const supabase = await createClient();
+    const { error } = await supabase
+      .from("kalendar_businesses")
+      .update({ bonos_enabled: enabled })
+      .eq("id", business.id)
+      .eq("owner_id", session.user.id);
+
+    if (error) return { ok: false, error: t.errSaveFailed };
+
+    revalidatePath("/panel/services");
+    revalidatePath("/panel/bonos");
+    revalidatePath("/panel/calendar");
+    revalidatePath("/panel");
+    return { ok: true };
+  }
+);

@@ -143,6 +143,7 @@ export default async function CalendarPage() {
           paymentStatus: b.paymentStatus,
           paymentMethod: b.paymentMethod,
           bonoPurchaseId: b.bonoPurchaseId,
+          paidAt: b.paidAt,
           clinicClientId: b.clinicClientId,
           clientName: b.clientName,
           clientEmail: b.clientEmail,
@@ -159,6 +160,7 @@ export default async function CalendarPage() {
         }))}
         weekStartIso={weekStartIso}
         whatsappEnabled={whatsappEnabled}
+        bonosEnabled={business.bonos_enabled}
         initialConflicts={initialConflicts}
         festivos={festivos}
         closures={closureRules}

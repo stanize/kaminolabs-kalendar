@@ -107,6 +107,7 @@ function toWeekBookingVM(b: BookingVM): WeekBookingVM {
     paymentStatus: "unpaid",
     paymentMethod: null,
     bonoPurchaseId: null,
+    paidAt: null,
     clinicClientId: null,
     clientName: b.clientName,
     clientEmail: b.clientEmail,
@@ -171,6 +172,7 @@ export function CalendarBookings({
   weekInitialBookings,
   weekStartIso,
   whatsappEnabled,
+  bonosEnabled,
   initialConflicts,
   festivos,
   closures,
@@ -190,6 +192,11 @@ export function CalendarBookings({
   weekInitialBookings: WeekBookingVM[];
   weekStartIso: string;
   whatsappEnabled: boolean;
+  // clinic-configuration.md's bonos-visibility-toggle — gates the bono
+  // option(s) in the Cobrar modal (BookingDetailModal) and in
+  // AppointmentModal's edit flow, forward-looking only (never hides
+  // already-recorded bono history elsewhere).
+  bonosEnabled: boolean;
   initialConflicts: ConflictRowVM[];
   // holidays-and-time-off (2026-09-26): recurring, clinic-wide festivos only
   // (month/day + optional label) — fetched once at the page level and
@@ -552,6 +559,7 @@ export function CalendarBookings({
           booking={selectedBooking}
           intlLocale={dict.intlLocale}
           dict={dict}
+          bonosEnabled={bonosEnabled}
           onClose={() => setSelectedBooking(null)}
           onUpdated={handleGridBookingCreated}
           onCancellationReviewed={() => {

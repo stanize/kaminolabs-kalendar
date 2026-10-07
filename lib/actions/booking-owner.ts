@@ -326,7 +326,12 @@ export const updateBookingResult = authedAction(
     session,
     input: {
       bookingId: string;
-      status: BookingResultStatus;
+      // Optional (cobrar-button-and-paid-at): the Cobrar modal saves
+      // payment independently of picking a Resultado first, so it omits
+      // this entirely — the booking's existing status is left untouched
+      // when not provided. The Resultado "Guardar" flow still always
+      // supplies it.
+      status?: BookingResultStatus;
       paymentStatus: BookingPaymentStatus;
       // Required when paymentStatus is "paid", ignored otherwise (the
       // modal never sends a method for an "unpaid" save).
@@ -343,7 +348,7 @@ export const updateBookingResult = authedAction(
 
     const { data: booking } = await supabase
       .from("kalendar_bookings")
-      .select("id, status, clinic_client_id, starts_at, payment_method, bono_purchase_id")
+      .select("id, status, clinic_client_id, starts_at, payment_status, payment_method, bono_purchase_id")
       .eq("id", input.bookingId)
       .eq("business_id", business.id)
       .maybeSingle();
@@ -424,13 +429,25 @@ export const updateBookingResult = authedAction(
       }
     }
 
+    // paid_at (cobrar-button-and-paid-at, calendar-management-past.md):
+    // set on the actual unpaid -> paid transition, left untouched when
+    // already paid and staying paid (e.g. switching cash -> card doesn't
+    // reset when it was originally marked paid), cleared on paid -> unpaid.
+    const newPaidAt: string | null | undefined =
+      input.paymentStatus === "paid"
+        ? booking.payment_status === "paid"
+          ? undefined // already paid — leave the existing paid_at as-is
+          : new Date().toISOString()
+        : null;
+
     const { error } = await supabase
       .from("kalendar_bookings")
       .update({
-        status: input.status,
+        ...(input.status !== undefined ? { status: input.status } : {}),
         payment_status: input.paymentStatus,
         payment_method: newPaymentMethod,
         bono_purchase_id: newBonoPurchaseId,
+        ...(newPaidAt !== undefined ? { paid_at: newPaidAt } : {}),
         status_updated_at: new Date().toISOString(),
       })
       .eq("id", input.bookingId)
@@ -453,7 +470,7 @@ export const updateBookingResult = authedAction(
       return { ok: false, error: t.errUpdateFailed };
     }
 
-    if (booking.clinic_client_id) {
+    if (booking.clinic_client_id && input.status !== undefined) {
       await applyResultToClientCounters({
         clinicClientId: booking.clinic_client_id,
         previousStatus: booking.status as BookingResultStatus | "pending_confirmation" | "confirmed",

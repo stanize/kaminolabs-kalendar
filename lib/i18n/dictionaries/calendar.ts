@@ -129,10 +129,16 @@ export interface CalendarDictionary {
     paymentMethodLabel: string; // "Método de pago" — inline selector shown once paymentPaid is chosen
     paymentMethodCash: string;
     paymentMethodCard: string;
+    paymentMethodBono: string; // generic short label ("Bono") used in the paid-summary line, no name/count
     paymentMethodBonoTemplate: string; // "{bonoName} ({n} restantes)" — one option per active bono
     paymentMethodLockedNote: string; // shown instead of the selector once a bono is already applied
     saveButton: string;
     saving: string;
+    // cobrar-button-and-paid-at (calendar-management-past.md)
+    cobrarButton: string; // "Cobrar" — shown instead of a payment toggle on an unpaid past appointment
+    cobrarModalTitle: string;
+    cobrarCancel: string; // closes the Cobrar modal without charging
+    paidWithTemplate: string; // "Pagado con {method} · {time}" — {method} and {time} replaced client-side
   };
   widget: {
     title: string; // "Hoy"
@@ -262,10 +268,15 @@ const es: CalendarDictionary = {
     paymentMethodLabel: "Método de pago",
     paymentMethodCash: "Efectivo",
     paymentMethodCard: "Tarjeta",
+    paymentMethodBono: "Bono",
     paymentMethodBonoTemplate: "{bonoName} ({n} restantes)",
     paymentMethodLockedNote: "Este pago ya está aplicado a un bono. Para cambiarlo, ve a la página de Bonos.",
     saveButton: "Guardar",
     saving: "Guardando…",
+    cobrarButton: "Cobrar",
+    cobrarModalTitle: "¿Cómo ha pagado?",
+    cobrarCancel: "Cancelar",
+    paidWithTemplate: "Pagado con {method} · {time}",
   },
   widget: {
     title: "Hoy",
@@ -394,10 +405,15 @@ const en: CalendarDictionary = {
     paymentMethodLabel: "Payment method",
     paymentMethodCash: "Cash",
     paymentMethodCard: "Card",
+    paymentMethodBono: "Bono",
     paymentMethodBonoTemplate: "{bonoName} ({n} left)",
     paymentMethodLockedNote: "This payment is already applied to a bono. To change it, go to the Bonos page.",
     saveButton: "Save",
     saving: "Saving…",
+    cobrarButton: "Charge",
+    cobrarModalTitle: "How did they pay?",
+    cobrarCancel: "Cancel",
+    paidWithTemplate: "Paid with {method} · {time}",
   },
   widget: {
     title: "Today",

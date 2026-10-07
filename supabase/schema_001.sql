@@ -308,7 +308,15 @@ create table public.kalendar_businesses (
   -- business active/disabled flag — see that file's "additional signals"
   -- section. When false, the public booking page shows a "temporarily
   -- down" message instead of rendering; the slug itself is unaffected.
-  slug_active             boolean     not null default true
+  slug_active             boolean     not null default true,
+  -- Bonos visibility toggle (schema_subset_022.sql, clinic-configuration.md's
+  -- bonos-visibility-toggle). Off by default so clinics that don't sell
+  -- session packages (podólogos, sanitarias, etc.) never see the Bonos tab
+  -- at all unless they explicitly opt in from Servicios. Purely a
+  -- forward-looking visibility gate — never hides already-recorded bono
+  -- history (client-page-bono-summary, patient-bono-view, past-booking
+  -- payment display all keep showing bono data regardless of this flag).
+  bonos_enabled           boolean     not null default false
 );
 
 create index kalendar_businesses_owner_id_idx on public.kalendar_businesses (owner_id);
@@ -838,6 +846,14 @@ create table public.kalendar_bookings (
   payment_method       text                  check (
     payment_method in ('cash', 'card', 'bono')
   ),
+  -- When payment_status last transitioned to 'paid' (schema_subset_022.sql,
+  -- calendar-management-past.md's cobrar-button-and-paid-at). Set to now()
+  -- on that transition, cleared back to null on an unpaid-flip — mirrors how
+  -- bono_purchase_id is already symmetrically set/cleared. Drives the
+  -- "Pagado con {método} · {hora}" summary; deliberately a dedicated column
+  -- rather than reusing updated_at, which also changes on unrelated edits
+  -- (notes, time, client details) and would misrepresent the payment moment.
+  paid_at              timestamptz,
   -- Which specific sold bono this booking's session was deducted from, only
   -- when payment_method = 'bono'. ON DELETE SET NULL rather than cascade —
   -- a deleted purchase record (shouldn't normally happen) must not silently

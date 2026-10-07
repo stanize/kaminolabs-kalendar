@@ -56,6 +56,15 @@ export interface ServicesDictionary {
     errDeleteFailed: string; // prefix; server detail appended
     errReorderFailed: string; // prefix; server detail appended
   };
+  // bonos-visibility-toggle (clinic-configuration.md) — saveBonosEnabled,
+  // lib/actions/business.ts
+  bonos: {
+    enabledLabel: string; // "Activar bonos" checkbox label
+    enabledHint: string; // short explainer under the checkbox
+    saving: string;
+    errNoBusiness: string;
+    errSaveFailed: string;
+  };
 }
 
 const es: ServicesDictionary = {
@@ -105,6 +114,13 @@ const es: ServicesDictionary = {
     errDeleteFailed: "No se pudo eliminar:",
     errReorderFailed: "No se pudo reordenar:",
   },
+  bonos: {
+    enabledLabel: "Activar bonos",
+    enabledHint: "Permite vender y gestionar bonos de sesiones prepagadas. Añade una sección Bonos a tu panel.",
+    saving: "Guardando…",
+    errNoBusiness: "No se encontró tu negocio.",
+    errSaveFailed: "No se pudo guardar el cambio.",
+  },
 };
 
 const en: ServicesDictionary = {
@@ -153,6 +169,13 @@ const en: ServicesDictionary = {
     errSaveFailed: "Couldn't save:",
     errDeleteFailed: "Couldn't delete:",
     errReorderFailed: "Couldn't reorder:",
+  },
+  bonos: {
+    enabledLabel: "Enable bonos",
+    enabledHint: "Lets you sell and manage prepaid session packages. Adds a Bonos section to your panel.",
+    saving: "Saving…",
+    errNoBusiness: "Business not found.",
+    errSaveFailed: "Couldn't save the change.",
   },
 };
 

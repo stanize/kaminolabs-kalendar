@@ -12,8 +12,13 @@ Criteria:
 - Bounds enforced both client-side (form validation, 0–720 with a clear Spanish error message) and at the DB level (CHECK constraint)
 
 ## Step: bonos-visibility-toggle
-Status: not_started
+Status: in_progress
 Criteria:
+- CODE IMPLEMENTED, TYPECHECKED, LINTED, BUILD PASSES (2026-10-07). Pending Arun's manual/live testing — not `done` yet.
+- `bonos_enabled` added to `kalendar_businesses` (`supabase/schema_subset_022.sql`, folded into `schema_001.sql`) — Arun still needs to run `schema_subset_022.sql` against the live DB.
+- Toggle implemented on `/panel/services` (`components/panel/services-manager.tsx`), saved via `saveBonosEnabled` (`lib/actions/business.ts`) — lives there rather than a dedicated bonos action file since the column is on `kalendar_businesses` alongside the other business-level flags.
+- Sidebar nav item hidden via a new `bonosEnabled` prop threaded `app/panel/layout.tsx` -> `PanelSidebar` (`components/panel/sidebar.tsx`); `/panel/bonos` itself route-guarded (`app/panel/bonos/page.tsx`, redirects to `/panel` when `bonos_enabled` is false) so a direct URL visit respects the flag too, not just the nav.
+- Historical bono data is untouched by any of this — only the nav item, the route, and (see calendar-management-past.md's `cobrar-button-and-paid-at`) the Cobrar modal's bono option are gated.
 - SPEC (2026-10-07, Arun): `kalendar_businesses` gains `bonos_enabled` (boolean, NOT NULL, default `false`). Purely a visibility flag — no change to bonos logic itself (bonos.md's schema/actions/triggers are untouched).
 - Toggle lives on the **Servicios** page (not /panel/settings — matches this file's existing pattern of config living alongside the feature it governs, see cancellation-window-setting's own "Reservas" tab precedent), labeled **"Activar bonos"**, off by default.
 - When `bonos_enabled` is false:

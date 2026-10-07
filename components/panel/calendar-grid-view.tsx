@@ -152,6 +152,7 @@ export interface WeekBookingVM {
   paymentStatus: "unpaid" | "paid";
   paymentMethod: "cash" | "card" | "bono" | null;
   bonoPurchaseId: string | null;
+  paidAt: string | null;
   clinicClientId: string | null;
   clientName: string;
   clientEmail: string;

@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth-session";
 import { assignRole, getUserRoles } from "@/lib/roles/data";
+import { getBusinessForUser } from "@/lib/business/data";
 import { PanelSidebar } from "@/components/panel/sidebar";
 import { EmailVerificationGate } from "@/components/panel/email-verification-gate";
 import { RoleUpgradeGate } from "@/components/panel/role-upgrade-gate";
@@ -91,6 +92,12 @@ export default async function PanelLayout({ children }: { children: ReactNode })
   // sign-ups arrive pre-verified and skip the gate.
   const needsVerification = session.user.emailVerified === false;
 
+  // clinic-configuration.md's bonos-visibility-toggle — read once here so
+  // the sidebar's Bonos nav item can be hidden for clinics that haven't
+  // opted in. No business yet (mid-onboarding) => no bonos, same as today.
+  const business = await getBusinessForUser(session.user.id);
+  const bonosEnabled = business?.bonos_enabled ?? false;
+
   return (
     <div className="flex min-h-screen flex-col bg-bg md:flex-row">
       {/* Preconnect to Stripe's domains as early as possible — the panel is
@@ -105,7 +112,7 @@ export default async function PanelLayout({ children }: { children: ReactNode })
       <link rel="preconnect" href="https://js.stripe.com" />
       <link rel="preconnect" href="https://m.stripe.network" />
       <link rel="dns-prefetch" href="https://js.stripe.com" />
-      <PanelSidebar user={session.user} dict={dict.sidebar} locale={locale} />
+      <PanelSidebar user={session.user} dict={dict.sidebar} locale={locale} bonosEnabled={bonosEnabled} />
       <main className="flex-1 overflow-y-auto">
         {children}
       </main>

@@ -12,6 +12,7 @@ import {
   deleteService,
   reorderServices,
 } from "@/lib/actions/services";
+import { saveBonosEnabled } from "@/lib/actions/business";
 import {
   DURATION_PRESETS,
   DURATION_MIN_MINUTES,
@@ -82,11 +83,13 @@ export function ServicesManager({
   templates,
   returnToHome,
   dict,
+  initialBonosEnabled,
 }: {
   initialServices: ServiceItem[];
   templates: TemplateItem[];
   returnToHome: boolean;
   dict: ServicesDictionary;
+  initialBonosEnabled: boolean;
 }) {
   const router = useRouter();
   const m = dict.manager;
@@ -95,6 +98,30 @@ export function ServicesManager({
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // ── Bonos visibility toggle (clinic-configuration.md) ───────────────────
+  const [bonosEnabled, setBonosEnabled] = useState(initialBonosEnabled);
+  const [bonosSaving, setBonosSaving] = useState(false);
+
+  async function handleToggleBonos(next: boolean) {
+    setBonosEnabled(next); // optimistic — reverted below on failure
+    setBonosSaving(true);
+    try {
+      const result = await saveBonosEnabled(next, dict.bonos);
+      if (!result.ok) {
+        setBonosEnabled(!next);
+        setError(result.error);
+      } else {
+        router.refresh(); // picks up the sidebar's Bonos nav item appearing/disappearing
+      }
+    } catch (e) {
+      reportClientError("saveBonosEnabled", e);
+      setBonosEnabled(!next);
+      setError(dict.bonos.errSaveFailed);
+    } finally {
+      setBonosSaving(false);
+    }
+  }
 
   // Staged template drafts the user is customizing before confirming. null when
   // not in the staging flow.
@@ -270,6 +297,23 @@ export function ServicesManager({
           <span>{error}</span>
         </div>
       )}
+
+      {/* Bonos visibility toggle (clinic-configuration.md's bonos-visibility-toggle) */}
+      <div className="rounded-xl border border-line bg-surface p-4">
+        <label className="flex items-start gap-2.5">
+          <input
+            type="checkbox"
+            checked={bonosEnabled}
+            disabled={bonosSaving}
+            onChange={(e) => handleToggleBonos(e.target.checked)}
+            className="mt-0.5 h-[18px] w-[18px] shrink-0 accent-brand disabled:opacity-60"
+          />
+          <span>
+            <span className="block text-[14px] font-medium text-ink">{dict.bonos.enabledLabel}</span>
+            <span className="block text-[12.5px] text-ink-soft">{dict.bonos.enabledHint}</span>
+          </span>
+        </label>
+      </div>
 
       {/* Existing services */}
       {services.length > 0 && (

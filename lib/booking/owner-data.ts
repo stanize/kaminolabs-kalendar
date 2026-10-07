@@ -140,6 +140,10 @@ export interface WeekViewBooking {
   // whenever paymentStatus is 'unpaid'.
   paymentMethod: "cash" | "card" | "bono" | null;
   bonoPurchaseId: string | null;
+  // When payment_status last transitioned to 'paid' — cobrar-button-and-
+  // paid-at (calendar-management-past.md). Null whenever paymentStatus is
+  // 'unpaid'. Drives the "Pagado con {método} · {hora}" summary.
+  paidAt: string | null;
   // The clinic's own client record for this booking, if linked — needed to
   // look up the client's active bonos for the payment-method dropdown.
   // Null for guest bookings that predate client-linking or that never got
@@ -223,7 +227,7 @@ export async function getWeekCalendarData(
     supabase
       .from("kalendar_bookings")
       .select(
-        "id, service_id, service_name, service_duration_min, starts_at, ends_at, status, payment_status, payment_method, bono_purchase_id, clinic_client_id, client_name, client_email, client_phone, notes, team_member_id, patient_id, pending_expiry_at, guest_locale, reminder_send_failed, last_reminder_error, cancellation_requested_at, clinic_reviewed_at"
+        "id, service_id, service_name, service_duration_min, starts_at, ends_at, status, payment_status, payment_method, bono_purchase_id, paid_at, clinic_client_id, client_name, client_email, client_phone, notes, team_member_id, patient_id, pending_expiry_at, guest_locale, reminder_send_failed, last_reminder_error, cancellation_requested_at, clinic_reviewed_at"
       )
       .eq("business_id", business.id)
       .gte("starts_at", weekStartIso)
@@ -250,6 +254,7 @@ export async function getWeekCalendarData(
           payment_status: PaymentStatus;
           payment_method: "cash" | "card" | "bono" | null;
           bono_purchase_id: string | null;
+          paid_at: string | null;
           clinic_client_id: string | null;
           client_name: string;
           client_email: string;
@@ -279,6 +284,7 @@ export async function getWeekCalendarData(
     paymentStatus: b.payment_status,
     paymentMethod: b.payment_method,
     bonoPurchaseId: b.bono_purchase_id,
+    paidAt: b.paid_at,
     clinicClientId: b.clinic_client_id,
     clientName: b.client_name,
     clientEmail: b.client_email,
@@ -564,7 +570,7 @@ export async function getConflictingBookingsForUser(userId: string): Promise<Con
   const { data } = await supabase
     .from("kalendar_bookings")
     .select(
-      "id, service_id, service_name, service_duration_min, starts_at, ends_at, status, payment_status, payment_method, bono_purchase_id, clinic_client_id, client_name, client_email, client_phone, notes, team_member_id, patient_id, pending_expiry_at, guest_locale, reminder_send_failed, last_reminder_error, cancellation_requested_at, clinic_reviewed_at"
+      "id, service_id, service_name, service_duration_min, starts_at, ends_at, status, payment_status, payment_method, bono_purchase_id, paid_at, clinic_client_id, client_name, client_email, client_phone, notes, team_member_id, patient_id, pending_expiry_at, guest_locale, reminder_send_failed, last_reminder_error, cancellation_requested_at, clinic_reviewed_at"
     )
     .eq("business_id", business.id)
     .in("id", bookingIds);
@@ -582,6 +588,7 @@ export async function getConflictingBookingsForUser(userId: string): Promise<Con
           payment_status: PaymentStatus;
           payment_method: "cash" | "card" | "bono" | null;
           bono_purchase_id: string | null;
+          paid_at: string | null;
           clinic_client_id: string | null;
           client_name: string;
           client_email: string;
@@ -613,6 +620,7 @@ export async function getConflictingBookingsForUser(userId: string): Promise<Con
         paymentStatus: b.payment_status,
         paymentMethod: b.payment_method,
         bonoPurchaseId: b.bono_purchase_id,
+        paidAt: b.paid_at,
         clinicClientId: b.clinic_client_id,
         clientName: b.client_name,
         clientEmail: b.client_email,
