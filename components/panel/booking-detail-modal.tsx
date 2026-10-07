@@ -220,14 +220,18 @@ export function BookingDetailModal({
   const handleNoShow = async () => {
     setBusy(true);
     setError(null);
-    let paymentMethod: BookingPaymentMethod | undefined;
-    if (booking.paymentMethod === "bono" && booking.bonoPurchaseId) {
-      paymentMethod = { bonoPurchaseId: booking.bonoPurchaseId };
-    } else if (booking.paymentMethod === "cash" || booking.paymentMethod === "card") {
-      paymentMethod = booking.paymentMethod;
-    }
+    // BUG FOUND + FIXED (2026-10-07, Arun, live testing): this used to
+    // re-send the booking's PREVIOUS payment state unchanged, so marking
+    // No-show via Editar on an already-paid booking left the stale
+    // "Pagado con ..." summary in place even though the grid chip
+    // correctly showed No-show. No-show and paid are the two mutually
+    // exclusive terminal states (per Arun's original framing), so this
+    // always clears payment to unpaid — matches updateBookingResult's
+    // already-existing unpaid-flip behavior, which also correctly
+    // restores a deducted bono session via the sync_bono_session_usage
+    // trigger when the booking was previously bono-paid.
     const res = await updateBookingResult(
-      { bookingId: booking.id, status: "no_show", paymentStatus: booking.paymentStatus, paymentMethod },
+      { bookingId: booking.id, status: "no_show", paymentStatus: "unpaid" },
       dict.errors
     );
     setBusy(false);
