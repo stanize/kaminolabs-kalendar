@@ -9,7 +9,6 @@ import {
   markBookingReviewedAsOwner,
   updateBookingResult,
   reviewCancellationRequest,
-  type BookingResultStatus,
   type BookingPaymentMethod,
 } from "@/lib/actions/booking-owner";
 import { getActiveBonosForClientAction } from "@/lib/actions/bonos";
@@ -53,21 +52,17 @@ export function BookingDetailModal({
   const d = dict.detailModal;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const initialResult: BookingResultStatus | null =
-    booking.status === "completed" || booking.status === "no_show" || booking.status === "cancelled"
-      ? booking.status
-      : null;
-  const [result, setResult] = useState<BookingResultStatus | null>(initialResult);
 
-  // ── Payment (cobrar-button-and-paid-at, calendar-management-past.md) ────
-  // Payment is no longer part of this Resultado/Guardar edit flow — Cobrar
-  // charges immediately on selection (handleCobrar below), independent of
-  // whatever Resultado the owner has/hasn't chosen. Once a booking is
-  // already paid, the modal only ever shows the static paidSummaryText
-  // below — no further payment UI at all here, so the old bono "locked"
-  // (switching AWAY from a bono is Bonos-page-only) has nothing left to
-  // gate in this component; it's enforced server-side in
-  // updateBookingResult regardless.
+  // ── Payment / Resultado (cobrar-button-and-paid-at, 2026-10) ────────────
+  // Simplified per Arun: a past appointment only ever ends up in one of
+  // three terminal states — paid (Cobrar, which also marks it completed),
+  // No-show, or already Cancelada (via the normal cancel flow, unrelated to
+  // this section) — no separate Resultado picker, no Guardar step. Each
+  // action saves immediately. Once a booking is already paid, the modal
+  // only ever shows the static paidSummaryText below — no further payment
+  // UI at all here, so the old bono "locked" (switching AWAY from a bono is
+  // Bonos-page-only) has nothing left to gate in this component; it's
+  // enforced server-side in updateBookingResult regardless.
   const [activeBonos, setActiveBonos] = useState<ClientActiveBono[] | null>(null);
   const [bonosLoading, setBonosLoading] = useState(false);
   // The Cobrar modal (Efectivo/Tarjeta/bono buttons), opened instead of the
@@ -93,8 +88,6 @@ export function BookingDetailModal({
       cancelled = true;
     };
   }, [bonosEnabled, cobrarModalOpen, booking.clinicClientId, activeBonos, bonosLoading]);
-
-  const isDirty = result !== initialResult;
 
   const isFuture = new Date(booking.startIso) > new Date();
   // Only a GUEST booking can still be pending_confirmation in the normal
@@ -193,9 +186,10 @@ export function BookingDetailModal({
   };
 
   // cobrar-button-and-paid-at: charges immediately on selection (no separate
-  // Guardar step) — the Cobrar button replaces the old toggle+inline
-  // selector entirely, and payment is independent of whatever Resultado the
-  // owner has/hasn't chosen yet (status omitted — see updateBookingResult).
+  // Guardar step). DECIDED (2026-10): paying also marks the appointment
+  // completed in the same write — a past appointment that's been paid is,
+  // by definition, one that happened, so there's no separate Resultado
+  // choice to make.
   const handleCobrar = async (methodValue: string) => {
     setBusy(true);
     setError(null);
@@ -203,7 +197,7 @@ export function BookingDetailModal({
       ? { bonoPurchaseId: methodValue.slice("bono:".length) }
       : (methodValue as "cash" | "card");
     const res = await updateBookingResult(
-      { bookingId: booking.id, paymentStatus: "paid", paymentMethod },
+      { bookingId: booking.id, status: "completed", paymentStatus: "paid", paymentMethod },
       dict.errors
     );
     setBusy(false);
@@ -213,13 +207,14 @@ export function BookingDetailModal({
     onClose();
   };
 
-  const handleSaveResult = async () => {
-    if (!result) return;
+  // No-show: the other terminal state for a past appointment, saved
+  // immediately — no Resultado picker, no separate Guardar step. Leaves
+  // payment untouched (re-sends the booking's current unchanged value,
+  // same as the rest of this file's pattern) since a no-show is, by
+  // definition, not being charged here.
+  const handleNoShow = async () => {
     setBusy(true);
     setError(null);
-    // Payment is saved separately via Cobrar (handleCobrar) — this write
-    // only ever changes Resultado, so it just re-sends the booking's
-    // current (unchanged) payment state rather than touching it.
     let paymentMethod: BookingPaymentMethod | undefined;
     if (booking.paymentMethod === "bono" && booking.bonoPurchaseId) {
       paymentMethod = { bonoPurchaseId: booking.bonoPurchaseId };
@@ -227,7 +222,7 @@ export function BookingDetailModal({
       paymentMethod = booking.paymentMethod;
     }
     const res = await updateBookingResult(
-      { bookingId: booking.id, status: result, paymentStatus: booking.paymentStatus, paymentMethod },
+      { bookingId: booking.id, status: "no_show", paymentStatus: booking.paymentStatus, paymentMethod },
       dict.errors
     );
     setBusy(false);
@@ -376,34 +371,34 @@ export function BookingDetailModal({
           <div className="flex flex-col gap-4">
             <div>
               <p className="mb-1.5 text-[12px] font-bold uppercase tracking-[.05em] text-ink-soft">
-                {d.resultLabel}
-              </p>
-              <div className="flex gap-1.5">
-                <ChoiceBtn active={result === "completed"} onClick={() => setResult("completed")} label={d.resultCompleted} />
-                <ChoiceBtn active={result === "no_show"} onClick={() => setResult("no_show")} label={d.resultNoShow} />
-                <ChoiceBtn active={result === "cancelled"} onClick={() => setResult("cancelled")} label={d.resultCancelled} />
-              </div>
-            </div>
-            <div>
-              <p className="mb-1.5 text-[12px] font-bold uppercase tracking-[.05em] text-ink-soft">
                 {d.paymentLabel}
               </p>
-              {paidSummaryText ? (
+              {booking.status === "cancelled" ? (
+                <p className="rounded-lg border border-line bg-surface-2/50 px-3 py-2 text-[12.5px] font-medium text-ink">
+                  {d.resultCancelled}
+                </p>
+              ) : paidSummaryText ? (
                 <p className="rounded-lg border border-line bg-surface-2/50 px-3 py-2 text-[12.5px] font-medium text-ink">
                   {paidSummaryText}
                 </p>
+              ) : booking.status === "no_show" ? (
+                <p className="rounded-lg border border-line bg-surface-2/50 px-3 py-2 text-[12.5px] font-medium text-ink">
+                  {d.resultNoShow}
+                </p>
               ) : (
-                <Btn variant="outline" onClick={() => setCobrarModalOpen(true)} disabled={busy}>
-                  {d.cobrarButton}
-                </Btn>
+                <div className="flex items-center gap-2">
+                  <Btn variant="primary" onClick={() => setCobrarModalOpen(true)} disabled={busy}>
+                    {d.cobrarButton}
+                  </Btn>
+                  <Btn variant="outline" size="sm" onClick={handleNoShow} disabled={busy}>
+                    {d.resultNoShow}
+                  </Btn>
+                </div>
               )}
             </div>
-            <div className="flex justify-end gap-2">
+            <div className="flex justify-end">
               <Btn variant="ghost" onClick={onClose} disabled={busy}>
                 {d.dismissButton}
-              </Btn>
-              <Btn onClick={handleSaveResult} disabled={busy || !result || !isDirty}>
-                {busy ? d.saving : d.saveButton}
               </Btn>
             </div>
           </div>
@@ -467,18 +462,5 @@ export function BookingDetailModal({
         </div>
       )}
     </div>
-  );
-}
-
-function ChoiceBtn({ active, onClick, label }: { active: boolean; onClick: () => void; label: string }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`flex-1 rounded-lg border px-2.5 py-2 text-[12.5px] font-semibold transition-colors ${
-        active ? "border-brand bg-brand-weak text-brand-ink" : "border-line text-ink-soft hover:bg-surface-2"
-      }`}
-    >
-      {label}
-    </button>
   );
 }

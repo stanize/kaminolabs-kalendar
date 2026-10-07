@@ -119,8 +119,6 @@ export interface CalendarDictionary {
     modifyButton: string; // "Modificar" — opens the appointment editor (future bookings)
     cancelButton: string;
     cancelling: string;
-    resultLabel: string; // "Resultado"
-    resultCompleted: string;
     resultNoShow: string;
     resultCancelled: string;
     paymentLabel: string; // "Pago"
@@ -258,8 +256,6 @@ const es: CalendarDictionary = {
     modifyButton: "Modificar",
     cancelButton: "Cancelar cita",
     cancelling: "Cancelando…",
-    resultLabel: "Resultado",
-    resultCompleted: "Completada",
     resultNoShow: "No-show",
     resultCancelled: "Cancelada",
     paymentLabel: "Pago",
@@ -395,8 +391,6 @@ const en: CalendarDictionary = {
     modifyButton: "Modify",
     cancelButton: "Cancel appointment",
     cancelling: "Cancelling…",
-    resultLabel: "Result",
-    resultCompleted: "Completed",
     resultNoShow: "No-show",
     resultCancelled: "Cancelled",
     paymentLabel: "Payment",
