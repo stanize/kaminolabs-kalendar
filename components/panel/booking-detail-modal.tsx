@@ -68,6 +68,11 @@ export function BookingDetailModal({
   // The Cobrar modal (Efectivo/Tarjeta/bono buttons), opened instead of the
   // old inline toggle+selector.
   const [cobrarModalOpen, setCobrarModalOpen] = useState(false);
+  // "Editar" next to an already-resolved Pago state (paid or no-show) — lets
+  // the clinic correct a mistake by re-showing the Cobrar/No-show buttons
+  // instead of the read-only summary. Not offered for an already-cancelled
+  // booking (cancelling is a separate, unrelated flow).
+  const [editingPayment, setEditingPayment] = useState(false);
 
   // Fetched lazily — only while the Cobrar modal is open, and only when the
   // clinic has bonos enabled at all (bonos-visibility-flag-interaction,
@@ -377,14 +382,28 @@ export function BookingDetailModal({
                 <p className="rounded-lg border border-line bg-surface-2/50 px-3 py-2 text-[12.5px] font-medium text-ink">
                   {d.resultCancelled}
                 </p>
-              ) : paidSummaryText ? (
-                <p className="rounded-lg border border-line bg-surface-2/50 px-3 py-2 text-[12.5px] font-medium text-ink">
-                  {paidSummaryText}
-                </p>
-              ) : booking.status === "no_show" ? (
-                <p className="rounded-lg border border-line bg-surface-2/50 px-3 py-2 text-[12.5px] font-medium text-ink">
-                  {d.resultNoShow}
-                </p>
+              ) : !editingPayment && paidSummaryText ? (
+                <div className="flex items-center justify-between gap-2 rounded-lg border border-line bg-surface-2/50 px-3 py-2">
+                  <p className="text-[12.5px] font-medium text-ink">{paidSummaryText}</p>
+                  <button
+                    type="button"
+                    onClick={() => setEditingPayment(true)}
+                    className="shrink-0 text-[12.5px] font-semibold text-brand hover:underline"
+                  >
+                    {d.editPaymentButton}
+                  </button>
+                </div>
+              ) : !editingPayment && booking.status === "no_show" ? (
+                <div className="flex items-center justify-between gap-2 rounded-lg border border-line bg-surface-2/50 px-3 py-2">
+                  <p className="text-[12.5px] font-medium text-ink">{d.resultNoShow}</p>
+                  <button
+                    type="button"
+                    onClick={() => setEditingPayment(true)}
+                    className="shrink-0 text-[12.5px] font-semibold text-brand hover:underline"
+                  >
+                    {d.editPaymentButton}
+                  </button>
+                </div>
               ) : (
                 <div className="flex items-center gap-2">
                   <Btn variant="primary" onClick={() => setCobrarModalOpen(true)} disabled={busy}>

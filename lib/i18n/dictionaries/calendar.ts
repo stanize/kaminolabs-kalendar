@@ -121,6 +121,7 @@ export interface CalendarDictionary {
     cancelling: string;
     resultNoShow: string;
     resultCancelled: string;
+    editPaymentButton: string; // "Editar" — small link next to a resolved Pago state (paid/no-show), reopens Cobrar/No-show
     paymentLabel: string; // "Pago"
     paymentPaid: string;
     paymentPending: string;
@@ -258,6 +259,7 @@ const es: CalendarDictionary = {
     cancelling: "Cancelando…",
     resultNoShow: "No-show",
     resultCancelled: "Cancelada",
+    editPaymentButton: "Editar",
     paymentLabel: "Pago",
     paymentPaid: "Pagado",
     paymentPending: "Pendiente",
@@ -393,6 +395,7 @@ const en: CalendarDictionary = {
     cancelling: "Cancelling…",
     resultNoShow: "No-show",
     resultCancelled: "Cancelled",
+    editPaymentButton: "Edit",
     paymentLabel: "Payment",
     paymentPaid: "Paid",
     paymentPending: "Pending",
