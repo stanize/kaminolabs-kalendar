@@ -647,8 +647,10 @@ function DayProviderColumn({
               </div>
               <div className="truncate opacity-90">
                 {timeLabel(b.startIso)} · {b.clientName}
-                {isPast && pastResultLabel(b, dict) && <> · <span className="font-semibold">{pastResultLabel(b, dict)}</span></>}
               </div>
+              {isPast && pastResultLabel(b, dict) && (
+                <div className="truncate font-semibold">{pastResultLabel(b, dict)}</div>
+              )}
             </div>
           );
         })}
