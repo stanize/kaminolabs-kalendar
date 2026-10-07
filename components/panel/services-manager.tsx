@@ -298,23 +298,6 @@ export function ServicesManager({
         </div>
       )}
 
-      {/* Bonos visibility toggle (clinic-configuration.md's bonos-visibility-toggle) */}
-      <div className="rounded-xl border border-line bg-surface p-4">
-        <label className="flex items-start gap-2.5">
-          <input
-            type="checkbox"
-            checked={bonosEnabled}
-            disabled={bonosSaving}
-            onChange={(e) => handleToggleBonos(e.target.checked)}
-            className="mt-0.5 h-[18px] w-[18px] shrink-0 accent-brand disabled:opacity-60"
-          />
-          <span>
-            <span className="block text-[14px] font-medium text-ink">{dict.bonos.enabledLabel}</span>
-            <span className="block text-[12.5px] text-ink-soft">{dict.bonos.enabledHint}</span>
-          </span>
-        </label>
-      </div>
-
       {/* Existing services */}
       {services.length > 0 && (
         <div className="flex flex-col gap-2">
@@ -445,6 +428,29 @@ export function ServicesManager({
               {m.cancel}
             </Btn>
           </div>
+        </div>
+      )}
+
+      {/* Bonos visibility toggle (clinic-configuration.md's bonos-visibility-toggle)
+          — a separate, secondary setting below the services list itself, not
+          the first thing the clinic sees on this page. The divider visually
+          separates it from the services section above. */}
+      {!inStaging && <div className="h-px bg-line" aria-hidden />}
+      {!inStaging && (
+        <div className="rounded-xl border border-line bg-surface p-4">
+          <label className="flex items-start gap-2.5">
+            <input
+              type="checkbox"
+              checked={bonosEnabled}
+              disabled={bonosSaving}
+              onChange={(e) => handleToggleBonos(e.target.checked)}
+              className="mt-0.5 h-[18px] w-[18px] shrink-0 accent-brand disabled:opacity-60"
+            />
+            <span>
+              <span className="block text-[14px] font-medium text-ink">{dict.bonos.enabledLabel}</span>
+              <span className="block text-[12.5px] text-ink-soft">{dict.bonos.enabledHint}</span>
+            </span>
+          </label>
         </div>
       )}
     </div>
