@@ -2,6 +2,7 @@ import { requireSession } from "@/lib/auth-session";
 import { getBusinessForUser } from "@/lib/business/data";
 import { BusinessForm } from "@/components/panel/business-form";
 import { WhatsappSettings } from "@/components/panel/whatsapp-settings";
+import { ProfessionalIdFields } from "@/components/panel/professional-id-fields";
 import { getLocale } from "@/lib/i18n/server";
 import { getBusinessDictionary } from "@/lib/i18n/dictionaries/business";
 import { getWhatsappConfig } from "@/lib/actions/whatsapp";
@@ -79,6 +80,13 @@ export default async function BusinessPage({
       />
 
       {business && <WhatsappSettings initial={whatsappConfig} dict={dict.whatsapp} />}
+      {business && (
+        <ProfessionalIdFields
+          initialDni={business.professional_dni}
+          initialCollegeNumber={business.professional_college_number}
+          dict={dict.professionalId}
+        />
+      )}
     </div>
   );
 }

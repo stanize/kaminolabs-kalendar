@@ -26,6 +26,7 @@ create extension if not exists "pgcrypto";
 -- Drop existing tables (cascade removes dependent objects: policies, indexes).
 -- Children before parents.
 -- ----------------------------------------------------------------------------
+drop table if exists public.kalendar_invoices                     cascade;
 drop table if exists public.kalendar_rate_limit_hits              cascade;
 drop table if exists public.kalendar_stripe_webhook_events       cascade;
 drop table if exists public.kalendar_discount_schedule_phases    cascade;
@@ -316,7 +317,30 @@ create table public.kalendar_businesses (
   -- forward-looking visibility gate — never hides already-recorded bono
   -- history (client-page-bono-summary, patient-bono-view, past-booking
   -- payment display all keep showing bono data regardless of this flag).
-  bonos_enabled           boolean     not null default false
+  bonos_enabled           boolean     not null default false,
+  -- ---------------------------------------------------------------------
+  -- Invoicing (schema_subset_023.sql, pdf-invoicing.md). Generated entirely
+  -- in-app (@react-pdf/renderer, generate-on-request — see
+  -- kalendar_invoices below), no external portal.
+  -- ---------------------------------------------------------------------
+  -- Which PDF template to render invoices with. A string id into a code
+  -- registry (lib/invoices/templates.ts), not a FK — templates are React
+  -- components, not data rows. Only 'vat-exempt' exists so far.
+  invoice_template_id     text        not null default 'vat-exempt',
+  -- Individual professional's personal DNI and professional college
+  -- registration number — distinct from legal_id (the business's own
+  -- NIF/CIF). Both optional: not every business type is a regulated
+  -- profession with a colegiada number. Shown on the invoice when filled
+  -- in, omitted otherwise.
+  professional_dni             text,
+  professional_college_number  text,
+  -- Uploaded signature image (invoice-signatures storage bucket, same
+  -- upload/remove pattern as logo_url). Shown on the invoice when set,
+  -- omitted otherwise — no placeholder/fallback graphic.
+  signature_url           text,
+  -- When true, Cobrar generates+sends the invoice automatically with no
+  -- confirm modal. Off by default.
+  auto_invoice_enabled    boolean     not null default false
 );
 
 create index kalendar_businesses_owner_id_idx on public.kalendar_businesses (owner_id);
@@ -966,6 +990,71 @@ create unique index kalendar_bookings_active_slot_idx
   )
   where status in ('pending_confirmation', 'confirmed');
 
+-- ----------------------------------------------------------------------------
+-- kalendar_invoices (schema_subset_023.sql, pdf-invoicing.md)
+-- Clinic -> patient factura records. PDFs are generated entirely on-request
+-- (no stored file, no external portal) from this row's snapshotted fields
+-- plus the business's current settings — see lib/invoices/. access_token is
+-- the bearer credential for the no-login client-facing/download link, same
+-- security model as kalendar_bookings.confirm_token.
+-- ----------------------------------------------------------------------------
+create table public.kalendar_invoices (
+  id              uuid        primary key default gen_random_uuid(),
+  business_id     uuid        not null references public.kalendar_businesses (id) on delete cascade,
+  -- Set null on delete rather than cascade — deleting a booking must not
+  -- silently delete its invoice history.
+  booking_id      uuid        references public.kalendar_bookings (id) on delete set null,
+  invoice_number  text        not null,
+  issue_year      integer     not null,
+  client_name     text        not null,
+  client_email    text        not null,
+  service_name    text        not null,
+  -- Snapshot of the booking's payment method at invoice-creation time —
+  -- invoice-on-payment-trigger only ever fires right after a successful
+  -- Cobrar, so this is simply the method just selected there.
+  payment_method  text        check (payment_method in ('cash', 'card', 'bono')),
+  amount          numeric(10, 2) not null default 0 check (amount >= 0),
+  access_token    text        not null unique,
+  sent_at         timestamptz,
+  created_at      timestamptz not null default now()
+);
+
+-- Not globally unique — only unique within a business + year (per-business,
+-- per-year reset numbering, sequential-numbering-allocation).
+create unique index kalendar_invoices_number_idx
+  on public.kalendar_invoices (business_id, issue_year, invoice_number);
+create index kalendar_invoices_business_id_idx on public.kalendar_invoices (business_id);
+create index kalendar_invoices_booking_id_idx  on public.kalendar_invoices (booking_id) where booking_id is not null;
+create index kalendar_invoices_access_token_idx on public.kalendar_invoices (access_token);
+
+alter table public.kalendar_invoices enable row level security;
+
+-- Transactional per-business, per-year sequential number allocation
+-- (sequential-numbering-allocation, the highest-risk piece of this feature —
+-- a numbering gap is a compliance problem, not just a bug). Uses a
+-- transaction-scoped advisory lock keyed by business_id+year so two
+-- concurrent invoice creations for the same business+year can't race past
+-- each other; pg_advisory_xact_lock blocks the second caller until the
+-- first transaction commits or rolls back, and the lock is released
+-- automatically at transaction end. Returns the formatted "YYYY-NNNN"
+-- string directly.
+create or replace function public.allocate_invoice_number(p_business_id uuid, p_issue_year int)
+returns text language plpgsql as $$
+declare
+  v_next int;
+begin
+  perform pg_advisory_xact_lock(hashtextextended(p_business_id::text || ':' || p_issue_year::text, 0));
+
+  select coalesce(max(invoice_number::int), 0) + 1
+    into v_next
+    from public.kalendar_invoices
+    where business_id = p_business_id
+      and issue_year = p_issue_year;
+
+  return lpad(v_next::text, 4, '0');
+end;
+$$;
+
 create or replace function public.set_updated_at()
 returns trigger language plpgsql as $$
 begin
@@ -1047,6 +1136,21 @@ values (
   true,
   2097152,
   array['image/png','image/jpeg','image/webp','image/svg+xml']
+) on conflict (id) do nothing;
+
+-- ============================================================================
+-- invoice-signatures storage bucket (kalendar_businesses.signature_url,
+-- schema_subset_023.sql, pdf-invoicing.md's signature-upload). Same pattern
+-- as business-logos but raster formats only — a signature is always a
+-- scan/photo, never a vector graphic.
+-- ============================================================================
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'invoice-signatures',
+  'invoice-signatures',
+  true,
+  2097152,
+  array['image/png','image/jpeg','image/webp']
 ) on conflict (id) do nothing;
 
 -- ----------------------------------------------------------------------------

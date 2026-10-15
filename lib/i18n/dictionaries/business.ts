@@ -104,6 +104,20 @@ export interface BusinessDictionary {
     errBusinessRequired: string;
     errSaveFailed: string;
   };
+  // professional-id-fields (pdf-invoicing.md) — saveProfessionalIdFields
+  professionalId: {
+    sectionTitle: string;
+    sectionSubtitle: string;
+    dniLabel: string;
+    dniPlaceholder: string;
+    collegeNumberLabel: string;
+    collegeNumberPlaceholder: string;
+    saveButton: string;
+    saving: string;
+    saved: string;
+    errNoBusiness: string;
+    errSaveFailed: string;
+  };
 }
 
 const es: BusinessDictionary = {
@@ -201,6 +215,19 @@ const es: BusinessDictionary = {
     errBusinessRequired: "Completa primero los datos de tu negocio.",
     errSaveFailed: "No se pudo guardar la configuración.",
   },
+  professionalId: {
+    sectionTitle: "Datos del profesional",
+    sectionSubtitle: "Se muestran en tus facturas cuando están rellenos. Ambos son opcionales.",
+    dniLabel: "DNI",
+    dniPlaceholder: "12345678A",
+    collegeNumberLabel: "Nº de colegiada/o",
+    collegeNumberPlaceholder: "838282838",
+    saveButton: "Guardar",
+    saving: "Guardando…",
+    saved: "¡Guardado correctamente!",
+    errNoBusiness: "No se encontró tu negocio.",
+    errSaveFailed: "No se pudo guardar la configuración.",
+  },
 };
 
 const en: BusinessDictionary = {
@@ -295,6 +322,19 @@ const en: BusinessDictionary = {
     saving: "Saving…",
     saved: "Configuration saved!",
     errBusinessRequired: "Complete your business details first.",
+    errSaveFailed: "Couldn't save the configuration.",
+  },
+  professionalId: {
+    sectionTitle: "Professional details",
+    sectionSubtitle: "Shown on your invoices when filled in. Both are optional.",
+    dniLabel: "DNI",
+    dniPlaceholder: "12345678A",
+    collegeNumberLabel: "Professional college number",
+    collegeNumberPlaceholder: "838282838",
+    saveButton: "Save",
+    saving: "Saving…",
+    saved: "Saved successfully!",
+    errNoBusiness: "Business not found.",
     errSaveFailed: "Couldn't save the configuration.",
   },
 };

@@ -14,6 +14,21 @@ file's notes).
 Grounded (2026-10-15) against a real factura Arun shared from a podóloga
 client — see legal-requirements-check below for what it confirmed.
 
+CODE IMPLEMENTED, TYPECHECKED, LINTED, BUILD PASSES (2026-10-15) — every
+step below except legal-requirements-check (already `done`) and
+pdf-portal-api-dependency (`superseded`, not built) is `in_progress`:
+code written this session, pending Arun's manual/live testing (migration
+not yet run against the live DB either). See each step's own criteria for
+exactly what shipped. High-level summary: `supabase/schema_subset_023.sql`
+(kalendar_invoices table, allocate_invoice_number function, new
+kalendar_businesses columns, invoice-signatures bucket); `lib/invoices/`
+(data layer, @react-pdf/renderer VAT-exempt template, render-on-request
+helper); `app/api/invoices/[id]/pdf/route.ts`; `lib/actions/invoices.ts`
+(create+send, resend, settings actions); the Facturación settings tab
+(`/panel/settings/invoicing`); the Facturas page (`/panel/invoices`);
+professional-id-fields on Negocio; and the Cobrar-triggered invoice
+confirm modal in `components/panel/booking-detail-modal.tsx`.
+
 ## Step: legal-requirements-check
 Status: done
 Criteria:
@@ -31,7 +46,7 @@ Criteria:
 - No PDF_PORTAL_URL / PDF_PORTAL_API_KEY env vars needed for this feature as a result — send-invoice-action below no longer has a "not configured" fallback state to handle, since there's no external dependency to be unconfigured.
 
 ## Step: in-app-pdf-generation
-Status: not_started
+Status: in_progress
 Criteria:
 - NEW STEP (2026-10-15, Arun), replacing pdf-portal-api-dependency. PDFs are rendered directly inside the Next.js app using `@react-pdf/renderer` — DECIDED over a headless-browser approach (Puppeteer/Playwright) specifically for Vercel/serverless friendliness (no chromium binary to bundle/cold-start) and because the invoice layout is structured/tabular, not design-heavy, so React-PDF's primitive-based layout is a good fit — matches the real example's plain table-and-boxes structure.
 - Each invoice template (see invoice-template-selection) is a `@react-pdf/renderer` React component taking a typed props object (business details + DNI/colegiada, client details, invoice number/date, line item, payment status) and rendering to a PDF buffer server-side (a Next.js server action or Route Handler, not a client component — `@react-pdf/renderer`'s `renderToBuffer`/`renderToStream`).
@@ -41,7 +56,7 @@ Criteria:
 - ~~Generated PDF needs to be stored somewhere retrievable... Supabase Storage bucket... `pdf_url`...~~ SUPERSEDED above, 2026-10-15 second pass — kept only as a history pointer in case on-demand generation turns out to have a real performance/cost problem at scale and storing becomes worth revisiting.
 
 ## Step: invoice-template-selection
-Status: not_started
+Status: in_progress
 Criteria:
 - NEW STEP (2026-10-15, Arun — "I am planning to build templates... I want to add this to the settings page. There the clinic can choose the template"): invoice templates are selectable per-business from Settings, not auto-derived from business type.
 - DECIDED (2026-10-15, Arun): only ONE template exists for this first pass — the VAT-exempt template grounded in legal-requirements-check above. The selection UI/mechanism is still built now (not deferred), even with a single option, so adding a second template later is just "add another option," not a re-design.
@@ -50,7 +65,7 @@ Criteria:
 - A template registry (e.g. `lib/invoices/templates.ts` mapping `invoice_template_id` -> `{ label, component }`) is the natural implementation shape — exact module layout is an implementation detail, not a design decision to pin down further here.
 
 ## Step: signature-upload
-Status: not_started
+Status: in_progress
 Criteria:
 - NEW STEP (2026-10-15, fourth pass, Arun — "there is an actual signature in the invoice, how can this be managed? ... the clinic can upload a signature image under the invoices tab in settings, and if there is an image, this image will be used"), grounded by the real example's handwritten signature over the "PAGADO" stamp.
 - New `kalendar_businesses.signature_url` (text, nullable) — DECIDED to mirror the existing logo-upload pattern exactly (`lib/actions/business.ts`'s `uploadBusinessLogo`/`removeBusinessLogo`, `logo_url` column, `business-logos` Supabase Storage bucket): same shape, new `uploadInvoiceSignature`/`removeInvoiceSignature` actions, a new `invoice-signatures` bucket (kept separate from `business-logos` rather than reused — different purpose, different place it's shown, no reason to conflate the two in storage even though the upload UI pattern is identical).
@@ -60,7 +75,7 @@ Criteria:
 - Business-level, not booking-level or invoice-level — one signature image per business, reused across every invoice sent, same as the logo. No per-invoice override in this pass.
 
 ## Step: professional-id-fields
-Status: not_started
+Status: in_progress
 Criteria:
 - NEW STEP (2026-10-15, Arun — "Yes — add DNI + colegiada number to Negocio"), grounded by legal-requirements-check's real invoice example.
 - New `kalendar_businesses` columns: `professional_dni` (text, nullable) and `professional_college_number` (text, nullable) — both optional (not every business type is a regulated profession with a colegiada number; a beauty salon or fitness coach wouldn't have one). Naming deliberately distinct from the existing `legal_id` (NIF/CIF business tax id) — these are the INDIVIDUAL professional's personal DNI and their professional college registration, a different concept the schema didn't capture before.
@@ -68,7 +83,7 @@ Criteria:
 - Both fields appear on the generated invoice (VAT-exempt template) when filled in, omitted/blank when not — matches the real example's "DNI: ... / [Name]. Podóloga Nºcolegiada: ..." header line, but gracefully degrades for a business that hasn't filled these in.
 
 ## Step: kalendar-invoices-schema
-Status: not_started
+Status: in_progress
 Criteria:
 - New table kalendar_invoices on the main Kalendar Supabase project: id, business_id (FK, cascade), booking_id (FK, nullable, set null on delete), invoice_number (text), issue_year (integer), client_name, client_email, service_name, payment_method (text, nullable, snapshot of the booking's cash/card/bono at invoice-creation time — see facturas-page's payment-method filter), amount (numeric, >= 0), access_token (text, not null, unique), sent_at (nullable), created_at
 - `payment_method` ADDED (2026-10-15, fifth pass — facturas-page needs to filter by it, per Arun). Snapshotted at creation like `amount`/`service_name` — since invoice-on-payment-trigger only ever fires right after a successful Cobrar, this is simply the method the clinic just selected in that same action, not a separate lookup.
@@ -81,7 +96,7 @@ Criteria:
 - Matching drop table if exists ... cascade added to schema_001.sql's destructive drop block in the same change, per repo convention
 
 ## Step: sequential-numbering-allocation
-Status: not_started
+Status: in_progress
 Criteria:
 - HIGHEST-RISK PIECE of this whole feature — a numbering gap is a compliance problem, not just a bug
 - CONFIRMED (2026-10-15, Arun, via legal-requirements-check): per-year reset format, `2026-0001` style — Arun explicitly chose this over the real example's running-sequence format. No change to this step's design from the earlier version.
@@ -91,7 +106,7 @@ Criteria:
 - UPDATED (2026-10-15, second pass — generate-on-request removes the PDF-generation step from the send flow entirely, see in-app-pdf-generation/send-invoice-action): the number is allocated at row-creation time regardless of whether the EMAIL send that follows succeeds — if that fails, the number is still considered used and must never be reused. A failed send surfaces a clear retryable error; retrying re-attempts the email for the SAME existing row/number, never allocates a second number for the same logical invoice. (The original wording here referred to a "PDF-generation call" failing — no longer applicable, since PDF rendering only ever happens later, on-demand, and failing to render on one view attempt has no bearing on numbering at all.)
 
 ## Step: send-invoice-action
-Status: not_started
+Status: in_progress
 Criteria:
 - The underlying create-and-email primitive — `createAndSendInvoice(bookingId, clientEmail?)` or equivalent — called from invoice-on-payment-trigger below (the only creation entry point, per Arun: "the invoice should be generated when an appointment is marked as paid") and from facturas-page's resend action for an invoice that already exists. This step itself is no longer a standalone "Enviar factura" button in the booking modal — SUPERSEDED, see invoice-on-payment-trigger.
 - Scoped via the existing authedAction pattern — booking must belong to the caller's business
@@ -100,7 +115,7 @@ Criteria:
 - No "PDF portal not configured" fallback state needed anymore (superseded along with pdf-portal-api-dependency) — the only external dependency left in this flow is Resend (lib/email.ts), which already has its own existing env-gated degrade-gracefully pattern.
 
 ## Step: invoice-on-payment-trigger
-Status: not_started
+Status: in_progress
 Criteria:
 - NEW STEP (2026-10-15, fifth pass, Arun — "the invoice should be generated when an appointment is marked as paid"). Invoice creation is now triggered exclusively by a successful Cobrar (`handleCobrar`, `components/panel/booking-detail-modal.tsx`, calendar-management-past.md) — not a standalone button, and not available for an unpaid booking. This narrows send-invoice-action's earlier "available for any booking" framing — superseded by this step.
 - DECIDED (Arun): after a successful Cobrar, a confirm modal asks "¿Quieres generar una factura?" (Sí/No). On "Sí", calls send-invoice-action for that booking. On "No", nothing happens — no invoice, no further prompt for that payment.
@@ -111,14 +126,14 @@ Criteria:
 - ALTERNATE-EMAIL OVERRIDE (2026-10-15, sixth pass, Arun — "there should be an option to send the invoice to a different email as well"): alongside the Sí/No confirm (or the missing-email inline field above), an optional "¿Enviar a otro email?" field lets the clinic type a one-off alternate address for this specific send — e.g. an accountant, a relative, a different contact than the client's own. DECIDED (Arun, explicitly): this is a ONE-TIME OVERRIDE ONLY — it does NOT update the client's saved profile email (unlike the missing-email case above, which does save). The alternate address is used as this invoice's own `client_email` (per kalendar-invoices-schema) for this one row; the client's `kalendar_clients` email is left untouched. Same override field is offered on facturas-page's Reenviar action (see that step) — one shared UI affordance, not two separate implementations.
 
 ## Step: auto-invoice-setting
-Status: not_started
+Status: in_progress
 Criteria:
 - NEW STEP (2026-10-15, fifth pass, Arun — "this should also be a settings, auto invoice - (when appointments are paid)"). New `kalendar_businesses.auto_invoice_enabled` (boolean, NOT NULL, default `false`) — off by default, matching this codebase's existing convention for new opt-in flags (e.g. bonos.md's `bonos_enabled`, clinic-configuration.md's bonos-visibility-toggle).
 - Lives on the SAME Invoicing settings tab as invoice-template-selection and signature-upload (`/panel/settings/invoicing`) — grouped with the other invoice-specific settings, labeled something like "Factura automática" with a short explainer ("Genera y envía la factura automáticamente al marcar una cita como pagada, sin preguntar cada vez").
 - Purely a trigger-behavior flag — see invoice-on-payment-trigger for exactly what it skips (the confirm modal only, nothing else about numbering/content/sending changes).
 
 ## Step: invoice-content-payload
-Status: not_started
+Status: in_progress
 Criteria:
 - RENAMED IN SPIRIT (2026-10-15): this is now the React-PDF template's PROPS shape, not a JSON payload sent to an external API — same field list, different consumer.
 - From `kalendar_businesses`: name, `legal_id`, full split address, contact_email, phone (country code + number), (per professional-id-fields) `professional_dni` + `professional_college_number`, and (new, per signature-upload) `signature_url` — all four optional/nullable in the props, each independently omitted from the rendered PDF when not filled in.
@@ -127,7 +142,7 @@ Criteria:
 - Manual/booking-less invoicing (a clinic invoicing for something not tracked as a Kalendar booking) is assumed OUT of scope for MVP — confirm this assumption still holds before building, per the spec's own open question
 
 ## Step: facturas-page
-Status: not_started
+Status: in_progress
 Criteria:
 - RENAMED + EXPANDED (2026-10-15, fifth pass) from this file's earlier, simpler invoice-history-view — Arun asked for real filtering and a resend action, not just a read-only list. Panel placement: new `/panel/invoices` (or `/panel/facturas` — exact route TBD, label "Facturas" in the sidebar either way) route, fills the nav slot post-mvp-menu-items.md's invoices-page step already tracked as superseded/absorbed into this file; mark that step accordingly once this lands.
 - Lists every invoice for the business: invoice_number, client_name, service_name, payment_method, amount, sent_at, with a download link (generate-on-request PDF route, same `?token=` link shape as the emailed one — per kalendar-invoices-schema's `access_token` and in-app-pdf-generation's decision; the owner is already authorized by seeing the row in their own page at all, no separate owner-only auth path needed).
@@ -155,4 +170,8 @@ Criteria:
 - SCOPE EXPANSION (2026-10-15, Arun, FIFTH pass, same day): invoice creation is now wired directly into the Cobrar payment flow (invoice-on-payment-trigger) rather than being a fully separate, manually-triggered action — "the invoice should be generated when an appointment is marked as paid." Adds an opt-in `auto_invoice_enabled` setting (auto-invoice-setting), a one-invoice-per-booking rule that survives later corrections via Editar, and expands the former invoice-history-view into a full filterable facturas-page with a resend action and shared missing-client-email handling. This is the largest scope addition since the original spec — reflected across invoice-on-payment-trigger, auto-invoice-setting, kalendar-invoices-schema's new `payment_method` column, and facturas-page.
 - RESOLVED (2026-10-15, sixth pass): the no-`clinic_client_id` open question from the fifth pass — backfill a real `kalendar_clients` row at invoice-generation time, per invoice-on-payment-trigger's own note. No open questions remain in this spec as of the sixth pass.
 - SCOPE ADDITION (2026-10-15, Arun, SIXTH pass, same day): alternate-email-at-send-time, a one-off override distinct from (and not replacing) the missing-email-saves-to-profile flow — see invoice-on-payment-trigger and facturas-page's matching notes.
-- Per Arun's explicit instruction (2026-10-15): this session was spec-only — no code written. All steps above remain `not_started`/`superseded` pending a future build session.
+- SEVENTH PASS (2026-10-15, same day, Arun — "start building now"): CODE IMPLEMENTED for every step except legal-requirements-check (already done) and pdf-portal-api-dependency (superseded, intentionally not built) — see the top-of-file note for the file-by-file summary. A few build-time implementation choices worth flagging, not separately confirmed with Arun:
+  - `allocate_invoice_number` uses a Postgres function with `pg_advisory_xact_lock` (keyed by business_id+year) rather than a separate counter table — an implementation-detail choice per sequential-numbering-allocation's own "decide once against existing conventions" note, since no prior per-business-sequence pattern existed in this codebase to match.
+  - The post-Cobrar invoice confirm modal uses ONE shared email input whose label switches between "¿Enviar a otro email?" (has a real email already) and the required missing-email prompt (doesn't) — one UI field serving both of invoice-on-payment-trigger's two distinct cases, rather than two separate inputs.
+  - One-invoice-per-booking is enforced at the application layer (a check-then-insert in `createInvoiceForBooking`/the Cobrar handler), not a DB unique constraint on `booking_id` alone — a genuinely concurrent double-click race is theoretically possible but not guarded against at the DB level; judged low-risk enough not to block this pass, flag if it ever actually happens.
+  - MIGRATION NOT YET RUN against the live DB — Arun still needs to run `schema_subset_023.sql`, per this repo's convention (Claude creates the file but doesn't execute live DDL).

@@ -23,6 +23,7 @@ import {
 } from "@/components/panel/calendar-grid-view";
 import { CalendarMonthView } from "@/components/panel/calendar-month-view";
 import { BookingDetailModal } from "@/components/panel/booking-detail-modal";
+import type { InvoicingDictionary } from "@/lib/i18n/dictionaries/invoicing";
 import { AppointmentModal, type ClosureRuleVM } from "@/components/panel/appointment-modal";
 import {
   dayStart,
@@ -173,6 +174,8 @@ export function CalendarBookings({
   weekStartIso,
   whatsappEnabled,
   bonosEnabled,
+  autoInvoiceEnabled,
+  invoicingDict,
   initialConflicts,
   festivos,
   closures,
@@ -197,6 +200,9 @@ export function CalendarBookings({
   // AppointmentModal's edit flow, forward-looking only (never hides
   // already-recorded bono history elsewhere).
   bonosEnabled: boolean;
+  // auto-invoice-setting/invoice-on-payment-trigger (pdf-invoicing.md)
+  autoInvoiceEnabled: boolean;
+  invoicingDict: InvoicingDictionary;
   initialConflicts: ConflictRowVM[];
   // holidays-and-time-off (2026-09-26): recurring, clinic-wide festivos only
   // (month/day + optional label) — fetched once at the page level and
@@ -559,7 +565,9 @@ export function CalendarBookings({
           booking={selectedBooking}
           intlLocale={dict.intlLocale}
           dict={dict}
+          invoicingDict={invoicingDict}
           bonosEnabled={bonosEnabled}
+          autoInvoiceEnabled={autoInvoiceEnabled}
           onClose={() => setSelectedBooking(null)}
           onUpdated={handleGridBookingCreated}
           onCancellationReviewed={() => {

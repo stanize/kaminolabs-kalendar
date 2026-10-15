@@ -59,6 +59,7 @@ export function PanelSidebar({
     { href: "/panel/calendar", label: dict.calendar, icon: "calendar" },
     { href: "/panel/clients", label: dict.clients, icon: "users" },
     ...(bonosEnabled ? [{ href: "/panel/bonos", label: dict.bonos, icon: "creditCard" }] : []),
+    { href: "/panel/invoices", label: dict.invoices, icon: "fileText" },
     { href: "/panel/business", label: dict.business, icon: "building" },
     { href: "/panel/services", label: dict.services, icon: "sparkles" },
     { href: "/panel/team", label: dict.team, icon: "user" },

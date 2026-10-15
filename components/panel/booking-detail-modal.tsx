@@ -13,7 +13,9 @@ import {
 } from "@/lib/actions/booking-owner";
 import { getActiveBonosForClientAction } from "@/lib/actions/bonos";
 import type { ClientActiveBono } from "@/lib/bonos/data";
+import { checkExistingInvoiceForBooking, createAndSendInvoice } from "@/lib/actions/invoices";
 import type { CalendarDictionary } from "@/lib/i18n/dictionaries/calendar";
+import type { InvoicingDictionary } from "@/lib/i18n/dictionaries/invoicing";
 import { clientStatusLabel, clientStatusBadgeClass, needsClinicFollowUp, type WeekBookingVM } from "@/components/panel/calendar-grid-view";
 import { isWhatsappSentinelEmail } from "@/lib/whatsapp/sentinel-email";
 
@@ -23,7 +25,9 @@ export function BookingDetailModal({
   booking,
   intlLocale,
   dict,
+  invoicingDict,
   bonosEnabled,
+  autoInvoiceEnabled,
   onClose,
   onUpdated,
   onModify,
@@ -32,10 +36,16 @@ export function BookingDetailModal({
   booking: WeekBookingVM;
   intlLocale: string;
   dict: CalendarDictionary;
+  // invoice-on-payment-trigger (pdf-invoicing.md) — the post-Cobrar
+  // Sí/No invoice confirm modal's copy.
+  invoicingDict: InvoicingDictionary;
   // clinic-configuration.md's bonos-visibility-toggle — gates the bono
   // option(s) in the Cobrar modal below, forward-looking only (an already
   // bono-paid booking keeps showing its real payment summary regardless).
   bonosEnabled: boolean;
+  // auto-invoice-setting — when true, Cobrar generates+sends the invoice
+  // immediately with no confirm modal at all.
+  autoInvoiceEnabled: boolean;
   onClose: () => void;
   onUpdated: () => void;
   onModify: (booking: WeekBookingVM) => void;
@@ -73,6 +83,18 @@ export function BookingDetailModal({
   // instead of the read-only summary. Not offered for an already-cancelled
   // booking (cancelling is a separate, unrelated flow).
   const [editingPayment, setEditingPayment] = useState(false);
+
+  // ── Invoice confirm (invoice-on-payment-trigger, pdf-invoicing.md) ──────
+  // Shown after a successful Cobrar, unless auto-invoice is on (skipped
+  // entirely) or an invoice already exists for this booking (one-invoice-
+  // per-booking — a correction via Editar never re-prompts or creates a
+  // second one).
+  const [invoiceConfirmOpen, setInvoiceConfirmOpen] = useState(false);
+  const [invoiceBookingId, setInvoiceBookingId] = useState<string | null>(null);
+  const [invoiceEmailInput, setInvoiceEmailInput] = useState("");
+  const [invoiceBusy, setInvoiceBusy] = useState(false);
+  const [invoiceError, setInvoiceError] = useState<string | null>(null);
+  const invoiceDict = invoicingDict.confirmModal;
 
   // Fetched lazily — only while the Cobrar modal is open, and only when the
   // clinic has bonos enabled at all (bonos-visibility-flag-interaction,
@@ -208,6 +230,58 @@ export function BookingDetailModal({
     setBusy(false);
     setCobrarModalOpen(false);
     if (!res.ok) { setError(res.error); return; }
+
+    // invoice-on-payment-trigger: one-invoice-per-booking — a correction
+    // via Editar (re-running Cobrar) never re-prompts or creates a second
+    // invoice for the same booking.
+    const existingInvoice = await checkExistingInvoiceForBooking(booking.id);
+    if (existingInvoice) {
+      onUpdated();
+      onClose();
+      return;
+    }
+
+    if (autoInvoiceEnabled) {
+      await createAndSendInvoice({ bookingId: booking.id });
+      onUpdated();
+      onClose();
+      return;
+    }
+
+    setInvoiceBookingId(booking.id);
+    setInvoiceEmailInput("");
+    setInvoiceError(null);
+    setInvoiceConfirmOpen(true);
+  };
+
+  const handleInvoiceConfirm = async (wantsInvoice: boolean) => {
+    if (!invoiceBookingId) return;
+    if (!wantsInvoice) {
+      setInvoiceConfirmOpen(false);
+      onUpdated();
+      onClose();
+      return;
+    }
+
+    const email = invoiceEmailInput.trim();
+    if (!hasRealEmail && !email) {
+      setInvoiceError(invoiceDict.errEmailRequired);
+      return;
+    }
+
+    setInvoiceBusy(true);
+    setInvoiceError(null);
+    const res = await createAndSendInvoice({
+      bookingId: invoiceBookingId,
+      alternateEmail: email || undefined,
+      saveToProfile: !hasRealEmail && !!email,
+    });
+    setInvoiceBusy(false);
+    if (!res.ok) {
+      setInvoiceError(res.error);
+      return;
+    }
+    setInvoiceConfirmOpen(false);
     onUpdated();
     onClose();
   };
@@ -479,6 +553,45 @@ export function BookingDetailModal({
             <div className="mt-4 flex justify-end">
               <Btn variant="ghost" onClick={() => setCobrarModalOpen(false)} disabled={busy}>
                 {d.cobrarCancel}
+              </Btn>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {invoiceConfirmOpen && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 px-4"
+          onClick={() => !invoiceBusy && handleInvoiceConfirm(false)}
+        >
+          <div className="w-full max-w-[360px] rounded-2xl bg-surface p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="mb-4 text-[15px] font-bold text-ink">{invoiceDict.title}</h3>
+
+            <div className="mb-4">
+              <label className="mb-1.5 block text-[12.5px] font-medium text-ink-soft">
+                {hasRealEmail ? invoiceDict.alternateEmailLabel : invoiceDict.missingEmailLabel}
+              </label>
+              <input
+                type="email"
+                value={invoiceEmailInput}
+                onChange={(e) => setInvoiceEmailInput(e.target.value)}
+                placeholder={hasRealEmail ? invoiceDict.alternateEmailPlaceholder : invoiceDict.missingEmailPlaceholder}
+                className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[13px] text-ink"
+              />
+            </div>
+
+            {invoiceError && (
+              <div className="mb-3 rounded-lg border border-error bg-error-weak px-3 py-2 text-[13px] text-error">
+                {invoiceError}
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2">
+              <Btn variant="ghost" onClick={() => handleInvoiceConfirm(false)} disabled={invoiceBusy}>
+                {invoiceDict.no}
+              </Btn>
+              <Btn onClick={() => handleInvoiceConfirm(true)} disabled={invoiceBusy}>
+                {invoiceBusy ? invoiceDict.sending : invoiceDict.yes}
               </Btn>
             </div>
           </div>

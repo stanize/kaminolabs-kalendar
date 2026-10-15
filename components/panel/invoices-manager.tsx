@@ -1,0 +1,156 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { Icon } from "@/components/ui/icon";
+import { Btn } from "@/components/ui/button";
+import { resendInvoice } from "@/lib/actions/invoices";
+import { formatInvoiceNumber, type InvoiceRow } from "@/lib/invoices/types";
+import type { InvoicingDictionary } from "@/lib/i18n/dictionaries/invoicing";
+import { reportClientError } from "@/lib/report-client-error";
+
+function pdfHref(invoice: InvoiceRow): string {
+  return `/api/invoices/${invoice.id}/pdf?token=${invoice.access_token}`;
+}
+
+export function InvoicesManager({ invoices, dict }: { invoices: InvoiceRow[]; dict: InvoicingDictionary["page"] }) {
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [service, setService] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("");
+  const [patientName, setPatientName] = useState("");
+  const [invoiceNumber, setInvoiceNumber] = useState("");
+
+  const services = useMemo(() => [...new Set(invoices.map((i) => i.service_name))].sort(), [invoices]);
+
+  const filtered = useMemo(() => {
+    return invoices.filter((inv) => {
+      if (dateFrom && new Date(inv.created_at) < new Date(dateFrom)) return false;
+      if (dateTo && new Date(inv.created_at) > new Date(`${dateTo}T23:59:59`)) return false;
+      if (service && inv.service_name !== service) return false;
+      if (paymentMethod && inv.payment_method !== paymentMethod) return false;
+      if (patientName && !inv.client_name.toLowerCase().includes(patientName.toLowerCase())) return false;
+      if (invoiceNumber && !formatInvoiceNumber(inv.issue_year, inv.invoice_number).includes(invoiceNumber)) return false;
+      return true;
+    });
+  }, [invoices, dateFrom, dateTo, service, paymentMethod, patientName, invoiceNumber]);
+
+  if (invoices.length === 0) {
+    return (
+      <div className="rounded-2xl border border-line bg-surface p-10 text-center">
+        <p className="text-[15px] font-semibold text-ink">{dict.emptyTitle}</p>
+        <p className="mt-1 text-[13.5px] text-ink-soft">{dict.emptySubtitle}</p>
+      </div>
+    );
+  }
+
+  const methodLabel = (m: InvoiceRow["payment_method"]) =>
+    m === "cash" ? dict.paymentMethodCash : m === "card" ? dict.paymentMethodCard : m === "bono" ? dict.paymentMethodBono : "—";
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-end gap-3 rounded-xl border border-line bg-surface p-4">
+        <div>
+          <label className="mb-1 block text-[11.5px] font-medium text-ink-soft">{dict.filterDateFrom}</label>
+          <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[13px] text-ink" />
+        </div>
+        <div>
+          <label className="mb-1 block text-[11.5px] font-medium text-ink-soft">{dict.filterDateTo}</label>
+          <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[13px] text-ink" />
+        </div>
+        <div>
+          <label className="mb-1 block text-[11.5px] font-medium text-ink-soft">{dict.filterService}</label>
+          <select value={service} onChange={(e) => setService(e.target.value)} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[13px] text-ink">
+            <option value="">{dict.filterServiceAll}</option>
+            {services.map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="mb-1 block text-[11.5px] font-medium text-ink-soft">{dict.filterPaymentMethod}</label>
+          <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[13px] text-ink">
+            <option value="">{dict.filterPaymentMethodAll}</option>
+            <option value="cash">{dict.paymentMethodCash}</option>
+            <option value="card">{dict.paymentMethodCard}</option>
+            <option value="bono">{dict.paymentMethodBono}</option>
+          </select>
+        </div>
+        <input
+          value={patientName}
+          onChange={(e) => setPatientName(e.target.value)}
+          placeholder={dict.filterPatientName}
+          className="min-w-[160px] rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[13px] text-ink"
+        />
+        <input
+          value={invoiceNumber}
+          onChange={(e) => setInvoiceNumber(e.target.value)}
+          placeholder={dict.filterInvoiceNumber}
+          className="min-w-[160px] rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[13px] text-ink"
+        />
+      </div>
+
+      {filtered.length === 0 ? (
+        <p className="rounded-xl border border-line bg-surface p-6 text-center text-[13.5px] text-ink-soft">{dict.noResults}</p>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {filtered.map((inv) => (
+            <InvoiceRowItem key={inv.id} invoice={inv} dict={dict} methodLabel={methodLabel} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function InvoiceRowItem({
+  invoice,
+  dict,
+  methodLabel,
+}: {
+  invoice: InvoiceRow;
+  dict: InvoicingDictionary["page"];
+  methodLabel: (m: InvoiceRow["payment_method"]) => string;
+}) {
+  const [resending, setResending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleResend() {
+    setResending(true);
+    setError(null);
+    try {
+      const result = await resendInvoice({ invoiceId: invoice.id });
+      if (!result.ok) setError(result.error);
+    } catch (e) {
+      reportClientError("resendInvoice", e);
+      setError("No se pudo reenviar.");
+    } finally {
+      setResending(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5 rounded-xl border border-line bg-surface px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[14px] font-semibold text-ink">
+          {formatInvoiceNumber(invoice.issue_year, invoice.invoice_number)} · {invoice.client_name}
+        </p>
+        <p className="truncate text-[12.5px] text-ink-soft">
+          {invoice.service_name} · {methodLabel(invoice.payment_method)} · {invoice.amount.toFixed(2)} €
+          {invoice.sent_at && ` · ${new Date(invoice.sent_at).toLocaleDateString()}`}
+        </p>
+        {error && <p className="text-[12px] text-error">{error}</p>}
+      </div>
+      <div className="flex shrink-0 items-center gap-2">
+        <a href={pdfHref(invoice)} target="_blank" rel="noopener noreferrer">
+          <Btn variant="outline" size="sm">
+            <Icon name="externalLink" size={13} />
+            {dict.download}
+          </Btn>
+        </a>
+        <Btn variant="outline" size="sm" onClick={handleResend} disabled={resending}>
+          {resending ? dict.resending : dict.resend}
+        </Btn>
+      </div>
+    </div>
+  );
+}

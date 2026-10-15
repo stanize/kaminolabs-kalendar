@@ -387,6 +387,31 @@ export function bookingCancelledOwnerHtml(input: {
  * approve/deny in the calendar booking-detail modal. Always Spanish —
  * owner-facing emails aren't locale-branched (see EMAIL_LOCALE usage below).
  */
+/**
+ * To the CLIENT: their invoice is ready — links to the generate-on-request
+ * PDF route (send-invoice-action, pdf-invoicing.md), no attachment (Arun's
+ * explicit decision: link only, keeps exactly one PDF-rendering code path
+ * for both this email and the owner's Facturas-page download). The link
+ * works for anyone holding it, including a forwarded copy — access_token
+ * is a bearer credential, no login, same trust model as the existing
+ * booking confirm/cancel links.
+ */
+export function invoiceEmailHtml(input: {
+  businessName: string;
+  invoiceNumberFormatted: string;
+  pdfUrl: string;
+  brandColor?: string | null;
+}): string {
+  const { businessName, invoiceNumberFormatted, pdfUrl, brandColor } = input;
+  const body = `
+    <h1 style="font-size:19px;margin:0 0 12px;">Tu factura de ${escapeHtml(businessName)}</h1>
+    <p style="font-size:15px;line-height:1.6;margin:0 0 18px;">
+      Adjuntamos el enlace a tu factura nº ${escapeHtml(invoiceNumberFormatted)}.
+    </p>
+    ${emailButton("Ver factura", pdfUrl, brandColor)}`;
+  return emailShell(body, `${businessName} · Factura`, businessName, brandColor);
+}
+
 export function cancellationRequestOwnerHtml(input: {
   serviceName: string;
   whenLabel: string;

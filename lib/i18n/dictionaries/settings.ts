@@ -9,6 +9,7 @@ export interface SettingsDictionary {
     subscription: string;
     notifications: string;
     bookings: string;
+    invoicing: string;
     security: string;
     language: string;
   };
@@ -32,6 +33,7 @@ const es: SettingsDictionary = {
     subscription: "Suscripción",
     notifications: "Notificaciones",
     bookings: "Reservas",
+    invoicing: "Facturación",
     security: "Seguridad",
     language: "Idioma",
   },
@@ -55,6 +57,7 @@ const en: SettingsDictionary = {
     subscription: "Subscription",
     notifications: "Notifications",
     bookings: "Bookings",
+    invoicing: "Invoicing",
     security: "Security",
     language: "Language",
   },

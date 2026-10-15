@@ -33,6 +33,11 @@ export interface Business {
   created_at: string;
   slug_active: boolean;
   bonos_enabled: boolean;
+  invoice_template_id: string;
+  professional_dni: string | null;
+  professional_college_number: string | null;
+  signature_url: string | null;
+  auto_invoice_enabled: boolean;
 }
 
 /**
@@ -51,7 +56,7 @@ export function formatBusinessAddress(
 
 const BUSINESS_TABLE = "kalendar_businesses";
 const BUSINESS_COLUMNS =
-  "id, owner_id, name, type, legal_id, address_street, address_number, address_additional, city, address_postal_code, address_province, address_country, phone_country_code, phone_number, contact_email, slug, slug_status, slug_flag_reason, slug_reviewed_at, brand_color, logo_url, team_mode, booking_window_months, cancellation_window_hours, onboarding_completed_at, created_at, slug_active, bonos_enabled";
+  "id, owner_id, name, type, legal_id, address_street, address_number, address_additional, city, address_postal_code, address_province, address_country, phone_country_code, phone_number, contact_email, slug, slug_status, slug_flag_reason, slug_reviewed_at, brand_color, logo_url, team_mode, booking_window_months, cancellation_window_hours, onboarding_completed_at, created_at, slug_active, bonos_enabled, invoice_template_id, professional_dni, professional_college_number, signature_url, auto_invoice_enabled";
 
 /**
  * The business owned by a given user, or null. Always scoped by the userId
@@ -67,6 +72,20 @@ export async function getBusinessForUser(userId: string): Promise<Business | nul
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
+  return (data as Business | null) ?? null;
+}
+
+/**
+ * Looks up a business directly by id, no owner/auth scoping — used by
+ * server-side flows that already resolved the id from a trusted source
+ * (e.g. the invoice PDF route, which authorizes via the invoice's own
+ * access_token first, or an invoice-sending action already scoped to the
+ * caller's own business). Never call this with a client-supplied id
+ * without separately verifying the caller is allowed to see it.
+ */
+export async function getBusinessById(id: string): Promise<Business | null> {
+  const supabase = await createClient();
+  const { data } = await supabase.from(BUSINESS_TABLE).select(BUSINESS_COLUMNS).eq("id", id).maybeSingle();
   return (data as Business | null) ?? null;
 }
 
