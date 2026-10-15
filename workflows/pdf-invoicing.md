@@ -49,6 +49,16 @@ Criteria:
 - New Settings tab/section (placement TBD — likely `/panel/settings/invoicing` as a new tab alongside the existing Reservas/Idioma/Notificaciones/Seguridad/Suscripción tabs, `app/panel/settings/`) where the clinic picks their template from a dropdown/radio of available `invoice_template_id` values. With only one template available at build time, this still renders (not hidden) — a single pre-selected, disabled-looking option is fine, per Arun's explicit ask to build the mechanism now.
 - A template registry (e.g. `lib/invoices/templates.ts` mapping `invoice_template_id` -> `{ label, component }`) is the natural implementation shape — exact module layout is an implementation detail, not a design decision to pin down further here.
 
+## Step: signature-upload
+Status: not_started
+Criteria:
+- NEW STEP (2026-10-15, fourth pass, Arun — "there is an actual signature in the invoice, how can this be managed? ... the clinic can upload a signature image under the invoices tab in settings, and if there is an image, this image will be used"), grounded by the real example's handwritten signature over the "PAGADO" stamp.
+- New `kalendar_businesses.signature_url` (text, nullable) — DECIDED to mirror the existing logo-upload pattern exactly (`lib/actions/business.ts`'s `uploadBusinessLogo`/`removeBusinessLogo`, `logo_url` column, `business-logos` Supabase Storage bucket): same shape, new `uploadInvoiceSignature`/`removeInvoiceSignature` actions, a new `invoice-signatures` bucket (kept separate from `business-logos` rather than reused — different purpose, different place it's shown, no reason to conflate the two in storage even though the upload UI pattern is identical).
+- Same constraints as logo-upload, reused rather than re-decided: 2MB max file size, image formats — but NARROWED from logo-upload's set: `image/png`, `image/jpeg`, `image/webp` only, deliberately EXCLUDING `image/svg+xml` this time (a signature is a scanned/photographed handwritten mark, never a vector graphic, unlike a logo which legitimately can be).
+- UI lives on the SAME new Settings tab as invoice-template-selection (`/panel/settings/invoicing`) — "under the invoices tab in settings," per Arun — not on the Negocio page alongside the logo, even though the upload mechanics are copied from there. Grouped with the other invoice-specific settings (template choice), not with the general business-identity settings.
+- DECIDED (Arun): conditional rendering, not a placeholder — when `signature_url` is set, the VAT-exempt template renders the uploaded image in the signature area of the invoice; when null (not yet uploaded), that area is simply omitted/blank, no fallback text, no generic stamp graphic. Matches invoice-content-payload's existing "gracefully degrades" pattern for the optional DNI/colegiada fields (professional-id-fields) — same philosophy, applied here too.
+- Business-level, not booking-level or invoice-level — one signature image per business, reused across every invoice sent, same as the logo. No per-invoice override in this pass.
+
 ## Step: professional-id-fields
 Status: not_started
 Criteria:
@@ -95,7 +105,7 @@ Criteria:
 Status: not_started
 Criteria:
 - RENAMED IN SPIRIT (2026-10-15): this is now the React-PDF template's PROPS shape, not a JSON payload sent to an external API — same field list, different consumer.
-- From `kalendar_businesses`: name, `legal_id`, full split address, contact_email, phone (country code + number), and (new, per professional-id-fields) `professional_dni` + `professional_college_number`, both optional/nullable in the props.
+- From `kalendar_businesses`: name, `legal_id`, full split address, contact_email, phone (country code + number), (per professional-id-fields) `professional_dni` + `professional_college_number`, and (new, per signature-upload) `signature_url` — all four optional/nullable in the props, each independently omitted from the rendered PDF when not filled in.
 - From the booking: client_name, client_email, service_name, service_price, and (new, per legal-requirements-check's content note) payment status — whether the invoiced booking is marked paid (`payment_status`/`paid_at`, already exists per calendar-management-past.md's Cobrar work) so the template can show a payment-status indicator, matching the real example's "PAGADO" stamp in spirit without literally reproducing a signature.
 - Generated at creation time: formatted invoice_number, issue_date
 - Manual/booking-less invoicing (a clinic invoicing for something not tracked as a Kalendar booking) is assumed OUT of scope for MVP — confirm this assumption still holds before building, per the spec's own open question
