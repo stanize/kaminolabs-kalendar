@@ -19,6 +19,14 @@ export interface InvoicingDictionary {
     signatureChange: string;
     signatureRemove: string;
     signatureUploading: string;
+    // draw-signature — alternative to uploading an image file: sign with
+    // mouse/touch/stylus directly in the browser.
+    signatureDrawButton: string;
+    signatureDrawHint: string;
+    signatureDrawClear: string;
+    signatureDrawSave: string;
+    signatureDrawCancel: string;
+    errSignatureEmpty: string;
     numberingSectionTitle: string;
     numberingSectionSubtitle: string;
     numberingNextLabel: string;
@@ -93,6 +101,12 @@ const es: InvoicingDictionary = {
     signatureChange: "Cambiar firma",
     signatureRemove: "Quitar",
     signatureUploading: "Subiendo…",
+    signatureDrawButton: "Dibujar firma",
+    signatureDrawHint: "Firma con el ratón, el dedo o un lápiz óptico.",
+    signatureDrawClear: "Borrar",
+    signatureDrawSave: "Guardar firma",
+    signatureDrawCancel: "Cancelar",
+    errSignatureEmpty: "Dibuja tu firma antes de guardar.",
     numberingSectionTitle: "Numeración de facturas",
     numberingSectionSubtitle:
       "El siguiente número se calcula automáticamente. Si vienes de otro sistema a mitad de año, indica aquí el número con el que debe continuar tu próxima factura.",
@@ -167,6 +181,12 @@ const en: InvoicingDictionary = {
     signatureChange: "Change signature",
     signatureRemove: "Remove",
     signatureUploading: "Uploading…",
+    signatureDrawButton: "Draw signature",
+    signatureDrawHint: "Sign with your mouse, finger, or a stylus.",
+    signatureDrawClear: "Clear",
+    signatureDrawSave: "Save signature",
+    signatureDrawCancel: "Cancel",
+    errSignatureEmpty: "Draw your signature before saving.",
     numberingSectionTitle: "Invoice numbering",
     numberingSectionSubtitle:
       "The next number is calculated automatically. If you're switching from another system mid-year, set the number your next invoice should continue from.",

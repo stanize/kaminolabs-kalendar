@@ -14,6 +14,7 @@ import {
 import { INVOICE_TEMPLATES } from "@/lib/invoices/templates";
 import type { InvoicingDictionary } from "@/lib/i18n/dictionaries/invoicing";
 import { reportClientError } from "@/lib/report-client-error";
+import { SignaturePad } from "@/components/panel/signature-pad";
 
 // invoice-template-selection + auto-invoice-setting + signature-upload
 // (pdf-invoicing.md) — all three live on this one Settings tab.
@@ -42,6 +43,7 @@ export function InvoicingSettings({
   const [autoSaving, setAutoSaving] = useState(false);
   const [signatureUrl, setSignatureUrl] = useState(initialSignatureUrl);
   const [uploading, setUploading] = useState(false);
+  const [drawingSignature, setDrawingSignature] = useState(false);
   const [nextNumberInput, setNextNumberInput] = useState(initialNextNumberOverride ? String(initialNextNumberOverride) : "");
   const [nextNumberOverride, setNextNumberOverride] = useState(initialNextNumberOverride);
   const [numberSaving, setNumberSaving] = useState(false);
@@ -79,16 +81,9 @@ export function InvoicingSettings({
     }
   }
 
-  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
-
-    if (file.size > 2 * 1024 * 1024 || !["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
-      setError(dict.errInvalidFile);
-      return;
-    }
-
+  // Shared by both signature sources (file upload + drawn pad) — the
+  // backend takes a plain File either way, so there's one upload path.
+  async function uploadSignatureFile(file: File) {
     setError(null);
     setUploading(true);
     const formData = new FormData();
@@ -99,6 +94,7 @@ export function InvoicingSettings({
         setError(result.error);
       } else {
         setSignatureUrl(result.signatureUrl);
+        setDrawingSignature(false);
         router.refresh();
       }
     } catch (e) {
@@ -107,6 +103,19 @@ export function InvoicingSettings({
     } finally {
       setUploading(false);
     }
+  }
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024 || !["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+      setError(dict.errInvalidFile);
+      return;
+    }
+
+    await uploadSignatureFile(file);
   }
 
   async function handleRemoveSignature() {
@@ -234,38 +243,58 @@ export function InvoicingSettings({
         <h2 className="text-[15px] font-semibold text-ink">{dict.signatureSectionTitle}</h2>
         <p className="mt-1.5 text-[13.5px] text-ink-soft">{dict.signatureSectionSubtitle}</p>
 
-        <div className="mt-4 flex items-center gap-4">
-          <div className="flex h-16 min-w-[140px] max-w-[220px] items-center justify-center rounded-xl border border-line bg-surface-2 px-3">
-            {signatureUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element -- external Supabase Storage URL, not a local/optimizable asset
-              <img src={signatureUrl} alt="Firma" className="max-h-12 max-w-full object-contain" />
-            ) : (
-              <Icon name="fileText" size={22} className="text-ink-soft" />
-            )}
+        {drawingSignature ? (
+          <div className="mt-4">
+            <SignaturePad
+              onSave={uploadSignatureFile}
+              onCancel={() => setDrawingSignature(false)}
+              saving={uploading}
+              dict={{
+                hint: dict.signatureDrawHint,
+                clear: dict.signatureDrawClear,
+                save: uploading ? dict.signatureUploading : dict.signatureDrawSave,
+                cancel: dict.signatureDrawCancel,
+                errEmpty: dict.errSignatureEmpty,
+              }}
+            />
           </div>
-          <div className="flex items-center gap-2">
-            <Btn variant="outline" size="sm" type="button" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
-              {uploading ? dict.signatureUploading : signatureUrl ? dict.signatureChange : dict.signatureUpload}
-            </Btn>
-            {signatureUrl && (
-              <button
-                type="button"
-                onClick={handleRemoveSignature}
-                disabled={uploading}
-                className="text-[12.5px] font-medium text-ink-soft hover:text-error disabled:opacity-50"
-              >
-                {dict.signatureRemove}
-              </button>
-            )}
+        ) : (
+          <div className="mt-4 flex flex-wrap items-center gap-4">
+            <div className="flex h-16 min-w-[140px] max-w-[220px] items-center justify-center rounded-xl border border-line bg-surface-2 px-3">
+              {signatureUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element -- external Supabase Storage URL, not a local/optimizable asset
+                <img src={signatureUrl} alt="Firma" className="max-h-12 max-w-full object-contain" />
+              ) : (
+                <Icon name="fileText" size={22} className="text-ink-soft" />
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Btn variant="outline" size="sm" type="button" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
+                {uploading ? dict.signatureUploading : signatureUrl ? dict.signatureChange : dict.signatureUpload}
+              </Btn>
+              <Btn variant="outline" size="sm" type="button" onClick={() => setDrawingSignature(true)} disabled={uploading}>
+                {dict.signatureDrawButton}
+              </Btn>
+              {signatureUrl && (
+                <button
+                  type="button"
+                  onClick={handleRemoveSignature}
+                  disabled={uploading}
+                  className="text-[12.5px] font-medium text-ink-soft hover:text-error disabled:opacity-50"
+                >
+                  {dict.signatureRemove}
+                </button>
+              )}
+            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              onChange={handleFileChange}
+              className="hidden"
+            />
           </div>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/png,image/jpeg,image/webp"
-            onChange={handleFileChange}
-            className="hidden"
-          />
-        </div>
+        )}
       </div>
 
       <div className="rounded-2xl border border-line bg-surface p-6">
