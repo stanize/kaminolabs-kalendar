@@ -98,6 +98,8 @@ function ContactCard({ client, dict }: { client: ClientDetail; dict: ClientsDict
   const [name, setName] = useState(client.name);
   const [email, setEmail] = useState(client.email ?? "");
   const [phone, setPhone] = useState(client.phone ?? "");
+  const [dni, setDni] = useState(client.dni ?? "");
+  const [address, setAddress] = useState(client.address ?? "");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -107,7 +109,7 @@ function ContactCard({ client, dict }: { client: ClientDetail; dict: ClientsDict
     setSaving(true);
     try {
       const result = await updateClientContactInfo(
-        { clientId: client.id, name, email, phone },
+        { clientId: client.id, name, email, phone, dni, address },
         dict.errors
       );
       if (!result.ok) {
@@ -130,6 +132,8 @@ function ContactCard({ client, dict }: { client: ClientDetail; dict: ClientsDict
     setName(client.name);
     setEmail(client.email ?? "");
     setPhone(client.phone ?? "");
+    setDni(client.dni ?? "");
+    setAddress(client.address ?? "");
     setEditing(false);
     setError(null);
   }
@@ -159,6 +163,14 @@ function ContactCard({ client, dict }: { client: ClientDetail; dict: ClientsDict
             <label className="mb-1 block text-[12px] font-medium text-ink-soft">{d.phoneLabel}</label>
             <input value={phone} onChange={(e) => setPhone(e.target.value)} className={inputClass} />
           </div>
+          <div>
+            <label className="mb-1 block text-[12px] font-medium text-ink-soft">{d.dniLabel}</label>
+            <input value={dni} onChange={(e) => setDni(e.target.value)} className={inputClass} />
+          </div>
+          <div>
+            <label className="mb-1 block text-[12px] font-medium text-ink-soft">{d.addressLabel}</label>
+            <input value={address} onChange={(e) => setAddress(e.target.value)} className={inputClass} />
+          </div>
           {error && <p className="text-[12.5px] text-error">{error}</p>}
           <div className="flex items-center gap-2">
             <Btn size="sm" onClick={handleSave} disabled={saving}>{saving ? d.saving : d.save}</Btn>
@@ -170,6 +182,8 @@ function ContactCard({ client, dict }: { client: ClientDetail; dict: ClientsDict
           <Row label={d.nameLabel} value={client.name} />
           <Row label={d.emailLabel} value={client.email ?? "—"} />
           <Row label={d.phoneLabel} value={client.phone ?? "—"} />
+          <Row label={d.dniLabel} value={client.dni ?? "—"} />
+          <Row label={d.addressLabel} value={client.address ?? "—"} />
           {saved && <p className="mt-1 text-[12.5px] text-brand-ink">{d.saved}</p>}
         </dl>
       )}

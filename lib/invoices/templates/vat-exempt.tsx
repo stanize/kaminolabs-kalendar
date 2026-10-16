@@ -36,7 +36,8 @@ const styles = StyleSheet.create({
 
   clientBox: { backgroundColor: "#f8fafc", borderRadius: 10, padding: 12, marginBottom: 20 },
   clientBoxLabel: { fontSize: 8, fontWeight: 700, color: "#94a3b8", letterSpacing: 0.5, marginBottom: 4 },
-  clientName: { fontSize: 12, fontWeight: 700, color: "#111827" },
+  clientName: { fontSize: 12, fontWeight: 700, color: "#111827", marginBottom: 2 },
+  clientSub: { fontSize: 9, color: "#6b7280" },
 
   table: { borderWidth: 1, borderColor: "#e5e7eb", borderRadius: 10, overflow: "hidden" },
   tableHeader: { flexDirection: "row", backgroundColor: "#f8fafc", borderBottomWidth: 1, borderBottomColor: "#e5e7eb" },
@@ -133,6 +134,8 @@ export function VatExemptInvoice(props: InvoiceTemplateProps) {
         <View style={styles.clientBox}>
           <Text style={styles.clientBoxLabel}>DATOS DEL CLIENTE</Text>
           <Text style={styles.clientName}>{client.name}</Text>
+          {client.dni && <Text style={styles.clientSub}>DNI: {client.dni}</Text>}
+          {client.address && <Text style={styles.clientSub}>{client.address}</Text>}
         </View>
 
         <View style={styles.table}>

@@ -87,7 +87,7 @@ const CLIENT_FALLBACK: ClientActionDict = {
 export const updateClientContactInfo = authedAction(
   async (
     session,
-    input: { clientId: string; name: string; email: string; phone: string },
+    input: { clientId: string; name: string; email: string; phone: string; dni: string; address: string },
     dict?: Partial<ClientActionDict>
   ): Promise<UpdateClientResult> => {
     const t = { ...CLIENT_FALLBACK, ...dict };
@@ -113,6 +113,8 @@ export const updateClientContactInfo = authedAction(
         name,
         email: input.email.trim() || null,
         phone: input.phone.trim() || null,
+        dni: input.dni.trim() || null,
+        address: input.address.trim() || null,
       })
       .eq("id", input.clientId)
       .eq("business_id", business.id);
@@ -121,6 +123,34 @@ export const updateClientContactInfo = authedAction(
 
     revalidatePath(`/panel/clients/${input.clientId}`);
     return { ok: true };
+  }
+);
+
+export interface ClientIdentity {
+  dni: string | null;
+  address: string | null;
+}
+
+/**
+ * The client's current DNI/address on file — client-identity-for-invoicing.
+ * Used to prefill the invoice confirm modal (editable if present, required
+ * if blank) without needing the full client-detail-view query. Scoped to
+ * the caller's own business, same as every other client read.
+ */
+export const getClientIdentity = authedAction(
+  async (session, clientId: string): Promise<ClientIdentity | null> => {
+    const business = await getBusinessForUser(session.user.id);
+    if (!business) return null;
+
+    const supabase = await createClient();
+    const { data } = await supabase
+      .from("kalendar_clients")
+      .select("dni, address")
+      .eq("id", clientId)
+      .eq("business_id", business.id)
+      .maybeSingle();
+
+    return data ? { dni: data.dni, address: data.address } : null;
   }
 );
 

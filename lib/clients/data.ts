@@ -66,6 +66,10 @@ export interface ClientDetail {
   name: string;
   email: string | null;
   phone: string | null;
+  // client-identity-for-invoicing: required on a factura's DATOS DEL
+  // CLIENTE block, editable here or inline in the invoice confirm modal.
+  dni: string | null;
+  address: string | null;
   totalSessions: number;
   completedCount: number;
   noShowCount: number;
@@ -91,7 +95,7 @@ export async function getClientDetail(userId: string, clientId: string): Promise
 
   const { data: client } = await supabase
     .from("kalendar_clients")
-    .select("id, business_id, name, email, phone, total_sessions, completed_count, no_show_count, cancelled_count, first_visit_at, last_visit_at")
+    .select("id, business_id, name, email, phone, dni, address, total_sessions, completed_count, no_show_count, cancelled_count, first_visit_at, last_visit_at")
     .eq("id", clientId)
     .eq("business_id", business.id)
     .maybeSingle();
@@ -153,6 +157,8 @@ export async function getClientDetail(userId: string, clientId: string): Promise
     name: client.name,
     email: displayableEmail(client.email),
     phone: client.phone,
+    dni: client.dni,
+    address: client.address,
     totalSessions: client.total_sessions,
     completedCount: client.completed_count,
     noShowCount: client.no_show_count,

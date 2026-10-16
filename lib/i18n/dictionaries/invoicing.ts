@@ -50,9 +50,16 @@ export interface InvoicingDictionary {
     alternateEmailPlaceholder: string;
     missingEmailLabel: string;
     missingEmailPlaceholder: string;
+    // client-identity-for-invoicing — required on the factura, pre-filled
+    // and editable when already on file, otherwise blank and mandatory.
+    dniLabel: string;
+    dniPlaceholder: string;
+    addressLabel: string;
+    addressPlaceholder: string;
     sending: string;
     errEmailRequired: string;
     errInvalidEmail: string;
+    errClientIdentityRequired: string;
     errCreateFailed: string;
     errSendFailed: string;
   };
@@ -131,9 +138,14 @@ const es: InvoicingDictionary = {
     alternateEmailPlaceholder: "otro@email.com",
     missingEmailLabel: "Este cliente no tiene email. Indica uno para enviar la factura:",
     missingEmailPlaceholder: "cliente@email.com",
+    dniLabel: "DNI del cliente",
+    dniPlaceholder: "12345678A",
+    addressLabel: "Domicilio del cliente",
+    addressPlaceholder: "Calle Mayor 5, 28001 Madrid",
     sending: "Enviando…",
     errEmailRequired: "Indica un email para enviar la factura.",
     errInvalidEmail: "Indica un email válido.",
+    errClientIdentityRequired: "Indica el DNI y el domicilio del cliente.",
     errCreateFailed: "No se pudo crear la factura.",
     errSendFailed: "La factura se creó pero no se pudo enviar. Puedes reenviarla desde Facturas.",
   },
@@ -211,9 +223,14 @@ const en: InvoicingDictionary = {
     alternateEmailPlaceholder: "other@email.com",
     missingEmailLabel: "This client has no email on file. Enter one to send the invoice:",
     missingEmailPlaceholder: "client@email.com",
+    dniLabel: "Client's DNI",
+    dniPlaceholder: "12345678A",
+    addressLabel: "Client's address",
+    addressPlaceholder: "Calle Mayor 5, 28001 Madrid",
     sending: "Sending…",
     errEmailRequired: "Enter an email to send the invoice.",
     errInvalidEmail: "Enter a valid email.",
+    errClientIdentityRequired: "Enter the client's DNI and address.",
     errCreateFailed: "Couldn't create the invoice.",
     errSendFailed: "The invoice was created but couldn't be sent. You can resend it from Invoices.",
   },

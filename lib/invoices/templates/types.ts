@@ -24,6 +24,8 @@ export interface InvoiceTemplateProps {
   };
   client: {
     name: string;
+    dni: string;
+    address: string;
   };
   invoiceNumberFormatted: string; // "2026-0001"
   issueDate: string; // formatted display date

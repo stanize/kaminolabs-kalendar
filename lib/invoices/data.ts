@@ -9,7 +9,7 @@ export type { InvoiceRow } from "@/lib/invoices/types";
 export { formatInvoiceNumber } from "@/lib/invoices/types";
 
 const INVOICE_COLUMNS =
-  "id, business_id, booking_id, invoice_number, issue_year, client_name, client_email, service_name, payment_method, amount, access_token, sent_at, created_at, business_snapshot";
+  "id, business_id, booking_id, invoice_number, issue_year, client_name, client_email, client_dni, client_address, service_name, payment_method, amount, access_token, sent_at, created_at, business_snapshot";
 
 /**
  * business-fields-snapshot: freezes everything the PDF template reads, at
@@ -48,6 +48,14 @@ function buildBusinessSnapshot(
   };
 }
 
+/** Coalesces legacy rows (client_dni/client_address added later, nullable
+ * on the live table — see schema_subset_028.sql) to "" so InvoiceRow's
+ * non-null string type holds for every row regardless of when it was
+ * created. */
+function normalizeInvoiceRow(row: InvoiceRow): InvoiceRow {
+  return { ...row, client_dni: row.client_dni ?? "", client_address: row.client_address ?? "" };
+}
+
 /**
  * The invoice already created for a given booking, if any — used by
  * invoice-on-payment-trigger's one-invoice-per-booking rule (never prompt
@@ -61,13 +69,13 @@ export async function getInvoiceForBooking(businessId: string, bookingId: string
     .eq("business_id", businessId)
     .eq("booking_id", bookingId)
     .maybeSingle();
-  return (data as InvoiceRow | null) ?? null;
+  return data ? normalizeInvoiceRow(data as InvoiceRow) : null;
 }
 
 export async function getInvoiceById(id: string): Promise<InvoiceRow | null> {
   const supabase = await createClient();
   const { data } = await supabase.from("kalendar_invoices").select(INVOICE_COLUMNS).eq("id", id).maybeSingle();
-  return (data as InvoiceRow | null) ?? null;
+  return data ? normalizeInvoiceRow(data as InvoiceRow) : null;
 }
 
 export async function getInvoicesForBusiness(businessId: string): Promise<InvoiceRow[]> {
@@ -77,7 +85,7 @@ export async function getInvoicesForBusiness(businessId: string): Promise<Invoic
     .select(INVOICE_COLUMNS)
     .eq("business_id", businessId)
     .order("created_at", { ascending: false });
-  return (data as InvoiceRow[] | null) ?? [];
+  return ((data as InvoiceRow[] | null) ?? []).map(normalizeInvoiceRow);
 }
 
 /**
@@ -109,11 +117,18 @@ export async function getNextInvoiceNumberPreview(
 export interface CreateInvoiceInput {
   business: Business;
   bookingId: string;
+  // client-identity-for-invoicing: entered/corrected in the invoice confirm
+  // modal. Falls back to the client's existing dni/address on file when
+  // left blank; if NEITHER is available, creation fails with
+  // "missing_identity" — the caller (lib/actions/invoices.ts) owns
+  // surfacing that as a required-field error.
+  clientDni?: string;
+  clientAddress?: string;
 }
 
 export type CreateInvoiceResult =
   | { ok: true; invoice: InvoiceRow }
-  | { ok: false; error: "no_booking" | "already_invoiced" | "create_failed" };
+  | { ok: false; error: "no_booking" | "already_invoiced" | "create_failed" | "missing_identity" };
 
 /**
  * Creates the kalendar_invoices row for a booking — allocates the
@@ -171,6 +186,29 @@ export async function createInvoiceForBooking(input: CreateInvoiceInput): Promis
     }
   }
 
+  // client-identity-for-invoicing: resolve the final dni/address — the
+  // modal's input (if any) wins, falling back to whatever's already on the
+  // client's profile. Required either way; missing either one fails the
+  // whole creation rather than writing a legally incomplete invoice.
+  let existingDni: string | null = null;
+  let existingAddress: string | null = null;
+  if (clinicClientId) {
+    const { data: clientRow } = await supabase
+      .from("kalendar_clients")
+      .select("dni, address")
+      .eq("id", clinicClientId)
+      .maybeSingle();
+    existingDni = clientRow?.dni ?? null;
+    existingAddress = clientRow?.address ?? null;
+  }
+  const finalDni = input.clientDni?.trim() || existingDni || "";
+  const finalAddress = input.clientAddress?.trim() || existingAddress || "";
+  if (!finalDni || !finalAddress) return { ok: false, error: "missing_identity" };
+
+  if (clinicClientId && (finalDni !== existingDni || finalAddress !== existingAddress)) {
+    await supabase.from("kalendar_clients").update({ dni: finalDni, address: finalAddress }).eq("id", clinicClientId);
+  }
+
   const issueYear = new Date().getFullYear();
   const { data: numberData, error: numberError } = await supabase.rpc("allocate_invoice_number", {
     p_business_id: businessId,
@@ -189,6 +227,8 @@ export async function createInvoiceForBooking(input: CreateInvoiceInput): Promis
       issue_year: issueYear,
       client_name: booking.client_name,
       client_email: booking.client_email,
+      client_dni: finalDni,
+      client_address: finalAddress,
       service_name: booking.service_name,
       payment_method: booking.payment_method,
       amount: booking.service_price,
@@ -199,5 +239,5 @@ export async function createInvoiceForBooking(input: CreateInvoiceInput): Promis
     .single();
 
   if (error || !created) return { ok: false, error: "create_failed" };
-  return { ok: true, invoice: created as InvoiceRow };
+  return { ok: true, invoice: normalizeInvoiceRow(created as InvoiceRow) };
 }

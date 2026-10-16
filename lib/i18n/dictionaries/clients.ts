@@ -31,6 +31,10 @@ export interface ClientsDictionary {
     nameLabel: string;
     emailLabel: string;
     phoneLabel: string;
+    // client-identity-for-invoicing — required on a factura's DATOS DEL
+    // CLIENTE block.
+    dniLabel: string;
+    addressLabel: string;
     edit: string;
     save: string;
     saving: string;
@@ -94,6 +98,8 @@ const es: ClientsDictionary = {
     nameLabel: "Nombre",
     emailLabel: "Email",
     phoneLabel: "Teléfono",
+    dniLabel: "DNI",
+    addressLabel: "Domicilio",
     edit: "Editar",
     save: "Guardar",
     saving: "Guardando…",
@@ -157,6 +163,8 @@ const en: ClientsDictionary = {
     nameLabel: "Name",
     emailLabel: "Email",
     phoneLabel: "Phone",
+    dniLabel: "DNI",
+    addressLabel: "Address",
     edit: "Edit",
     save: "Save",
     saving: "Saving…",

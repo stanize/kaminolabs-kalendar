@@ -691,6 +691,13 @@ create table public.kalendar_clients (
   name            text        not null,
   email           text,
   phone           text,
+  -- client-identity-for-invoicing (schema_subset_028.sql): required on a
+  -- Spanish factura's "DATOS DEL CLIENTE" block. Entered/corrected either
+  -- here (Clientes > client detail) or inline in the invoice-generation
+  -- confirm modal (which writes back here too) — one record per client,
+  -- reused across all their invoices and bookings.
+  dni             text,
+  address         text,
   total_sessions  integer     not null default 0,
   completed_count integer     not null default 0,
   no_show_count   integer     not null default 0,
@@ -1027,6 +1034,12 @@ create table public.kalendar_invoices (
   issue_year      integer     not null,
   client_name     text        not null,
   client_email    text        not null,
+  -- client-identity-for-invoicing (schema_subset_028.sql): frozen from
+  -- kalendar_clients.dni/address at invoice-creation time, same as every
+  -- other invoice field — a later edit to the client's profile must not
+  -- change an already-generated invoice.
+  client_dni      text        not null,
+  client_address  text        not null,
   service_name    text        not null,
   -- Snapshot of the booking's payment method at invoice-creation time —
   -- invoice-on-payment-trigger only ever fires right after a successful

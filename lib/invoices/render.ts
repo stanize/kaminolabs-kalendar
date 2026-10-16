@@ -44,7 +44,7 @@ export async function renderInvoicePdf(invoice: InvoiceRow, paid: boolean): Prom
       brandColor: snapshot.brandColor,
       isSolo: snapshot.isSolo,
     },
-    client: { name: invoice.client_name },
+    client: { name: invoice.client_name, dni: invoice.client_dni, address: invoice.client_address },
     invoiceNumberFormatted: formatInvoiceNumber(invoice.issue_year, invoice.invoice_number),
     issueDate: new Intl.DateTimeFormat(INTL_LOCALE, { timeZone: TZ, day: "numeric", month: "long", year: "numeric" }).format(
       new Date(invoice.created_at)

@@ -14,6 +14,7 @@ import {
 import { getActiveBonosForClientAction } from "@/lib/actions/bonos";
 import type { ClientActiveBono } from "@/lib/bonos/data";
 import { checkExistingInvoiceForBooking, createAndSendInvoice } from "@/lib/actions/invoices";
+import { getClientIdentity } from "@/lib/actions/clients";
 import type { CalendarDictionary } from "@/lib/i18n/dictionaries/calendar";
 import type { InvoicingDictionary } from "@/lib/i18n/dictionaries/invoicing";
 import { clientStatusLabel, clientStatusBadgeClass, needsClinicFollowUp, type WeekBookingVM } from "@/components/panel/calendar-grid-view";
@@ -93,6 +94,10 @@ export function BookingDetailModal({
   const [invoiceBookingId, setInvoiceBookingId] = useState<string | null>(null);
   const [invoiceEmailInput, setInvoiceEmailInput] = useState("");
   const [invoiceSendEmail, setInvoiceSendEmail] = useState(true);
+  // client-identity-for-invoicing: pre-filled from the client's profile
+  // when on file, editable either way, mandatory to submit.
+  const [invoiceDniInput, setInvoiceDniInput] = useState("");
+  const [invoiceAddressInput, setInvoiceAddressInput] = useState("");
   const [invoiceBusy, setInvoiceBusy] = useState(false);
   const [invoiceError, setInvoiceError] = useState<string | null>(null);
   const invoiceDict = invoicingDict.confirmModal;
@@ -242,19 +247,32 @@ export function BookingDetailModal({
       return;
     }
 
-    if (autoInvoiceEnabled) {
+    // client-identity-for-invoicing: fetched up front either way — to
+    // decide whether auto-invoice can actually proceed, and to pre-fill
+    // the manual modal's DNI/Domicilio inputs when it can't (or auto-
+    // invoice is off).
+    const identity = booking.clinicClientId ? await getClientIdentity(booking.clinicClientId) : null;
+    const dni = identity?.dni ?? "";
+    const address = identity?.address ?? "";
+
+    if (autoInvoiceEnabled && dni && address) {
       // invoice-generation-without-send: auto-invoice always generates;
       // it only emails when the client already has a real email on file,
       // and never errors/prompts when there isn't one.
-      await createAndSendInvoice({ bookingId: booking.id, sendEmail: !!hasRealEmail });
+      await createAndSendInvoice({ bookingId: booking.id, sendEmail: !!hasRealEmail, clientDni: dni, clientAddress: address });
       onUpdated();
       onClose();
       return;
     }
 
+    // Auto-invoice is either off, or on but missing required DNI/Domicilio
+    // — falls back to the manual modal that one time so the clinic can
+    // fill it in, per Arun's call on that edge case.
     setInvoiceBookingId(booking.id);
     setInvoiceEmailInput("");
     setInvoiceSendEmail(true);
+    setInvoiceDniInput(dni);
+    setInvoiceAddressInput(address);
     setInvoiceError(null);
     setInvoiceConfirmOpen(true);
   };
@@ -273,6 +291,12 @@ export function BookingDetailModal({
       setInvoiceError(invoiceDict.errEmailRequired);
       return;
     }
+    const dni = invoiceDniInput.trim();
+    const address = invoiceAddressInput.trim();
+    if (!dni || !address) {
+      setInvoiceError(invoiceDict.errClientIdentityRequired);
+      return;
+    }
 
     setInvoiceBusy(true);
     setInvoiceError(null);
@@ -281,6 +305,8 @@ export function BookingDetailModal({
       sendEmail: invoiceSendEmail,
       alternateEmail: email || undefined,
       saveToProfile: invoiceSendEmail && !hasRealEmail && !!email,
+      clientDni: dni,
+      clientAddress: address,
     });
     setInvoiceBusy(false);
     if (!res.ok) {
@@ -572,6 +598,33 @@ export function BookingDetailModal({
         >
           <div className="w-full max-w-[360px] rounded-2xl bg-surface p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
             <h3 className="mb-4 text-[15px] font-bold text-ink">{invoiceDict.title}</h3>
+
+            <div className="mb-4 flex flex-col gap-3">
+              <div>
+                <label className="mb-1.5 block text-[12.5px] font-medium text-ink-soft">{invoiceDict.dniLabel}</label>
+                <input
+                  value={invoiceDniInput}
+                  onChange={(e) => {
+                    setInvoiceDniInput(e.target.value);
+                    setInvoiceError(null);
+                  }}
+                  placeholder={invoiceDict.dniPlaceholder}
+                  className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[13px] text-ink"
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-[12.5px] font-medium text-ink-soft">{invoiceDict.addressLabel}</label>
+                <input
+                  value={invoiceAddressInput}
+                  onChange={(e) => {
+                    setInvoiceAddressInput(e.target.value);
+                    setInvoiceError(null);
+                  }}
+                  placeholder={invoiceDict.addressPlaceholder}
+                  className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[13px] text-ink"
+                />
+              </div>
+            </div>
 
             <label className="mb-4 flex items-center gap-2 text-[13px] font-medium text-ink">
               <input

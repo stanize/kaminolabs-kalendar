@@ -15,6 +15,7 @@ export interface InvoiceActionDict {
   errSendFailed: string;
   errEmailRequired: string;
   errInvalidEmail: string;
+  errClientIdentityRequired: string;
 }
 
 const FALLBACK: InvoiceActionDict = {
@@ -25,6 +26,7 @@ const FALLBACK: InvoiceActionDict = {
   errSendFailed: "La factura se creó pero no se pudo enviar. Puedes reenviarla desde Facturas.",
   errEmailRequired: "Indica un email para enviar la factura.",
   errInvalidEmail: "Indica un email válido.",
+  errClientIdentityRequired: "Indica el DNI y el domicilio del cliente.",
 };
 
 function isValidEmail(email: string): boolean {
@@ -76,7 +78,17 @@ export const createAndSendInvoice = authedAction(
     // email required at all. The auto-invoice trigger passes this as
     // whether the client has a real email on file, so it silently skips
     // sending (never errors) when there's none.
-    input: { bookingId: string; sendEmail?: boolean; alternateEmail?: string; saveToProfile?: boolean },
+    input: {
+      bookingId: string;
+      sendEmail?: boolean;
+      alternateEmail?: string;
+      saveToProfile?: boolean;
+      // client-identity-for-invoicing: entered/corrected in the confirm
+      // modal, falls back to the client's existing profile values —
+      // createInvoiceForBooking does the actual required-either-way check.
+      clientDni?: string;
+      clientAddress?: string;
+    },
     dict?: Partial<InvoiceActionDict>
   ): Promise<CreateAndSendInvoiceResult> => {
     const t = { ...FALLBACK, ...dict };
@@ -89,10 +101,21 @@ export const createAndSendInvoice = authedAction(
       return { ok: false, error: t.errInvalidEmail };
     }
 
-    const created = await createInvoiceForBooking({ business, bookingId: input.bookingId });
+    const created = await createInvoiceForBooking({
+      business,
+      bookingId: input.bookingId,
+      clientDni: input.clientDni,
+      clientAddress: input.clientAddress,
+    });
     if (!created.ok) {
       const error =
-        created.error === "no_booking" ? t.errNoBooking : created.error === "already_invoiced" ? t.errAlreadyInvoiced : t.errCreateFailed;
+        created.error === "no_booking"
+          ? t.errNoBooking
+          : created.error === "already_invoiced"
+            ? t.errAlreadyInvoiced
+            : created.error === "missing_identity"
+              ? t.errClientIdentityRequired
+              : t.errCreateFailed;
       return { ok: false, error };
     }
 

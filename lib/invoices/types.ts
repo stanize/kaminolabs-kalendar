@@ -45,6 +45,10 @@ export interface InvoiceRow {
   issue_year: number;
   client_name: string;
   client_email: string;
+  // client-identity-for-invoicing: required on a factura's DATOS DEL
+  // CLIENTE block, frozen at creation time like every other field here.
+  client_dni: string;
+  client_address: string;
   service_name: string;
   payment_method: "cash" | "card" | "bono" | null;
   amount: number;
