@@ -89,7 +89,7 @@ export const createAndSendInvoice = authedAction(
       return { ok: false, error: t.errInvalidEmail };
     }
 
-    const created = await createInvoiceForBooking({ businessId: business.id, bookingId: input.bookingId });
+    const created = await createInvoiceForBooking({ business, bookingId: input.bookingId });
     if (!created.ok) {
       const error =
         created.error === "no_booking" ? t.errNoBooking : created.error === "already_invoiced" ? t.errAlreadyInvoiced : t.errCreateFailed;

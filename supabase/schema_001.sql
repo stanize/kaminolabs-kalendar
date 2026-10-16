@@ -1000,10 +1000,10 @@ create unique index kalendar_bookings_active_slot_idx
 -- ----------------------------------------------------------------------------
 -- kalendar_invoices (schema_subset_023.sql, pdf-invoicing.md)
 -- Clinic -> patient factura records. PDFs are generated entirely on-request
--- (no stored file, no external portal) from this row's snapshotted fields
--- plus the business's current settings — see lib/invoices/. access_token is
--- the bearer credential for the no-login client-facing/download link, same
--- security model as kalendar_bookings.confirm_token.
+-- (no stored file, no external portal) from this row's own snapshotted
+-- fields — see lib/invoices/. access_token is the bearer credential for the
+-- no-login client-facing/download link, same security model as
+-- kalendar_bookings.confirm_token.
 -- ----------------------------------------------------------------------------
 create table public.kalendar_invoices (
   id              uuid        primary key default gen_random_uuid(),
@@ -1023,7 +1023,13 @@ create table public.kalendar_invoices (
   amount          numeric(10, 2) not null default 0 check (amount >= 0),
   access_token    text        not null unique,
   sent_at         timestamptz,
-  created_at      timestamptz not null default now()
+  created_at      timestamptz not null default now(),
+  -- business-fields-snapshot (schema_subset_025.sql): every business-level
+  -- field the PDF template renders (name, legal/DNI/colegiada, address,
+  -- signature, template id), frozen at creation time — a later edit to the
+  -- business (DNI change, new signature, etc.) must never alter an
+  -- already-generated invoice. See InvoiceBusinessSnapshot (lib/invoices/types.ts).
+  business_snapshot jsonb     not null default '{}'::jsonb
 );
 
 -- Not globally unique — only unique within a business + year (per-business,

@@ -2,13 +2,37 @@ import "server-only";
 import { randomBytes } from "crypto";
 import { createClient } from "@/lib/supabase/server";
 import { resolveClinicClientId } from "@/lib/booking/client-link";
-import type { InvoiceRow } from "@/lib/invoices/types";
+import type { Business } from "@/lib/business/data";
+import type { InvoiceBusinessSnapshot, InvoiceRow } from "@/lib/invoices/types";
 
 export type { InvoiceRow } from "@/lib/invoices/types";
 export { formatInvoiceNumber } from "@/lib/invoices/types";
 
 const INVOICE_COLUMNS =
-  "id, business_id, booking_id, invoice_number, issue_year, client_name, client_email, service_name, payment_method, amount, access_token, sent_at, created_at";
+  "id, business_id, booking_id, invoice_number, issue_year, client_name, client_email, service_name, payment_method, amount, access_token, sent_at, created_at, business_snapshot";
+
+/** business-fields-snapshot: freezes everything the PDF template reads off the business, at invoice-creation time. */
+function buildBusinessSnapshot(business: Business): InvoiceBusinessSnapshot {
+  return {
+    name: business.name,
+    legalId: business.legal_id,
+    addressStreet: business.address_street,
+    addressNumber: business.address_number,
+    addressAdditional: business.address_additional,
+    city: business.city,
+    addressPostalCode: business.address_postal_code,
+    addressProvince: business.address_province,
+    addressCountry: business.address_country,
+    contactEmail: business.contact_email,
+    phoneCountryCode: business.phone_country_code,
+    phoneNumber: business.phone_number,
+    professionalDni: business.professional_dni,
+    professionalCollegeNumber: business.professional_college_number,
+    signatureUrl: business.signature_url,
+    templateId: business.invoice_template_id,
+    brandColor: business.brand_color,
+  };
+}
 
 /**
  * The invoice already created for a given booking, if any — used by
@@ -69,7 +93,7 @@ export async function getNextInvoiceNumberPreview(
 }
 
 export interface CreateInvoiceInput {
-  businessId: string;
+  business: Business;
   bookingId: string;
 }
 
@@ -92,23 +116,24 @@ export type CreateInvoiceResult =
  */
 export async function createInvoiceForBooking(input: CreateInvoiceInput): Promise<CreateInvoiceResult> {
   const supabase = await createClient();
+  const businessId = input.business.id;
 
   const { data: booking } = await supabase
     .from("kalendar_bookings")
     .select("id, business_id, clinic_client_id, patient_id, client_name, client_email, client_phone, service_name, service_price, payment_method")
     .eq("id", input.bookingId)
-    .eq("business_id", input.businessId)
+    .eq("business_id", businessId)
     .maybeSingle();
 
   if (!booking) return { ok: false, error: "no_booking" };
 
-  const existing = await getInvoiceForBooking(input.businessId, input.bookingId);
+  const existing = await getInvoiceForBooking(businessId, input.bookingId);
   if (existing) return { ok: false, error: "already_invoiced" };
 
   let clinicClientId = booking.clinic_client_id as string | null;
   if (!clinicClientId) {
     clinicClientId = await resolveClinicClientId({
-      businessId: input.businessId,
+      businessId,
       patientId: booking.patient_id,
       name: booking.client_name,
       email: booking.client_email,
@@ -121,7 +146,7 @@ export async function createInvoiceForBooking(input: CreateInvoiceInput): Promis
 
   const issueYear = new Date().getFullYear();
   const { data: numberData, error: numberError } = await supabase.rpc("allocate_invoice_number", {
-    p_business_id: input.businessId,
+    p_business_id: businessId,
     p_issue_year: issueYear,
   });
   if (numberError || !numberData) return { ok: false, error: "create_failed" };
@@ -131,7 +156,7 @@ export async function createInvoiceForBooking(input: CreateInvoiceInput): Promis
   const { data: created, error } = await supabase
     .from("kalendar_invoices")
     .insert({
-      business_id: input.businessId,
+      business_id: businessId,
       booking_id: booking.id,
       invoice_number: numberData,
       issue_year: issueYear,
@@ -141,6 +166,7 @@ export async function createInvoiceForBooking(input: CreateInvoiceInput): Promis
       payment_method: booking.payment_method,
       amount: booking.service_price,
       access_token: accessToken,
+      business_snapshot: buildBusinessSnapshot(input.business),
     })
     .select(INVOICE_COLUMNS)
     .single();

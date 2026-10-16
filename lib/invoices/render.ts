@@ -1,7 +1,6 @@
 import "server-only";
 import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer";
 import { createElement, type ReactElement } from "react";
-import type { Business } from "@/lib/business/data";
 import type { InvoiceRow } from "@/lib/invoices/data";
 import { getInvoiceTemplate } from "@/lib/invoices/templates";
 import type { InvoiceTemplateProps } from "@/lib/invoices/templates/types";
@@ -12,33 +11,35 @@ const TZ = "Europe/Madrid";
 
 /**
  * Renders an invoice's PDF live, on request (in-app-pdf-generation,
- * generate-on-request) — from the invoice row's own already-snapshotted
- * fields plus the business's CURRENT settings (template, DNI, colegiada,
- * signature). Known trade-off, accepted: if the template's layout changes
- * later, re-rendering an old invoice shows the new layout, not whatever it
- * looked like when sent — the numbers/content stay accurate regardless,
- * since they're snapshotted on the row.
+ * generate-on-request) — entirely from the invoice row's own
+ * business-fields-snapshot (frozen at creation time), never the business's
+ * CURRENT settings. A later change to the business's name/DNI/address/
+ * colegiada number/signature/template must not alter an already-generated
+ * invoice. Known trade-off, accepted: if the TEMPLATE COMPONENT's own
+ * layout code changes later, re-rendering an old invoice shows the new
+ * layout — only the data is frozen, not the rendering code.
  */
-export async function renderInvoicePdf(invoice: InvoiceRow, business: Business, paid: boolean): Promise<Buffer> {
-  const template = getInvoiceTemplate(business.invoice_template_id);
+export async function renderInvoicePdf(invoice: InvoiceRow, paid: boolean): Promise<Buffer> {
+  const snapshot = invoice.business_snapshot;
+  const template = getInvoiceTemplate(snapshot.templateId);
 
   const props: InvoiceTemplateProps = {
     business: {
-      name: business.name,
-      legalId: business.legal_id,
-      addressStreet: business.address_street,
-      addressNumber: business.address_number,
-      addressAdditional: business.address_additional,
-      city: business.city,
-      addressPostalCode: business.address_postal_code,
-      addressProvince: business.address_province,
-      addressCountry: business.address_country,
-      contactEmail: business.contact_email,
-      phoneCountryCode: business.phone_country_code,
-      phoneNumber: business.phone_number,
-      professionalDni: business.professional_dni,
-      professionalCollegeNumber: business.professional_college_number,
-      signatureUrl: business.signature_url,
+      name: snapshot.name,
+      legalId: snapshot.legalId,
+      addressStreet: snapshot.addressStreet,
+      addressNumber: snapshot.addressNumber,
+      addressAdditional: snapshot.addressAdditional,
+      city: snapshot.city,
+      addressPostalCode: snapshot.addressPostalCode,
+      addressProvince: snapshot.addressProvince,
+      addressCountry: snapshot.addressCountry,
+      contactEmail: snapshot.contactEmail,
+      phoneCountryCode: snapshot.phoneCountryCode,
+      phoneNumber: snapshot.phoneNumber,
+      professionalDni: snapshot.professionalDni,
+      professionalCollegeNumber: snapshot.professionalCollegeNumber,
+      signatureUrl: snapshot.signatureUrl,
     },
     client: { name: invoice.client_name },
     invoiceNumberFormatted: formatInvoiceNumber(invoice.issue_year, invoice.invoice_number),

@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getBusinessById } from "@/lib/business/data";
 import { getInvoiceById } from "@/lib/invoices/data";
 import { renderInvoicePdf } from "@/lib/invoices/render";
 
@@ -19,10 +18,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const business = await getBusinessById(invoice.business_id);
-  if (!business) return NextResponse.json({ error: "Not found" }, { status: 404 });
-
-  const pdfBuffer = await renderInvoicePdf(invoice, business, true);
+  const pdfBuffer = await renderInvoicePdf(invoice, true);
 
   return new NextResponse(new Uint8Array(pdfBuffer), {
     headers: {

@@ -76,19 +76,6 @@ export async function getBusinessForUser(userId: string): Promise<Business | nul
   return (data as Business | null) ?? null;
 }
 
-/**
- * Looks up a business directly by id, no owner/auth scoping — used by
- * server-side flows that already resolved the id from a trusted source
- * (e.g. the invoice PDF route, which authorizes via the invoice's own
- * access_token first, or an invoice-sending action already scoped to the
- * caller's own business). Never call this with a client-supplied id
- * without separately verifying the caller is allowed to see it.
- */
-export async function getBusinessById(id: string): Promise<Business | null> {
-  const supabase = await createClient();
-  const { data } = await supabase.from(BUSINESS_TABLE).select(BUSINESS_COLUMNS).eq("id", id).maybeSingle();
-  return (data as Business | null) ?? null;
-}
 
 /**
  * A publicly bookable business by slug, or null. Only returns rows whose slug
