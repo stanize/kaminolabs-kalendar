@@ -18,6 +18,7 @@ export interface InvoiceTemplateProps {
     professionalDni: string | null;
     professionalCollegeNumber: string | null;
     signatureUrl: string | null;
+    brandColor: string;
   };
   client: {
     name: string;

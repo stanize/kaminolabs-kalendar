@@ -1,38 +1,77 @@
 import { Document, Page, View, Text, Image, StyleSheet } from "@react-pdf/renderer";
 import type { InvoiceTemplateProps } from "./types";
 
-// VAT-exempt invoice template — legal-requirements-check (pdf-invoicing.md),
-// grounded against a real factura from a podóloga client. No VAT section at
-// all (not even a 0% line) — this template structurally never shows one,
-// per that step's decision. Layout mirrors the real example: header with
-// professional's DNI/name/colegiada number, client name, invoice number +
-// date, a CONCEPTOS table, the VAT-exemption legal citation box, total, and
-// a signature area.
+// VAT-exempt invoice template — legal-requirements-check (pdf-invoicing.md).
+// Visual layout (2026-10, invoice-layout-redesign) follows a reference
+// mockup Arun supplied — card-style header with a colored initials avatar,
+// a "FACTURA" badge, a soft DATOS DEL CLIENTE box, and a Base
+// Imponible/IVA/Total breakdown box — but the CONTENT stays exactly what
+// we already collect (no client DNI/address fields exist, so none are
+// shown; the payment-status badge from the mockup was explicitly declined
+// in favor of keeping the existing PAGADO stamp near the signature).
 const styles = StyleSheet.create({
-  page: { padding: 40, fontSize: 10, fontFamily: "Helvetica", color: "#111827" },
-  headerCenter: { textAlign: "center", marginBottom: 24 },
-  headerLine: { marginBottom: 2 },
-  clientBlock: { marginBottom: 20 },
-  numberRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 16 },
-  numberBox: { border: "1pt solid #111827", padding: "4pt 8pt" },
-  table: { border: "1pt solid #111827" },
-  tableHeader: { flexDirection: "row", borderBottom: "1pt solid #111827", fontWeight: 700 },
-  tableRow: { flexDirection: "row", minHeight: 24 },
-  colUd: { width: "10%", padding: 4, borderRight: "1pt solid #111827" },
-  colConcepto: { width: "55%", padding: 4, borderRight: "1pt solid #111827" },
-  colPrecio: { width: "17.5%", padding: 4, borderRight: "1pt solid #111827", textAlign: "right" },
-  colImporte: { width: "17.5%", padding: 4, textAlign: "right" },
-  exemptBox: { border: "1pt solid #111827", padding: 8, marginTop: 16, width: "60%", fontSize: 9 },
-  totalRow: { flexDirection: "row", justifyContent: "flex-end", marginTop: 16 },
-  totalBox: { border: "1pt solid #111827", padding: "4pt 10pt", fontWeight: 700 },
+  page: { padding: 36, fontSize: 10, fontFamily: "Helvetica", color: "#111827" },
+
+  headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 },
+  headerLeft: { flexDirection: "row", alignItems: "flex-start", gap: 10, maxWidth: "60%" },
+  avatar: { width: 40, height: 40, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  avatarText: { color: "#ffffff", fontSize: 13, fontWeight: 700 },
+  businessName: { fontSize: 13, fontWeight: 700, color: "#111827", marginBottom: 2 },
+  businessSub: { fontSize: 9, color: "#6b7280", marginBottom: 1 },
+
+  headerRight: { alignItems: "flex-end" },
+  badge: {
+    fontSize: 8,
+    fontWeight: 700,
+    color: "#4338ca",
+    backgroundColor: "#eef2ff",
+    borderRadius: 10,
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    marginBottom: 6,
+  },
+  invoiceNumber: { fontSize: 15, fontWeight: 700, color: "#111827", marginBottom: 2 },
+  issueDateText: { fontSize: 9, color: "#6b7280" },
+
+  clientBox: { backgroundColor: "#f8fafc", borderRadius: 10, padding: 12, marginBottom: 20 },
+  clientBoxLabel: { fontSize: 8, fontWeight: 700, color: "#94a3b8", letterSpacing: 0.5, marginBottom: 4 },
+  clientName: { fontSize: 12, fontWeight: 700, color: "#111827" },
+
+  table: { borderWidth: 1, borderColor: "#e5e7eb", borderRadius: 10, overflow: "hidden" },
+  tableHeader: { flexDirection: "row", backgroundColor: "#f8fafc", borderBottomWidth: 1, borderBottomColor: "#e5e7eb" },
+  tableHeaderCell: { fontSize: 8, fontWeight: 700, color: "#94a3b8", letterSpacing: 0.5, padding: 8 },
+  tableRow: { flexDirection: "row", minHeight: 28 },
+  colUd: { width: "10%", padding: 8 },
+  colConcepto: { width: "55%", padding: 8 },
+  colPrecio: { width: "17.5%", padding: 8, textAlign: "right" },
+  colImporte: { width: "17.5%", padding: 8, textAlign: "right", fontWeight: 700 },
+
+  bottomRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 20 },
+  exemptBox: { backgroundColor: "#f8fafc", borderRadius: 10, padding: 10, width: "48%", fontSize: 8.5, color: "#475569" },
+  exemptBoxLabel: { fontSize: 8, fontWeight: 700, color: "#94a3b8", letterSpacing: 0.5, marginBottom: 4 },
+  totalsBox: { width: "40%" },
+  totalsRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 6 },
+  totalsLabel: { fontSize: 9.5, color: "#475569" },
+  totalsValue: { fontSize: 9.5, color: "#111827" },
+  totalsDivider: { borderBottomWidth: 1, borderBottomColor: "#e5e7eb", marginVertical: 6 },
+  grandTotalLabel: { fontSize: 11, fontWeight: 700, color: "#111827" },
+  grandTotalValue: { fontSize: 13, fontWeight: 700, color: "#111827" },
+
   signatureArea: { marginTop: 48 },
   signatureImage: { width: 140, height: 60, objectFit: "contain" },
   paidStamp: { marginTop: 8, fontWeight: 700, fontSize: 11 },
+  signatureName: { fontSize: 9, color: "#6b7280", marginTop: 2 },
 });
 
 function fullAddressLine(b: InvoiceTemplateProps["business"]): string {
   const street = `${b.addressStreet} ${b.addressNumber}${b.addressAdditional ? `, ${b.addressAdditional}` : ""}`;
   return `${street} · ${b.addressPostalCode} ${b.city}, ${b.addressProvince}`;
+}
+
+function initialsFor(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  const letters = words.slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "");
+  return letters.join("") || "?";
 }
 
 export function VatExemptInvoice(props: InvoiceTemplateProps) {
@@ -42,52 +81,79 @@ export function VatExemptInvoice(props: InvoiceTemplateProps) {
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        <View style={styles.headerCenter}>
-          {business.professionalDni && <Text style={styles.headerLine}>DNI: {business.professionalDni}</Text>}
-          <Text style={styles.headerLine}>
-            {business.name}
-            {business.professionalCollegeNumber ? ` · Nºcolegiada: ${business.professionalCollegeNumber}` : ""}
-          </Text>
-          <Text style={styles.headerLine}>{fullAddressLine(business)}</Text>
+        <View style={styles.headerRow}>
+          <View style={styles.headerLeft}>
+            <View style={[styles.avatar, { backgroundColor: business.brandColor || "#0d9488" }]}>
+              <Text style={styles.avatarText}>{initialsFor(business.name)}</Text>
+            </View>
+            <View>
+              <Text style={styles.businessName}>{business.name}</Text>
+              <Text style={styles.businessSub}>{fullAddressLine(business)}</Text>
+              {business.legalId && <Text style={styles.businessSub}>NIF: {business.legalId}</Text>}
+              {(business.professionalDni || business.professionalCollegeNumber) && (
+                <Text style={styles.businessSub}>
+                  {business.professionalDni ? `DNI: ${business.professionalDni}` : ""}
+                  {business.professionalDni && business.professionalCollegeNumber ? " · " : ""}
+                  {business.professionalCollegeNumber ? `Nºcolegiada: ${business.professionalCollegeNumber}` : ""}
+                </Text>
+              )}
+            </View>
+          </View>
+          <View style={styles.headerRight}>
+            <Text style={styles.badge}>FACTURA</Text>
+            <Text style={styles.invoiceNumber}>Nº {invoiceNumberFormatted}</Text>
+            <Text style={styles.issueDateText}>Fecha de emisión: {issueDate}</Text>
+          </View>
         </View>
 
-        <View style={styles.clientBlock}>
-          <Text>{client.name}</Text>
-        </View>
-
-        <View style={styles.numberRow}>
-          <Text style={styles.numberBox}>Nº {invoiceNumberFormatted}</Text>
-          <Text style={styles.numberBox}>{issueDate}</Text>
+        <View style={styles.clientBox}>
+          <Text style={styles.clientBoxLabel}>DATOS DEL CLIENTE</Text>
+          <Text style={styles.clientName}>{client.name}</Text>
         </View>
 
         <View style={styles.table}>
           <View style={styles.tableHeader}>
-            <Text style={styles.colUd}>UD</Text>
-            <Text style={styles.colConcepto}>CONCEPTOS</Text>
-            <Text style={styles.colPrecio}>PRECIO</Text>
-            <Text style={styles.colImporte}>IMPORTE</Text>
+            <Text style={[styles.tableHeaderCell, styles.colUd]}>UD</Text>
+            <Text style={[styles.tableHeaderCell, styles.colConcepto]}>CONCEPTOS</Text>
+            <Text style={[styles.tableHeaderCell, styles.colPrecio]}>PRECIO</Text>
+            <Text style={[styles.tableHeaderCell, styles.colImporte]}>IMPORTE</Text>
           </View>
           <View style={styles.tableRow}>
-            <Text style={styles.colUd} />
+            <Text style={styles.colUd}>1</Text>
             <Text style={styles.colConcepto}>{serviceName}</Text>
-            <Text style={styles.colPrecio}>{amountFormatted}</Text>
-            <Text style={styles.colImporte}>{amountFormatted}</Text>
+            <Text style={styles.colPrecio}>{amountFormatted} €</Text>
+            <Text style={styles.colImporte}>{amountFormatted} €</Text>
           </View>
         </View>
 
-        <View style={styles.exemptBox}>
-          <Text>Operación exenta de I.V.A por el artículo 20 de la Ley 37/1992 de 28 de Diciembre.</Text>
-        </View>
+        <View style={styles.bottomRow}>
+          <View style={styles.exemptBox}>
+            <Text style={styles.exemptBoxLabel}>EXENCIÓN DE IVA</Text>
+            <Text>Operación exenta de I.V.A por el artículo 20 de la Ley 37/1992 de 28 de Diciembre.</Text>
+          </View>
 
-        <View style={styles.totalRow}>
-          <Text style={styles.totalBox}>Total: {amountFormatted} €</Text>
+          <View style={styles.totalsBox}>
+            <View style={styles.totalsRow}>
+              <Text style={styles.totalsLabel}>Base Imponible</Text>
+              <Text style={styles.totalsValue}>{amountFormatted} €</Text>
+            </View>
+            <View style={styles.totalsRow}>
+              <Text style={styles.totalsLabel}>IVA (Exento 0%)</Text>
+              <Text style={styles.totalsValue}>0,00 €</Text>
+            </View>
+            <View style={styles.totalsDivider} />
+            <View style={styles.totalsRow}>
+              <Text style={styles.grandTotalLabel}>Total Factura</Text>
+              <Text style={styles.grandTotalValue}>{amountFormatted} €</Text>
+            </View>
+          </View>
         </View>
 
         <View style={styles.signatureArea}>
-          {/* eslint-disable-next-line jsx-a11y/alt-text -- react-pdf's Image has no alt prop (not a DOM <img>) */}
+          {/* eslint-disable-next-line jsx-a11y/alt-text -- react-pdf's Image has no alt prop (not a DOM element) */}
           {business.signatureUrl && <Image style={styles.signatureImage} src={business.signatureUrl} />}
           {paid && <Text style={styles.paidStamp}>PAGADO</Text>}
-          <Text>{business.name}</Text>
+          <Text style={styles.signatureName}>{business.name}</Text>
         </View>
       </Page>
     </Document>
