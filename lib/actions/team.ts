@@ -44,6 +44,10 @@ export interface TeamMemberInput {
   id: string | null;
   name: string;
   role: string;
+  // provider-invoicing-fields: shown on invoices for bookings assigned to
+  // this member (lib/invoices/data.ts). Both optional.
+  professionalDni: string;
+  professionalCollegeNumber: string;
 }
 
 export interface SaveTeamInput {
@@ -57,6 +61,8 @@ export interface SavedTeamMember {
   name: string;
   role: string | null;
   is_owner: boolean;
+  professional_dni: string | null;
+  professional_college_number: string | null;
 }
 
 export type SaveTeamResult =
@@ -100,6 +106,8 @@ export const saveTeam = authedAction(
       id: m.id,
       name: (m.name ?? "").trim(),
       role: (m.role ?? "").trim(),
+      professionalDni: (m.professionalDni ?? "").trim(),
+      professionalCollegeNumber: (m.professionalCollegeNumber ?? "").trim(),
     }));
     for (const r of rows) {
       if (r.name.length < 2) return { ok: false, error: t.errNameRequired };
@@ -169,7 +177,13 @@ export const saveTeam = authedAction(
       if (r.id) {
         const { error } = await supabase
           .from("kalendar_team_members")
-          .update({ name: r.name, role: r.role || null, sort_order: i })
+          .update({
+            name: r.name,
+            role: r.role || null,
+            sort_order: i,
+            professional_dni: r.professionalDni || null,
+            professional_college_number: r.professionalCollegeNumber || null,
+          })
           .eq("id", r.id)
           .eq("business_id", business.id);
         if (error) return { ok: false, error: `${t.errSaveFailed} ${error.message}` };
@@ -180,6 +194,8 @@ export const saveTeam = authedAction(
           role: r.role || null,
           is_owner: false,
           sort_order: i,
+          professional_dni: r.professionalDni || null,
+          professional_college_number: r.professionalCollegeNumber || null,
         });
         if (error) return { ok: false, error: `${t.errAddFailed} ${error.message}` };
       }
@@ -189,7 +205,7 @@ export const saveTeam = authedAction(
     // their real ids — prevents duplicate inserts on a second save).
     const { data: savedData, error: refetchError } = await supabase
       .from("kalendar_team_members")
-      .select("id, name, role, is_owner")
+      .select("id, name, role, is_owner, professional_dni, professional_college_number")
       .eq("business_id", business.id)
       .order("sort_order", { ascending: true })
       .order("created_at", { ascending: true });

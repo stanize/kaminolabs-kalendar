@@ -16,6 +16,8 @@ interface MemberItem {
   name: string;
   role: string;
   is_owner: boolean;
+  professional_dni: string | null;
+  professional_college_number: string | null;
 }
 
 /** One locally edited roster row. id === null → new member, not yet saved. */
@@ -25,6 +27,8 @@ interface Row {
   name: string;
   role: string;
   isOwner: boolean;
+  professionalDni: string;
+  professionalCollegeNumber: string;
 }
 
 function toRows(members: MemberItem[]): Row[] {
@@ -34,6 +38,8 @@ function toRows(members: MemberItem[]): Row[] {
     name: m.name,
     role: m.role,
     isOwner: m.is_owner,
+    professionalDni: m.professional_dni ?? "",
+    professionalCollegeNumber: m.professional_college_number ?? "",
   }));
 }
 
@@ -65,7 +71,10 @@ export function TeamManager({
   const { overlay, setOverlay, flashSuccessThen } = useSaveOverlay();
 
   // ── Local roster edits ──────────────────────────────────────────────────────
-  function updateRow(key: string, patch: Partial<Pick<Row, "name" | "role">>) {
+  function updateRow(
+    key: string,
+    patch: Partial<Pick<Row, "name" | "role" | "professionalDni" | "professionalCollegeNumber">>
+  ) {
     setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch } : r)));
   }
 
@@ -76,7 +85,15 @@ export function TeamManager({
   function addRow() {
     setRows((rs) => [
       ...rs,
-      { key: crypto.randomUUID(), id: null, name: "", role: "", isOwner: false },
+      {
+        key: crypto.randomUUID(),
+        id: null,
+        name: "",
+        role: "",
+        isOwner: false,
+        professionalDni: "",
+        professionalCollegeNumber: "",
+      },
     ]);
   }
 
@@ -124,7 +141,13 @@ export function TeamManager({
       const result = await saveTeam(
         {
           mode,
-          members: rows.map((r) => ({ id: r.id, name: r.name.trim(), role: r.role.trim() })),
+          members: rows.map((r) => ({
+            id: r.id,
+            name: r.name.trim(),
+            role: r.role.trim(),
+            professionalDni: r.professionalDni.trim(),
+            professionalCollegeNumber: r.professionalCollegeNumber.trim(),
+          })),
         },
         dict.errors
       );
@@ -148,6 +171,8 @@ export function TeamManager({
               name: mem.name,
               role: mem.role ?? "",
               is_owner: mem.is_owner,
+              professional_dni: mem.professional_dni,
+              professional_college_number: mem.professional_college_number,
             }))
           )
         );
@@ -202,7 +227,8 @@ export function TeamManager({
       </div>
 
       {/* Members — inline editable rows */}
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-3">
+        <p className="text-[12px] text-ink-soft">{m.invoicingFieldsHint}</p>
         {rows.map((r, index) => {
           return (
             <div key={r.key}>
@@ -253,6 +279,29 @@ export function TeamManager({
                     <Icon name="x" size={15} />
                   </button>
                 )}
+              </div>
+
+              {/* provider-invoicing-fields — DNI + colegiada number for this
+                  member, shown on invoices for their bookings. */}
+              <div className="mt-1.5 flex flex-wrap items-center gap-2 pl-1 sm:pl-6">
+                <div className="min-w-[140px] flex-1">
+                  <input
+                    value={r.professionalDni}
+                    onChange={(e) => updateRow(r.key, { professionalDni: e.target.value })}
+                    placeholder={m.dniPlaceholder}
+                    aria-label={m.dniLabel}
+                    className={inputBase}
+                  />
+                </div>
+                <div className="min-w-[160px] flex-1">
+                  <input
+                    value={r.professionalCollegeNumber}
+                    onChange={(e) => updateRow(r.key, { professionalCollegeNumber: e.target.value })}
+                    placeholder={m.collegeNumberPlaceholder}
+                    aria-label={m.collegeNumberLabel}
+                    className={inputBase}
+                  />
+                </div>
               </div>
             </div>
           );

@@ -11,8 +11,20 @@ export { formatInvoiceNumber } from "@/lib/invoices/types";
 const INVOICE_COLUMNS =
   "id, business_id, booking_id, invoice_number, issue_year, client_name, client_email, service_name, payment_method, amount, access_token, sent_at, created_at, business_snapshot";
 
-/** business-fields-snapshot: freezes everything the PDF template reads off the business, at invoice-creation time. */
-function buildBusinessSnapshot(business: Business): InvoiceBusinessSnapshot {
+/**
+ * business-fields-snapshot: freezes everything the PDF template reads, at
+ * invoice-creation time. provider-invoicing-fields (2026-10): the DNI/
+ * colegiada number/"Fdo:" name come from the booking's ASSIGNED team
+ * member, not the business — a multi-provider clinic can have a different
+ * one per person. `provider` is null when the booking has no
+ * team_member_id (shouldn't happen in practice — every booking gets one,
+ * solo included, see lib/actions/booking.ts — but handled defensively),
+ * in which case these three fields fall back to blank/the business name.
+ */
+function buildBusinessSnapshot(
+  business: Business,
+  provider: { name: string; professional_dni: string | null; professional_college_number: string | null } | null
+): InvoiceBusinessSnapshot {
   return {
     name: business.name,
     legalId: business.legal_id,
@@ -26,9 +38,9 @@ function buildBusinessSnapshot(business: Business): InvoiceBusinessSnapshot {
     contactEmail: business.contact_email,
     phoneCountryCode: business.phone_country_code,
     phoneNumber: business.phone_number,
-    professionalDni: business.professional_dni,
-    professionalCollegeNumber: business.professional_college_number,
-    professionalName: business.professional_name,
+    professionalDni: provider?.professional_dni ?? null,
+    professionalCollegeNumber: provider?.professional_college_number ?? null,
+    professionalName: provider?.name ?? business.name,
     signatureUrl: business.signature_url,
     templateId: business.invoice_template_id,
     brandColor: business.brand_color,
@@ -121,12 +133,25 @@ export async function createInvoiceForBooking(input: CreateInvoiceInput): Promis
 
   const { data: booking } = await supabase
     .from("kalendar_bookings")
-    .select("id, business_id, clinic_client_id, patient_id, client_name, client_email, client_phone, service_name, service_price, payment_method")
+    .select(
+      "id, business_id, clinic_client_id, patient_id, team_member_id, client_name, client_email, client_phone, service_name, service_price, payment_method"
+    )
     .eq("id", input.bookingId)
     .eq("business_id", businessId)
     .maybeSingle();
 
   if (!booking) return { ok: false, error: "no_booking" };
+
+  let provider: { name: string; professional_dni: string | null; professional_college_number: string | null } | null = null;
+  if (booking.team_member_id) {
+    const { data: member } = await supabase
+      .from("kalendar_team_members")
+      .select("name, professional_dni, professional_college_number")
+      .eq("id", booking.team_member_id)
+      .eq("business_id", businessId)
+      .maybeSingle();
+    provider = member ?? null;
+  }
 
   const existing = await getInvoiceForBooking(businessId, input.bookingId);
   if (existing) return { ok: false, error: "already_invoiced" };
@@ -167,7 +192,7 @@ export async function createInvoiceForBooking(input: CreateInvoiceInput): Promis
       payment_method: booking.payment_method,
       amount: booking.service_price,
       access_token: accessToken,
-      business_snapshot: buildBusinessSnapshot(input.business),
+      business_snapshot: buildBusinessSnapshot(input.business, provider),
     })
     .select(INVOICE_COLUMNS)
     .single();

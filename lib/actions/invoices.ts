@@ -363,27 +363,3 @@ export const saveNextInvoiceNumber = authedAction(
   }
 );
 
-export const saveProfessionalIdFields = authedAction(
-  async (
-    session,
-    input: { professionalDni: string; professionalCollegeNumber: string; professionalName: string },
-    dict?: { errNoBusiness: string; errSaveFailed: string }
-  ): Promise<SaveInvoiceSettingResult> => {
-    const t = { errNoBusiness: dict?.errNoBusiness ?? FALLBACK.errNoBusiness, errSaveFailed: dict?.errSaveFailed ?? "No se pudo guardar." };
-    const business = await getBusinessForUser(session.user.id);
-    if (!business) return { ok: false, error: t.errNoBusiness };
-    const supabase = await createClient();
-    const { error } = await supabase
-      .from("kalendar_businesses")
-      .update({
-        professional_dni: input.professionalDni.trim() || null,
-        professional_college_number: input.professionalCollegeNumber.trim() || null,
-        professional_name: input.professionalName.trim() || null,
-      })
-      .eq("id", business.id)
-      .eq("owner_id", session.user.id);
-    if (error) return { ok: false, error: t.errSaveFailed };
-    revalidatePath("/panel/business");
-    return { ok: true };
-  }
-);

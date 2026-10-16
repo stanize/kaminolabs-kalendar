@@ -10,6 +10,7 @@ export interface SettingsDictionary {
     notifications: string;
     bookings: string;
     invoicing: string;
+    whatsapp: string;
     security: string;
     language: string;
   };
@@ -34,6 +35,7 @@ const es: SettingsDictionary = {
     notifications: "Notificaciones",
     bookings: "Reservas",
     invoicing: "Facturación",
+    whatsapp: "WhatsApp",
     security: "Seguridad",
     language: "Idioma",
   },
@@ -58,6 +60,7 @@ const en: SettingsDictionary = {
     notifications: "Notifications",
     bookings: "Bookings",
     invoicing: "Invoicing",
+    whatsapp: "WhatsApp",
     security: "Security",
     language: "Language",
   },

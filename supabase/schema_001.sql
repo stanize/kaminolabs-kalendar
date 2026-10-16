@@ -327,18 +327,15 @@ create table public.kalendar_businesses (
   -- registry (lib/invoices/templates.ts), not a FK — templates are React
   -- components, not data rows. Only 'vat-exempt' exists so far.
   invoice_template_id     text        not null default 'vat-exempt',
-  -- Individual professional's personal DNI and professional college
-  -- registration number — distinct from legal_id (the business's own
-  -- NIF/CIF). Both optional: not every business type is a regulated
-  -- profession with a colegiada number. Shown on the invoice when filled
-  -- in, omitted otherwise.
+  -- DEPRECATED (schema_subset_027.sql, provider-invoicing-fields): these
+  -- three single-business-level fields are no longer read by the app —
+  -- replaced by kalendar_team_members.professional_dni/
+  -- professional_college_number (per-member, below) and that table's own
+  -- `name` column for the "Fdo:" signature line. Columns kept rather than
+  -- dropped since they may still hold real values from before the move;
+  -- safe to drop in a later cleanup once confirmed unused.
   professional_dni             text,
   professional_college_number  text,
-  -- The provider's own personal name — distinct from `name` (the clinic/
-  -- business name) — used for the invoice's "Fdo: {name}" signature line
-  -- (schema_subset_026.sql). Solo-practitioner model: one name per
-  -- business, same as DNI/colegiada above. Falls back to the business
-  -- name when blank, so filling it in is optional.
   professional_name            text,
   -- Uploaded signature image (invoice-signatures storage bucket, same
   -- upload/remove pattern as logo_url). Shown on the invoice when set,
@@ -552,7 +549,16 @@ create table public.kalendar_team_members (
   role        text,
   is_owner    boolean     not null default false,
   sort_order  integer     not null default 0,
-  created_at  timestamptz not null default now()
+  created_at  timestamptz not null default now(),
+  -- provider-invoicing-fields (schema_subset_027.sql, pdf-invoicing.md):
+  -- per-member DNI + professional college number, shown on invoices for
+  -- bookings assigned to this member (lib/invoices/data.ts resolves these
+  -- via the booking's team_member_id) — replaces the old single
+  -- business-level professional_dni/professional_college_number fields so
+  -- each team member can have their own. This member's own `name` is used
+  -- as the invoice's "Fdo:" signature line, so no separate name field here.
+  professional_dni             text,
+  professional_college_number  text
 );
 
 create index kalendar_team_members_business_id_idx on public.kalendar_team_members (business_id);

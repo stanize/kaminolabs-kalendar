@@ -26,6 +26,15 @@ export interface TeamDictionary {
     namePlaceholder: string;
     roleLabel: string;
     rolePlaceholder: string;
+    // provider-invoicing-fields (pdf-invoicing.md, 2026-10): per-member DNI
+    // + professional college number, shown on invoices generated for
+    // bookings assigned to that member — moved here from a single
+    // business-level field so each team member can have their own.
+    dniLabel: string;
+    dniPlaceholder: string;
+    collegeNumberLabel: string;
+    collegeNumberPlaceholder: string;
+    invoicingFieldsHint: string;
     saving: string;
     flashSuccess: string; // success flash shown in the save overlay
     errUnexpected: string;
@@ -69,6 +78,11 @@ const es: TeamDictionary = {
     namePlaceholder: "Nombre y apellido",
     roleLabel: "Rol",
     rolePlaceholder: "Rol",
+    dniLabel: "DNI",
+    dniPlaceholder: "12345678A",
+    collegeNumberLabel: "Nº de colegiada/o",
+    collegeNumberPlaceholder: "838282838",
+    invoicingFieldsHint: "Datos de facturación (opcional) — aparecen en las facturas de sus citas.",
     saving: "Guardando…",
     flashSuccess: "¡Guardado correctamente!",
     errUnexpected: "Ocurrió un error inesperado. Inténtalo de nuevo.",
@@ -109,6 +123,11 @@ const en: TeamDictionary = {
     namePlaceholder: "First and last name",
     roleLabel: "Role",
     rolePlaceholder: "Role",
+    dniLabel: "DNI",
+    dniPlaceholder: "12345678A",
+    collegeNumberLabel: "Professional college number",
+    collegeNumberPlaceholder: "838282838",
+    invoicingFieldsHint: "Invoicing details (optional) — shown on invoices for their appointments.",
     saving: "Saving…",
     flashSuccess: "Saved successfully!",
     errUnexpected: "An unexpected error occurred. Please try again.",
