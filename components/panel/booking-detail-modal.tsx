@@ -612,7 +612,11 @@ export function BookingDetailModal({
                 {invoiceDict.no}
               </Btn>
               <Btn onClick={() => handleInvoiceConfirm(true)} disabled={invoiceBusy}>
-                {invoiceBusy ? invoiceDict.sending : invoiceDict.yes}
+                {invoiceBusy
+                  ? invoiceDict.sending
+                  : invoiceSendEmail
+                    ? invoiceDict.yesGenerateAndSend
+                    : invoiceDict.yesGenerateOnly}
               </Btn>
             </div>
           </div>

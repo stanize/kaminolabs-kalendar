@@ -34,7 +34,8 @@ export interface InvoicingDictionary {
   };
   confirmModal: {
     title: string;
-    yes: string;
+    yesGenerateAndSend: string;
+    yesGenerateOnly: string;
     no: string;
     sendEmailCheckboxLabel: string;
     alternateEmailLabel: string;
@@ -108,7 +109,8 @@ const es: InvoicingDictionary = {
   },
   confirmModal: {
     title: "¿Quieres generar una factura?",
-    yes: "Sí, generar",
+    yesGenerateAndSend: "Generar y mandar correo",
+    yesGenerateOnly: "Solo generar",
     no: "No",
     sendEmailCheckboxLabel: "Enviar factura al cliente por email",
     alternateEmailLabel: "¿Enviar a otro email? (opcional)",
@@ -181,7 +183,8 @@ const en: InvoicingDictionary = {
   },
   confirmModal: {
     title: "Generate an invoice?",
-    yes: "Yes, generate",
+    yesGenerateAndSend: "Generate and send email",
+    yesGenerateOnly: "Generate only",
     no: "No",
     sendEmailCheckboxLabel: "Email the invoice to the client",
     alternateEmailLabel: "Send to a different email? (optional)",
