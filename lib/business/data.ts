@@ -38,6 +38,7 @@ export interface Business {
   professional_college_number: string | null;
   signature_url: string | null;
   auto_invoice_enabled: boolean;
+  invoice_next_number: number | null;
 }
 
 /**
@@ -56,7 +57,7 @@ export function formatBusinessAddress(
 
 const BUSINESS_TABLE = "kalendar_businesses";
 const BUSINESS_COLUMNS =
-  "id, owner_id, name, type, legal_id, address_street, address_number, address_additional, city, address_postal_code, address_province, address_country, phone_country_code, phone_number, contact_email, slug, slug_status, slug_flag_reason, slug_reviewed_at, brand_color, logo_url, team_mode, booking_window_months, cancellation_window_hours, onboarding_completed_at, created_at, slug_active, bonos_enabled, invoice_template_id, professional_dni, professional_college_number, signature_url, auto_invoice_enabled";
+  "id, owner_id, name, type, legal_id, address_street, address_number, address_additional, city, address_postal_code, address_province, address_country, phone_country_code, phone_number, contact_email, slug, slug_status, slug_flag_reason, slug_reviewed_at, brand_color, logo_url, team_mode, booking_window_months, cancellation_window_hours, onboarding_completed_at, created_at, slug_active, bonos_enabled, invoice_template_id, professional_dni, professional_college_number, signature_url, auto_invoice_enabled, invoice_next_number";
 
 /**
  * The business owned by a given user, or null. Always scoped by the userId

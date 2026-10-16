@@ -333,6 +333,36 @@ export const removeInvoiceSignature = authedAction(
   }
 );
 
+export const saveNextInvoiceNumber = authedAction(
+  async (
+    session,
+    // null clears the override (back to the natural sequence); a number
+    // sets next-invoice-number-override's one-shot floor for this business.
+    value: number | null,
+    dict?: { errNoBusiness: string; errInvalid: string; errSaveFailed: string }
+  ): Promise<SaveInvoiceSettingResult> => {
+    const t = {
+      errNoBusiness: dict?.errNoBusiness ?? FALLBACK.errNoBusiness,
+      errInvalid: dict?.errInvalid ?? "Indica un número de factura válido.",
+      errSaveFailed: dict?.errSaveFailed ?? "No se pudo guardar.",
+    };
+    if (value !== null && (!Number.isInteger(value) || value < 1)) {
+      return { ok: false, error: t.errInvalid };
+    }
+    const business = await getBusinessForUser(session.user.id);
+    if (!business) return { ok: false, error: t.errNoBusiness };
+    const supabase = await createClient();
+    const { error } = await supabase
+      .from("kalendar_businesses")
+      .update({ invoice_next_number: value })
+      .eq("id", business.id)
+      .eq("owner_id", session.user.id);
+    if (error) return { ok: false, error: t.errSaveFailed };
+    revalidatePath("/panel/settings/invoicing");
+    return { ok: true };
+  }
+);
+
 export const saveProfessionalIdFields = authedAction(
   async (
     session,

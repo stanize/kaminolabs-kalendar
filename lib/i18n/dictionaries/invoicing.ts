@@ -19,8 +19,17 @@ export interface InvoicingDictionary {
     signatureChange: string;
     signatureRemove: string;
     signatureUploading: string;
+    numberingSectionTitle: string;
+    numberingSectionSubtitle: string;
+    numberingNextLabel: string;
+    numberingNextHint: string;
+    numberingInputPlaceholder: string;
+    numberingSave: string;
+    numberingSaving: string;
+    numberingClear: string;
     errNoBusiness: string;
     errInvalidFile: string;
+    errInvalidNumber: string;
     errSaveFailed: string;
   };
   confirmModal: {
@@ -83,8 +92,18 @@ const es: InvoicingDictionary = {
     signatureChange: "Cambiar firma",
     signatureRemove: "Quitar",
     signatureUploading: "Subiendo…",
+    numberingSectionTitle: "Numeración de facturas",
+    numberingSectionSubtitle:
+      "El siguiente número se calcula automáticamente. Si vienes de otro sistema a mitad de año, indica aquí el número con el que debe continuar tu próxima factura.",
+    numberingNextLabel: "Próxima factura",
+    numberingNextHint: "Forzar el número de la próxima factura generada (una sola vez)",
+    numberingInputPlaceholder: "ej. 48",
+    numberingSave: "Guardar",
+    numberingSaving: "Guardando…",
+    numberingClear: "Quitar",
     errNoBusiness: "No se encontró tu negocio.",
     errInvalidFile: "Sube una imagen PNG, JPG o WEBP de hasta 2MB.",
+    errInvalidNumber: "Indica un número de factura válido.",
     errSaveFailed: "No se pudo guardar el cambio.",
   },
   confirmModal: {
@@ -146,8 +165,18 @@ const en: InvoicingDictionary = {
     signatureChange: "Change signature",
     signatureRemove: "Remove",
     signatureUploading: "Uploading…",
+    numberingSectionTitle: "Invoice numbering",
+    numberingSectionSubtitle:
+      "The next number is calculated automatically. If you're switching from another system mid-year, set the number your next invoice should continue from.",
+    numberingNextLabel: "Next invoice",
+    numberingNextHint: "Force the number of the next invoice generated (one-time)",
+    numberingInputPlaceholder: "e.g. 48",
+    numberingSave: "Save",
+    numberingSaving: "Saving…",
+    numberingClear: "Clear",
     errNoBusiness: "Business not found.",
     errInvalidFile: "Upload a PNG, JPG, or WEBP image up to 2MB.",
+    errInvalidNumber: "Enter a valid invoice number.",
     errSaveFailed: "Couldn't save the change.",
   },
   confirmModal: {

@@ -340,7 +340,14 @@ create table public.kalendar_businesses (
   signature_url           text,
   -- When true, Cobrar generates+sends the invoice automatically with no
   -- confirm modal. Off by default.
-  auto_invoice_enabled    boolean     not null default false
+  auto_invoice_enabled    boolean     not null default false,
+  -- next-invoice-number-override (schema_subset_024.sql): lets a clinic
+  -- switching platforms mid-year set the number their NEXT generated
+  -- invoice should get (e.g. they were at #047 on their old system).
+  -- One-shot: allocate_invoice_number consumes it (clears it back to null)
+  -- the moment it's used, and only ever raises the natural next number,
+  -- never lowers it below one already issued this year.
+  invoice_next_number     int
 );
 
 create index kalendar_businesses_owner_id_idx on public.kalendar_businesses (owner_id);
@@ -1042,6 +1049,7 @@ create or replace function public.allocate_invoice_number(p_business_id uuid, p_
 returns text language plpgsql as $$
 declare
   v_next int;
+  v_override int;
 begin
   perform pg_advisory_xact_lock(hashtextextended(p_business_id::text || ':' || p_issue_year::text, 0));
 
@@ -1050,6 +1058,20 @@ begin
     from public.kalendar_invoices
     where business_id = p_business_id
       and issue_year = p_issue_year;
+
+  -- next-invoice-number-override: only raises v_next, never lowers it
+  -- below a number already issued this year, and is consumed (cleared)
+  -- the moment it's applied so it only affects the very next invoice.
+  select invoice_next_number into v_override
+    from public.kalendar_businesses
+    where id = p_business_id;
+
+  if v_override is not null then
+    if v_override > v_next then
+      v_next := v_override;
+    end if;
+    update public.kalendar_businesses set invoice_next_number = null where id = p_business_id;
+  end if;
 
   return lpad(v_next::text, 4, '0');
 end;

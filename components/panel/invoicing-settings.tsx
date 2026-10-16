@@ -9,6 +9,7 @@ import {
   saveAutoInvoiceSetting,
   uploadInvoiceSignature,
   removeInvoiceSignature,
+  saveNextInvoiceNumber,
 } from "@/lib/actions/invoices";
 import { INVOICE_TEMPLATES } from "@/lib/invoices/templates";
 import type { InvoicingDictionary } from "@/lib/i18n/dictionaries/invoicing";
@@ -20,11 +21,19 @@ export function InvoicingSettings({
   initialTemplateId,
   initialAutoInvoice,
   initialSignatureUrl,
+  initialNextNumberOverride,
+  nextNumberPreview,
   dict,
 }: {
   initialTemplateId: string;
   initialAutoInvoice: boolean;
   initialSignatureUrl: string | null;
+  // next-invoice-number-override: the raw stored override (null = none set,
+  // natural sequence applies) vs. nextNumberPreview, the already-computed
+  // "what the next invoice will actually be" display string (accounts for
+  // the override AND the real max already issued this year).
+  initialNextNumberOverride: number | null;
+  nextNumberPreview: string;
   dict: InvoicingDictionary["settings"];
 }) {
   const router = useRouter();
@@ -33,6 +42,9 @@ export function InvoicingSettings({
   const [autoSaving, setAutoSaving] = useState(false);
   const [signatureUrl, setSignatureUrl] = useState(initialSignatureUrl);
   const [uploading, setUploading] = useState(false);
+  const [nextNumberInput, setNextNumberInput] = useState(initialNextNumberOverride ? String(initialNextNumberOverride) : "");
+  const [nextNumberOverride, setNextNumberOverride] = useState(initialNextNumberOverride);
+  const [numberSaving, setNumberSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -113,6 +125,59 @@ export function InvoicingSettings({
       setError(dict.errSaveFailed);
     } finally {
       setUploading(false);
+    }
+  }
+
+  async function handleSaveNextNumber() {
+    const trimmed = nextNumberInput.trim();
+    const value = trimmed ? parseInt(trimmed, 10) : null;
+    if (trimmed && (!Number.isInteger(value) || (value as number) < 1)) {
+      setError(dict.errInvalidNumber);
+      return;
+    }
+    setError(null);
+    setNumberSaving(true);
+    try {
+      const result = await saveNextInvoiceNumber(value, {
+        errNoBusiness: dict.errNoBusiness,
+        errInvalid: dict.errInvalidNumber,
+        errSaveFailed: dict.errSaveFailed,
+      });
+      if (!result.ok) {
+        setError(result.error);
+      } else {
+        setNextNumberOverride(value);
+        router.refresh();
+      }
+    } catch (e) {
+      reportClientError("saveNextInvoiceNumber", e);
+      setError(dict.errSaveFailed);
+    } finally {
+      setNumberSaving(false);
+    }
+  }
+
+  async function handleClearNextNumber() {
+    setNextNumberInput("");
+    setError(null);
+    setNumberSaving(true);
+    try {
+      const result = await saveNextInvoiceNumber(null, {
+        errNoBusiness: dict.errNoBusiness,
+        errInvalid: dict.errInvalidNumber,
+        errSaveFailed: dict.errSaveFailed,
+      });
+      if (!result.ok) {
+        setError(result.error);
+      } else {
+        setNextNumberOverride(null);
+        router.refresh();
+      }
+    } catch (e) {
+      reportClientError("saveNextInvoiceNumber", e);
+      setError(dict.errSaveFailed);
+    } finally {
+      setNumberSaving(false);
     }
   }
 
@@ -201,6 +266,41 @@ export function InvoicingSettings({
             className="hidden"
           />
         </div>
+      </div>
+
+      <div className="rounded-2xl border border-line bg-surface p-6">
+        <h2 className="text-[15px] font-semibold text-ink">{dict.numberingSectionTitle}</h2>
+        <p className="mt-1.5 text-[13.5px] text-ink-soft">{dict.numberingSectionSubtitle}</p>
+
+        <p className="mt-4 text-[13.5px] text-ink">
+          {dict.numberingNextLabel}: <span className="font-semibold">{nextNumberPreview}</span>
+        </p>
+
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <input
+            type="number"
+            min={1}
+            step={1}
+            value={nextNumberInput}
+            onChange={(e) => setNextNumberInput(e.target.value)}
+            placeholder={dict.numberingInputPlaceholder}
+            className="w-32 rounded-lg border border-line bg-surface px-3 py-2 text-[13px] text-ink"
+          />
+          <Btn variant="outline" size="sm" type="button" onClick={handleSaveNextNumber} disabled={numberSaving}>
+            {numberSaving ? dict.numberingSaving : dict.numberingSave}
+          </Btn>
+          {nextNumberOverride && (
+            <button
+              type="button"
+              onClick={handleClearNextNumber}
+              disabled={numberSaving}
+              className="text-[12.5px] font-medium text-ink-soft hover:text-error disabled:opacity-50"
+            >
+              {dict.numberingClear}
+            </button>
+          )}
+        </div>
+        <p className="mt-2 text-[12px] text-ink-soft">{dict.numberingNextHint}</p>
       </div>
     </div>
   );

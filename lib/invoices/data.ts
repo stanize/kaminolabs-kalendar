@@ -42,6 +42,32 @@ export async function getInvoicesForBusiness(businessId: string): Promise<Invoic
   return (data as InvoiceRow[] | null) ?? [];
 }
 
+/**
+ * Read-only prediction of the number the NEXT invoice generated this year
+ * would get — next-invoice-number-override's settings-page preview. Mirrors
+ * allocate_invoice_number's logic without consuming the override or
+ * allocating anything, so it's safe to call on every settings page render.
+ */
+export async function getNextInvoiceNumberPreview(
+  businessId: string,
+  issueYear: number,
+  overrideNumber: number | null
+): Promise<string> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("kalendar_invoices")
+    .select("invoice_number")
+    .eq("business_id", businessId)
+    .eq("issue_year", issueYear)
+    .order("invoice_number", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const natural = (data ? parseInt(data.invoice_number, 10) : 0) + 1;
+  const next = overrideNumber && overrideNumber > natural ? overrideNumber : natural;
+  return String(next).padStart(4, "0");
+}
+
 export interface CreateInvoiceInput {
   businessId: string;
   bookingId: string;
