@@ -57,10 +57,31 @@ const styles = StyleSheet.create({
   grandTotalLabel: { fontSize: 11, fontWeight: 700, color: "#111827" },
   grandTotalValue: { fontSize: 13, fontWeight: 700, color: "#111827" },
 
-  signatureArea: { marginTop: 48 },
-  signatureImage: { width: 140, height: 60, objectFit: "contain" },
-  paidStamp: { marginTop: 8, fontWeight: 700, fontSize: 11 },
-  signatureName: { fontSize: 9, color: "#6b7280", marginTop: 2 },
+  signatureArea: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginTop: 48,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: "#e5e7eb",
+  },
+  paidPill: {
+    fontSize: 9,
+    fontWeight: 700,
+    color: "#059669",
+    backgroundColor: "#ecfdf5",
+    borderRadius: 10,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    alignSelf: "flex-start",
+    marginBottom: 4,
+  },
+  paidCaption: { fontSize: 8.5, color: "#94a3b8" },
+  signatureBlock: { alignItems: "flex-end" },
+  signatureImage: { width: 130, height: 50, objectFit: "contain", marginBottom: 4 },
+  signatureName: { fontSize: 9.5, fontWeight: 700, color: "#111827" },
+  signatureCaption: { fontSize: 8.5, color: "#94a3b8", marginTop: 2 },
 });
 
 function fullAddressLine(b: InvoiceTemplateProps["business"]): string {
@@ -150,10 +171,20 @@ export function VatExemptInvoice(props: InvoiceTemplateProps) {
         </View>
 
         <View style={styles.signatureArea}>
-          {/* eslint-disable-next-line jsx-a11y/alt-text -- react-pdf's Image has no alt prop (not a DOM element) */}
-          {business.signatureUrl && <Image style={styles.signatureImage} src={business.signatureUrl} />}
-          {paid && <Text style={styles.paidStamp}>PAGADO</Text>}
-          <Text style={styles.signatureName}>{business.name}</Text>
+          <View>
+            {paid && (
+              <>
+                <Text style={styles.paidPill}>PAGADO</Text>
+                <Text style={styles.paidCaption}>Comprobante verificado</Text>
+              </>
+            )}
+          </View>
+          <View style={styles.signatureBlock}>
+            {/* eslint-disable-next-line jsx-a11y/alt-text -- react-pdf's Image has no alt prop (not a DOM element) */}
+            {business.signatureUrl && <Image style={styles.signatureImage} src={business.signatureUrl} />}
+            <Text style={styles.signatureName}>Fdo: {business.name}</Text>
+            <Text style={styles.signatureCaption}>Firma y sello autorizados</Text>
+          </View>
         </View>
       </Page>
     </Document>
