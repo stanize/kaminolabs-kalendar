@@ -96,7 +96,7 @@ const es: InvoicingDictionary = {
     numberingSectionSubtitle:
       "El siguiente número se calcula automáticamente. Si vienes de otro sistema a mitad de año, indica aquí el número con el que debe continuar tu próxima factura.",
     numberingNextLabel: "Próxima factura",
-    numberingNextHint: "Forzar el número de la próxima factura generada (una sola vez)",
+    numberingNextHint: "Marca a partir de qué número debe continuar tu numeración — las facturas siguientes seguirán la secuencia desde ahí.",
     numberingInputPlaceholder: "ej. 48",
     numberingSave: "Guardar",
     numberingSaving: "Guardando…",
@@ -169,7 +169,7 @@ const en: InvoicingDictionary = {
     numberingSectionSubtitle:
       "The next number is calculated automatically. If you're switching from another system mid-year, set the number your next invoice should continue from.",
     numberingNextLabel: "Next invoice",
-    numberingNextHint: "Force the number of the next invoice generated (one-time)",
+    numberingNextHint: "Sets the starting point for your numbering — every invoice after that will continue the sequence from here.",
     numberingInputPlaceholder: "e.g. 48",
     numberingSave: "Save",
     numberingSaving: "Saving…",
