@@ -3,19 +3,20 @@ import type { InvoiceTemplateProps } from "./types";
 
 // VAT-exempt invoice template — legal-requirements-check (pdf-invoicing.md).
 // Visual layout (2026-10, invoice-layout-redesign) follows a reference
-// mockup Arun supplied — card-style header with a colored initials avatar,
-// a "FACTURA" badge, a soft DATOS DEL CLIENTE box, and a Base
-// Imponible/IVA/Total breakdown box — but the CONTENT stays exactly what
-// we already collect (no client DNI/address fields exist, so none are
-// shown; the payment-status badge from the mockup was explicitly declined
-// in favor of keeping the existing PAGADO stamp near the signature).
+// mockup Arun supplied — card-style header, a "FACTURA" badge, a soft
+// DATOS DEL CLIENTE box, and a Base Imponible/IVA/Total breakdown box —
+// but the CONTENT stays exactly what we already collect (no client DNI/
+// address fields exist, so none are shown; the payment-status badge from
+// the mockup was explicitly declined in favor of keeping the existing
+// PAGADO stamp near the signature). No avatar (removed per feedback).
+// solo-provider-header: for a solo business, the header shows just the
+// provider's name + DNI/colegiada instead of the clinic name/address —
+// multi-provider header handling deferred for later.
 const styles = StyleSheet.create({
   page: { padding: 36, fontSize: 10, fontFamily: "Helvetica", color: "#111827" },
 
   headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 },
-  headerLeft: { flexDirection: "row", alignItems: "flex-start", gap: 10, maxWidth: "60%" },
-  avatar: { width: 40, height: 40, borderRadius: 10, alignItems: "center", justifyContent: "center" },
-  avatarText: { color: "#ffffff", fontSize: 13, fontWeight: 700 },
+  headerLeft: { maxWidth: "60%" },
   businessName: { fontSize: 13, fontWeight: 700, color: "#111827", marginBottom: 2 },
   businessSub: { fontSize: 9, color: "#6b7280", marginBottom: 1 },
 
@@ -84,12 +85,6 @@ function fullAddressLine(b: InvoiceTemplateProps["business"]): string {
   return `${street} · ${b.addressPostalCode} ${b.city}, ${b.addressProvince}`;
 }
 
-function initialsFor(name: string): string {
-  const words = name.trim().split(/\s+/).filter(Boolean);
-  const letters = words.slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "");
-  return letters.join("") || "?";
-}
-
 export function VatExemptInvoice(props: InvoiceTemplateProps) {
   const { business, client, invoiceNumberFormatted, issueDate, serviceName, amount, paid } = props;
   const amountFormatted = amount.toFixed(2).replace(".", ",");
@@ -99,21 +94,34 @@ export function VatExemptInvoice(props: InvoiceTemplateProps) {
       <Page size="A4" style={styles.page}>
         <View style={styles.headerRow}>
           <View style={styles.headerLeft}>
-            <View style={[styles.avatar, { backgroundColor: business.brandColor || "#0d9488" }]}>
-              <Text style={styles.avatarText}>{initialsFor(business.name)}</Text>
-            </View>
-            <View>
-              <Text style={styles.businessName}>{business.name}</Text>
-              <Text style={styles.businessSub}>{fullAddressLine(business)}</Text>
-              {business.legalId && <Text style={styles.businessSub}>NIF: {business.legalId}</Text>}
-              {(business.professionalDni || business.professionalCollegeNumber) && (
-                <Text style={styles.businessSub}>
-                  {business.professionalDni ? `DNI: ${business.professionalDni}` : ""}
-                  {business.professionalDni && business.professionalCollegeNumber ? " · " : ""}
-                  {business.professionalCollegeNumber ? `Nºcolegiada: ${business.professionalCollegeNumber}` : ""}
-                </Text>
-              )}
-            </View>
+            {business.isSolo ? (
+              // solo-provider-header: just the provider + DNI/colegiada —
+              // no clinic name/address/NIF. Multi-provider header handling
+              // is deferred for later.
+              <>
+                <Text style={styles.businessName}>{business.professionalName || business.name}</Text>
+                {(business.professionalDni || business.professionalCollegeNumber) && (
+                  <Text style={styles.businessSub}>
+                    {business.professionalDni ? `DNI: ${business.professionalDni}` : ""}
+                    {business.professionalDni && business.professionalCollegeNumber ? " · " : ""}
+                    {business.professionalCollegeNumber ? `Nºcolegiada: ${business.professionalCollegeNumber}` : ""}
+                  </Text>
+                )}
+              </>
+            ) : (
+              <>
+                <Text style={styles.businessName}>{business.name}</Text>
+                <Text style={styles.businessSub}>{fullAddressLine(business)}</Text>
+                {business.legalId && <Text style={styles.businessSub}>NIF: {business.legalId}</Text>}
+                {(business.professionalDni || business.professionalCollegeNumber) && (
+                  <Text style={styles.businessSub}>
+                    {business.professionalDni ? `DNI: ${business.professionalDni}` : ""}
+                    {business.professionalDni && business.professionalCollegeNumber ? " · " : ""}
+                    {business.professionalCollegeNumber ? `Nºcolegiada: ${business.professionalCollegeNumber}` : ""}
+                  </Text>
+                )}
+              </>
+            )}
           </View>
           <View style={styles.headerRight}>
             <Text style={styles.badge}>FACTURA</Text>

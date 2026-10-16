@@ -44,6 +44,7 @@ function buildBusinessSnapshot(
     signatureUrl: business.signature_url,
     templateId: business.invoice_template_id,
     brandColor: business.brand_color,
+    isSolo: business.team_mode === "solo",
   };
 }
 

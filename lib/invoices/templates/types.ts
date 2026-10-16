@@ -20,6 +20,7 @@ export interface InvoiceTemplateProps {
     professionalName: string | null;
     signatureUrl: string | null;
     brandColor: string;
+    isSolo: boolean;
   };
   client: {
     name: string;

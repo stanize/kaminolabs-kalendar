@@ -30,6 +30,11 @@ export interface InvoiceBusinessSnapshot {
   signatureUrl: string | null;
   templateId: string;
   brandColor: string;
+  // solo-provider-header (2026-10): when the business is solo mode, the
+  // invoice header shows just the provider's name + DNI/colegiada instead
+  // of the clinic name/address — multi-provider header handling is
+  // deferred for later.
+  isSolo: boolean;
 }
 
 export interface InvoiceRow {
