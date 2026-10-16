@@ -55,7 +55,7 @@ const styles = StyleSheet.create({
   totalsValue: { fontSize: 9.5, color: "#111827" },
   totalsDivider: { borderBottomWidth: 1, borderBottomColor: "#e5e7eb", marginVertical: 6 },
   grandTotalLabel: { fontSize: 11, fontWeight: 700, color: "#111827" },
-  grandTotalValue: { fontSize: 13, fontWeight: 700, color: "#111827" },
+  grandTotalValue: { fontSize: 13, fontWeight: 700, color: "#4338ca" },
 
   signatureArea: {
     flexDirection: "row",
