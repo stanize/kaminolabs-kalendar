@@ -68,10 +68,19 @@ export const createAndSendInvoice = authedAction(
     // false/omitted, profile untouched). See invoice-on-payment-trigger's
     // two distinctly-named notes for why these are deliberately different
     // behaviors sharing one field.
-    input: { bookingId: string; alternateEmail?: string; saveToProfile?: boolean },
+    //
+    // `sendEmail` (default true): invoice-generation-without-send — the
+    // "Enviar factura al cliente" checkbox in the confirm modal, default
+    // checked. Checked + no resolvable email -> errEmailRequired (same as
+    // before). Unchecked -> invoice is generated but never emailed, no
+    // email required at all. The auto-invoice trigger passes this as
+    // whether the client has a real email on file, so it silently skips
+    // sending (never errors) when there's none.
+    input: { bookingId: string; sendEmail?: boolean; alternateEmail?: string; saveToProfile?: boolean },
     dict?: Partial<InvoiceActionDict>
   ): Promise<CreateAndSendInvoiceResult> => {
     const t = { ...FALLBACK, ...dict };
+    const sendEmail = input.sendEmail ?? true;
 
     const business = await getBusinessForUser(session.user.id);
     if (!business) return { ok: false, error: t.errNoBusiness };
@@ -85,6 +94,12 @@ export const createAndSendInvoice = authedAction(
       const error =
         created.error === "no_booking" ? t.errNoBooking : created.error === "already_invoiced" ? t.errAlreadyInvoiced : t.errCreateFailed;
       return { ok: false, error };
+    }
+
+    if (!sendEmail) {
+      revalidatePath("/panel/calendar");
+      revalidatePath("/panel/invoices");
+      return { ok: true, invoice: created.invoice };
     }
 
     const sendTo = input.alternateEmail?.trim() || created.invoice.client_email;

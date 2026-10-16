@@ -92,6 +92,7 @@ export function BookingDetailModal({
   const [invoiceConfirmOpen, setInvoiceConfirmOpen] = useState(false);
   const [invoiceBookingId, setInvoiceBookingId] = useState<string | null>(null);
   const [invoiceEmailInput, setInvoiceEmailInput] = useState("");
+  const [invoiceSendEmail, setInvoiceSendEmail] = useState(true);
   const [invoiceBusy, setInvoiceBusy] = useState(false);
   const [invoiceError, setInvoiceError] = useState<string | null>(null);
   const invoiceDict = invoicingDict.confirmModal;
@@ -242,7 +243,10 @@ export function BookingDetailModal({
     }
 
     if (autoInvoiceEnabled) {
-      await createAndSendInvoice({ bookingId: booking.id });
+      // invoice-generation-without-send: auto-invoice always generates;
+      // it only emails when the client already has a real email on file,
+      // and never errors/prompts when there isn't one.
+      await createAndSendInvoice({ bookingId: booking.id, sendEmail: !!hasRealEmail });
       onUpdated();
       onClose();
       return;
@@ -250,6 +254,7 @@ export function BookingDetailModal({
 
     setInvoiceBookingId(booking.id);
     setInvoiceEmailInput("");
+    setInvoiceSendEmail(true);
     setInvoiceError(null);
     setInvoiceConfirmOpen(true);
   };
@@ -264,7 +269,7 @@ export function BookingDetailModal({
     }
 
     const email = invoiceEmailInput.trim();
-    if (!hasRealEmail && !email) {
+    if (invoiceSendEmail && !hasRealEmail && !email) {
       setInvoiceError(invoiceDict.errEmailRequired);
       return;
     }
@@ -273,8 +278,9 @@ export function BookingDetailModal({
     setInvoiceError(null);
     const res = await createAndSendInvoice({
       bookingId: invoiceBookingId,
+      sendEmail: invoiceSendEmail,
       alternateEmail: email || undefined,
-      saveToProfile: !hasRealEmail && !!email,
+      saveToProfile: invoiceSendEmail && !hasRealEmail && !!email,
     });
     setInvoiceBusy(false);
     if (!res.ok) {
@@ -567,18 +573,33 @@ export function BookingDetailModal({
           <div className="w-full max-w-[360px] rounded-2xl bg-surface p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
             <h3 className="mb-4 text-[15px] font-bold text-ink">{invoiceDict.title}</h3>
 
-            <div className="mb-4">
-              <label className="mb-1.5 block text-[12.5px] font-medium text-ink-soft">
-                {hasRealEmail ? invoiceDict.alternateEmailLabel : invoiceDict.missingEmailLabel}
-              </label>
+            <label className="mb-4 flex items-center gap-2 text-[13px] font-medium text-ink">
               <input
-                type="email"
-                value={invoiceEmailInput}
-                onChange={(e) => setInvoiceEmailInput(e.target.value)}
-                placeholder={hasRealEmail ? invoiceDict.alternateEmailPlaceholder : invoiceDict.missingEmailPlaceholder}
-                className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[13px] text-ink"
+                type="checkbox"
+                checked={invoiceSendEmail}
+                onChange={(e) => {
+                  setInvoiceSendEmail(e.target.checked);
+                  setInvoiceError(null);
+                }}
+                className="h-4 w-4 rounded border-line"
               />
-            </div>
+              {invoiceDict.sendEmailCheckboxLabel}
+            </label>
+
+            {invoiceSendEmail && (
+              <div className="mb-4">
+                <label className="mb-1.5 block text-[12.5px] font-medium text-ink-soft">
+                  {hasRealEmail ? invoiceDict.alternateEmailLabel : invoiceDict.missingEmailLabel}
+                </label>
+                <input
+                  type="email"
+                  value={invoiceEmailInput}
+                  onChange={(e) => setInvoiceEmailInput(e.target.value)}
+                  placeholder={hasRealEmail ? invoiceDict.alternateEmailPlaceholder : invoiceDict.missingEmailPlaceholder}
+                  className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[13px] text-ink"
+                />
+              </div>
+            )}
 
             {invoiceError && (
               <div className="mb-3 rounded-lg border border-error bg-error-weak px-3 py-2 text-[13px] text-error">

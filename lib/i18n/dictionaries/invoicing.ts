@@ -27,6 +27,7 @@ export interface InvoicingDictionary {
     title: string;
     yes: string;
     no: string;
+    sendEmailCheckboxLabel: string;
     alternateEmailLabel: string;
     alternateEmailPlaceholder: string;
     missingEmailLabel: string;
@@ -90,6 +91,7 @@ const es: InvoicingDictionary = {
     title: "¿Quieres generar una factura?",
     yes: "Sí, generar",
     no: "No",
+    sendEmailCheckboxLabel: "Enviar factura al cliente por email",
     alternateEmailLabel: "¿Enviar a otro email? (opcional)",
     alternateEmailPlaceholder: "otro@email.com",
     missingEmailLabel: "Este cliente no tiene email. Indica uno para enviar la factura:",
@@ -152,6 +154,7 @@ const en: InvoicingDictionary = {
     title: "Generate an invoice?",
     yes: "Yes, generate",
     no: "No",
+    sendEmailCheckboxLabel: "Email the invoice to the client",
     alternateEmailLabel: "Send to a different email? (optional)",
     alternateEmailPlaceholder: "other@email.com",
     missingEmailLabel: "This client has no email on file. Enter one to send the invoice:",
