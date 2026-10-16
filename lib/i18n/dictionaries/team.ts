@@ -34,7 +34,6 @@ export interface TeamDictionary {
     dniPlaceholder: string;
     collegeNumberLabel: string;
     collegeNumberPlaceholder: string;
-    invoicingFieldsHint: string;
     saving: string;
     flashSuccess: string; // success flash shown in the save overlay
     errUnexpected: string;
@@ -82,7 +81,6 @@ const es: TeamDictionary = {
     dniPlaceholder: "12345678A",
     collegeNumberLabel: "Nº de colegiada/o",
     collegeNumberPlaceholder: "838282838",
-    invoicingFieldsHint: "Datos de facturación (opcional) — aparecen en las facturas de sus citas.",
     saving: "Guardando…",
     flashSuccess: "¡Guardado correctamente!",
     errUnexpected: "Ocurrió un error inesperado. Inténtalo de nuevo.",
@@ -127,7 +125,6 @@ const en: TeamDictionary = {
     dniPlaceholder: "12345678A",
     collegeNumberLabel: "Professional college number",
     collegeNumberPlaceholder: "838282838",
-    invoicingFieldsHint: "Invoicing details (optional) — shown on invoices for their appointments.",
     saving: "Saving…",
     flashSuccess: "Saved successfully!",
     errUnexpected: "An unexpected error occurred. Please try again.",

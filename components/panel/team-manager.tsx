@@ -226,45 +226,28 @@ export function TeamManager({
         </div>
       </div>
 
-      {/* Members — inline editable rows */}
+      {/* Members — each a card with labeled fields (name/role up top,
+          invoicing fields below) */}
       <div className="flex flex-col gap-3">
-        <p className="text-[12px] text-ink-soft">{m.invoicingFieldsHint}</p>
         {rows.map((r, index) => {
           return (
-            <div key={r.key}>
-              <div
-                draggable={canDrag}
-                onDragStart={() => canDrag && setDragIndex(index)}
-                onDragOver={(e) => canDrag && e.preventDefault()}
-                onDrop={() => canDrag && handleDrop(index)}
-                className={`flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2.5 transition-colors sm:flex-nowrap ${
-                  dragIndex === index ? "opacity-50" : ""
-                }`}
-              >
-                {canDrag && (
-                  <span className="cursor-grab text-ink-soft active:cursor-grabbing" aria-hidden>
-                    <Icon name="list" size={16} />
-                  </span>
-                )}
-                <div className="min-w-[140px] flex-1">
-                  <input
-                    value={r.name}
-                    onChange={(e) => updateRow(r.key, { name: e.target.value })}
-                    placeholder={m.namePlaceholder}
-                    aria-label={m.nameLabel}
-                    maxLength={80}
-                    className={inputBase}
-                  />
-                </div>
-                <div className="min-w-[120px] flex-1">
-                  <input
-                    value={r.role}
-                    onChange={(e) => updateRow(r.key, { role: e.target.value })}
-                    placeholder={m.rolePlaceholder}
-                    aria-label={m.roleLabel}
-                    maxLength={60}
-                    className={inputBase}
-                  />
+            <div
+              key={r.key}
+              draggable={canDrag}
+              onDragStart={() => canDrag && setDragIndex(index)}
+              onDragOver={(e) => canDrag && e.preventDefault()}
+              onDrop={() => canDrag && handleDrop(index)}
+              className={`rounded-xl border border-line bg-surface p-4 transition-colors ${
+                dragIndex === index ? "opacity-50" : ""
+              }`}
+            >
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  {canDrag && (
+                    <span className="cursor-grab text-ink-soft active:cursor-grabbing" aria-hidden>
+                      <Icon name="list" size={16} />
+                    </span>
+                  )}
                 </div>
                 {r.isOwner ? (
                   <span className="shrink-0 rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-semibold text-ink-soft">
@@ -281,27 +264,37 @@ export function TeamManager({
                 )}
               </div>
 
-              {/* provider-invoicing-fields — DNI + colegiada number for this
-                  member, shown on invoices for their bookings. */}
-              <div className="mt-1.5 flex flex-wrap items-center gap-2 pl-1 sm:pl-6">
-                <div className="min-w-[140px] flex-1">
-                  <input
-                    value={r.professionalDni}
-                    onChange={(e) => updateRow(r.key, { professionalDni: e.target.value })}
-                    placeholder={m.dniPlaceholder}
-                    aria-label={m.dniLabel}
-                    className={inputBase}
-                  />
-                </div>
-                <div className="min-w-[160px] flex-1">
-                  <input
-                    value={r.professionalCollegeNumber}
-                    onChange={(e) => updateRow(r.key, { professionalCollegeNumber: e.target.value })}
-                    placeholder={m.collegeNumberPlaceholder}
-                    aria-label={m.collegeNumberLabel}
-                    className={inputBase}
-                  />
-                </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <LabeledField
+                  label={m.nameLabel}
+                  value={r.name}
+                  onChange={(v) => updateRow(r.key, { name: v })}
+                  placeholder={m.namePlaceholder}
+                  maxLength={80}
+                  inputClassName={inputBase}
+                />
+                <LabeledField
+                  label={m.roleLabel}
+                  value={r.role}
+                  onChange={(v) => updateRow(r.key, { role: v })}
+                  placeholder={m.rolePlaceholder}
+                  maxLength={60}
+                  inputClassName={inputBase}
+                />
+                <LabeledField
+                  label={m.dniLabel}
+                  value={r.professionalDni}
+                  onChange={(v) => updateRow(r.key, { professionalDni: v })}
+                  placeholder={m.dniPlaceholder}
+                  inputClassName={inputBase}
+                />
+                <LabeledField
+                  label={m.collegeNumberLabel}
+                  value={r.professionalCollegeNumber}
+                  onChange={(v) => updateRow(r.key, { professionalCollegeNumber: v })}
+                  placeholder={m.collegeNumberPlaceholder}
+                  inputClassName={inputBase}
+                />
               </div>
             </div>
           );
@@ -357,5 +350,34 @@ function ModeCard({
       </span>
       <span className="text-[12px] text-ink-soft">{sub}</span>
     </button>
+  );
+}
+
+function LabeledField({
+  label,
+  value,
+  onChange,
+  placeholder,
+  maxLength,
+  inputClassName,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  maxLength?: number;
+  inputClassName: string;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-1 block text-[11px] font-semibold uppercase tracking-[.03em] text-ink-soft">{label}</span>
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        maxLength={maxLength}
+        className={inputClassName}
+      />
+    </label>
   );
 }
