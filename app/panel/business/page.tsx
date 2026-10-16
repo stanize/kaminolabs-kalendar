@@ -82,6 +82,7 @@ export default async function BusinessPage({
       {business && <WhatsappSettings initial={whatsappConfig} dict={dict.whatsapp} />}
       {business && (
         <ProfessionalIdFields
+          initialName={business.professional_name}
           initialDni={business.professional_dni}
           initialCollegeNumber={business.professional_college_number}
           dict={dict.professionalId}

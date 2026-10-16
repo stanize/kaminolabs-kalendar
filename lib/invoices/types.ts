@@ -26,6 +26,7 @@ export interface InvoiceBusinessSnapshot {
   phoneNumber: string;
   professionalDni: string | null;
   professionalCollegeNumber: string | null;
+  professionalName: string | null;
   signatureUrl: string | null;
   templateId: string;
   brandColor: string;

@@ -334,6 +334,12 @@ create table public.kalendar_businesses (
   -- in, omitted otherwise.
   professional_dni             text,
   professional_college_number  text,
+  -- The provider's own personal name — distinct from `name` (the clinic/
+  -- business name) — used for the invoice's "Fdo: {name}" signature line
+  -- (schema_subset_026.sql). Solo-practitioner model: one name per
+  -- business, same as DNI/colegiada above. Falls back to the business
+  -- name when blank, so filling it in is optional.
+  professional_name            text,
   -- Uploaded signature image (invoice-signatures storage bucket, same
   -- upload/remove pattern as logo_url). Shown on the invoice when set,
   -- omitted otherwise — no placeholder/fallback graphic.

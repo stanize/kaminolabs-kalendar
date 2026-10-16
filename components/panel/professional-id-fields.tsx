@@ -9,18 +9,23 @@ import type { BusinessDictionary } from "@/lib/i18n/dictionaries/business";
 import { reportClientError } from "@/lib/report-client-error";
 
 // professional-id-fields (pdf-invoicing.md) — the individual professional's
-// DNI and professional college registration number, distinct from the
-// business's own legal_id (NIF/CIF). Both optional; shown on generated
-// invoices when filled in.
+// name, DNI, and professional college registration number, distinct from
+// the business's own name/legal_id (NIF/CIF). All optional; shown on
+// generated invoices when filled in — the name specifically drives the
+// invoice's "Fdo: {name}" signature line, falling back to the business
+// name when blank (provider-signature-name).
 export function ProfessionalIdFields({
+  initialName,
   initialDni,
   initialCollegeNumber,
   dict,
 }: {
+  initialName: string | null;
   initialDni: string | null;
   initialCollegeNumber: string | null;
   dict: BusinessDictionary["professionalId"];
 }) {
+  const [name, setName] = useState(initialName ?? "");
   const [dni, setDni] = useState(initialDni ?? "");
   const [collegeNumber, setCollegeNumber] = useState(initialCollegeNumber ?? "");
   const [saving, setSaving] = useState(false);
@@ -33,7 +38,7 @@ export function ProfessionalIdFields({
     setError(null);
     try {
       const result = await saveProfessionalIdFields(
-        { professionalDni: dni, professionalCollegeNumber: collegeNumber },
+        { professionalName: name, professionalDni: dni, professionalCollegeNumber: collegeNumber },
         { errNoBusiness: dict.errNoBusiness, errSaveFailed: dict.errSaveFailed }
       );
       if (result.ok) {
@@ -57,6 +62,7 @@ export function ProfessionalIdFields({
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
+        <Field label={dict.nameLabel} placeholder={dict.namePlaceholder} value={name} onChange={(e) => setName(e.target.value)} />
         <Field label={dict.dniLabel} placeholder={dict.dniPlaceholder} value={dni} onChange={(e) => setDni(e.target.value)} />
         <Field
           label={dict.collegeNumberLabel}

@@ -28,6 +28,7 @@ function buildBusinessSnapshot(business: Business): InvoiceBusinessSnapshot {
     phoneNumber: business.phone_number,
     professionalDni: business.professional_dni,
     professionalCollegeNumber: business.professional_college_number,
+    professionalName: business.professional_name,
     signatureUrl: business.signature_url,
     templateId: business.invoice_template_id,
     brandColor: business.brand_color,

@@ -57,14 +57,12 @@ const styles = StyleSheet.create({
   grandTotalLabel: { fontSize: 11, fontWeight: 700, color: "#111827" },
   grandTotalValue: { fontSize: 13, fontWeight: 700, color: "#4338ca" },
 
+  signatureDivider: { marginTop: 48, borderTopWidth: 1, borderTopColor: "#e5e7eb" },
   signatureArea: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    marginTop: 48,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: "#e5e7eb",
+    marginTop: 24,
   },
   paidPill: {
     fontSize: 9,
@@ -75,13 +73,10 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     paddingHorizontal: 10,
     alignSelf: "flex-start",
-    marginBottom: 4,
   },
-  paidCaption: { fontSize: 8.5, color: "#94a3b8" },
   signatureBlock: { alignItems: "flex-end" },
   signatureImage: { width: 130, height: 50, objectFit: "contain", marginBottom: 4 },
   signatureName: { fontSize: 9.5, fontWeight: 700, color: "#111827" },
-  signatureCaption: { fontSize: 8.5, color: "#94a3b8", marginTop: 2 },
 });
 
 function fullAddressLine(b: InvoiceTemplateProps["business"]): string {
@@ -170,20 +165,13 @@ export function VatExemptInvoice(props: InvoiceTemplateProps) {
           </View>
         </View>
 
+        <View style={styles.signatureDivider} />
         <View style={styles.signatureArea}>
-          <View>
-            {paid && (
-              <>
-                <Text style={styles.paidPill}>PAGADO</Text>
-                <Text style={styles.paidCaption}>Comprobante verificado</Text>
-              </>
-            )}
-          </View>
+          <View>{paid && <Text style={styles.paidPill}>PAGADO</Text>}</View>
           <View style={styles.signatureBlock}>
             {/* eslint-disable-next-line jsx-a11y/alt-text -- react-pdf's Image has no alt prop (not a DOM element) */}
             {business.signatureUrl && <Image style={styles.signatureImage} src={business.signatureUrl} />}
-            <Text style={styles.signatureName}>Fdo: {business.name}</Text>
-            <Text style={styles.signatureCaption}>Firma y sello autorizados</Text>
+            <Text style={styles.signatureName}>Fdo: {business.professionalName || business.name}</Text>
           </View>
         </View>
       </Page>

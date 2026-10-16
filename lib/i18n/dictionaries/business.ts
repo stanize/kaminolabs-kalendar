@@ -108,6 +108,8 @@ export interface BusinessDictionary {
   professionalId: {
     sectionTitle: string;
     sectionSubtitle: string;
+    nameLabel: string;
+    namePlaceholder: string;
     dniLabel: string;
     dniPlaceholder: string;
     collegeNumberLabel: string;
@@ -217,7 +219,9 @@ const es: BusinessDictionary = {
   },
   professionalId: {
     sectionTitle: "Datos del profesional",
-    sectionSubtitle: "Se muestran en tus facturas cuando están rellenos. Ambos son opcionales.",
+    sectionSubtitle: "Se muestran en tus facturas cuando están rellenos. Todos son opcionales.",
+    nameLabel: "Nombre del profesional",
+    namePlaceholder: "María García",
     dniLabel: "DNI",
     dniPlaceholder: "12345678A",
     collegeNumberLabel: "Nº de colegiada/o",
@@ -326,7 +330,9 @@ const en: BusinessDictionary = {
   },
   professionalId: {
     sectionTitle: "Professional details",
-    sectionSubtitle: "Shown on your invoices when filled in. Both are optional.",
+    sectionSubtitle: "Shown on your invoices when filled in. All are optional.",
+    nameLabel: "Provider's name",
+    namePlaceholder: "Jane Smith",
     dniLabel: "DNI",
     dniPlaceholder: "12345678A",
     collegeNumberLabel: "Professional college number",
