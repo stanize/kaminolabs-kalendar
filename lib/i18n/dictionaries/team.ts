@@ -26,6 +26,8 @@ export interface TeamDictionary {
     namePlaceholder: string;
     roleLabel: string;
     rolePlaceholder: string;
+    professionalDataTitle: string;
+    professionalDataSubtitle: string;
     // provider-invoicing-fields (pdf-invoicing.md, 2026-10): per-member DNI
     // + professional college number, shown on invoices generated for
     // bookings assigned to that member — moved here from a single
@@ -77,6 +79,8 @@ const es: TeamDictionary = {
     namePlaceholder: "Nombre y apellido",
     roleLabel: "Rol",
     rolePlaceholder: "Rol",
+    professionalDataTitle: "Datos del profesional",
+    professionalDataSubtitle: "Aparecen en las facturas y recordatorios de sus citas.",
     dniLabel: "DNI",
     dniPlaceholder: "12345678A",
     collegeNumberLabel: "Nº de colegiada/o",
@@ -121,6 +125,8 @@ const en: TeamDictionary = {
     namePlaceholder: "First and last name",
     roleLabel: "Role",
     rolePlaceholder: "Role",
+    professionalDataTitle: "Professional details",
+    professionalDataSubtitle: "Shown on invoices and reminders for their appointments.",
     dniLabel: "DNI",
     dniPlaceholder: "12345678A",
     collegeNumberLabel: "Professional college number",

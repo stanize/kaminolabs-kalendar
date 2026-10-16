@@ -241,13 +241,17 @@ export function TeamManager({
                 dragIndex === index ? "opacity-50" : ""
               }`}
             >
-              <div className="mb-3 flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
+              <div className="mb-3 flex items-start justify-between gap-2 border-b border-line pb-3">
+                <div className="flex items-start gap-2">
                   {canDrag && (
-                    <span className="cursor-grab text-ink-soft active:cursor-grabbing" aria-hidden>
+                    <span className="mt-0.5 cursor-grab text-ink-soft active:cursor-grabbing" aria-hidden>
                       <Icon name="list" size={16} />
                     </span>
                   )}
+                  <div>
+                    <h3 className="text-[14px] font-semibold text-ink">{m.professionalDataTitle}</h3>
+                    <p className="text-[12px] text-ink-soft">{m.professionalDataSubtitle}</p>
+                  </div>
                 </div>
                 {r.isOwner ? (
                   <span className="shrink-0 rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-semibold text-ink-soft">
