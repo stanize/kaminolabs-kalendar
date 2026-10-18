@@ -95,10 +95,14 @@ export const createAndSendInvoice = authedAction(
       // createInvoiceForBooking does the actual required-either-way check.
       clientDni?: string;
       clientAddress?: string;
-      // invoice-concepts-list: the chosen/typed concept label, overriding
-      // the booking's service_name on the invoice. A custom (not-yet-listed)
-      // value is auto-added to the business's concepts list.
+      // invoice-concepts-list: `concept` is the full invoice service_name
+      // override (service name + optional extra line already joined by
+      // the modal). `extraConcept`, when present, is just the extra line
+      // on its own — the thing that gets auto-added to the business's
+      // concepts list (never the combined string, which always starts
+      // with the booking's service name).
       concept?: string;
+      extraConcept?: string;
     },
     dict?: Partial<InvoiceActionDict>
   ): Promise<CreateAndSendInvoiceResult> => {
@@ -112,8 +116,9 @@ export const createAndSendInvoice = authedAction(
       return { ok: false, error: t.errInvalidEmail };
     }
 
+    const extraConcept = input.extraConcept?.trim();
+    if (extraConcept) await findOrCreateInvoiceConcept(business.id, extraConcept);
     const concept = input.concept?.trim();
-    if (concept) await findOrCreateInvoiceConcept(business.id, concept);
 
     const created = await createInvoiceForBooking({
       business,

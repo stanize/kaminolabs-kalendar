@@ -537,7 +537,7 @@ export function BookingDetailModal({
           bookingId={booking.id}
           clinicClientId={booking.clinicClientId}
           clientEmail={booking.clientEmail}
-          initialConcept={booking.serviceName}
+          serviceName={booking.serviceName}
           dict={invoiceDict}
           onClose={() => {
             setInvoiceConfirmOpen(false);

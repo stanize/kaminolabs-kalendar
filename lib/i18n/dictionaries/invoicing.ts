@@ -52,12 +52,14 @@ export interface InvoicingDictionary {
   };
   confirmModal: {
     title: string;
-    // invoice-concepts-list: picked from the business's list or typed
-    // fresh (auto-added to the list either way) at invoice-generation
-    // time, overriding the booking's service name on the invoice.
+    // invoice-concepts-list: `serviceLabel` shows the booking's own
+    // appointment type (always the invoice's first line, read-only here);
+    // `conceptLabel`/`conceptPlaceholder` are for the OPTIONAL extra line
+    // on top — picked from the business's list or typed fresh (auto-added
+    // to the list either way).
+    serviceLabel: string;
     conceptLabel: string;
     conceptPlaceholder: string;
-    errConceptRequired: string;
     yesGenerateAndSend: string;
     yesGenerateOnly: string;
     no: string;
@@ -163,9 +165,9 @@ const es: InvoicingDictionary = {
   },
   confirmModal: {
     title: "¿Quieres generar una factura?",
-    conceptLabel: "Concepto de la factura",
+    serviceLabel: "Servicio",
+    conceptLabel: "Concepto de factura adicional (opcional)",
     conceptPlaceholder: "ej. Quiropodia",
-    errConceptRequired: "Indica el concepto de la factura.",
     yesGenerateAndSend: "Generar y mandar correo",
     yesGenerateOnly: "Solo generar",
     no: "No",
@@ -264,9 +266,9 @@ const en: InvoicingDictionary = {
   },
   confirmModal: {
     title: "Generate an invoice?",
-    conceptLabel: "Invoice concept",
+    serviceLabel: "Service",
+    conceptLabel: "Additional invoice concept (optional)",
     conceptPlaceholder: "e.g. Chiropody",
-    errConceptRequired: "Enter the invoice concept.",
     yesGenerateAndSend: "Generate and send email",
     yesGenerateOnly: "Generate only",
     no: "No",

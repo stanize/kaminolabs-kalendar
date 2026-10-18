@@ -35,10 +35,11 @@ export function InvoiceConfirmModal({
   bookingId,
   clinicClientId,
   clientEmail,
-  // invoice-concepts-list: defaults the concept field to the booking's
-  // current service name, editable/overridable; a custom value is
-  // auto-added to the business's concepts list on submit.
-  initialConcept,
+  // invoice-concepts-list: the booking's own appointment type — always the
+  // invoice's first line, shown but not editable here (changing what the
+  // appointment actually was is the separate, parked Cobrar-time
+  // override feature).
+  serviceName,
   dict,
   onClose,
   onDone,
@@ -46,7 +47,7 @@ export function InvoiceConfirmModal({
   bookingId: string;
   clinicClientId: string | null;
   clientEmail: string;
-  initialConcept: string;
+  serviceName: string;
   dict: InvoicingDictionary["confirmModal"];
   onClose: () => void;
   onDone: () => void;
@@ -58,7 +59,10 @@ export function InvoiceConfirmModal({
   const [sendEmail, setSendEmail] = useState(true);
   const [dniInput, setDniInput] = useState("");
   const [addressInput, setAddressInput] = useState("");
-  const [conceptInput, setConceptInput] = useState(initialConcept);
+  // invoice-concepts-list: an OPTIONAL extra line on top of the service
+  // name above — picked from the business's list or typed fresh (a fresh
+  // value is auto-added to the list on submit).
+  const [extraConceptInput, setExtraConceptInput] = useState("");
   const [concepts, setConcepts] = useState<string[]>([]);
   const [loadingIdentity, setLoadingIdentity] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -100,11 +104,8 @@ export function InvoiceConfirmModal({
       setError(dict.errClientIdentityRequired);
       return;
     }
-    const concept = conceptInput.trim();
-    if (!concept) {
-      setError(dict.errConceptRequired);
-      return;
-    }
+    const extraConcept = extraConceptInput.trim();
+    const concept = extraConcept ? `${serviceName}\n${extraConcept}` : serviceName;
 
     setBusy(true);
     setError(null);
@@ -116,6 +117,7 @@ export function InvoiceConfirmModal({
       clientDni: dni,
       clientAddress: address,
       concept,
+      extraConcept: extraConcept || undefined,
     });
     setBusy(false);
     if (!res.ok) {
@@ -135,11 +137,15 @@ export function InvoiceConfirmModal({
 
         <div className="mb-4 flex flex-col gap-3">
           <div>
+            <label className="mb-1.5 block text-[12.5px] font-medium text-ink-soft">{dict.serviceLabel}</label>
+            <p className="w-full rounded-lg border border-line bg-surface-2 px-3 py-2 text-[13px] text-ink">{serviceName}</p>
+          </div>
+          <div>
             <label className="mb-1.5 block text-[12.5px] font-medium text-ink-soft">{dict.conceptLabel}</label>
             <input
-              value={conceptInput}
+              value={extraConceptInput}
               onChange={(e) => {
-                setConceptInput(e.target.value);
+                setExtraConceptInput(e.target.value);
                 setError(null);
               }}
               placeholder={dict.conceptPlaceholder}

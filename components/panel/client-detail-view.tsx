@@ -81,7 +81,7 @@ export function ClientDetailView({
           bookingId={generatingBooking.id}
           clinicClientId={client.id}
           clientEmail={client.email ?? ""}
-          initialConcept={generatingBooking.serviceName}
+          serviceName={generatingBooking.serviceName}
           dict={invoicingConfirmModalDict}
           onClose={() => setGeneratingBooking(null)}
           onDone={() => {
