@@ -5,6 +5,7 @@ import { getClientDetail, getClientNotes } from "@/lib/clients/data";
 import { getBonosForClient } from "@/lib/bonos/data";
 import { getLocale } from "@/lib/i18n/server";
 import { getClientsDictionary } from "@/lib/i18n/dictionaries/clients";
+import { getInvoicingDictionary } from "@/lib/i18n/dictionaries/invoicing";
 import { Icon } from "@/components/ui/icon";
 import { ClientDetailView } from "@/components/panel/client-detail-view";
 
@@ -17,6 +18,7 @@ export default async function ClientDetailPage({
   const session = await requireSession();
   const locale = await getLocale();
   const dict = getClientsDictionary(locale);
+  const invoicingDict = getInvoicingDictionary(locale);
 
   const [client, notes, bonos] = await Promise.all([
     getClientDetail(session.user.id, id),
@@ -35,7 +37,15 @@ export default async function ClientDetailPage({
         <Icon name="chevronLeft" size={14} /> {dict.detail.back}
       </Link>
 
-      <ClientDetailView client={client} initialNotes={notes} bonos={bonos} dict={dict} locale={locale} />
+      <ClientDetailView
+        client={client}
+        initialNotes={notes}
+        bonos={bonos}
+        dict={dict}
+        locale={locale}
+        invoicingPageDict={invoicingDict.page}
+        invoicingConfirmModalDict={invoicingDict.confirmModal}
+      />
     </div>
   );
 }

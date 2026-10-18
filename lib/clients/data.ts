@@ -58,6 +58,12 @@ export interface ClientBookingSummary {
   durationMin: number;
   status: BookingStatus;
   providerName: string | null;
+  // generate-invoice-from-client-page (2026-10): paid-but-uninvoiced
+  // bookings get a "Generar factura" action right here, in addition to
+  // the post-Cobrar prompt and Facturas > Pendientes — all three share
+  // one InvoiceConfirmModal/createAndSendInvoice path.
+  paymentStatus: "unpaid" | "paid";
+  invoice: { id: string; accessToken: string } | null;
 }
 
 export interface ClientDetail {
@@ -107,7 +113,7 @@ export async function getClientDetail(userId: string, clientId: string): Promise
   const [{ data: upcomingRows }, { data: historyRows }] = await Promise.all([
     supabase
       .from("kalendar_bookings")
-      .select("id, service_name, starts_at, service_duration_min, status, team_member_id")
+      .select("id, service_name, starts_at, service_duration_min, status, team_member_id, payment_status")
       .eq("clinic_client_id", clientId)
       .eq("business_id", business.id)
       .gte("starts_at", nowIso)
@@ -115,13 +121,26 @@ export async function getClientDetail(userId: string, clientId: string): Promise
       .order("starts_at", { ascending: true }),
     supabase
       .from("kalendar_bookings")
-      .select("id, service_name, starts_at, service_duration_min, status, team_member_id")
+      .select("id, service_name, starts_at, service_duration_min, status, team_member_id, payment_status")
       .eq("clinic_client_id", clientId)
       .eq("business_id", business.id)
       .or(`starts_at.lt.${nowIso},status.in.(completed,no_show,cancelled)`)
       .order("starts_at", { ascending: false })
       .limit(100),
   ]);
+
+  const allBookingIds = [...(upcomingRows ?? []), ...(historyRows ?? [])].map((b) => b.id);
+  const invoiceByBookingId = new Map<string, { id: string; accessToken: string }>();
+  if (allBookingIds.length > 0) {
+    const { data: invoiceRows } = await supabase
+      .from("kalendar_invoices")
+      .select("id, booking_id, access_token")
+      .eq("business_id", business.id)
+      .in("booking_id", allBookingIds);
+    for (const inv of (invoiceRows as { id: string; booking_id: string | null; access_token: string }[] | null) ?? []) {
+      if (inv.booking_id) invoiceByBookingId.set(inv.booking_id, { id: inv.id, accessToken: inv.access_token });
+    }
+  }
 
   const memberIds = new Set(
     [...(upcomingRows ?? []), ...(historyRows ?? [])]
@@ -141,7 +160,7 @@ export async function getClientDetail(userId: string, clientId: string): Promise
 
   const toSummary = (b: {
     id: string; service_name: string; starts_at: string; service_duration_min: number;
-    status: BookingStatus; team_member_id: string | null;
+    status: BookingStatus; team_member_id: string | null; payment_status: "unpaid" | "paid";
   }): ClientBookingSummary => ({
     id: b.id,
     serviceName: b.service_name,
@@ -149,6 +168,8 @@ export async function getClientDetail(userId: string, clientId: string): Promise
     durationMin: b.service_duration_min,
     status: b.status,
     providerName: b.team_member_id ? memberName.get(b.team_member_id) ?? null : null,
+    paymentStatus: b.payment_status,
+    invoice: invoiceByBookingId.get(b.id) ?? null,
   });
 
   return {

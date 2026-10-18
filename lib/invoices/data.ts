@@ -114,6 +114,59 @@ export async function getNextInvoiceNumberPreview(
   return String(next).padStart(4, "0");
 }
 
+export interface PendingInvoiceBooking {
+  id: string;
+  clinicClientId: string | null;
+  clientName: string;
+  clientEmail: string;
+  serviceName: string;
+  amount: number;
+  paymentMethod: "cash" | "card" | "bono" | null;
+  paidAt: string | null;
+}
+
+/**
+ * facturas-pending-tab: every PAID booking (cash/card/bono — a bono-paid
+ * session counts too, per Arun's call; the bono purchase itself getting
+ * its own invoice is a separate, not-yet-built feature) that has no
+ * kalendar_invoices row yet. Covers both "declined the post-Cobrar
+ * prompt" (that decline is no longer a permanent dismissal — it just
+ * means "later") and any paid booking from before this feature existed.
+ * Two queries + an in-memory diff rather than a single not-in query —
+ * simpler to read and plenty fast at clinic-scale booking volumes.
+ */
+export async function getPendingInvoiceBookings(businessId: string): Promise<PendingInvoiceBooking[]> {
+  const supabase = await createClient();
+
+  const [{ data: invoiced }, { data: paidBookings }] = await Promise.all([
+    supabase.from("kalendar_invoices").select("booking_id").eq("business_id", businessId).not("booking_id", "is", null),
+    supabase
+      .from("kalendar_bookings")
+      .select("id, clinic_client_id, client_name, client_email, service_name, service_price, payment_method, paid_at")
+      .eq("business_id", businessId)
+      .eq("payment_status", "paid")
+      .order("paid_at", { ascending: false }),
+  ]);
+
+  const invoicedIds = new Set((invoiced ?? []).map((r) => r.booking_id as string));
+
+  return ((paidBookings ?? []) as {
+    id: string; clinic_client_id: string | null; client_name: string; client_email: string;
+    service_name: string; service_price: number; payment_method: "cash" | "card" | "bono" | null; paid_at: string | null;
+  }[])
+    .filter((b) => !invoicedIds.has(b.id))
+    .map((b) => ({
+      id: b.id,
+      clinicClientId: b.clinic_client_id,
+      clientName: b.client_name,
+      clientEmail: b.client_email,
+      serviceName: b.service_name,
+      amount: b.service_price,
+      paymentMethod: b.payment_method,
+      paidAt: b.paid_at,
+    }));
+}
+
 export interface CreateInvoiceInput {
   business: Business;
   bookingId: string;

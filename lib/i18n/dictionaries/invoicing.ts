@@ -90,6 +90,15 @@ export interface InvoicingDictionary {
     paymentMethodCard: string;
     paymentMethodBono: string;
     neverSent: string;
+    // facturas-pending-tab (2026-10): Generadas/Pendientes split — a paid
+    // booking with no invoice yet (declined at Cobrar time, or from
+    // before this feature existed) sits here until generated, instead of
+    // disappearing once the post-Cobrar prompt is dismissed.
+    tabGenerated: string;
+    tabPending: string;
+    pendingEmptyTitle: string;
+    pendingEmptySubtitle: string;
+    generateInvoice: string;
   };
 }
 
@@ -176,6 +185,11 @@ const es: InvoicingDictionary = {
     paymentMethodCard: "Tarjeta",
     paymentMethodBono: "Bono",
     neverSent: "—",
+    tabGenerated: "Generadas",
+    tabPending: "Pendientes",
+    pendingEmptyTitle: "No hay facturas pendientes",
+    pendingEmptySubtitle: "Las citas pagadas sin factura generada aparecerán aquí.",
+    generateInvoice: "Generar factura",
   },
 };
 
@@ -261,6 +275,11 @@ const en: InvoicingDictionary = {
     paymentMethodCard: "Card",
     paymentMethodBono: "Bono",
     neverSent: "—",
+    tabGenerated: "Generated",
+    tabPending: "Pending",
+    pendingEmptyTitle: "No pending invoices",
+    pendingEmptySubtitle: "Paid appointments with no invoice yet will show up here.",
+    generateInvoice: "Generate invoice",
   },
 };
 

@@ -13,21 +13,34 @@ import { reportClientError } from "@/lib/report-client-error";
 import type { ClientDetail, ClientNote, ClientBookingSummary } from "@/lib/clients/data";
 import type { ClientBonoSummary } from "@/lib/bonos/data";
 import type { ClientsDictionary } from "@/lib/i18n/dictionaries/clients";
+import type { InvoicingDictionary } from "@/lib/i18n/dictionaries/invoicing";
 import type { Locale } from "@/lib/i18n/config";
+import { InvoiceConfirmModal } from "@/components/panel/invoice-confirm-modal";
+
+function invoicePdfHref(invoice: { id: string; accessToken: string }): string {
+  return `/api/invoices/${invoice.id}/pdf?token=${invoice.accessToken}`;
+}
 
 const inputClass =
   "w-full rounded-lg border border-line bg-surface px-3 py-2 text-[14px] text-ink outline-none focus:border-brand";
 
 export function ClientDetailView({
-  client, initialNotes, bonos, dict, locale,
+  client, initialNotes, bonos, dict, locale, invoicingPageDict, invoicingConfirmModalDict,
 }: {
   client: ClientDetail;
   initialNotes: ClientNote[];
   bonos: ClientBonoSummary[];
   dict: ClientsDictionary;
   locale: Locale;
+  // generate-invoice-from-client-page: "Generar factura"/"Descargar
+  // factura" on each paid booking row below, sharing the same
+  // InvoiceConfirmModal as Cobrar and Facturas > Pendientes.
+  invoicingPageDict: InvoicingDictionary["page"];
+  invoicingConfirmModalDict: InvoicingDictionary["confirmModal"];
 }) {
   const d = dict.detail;
+  const router = useRouter();
+  const [generatingBookingId, setGeneratingBookingId] = useState<string | null>(null);
 
   return (
     <div className="flex flex-col gap-6">
@@ -48,6 +61,8 @@ export function ClientDetailView({
         bookings={client.upcoming}
         dict={dict}
         locale={locale}
+        invoicingPageDict={invoicingPageDict}
+        onGenerateInvoice={setGeneratingBookingId}
       />
       <BookingListCard
         title={d.historyTitle}
@@ -55,9 +70,25 @@ export function ClientDetailView({
         bookings={client.history}
         dict={dict}
         locale={locale}
+        invoicingPageDict={invoicingPageDict}
+        onGenerateInvoice={setGeneratingBookingId}
       />
 
       <NotesCard clientId={client.id} initialNotes={initialNotes} dict={dict} locale={locale} />
+
+      {generatingBookingId && (
+        <InvoiceConfirmModal
+          bookingId={generatingBookingId}
+          clinicClientId={client.id}
+          clientEmail={client.email ?? ""}
+          dict={invoicingConfirmModalDict}
+          onClose={() => setGeneratingBookingId(null)}
+          onDone={() => {
+            setGeneratingBookingId(null);
+            router.refresh();
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -249,13 +280,15 @@ function statusLabel(status: string, d: ClientsDictionary["detail"]): string {
 }
 
 function BookingListCard({
-  title, empty, bookings, dict, locale,
+  title, empty, bookings, dict, locale, invoicingPageDict, onGenerateInvoice,
 }: {
   title: string;
   empty: string;
   bookings: ClientBookingSummary[];
   dict: ClientsDictionary;
   locale: Locale;
+  invoicingPageDict: InvoicingDictionary["page"];
+  onGenerateInvoice: (bookingId: string) => void;
 }) {
   const d = dict.detail;
   return (
@@ -268,7 +301,7 @@ function BookingListCard({
       ) : (
         <div className="overflow-hidden rounded-xl border border-line bg-surface">
           {bookings.map((b, i) => (
-            <div key={b.id} className={`flex items-center gap-3 px-4 py-3 ${i > 0 ? "border-t border-line" : ""}`}>
+            <div key={b.id} className={`flex flex-wrap items-center gap-3 px-4 py-3 ${i > 0 ? "border-t border-line" : ""}`}>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[13.5px] font-semibold text-ink">{b.serviceName}</p>
                 <p className="truncate text-[12px] text-ink-soft capitalize">
@@ -276,6 +309,18 @@ function BookingListCard({
                   {b.providerName ? ` · ${b.providerName}` : ""} · {b.durationMin} {d.minutesUnit}
                 </p>
               </div>
+              {b.paymentStatus === "paid" &&
+                (b.invoice ? (
+                  <a href={invoicePdfHref(b.invoice)} target="_blank" rel="noopener noreferrer" className="shrink-0">
+                    <Btn variant="outline" size="sm">
+                      {invoicingPageDict.download}
+                    </Btn>
+                  </a>
+                ) : (
+                  <Btn variant="outline" size="sm" className="shrink-0" onClick={() => onGenerateInvoice(b.id)}>
+                    {invoicingPageDict.generateInvoice}
+                  </Btn>
+                ))}
               <span className="shrink-0 rounded-full border border-line bg-surface-2 px-2.5 py-0.5 text-[11px] font-semibold text-ink-soft">
                 {statusLabel(b.status, d)}
               </span>

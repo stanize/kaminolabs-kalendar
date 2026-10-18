@@ -1,18 +1,39 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { Btn } from "@/components/ui/button";
 import { resendInvoice } from "@/lib/actions/invoices";
 import { formatInvoiceNumber, type InvoiceRow } from "@/lib/invoices/types";
+import type { PendingInvoiceBooking } from "@/lib/invoices/data";
 import type { InvoicingDictionary } from "@/lib/i18n/dictionaries/invoicing";
 import { reportClientError } from "@/lib/report-client-error";
+import { InvoiceConfirmModal } from "@/components/panel/invoice-confirm-modal";
 
 function pdfHref(invoice: InvoiceRow): string {
   return `/api/invoices/${invoice.id}/pdf?token=${invoice.access_token}`;
 }
 
-export function InvoicesManager({ invoices, dict }: { invoices: InvoiceRow[]; dict: InvoicingDictionary["page"] }) {
+// facturas-pending-tab (2026-10): Generadas/Pendientes — a paid booking
+// with no invoice yet (the post-Cobrar prompt was declined, or it's from
+// before this feature existed) sits in Pendientes rather than vanishing;
+// "No" at Cobrar time now means "later", not "never". One shared
+// InvoiceConfirmModal generates from either tab.
+export function InvoicesManager({
+  invoices,
+  pendingBookings,
+  dict,
+  confirmModalDict,
+}: {
+  invoices: InvoiceRow[];
+  pendingBookings: PendingInvoiceBooking[];
+  dict: InvoicingDictionary["page"];
+  confirmModalDict: InvoicingDictionary["confirmModal"];
+}) {
+  const router = useRouter();
+  const [tab, setTab] = useState<"generated" | "pending">("generated");
+  const [generatingBookingId, setGeneratingBookingId] = useState<string | null>(null);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [service, setService] = useState("");
@@ -34,71 +55,139 @@ export function InvoicesManager({ invoices, dict }: { invoices: InvoiceRow[]; di
     });
   }, [invoices, dateFrom, dateTo, service, paymentMethod, patientName, invoiceNumber]);
 
-  if (invoices.length === 0) {
-    return (
-      <div className="rounded-2xl border border-line bg-surface p-10 text-center">
-        <p className="text-[15px] font-semibold text-ink">{dict.emptyTitle}</p>
-        <p className="mt-1 text-[13.5px] text-ink-soft">{dict.emptySubtitle}</p>
-      </div>
-    );
-  }
-
   const methodLabel = (m: InvoiceRow["payment_method"]) =>
     m === "cash" ? dict.paymentMethodCash : m === "card" ? dict.paymentMethodCard : m === "bono" ? dict.paymentMethodBono : "—";
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-end gap-3 rounded-xl border border-line bg-surface p-4">
-        <div>
-          <label className="mb-1 block text-[11.5px] font-medium text-ink-soft">{dict.filterDateFrom}</label>
-          <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[13px] text-ink" />
-        </div>
-        <div>
-          <label className="mb-1 block text-[11.5px] font-medium text-ink-soft">{dict.filterDateTo}</label>
-          <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[13px] text-ink" />
-        </div>
-        <div>
-          <label className="mb-1 block text-[11.5px] font-medium text-ink-soft">{dict.filterService}</label>
-          <select value={service} onChange={(e) => setService(e.target.value)} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[13px] text-ink">
-            <option value="">{dict.filterServiceAll}</option>
-            {services.map((s) => (
-              <option key={s} value={s}>{s}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="mb-1 block text-[11.5px] font-medium text-ink-soft">{dict.filterPaymentMethod}</label>
-          <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[13px] text-ink">
-            <option value="">{dict.filterPaymentMethodAll}</option>
-            <option value="cash">{dict.paymentMethodCash}</option>
-            <option value="card">{dict.paymentMethodCard}</option>
-            <option value="bono">{dict.paymentMethodBono}</option>
-          </select>
-        </div>
-        <input
-          value={patientName}
-          onChange={(e) => setPatientName(e.target.value)}
-          placeholder={dict.filterPatientName}
-          className="min-w-[160px] rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[13px] text-ink"
-        />
-        <input
-          value={invoiceNumber}
-          onChange={(e) => setInvoiceNumber(e.target.value)}
-          placeholder={dict.filterInvoiceNumber}
-          className="min-w-[160px] rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[13px] text-ink"
-        />
+      <div className="flex gap-1 border-b border-line">
+        <TabButton active={tab === "generated"} onClick={() => setTab("generated")}>
+          {dict.tabGenerated}
+        </TabButton>
+        <TabButton active={tab === "pending"} onClick={() => setTab("pending")}>
+          {dict.tabPending}
+          {pendingBookings.length > 0 && (
+            <span className="ml-1.5 rounded-full bg-surface-2 px-1.5 py-0.5 text-[11px] font-semibold text-ink-soft">
+              {pendingBookings.length}
+            </span>
+          )}
+        </TabButton>
       </div>
 
-      {filtered.length === 0 ? (
-        <p className="rounded-xl border border-line bg-surface p-6 text-center text-[13.5px] text-ink-soft">{dict.noResults}</p>
+      {tab === "generated" ? (
+        invoices.length === 0 ? (
+          <div className="rounded-2xl border border-line bg-surface p-10 text-center">
+            <p className="text-[15px] font-semibold text-ink">{dict.emptyTitle}</p>
+            <p className="mt-1 text-[13.5px] text-ink-soft">{dict.emptySubtitle}</p>
+          </div>
+        ) : (
+          <>
+            <div className="flex flex-wrap items-end gap-3 rounded-xl border border-line bg-surface p-4">
+              <div>
+                <label className="mb-1 block text-[11.5px] font-medium text-ink-soft">{dict.filterDateFrom}</label>
+                <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[13px] text-ink" />
+              </div>
+              <div>
+                <label className="mb-1 block text-[11.5px] font-medium text-ink-soft">{dict.filterDateTo}</label>
+                <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[13px] text-ink" />
+              </div>
+              <div>
+                <label className="mb-1 block text-[11.5px] font-medium text-ink-soft">{dict.filterService}</label>
+                <select value={service} onChange={(e) => setService(e.target.value)} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[13px] text-ink">
+                  <option value="">{dict.filterServiceAll}</option>
+                  {services.map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-[11.5px] font-medium text-ink-soft">{dict.filterPaymentMethod}</label>
+                <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[13px] text-ink">
+                  <option value="">{dict.filterPaymentMethodAll}</option>
+                  <option value="cash">{dict.paymentMethodCash}</option>
+                  <option value="card">{dict.paymentMethodCard}</option>
+                  <option value="bono">{dict.paymentMethodBono}</option>
+                </select>
+              </div>
+              <input
+                value={patientName}
+                onChange={(e) => setPatientName(e.target.value)}
+                placeholder={dict.filterPatientName}
+                className="min-w-[160px] rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[13px] text-ink"
+              />
+              <input
+                value={invoiceNumber}
+                onChange={(e) => setInvoiceNumber(e.target.value)}
+                placeholder={dict.filterInvoiceNumber}
+                className="min-w-[160px] rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[13px] text-ink"
+              />
+            </div>
+
+            {filtered.length === 0 ? (
+              <p className="rounded-xl border border-line bg-surface p-6 text-center text-[13.5px] text-ink-soft">{dict.noResults}</p>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {filtered.map((inv) => (
+                  <InvoiceRowItem key={inv.id} invoice={inv} dict={dict} methodLabel={methodLabel} />
+                ))}
+              </div>
+            )}
+          </>
+        )
+      ) : pendingBookings.length === 0 ? (
+        <div className="rounded-2xl border border-line bg-surface p-10 text-center">
+          <p className="text-[15px] font-semibold text-ink">{dict.pendingEmptyTitle}</p>
+          <p className="mt-1 text-[13.5px] text-ink-soft">{dict.pendingEmptySubtitle}</p>
+        </div>
       ) : (
         <div className="flex flex-col gap-2">
-          {filtered.map((inv) => (
-            <InvoiceRowItem key={inv.id} invoice={inv} dict={dict} methodLabel={methodLabel} />
+          {pendingBookings.map((b) => (
+            <div
+              key={b.id}
+              className="flex flex-col gap-1.5 rounded-xl border border-line bg-surface px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+            >
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[14px] font-semibold text-ink">{b.clientName}</p>
+                <p className="truncate text-[12.5px] text-ink-soft">
+                  {b.serviceName} · {methodLabel(b.paymentMethod)} · {b.amount.toFixed(2)} €
+                </p>
+              </div>
+              <Btn variant="outline" size="sm" className="shrink-0" onClick={() => setGeneratingBookingId(b.id)}>
+                {dict.generateInvoice}
+              </Btn>
+            </div>
           ))}
         </div>
       )}
+
+      {generatingBookingId && (
+        <InvoiceConfirmModal
+          bookingId={generatingBookingId}
+          clinicClientId={pendingBookings.find((b) => b.id === generatingBookingId)?.clinicClientId ?? null}
+          clientEmail={pendingBookings.find((b) => b.id === generatingBookingId)?.clientEmail ?? ""}
+          dict={confirmModalDict}
+          onClose={() => setGeneratingBookingId(null)}
+          onDone={() => {
+            setGeneratingBookingId(null);
+            router.refresh();
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex items-center border-b-2 px-3.5 py-2.5 text-[13.5px] font-medium transition-colors ${
+        active ? "border-brand text-brand-ink font-semibold" : "border-transparent text-ink-soft hover:text-ink"
+      }`}
+    >
+      {children}
+    </button>
   );
 }
 
