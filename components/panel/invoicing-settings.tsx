@@ -15,6 +15,8 @@ import { INVOICE_TEMPLATES } from "@/lib/invoices/templates";
 import type { InvoicingDictionary } from "@/lib/i18n/dictionaries/invoicing";
 import { reportClientError } from "@/lib/report-client-error";
 import { SignaturePad } from "@/components/panel/signature-pad";
+import { InvoiceConceptsSettings } from "@/components/panel/invoice-concepts-settings";
+import type { InvoiceConcept } from "@/lib/invoices/concepts";
 
 // invoice-template-selection + auto-invoice-setting + signature-upload
 // (pdf-invoicing.md) — all three live on this one Settings tab.
@@ -24,6 +26,7 @@ export function InvoicingSettings({
   initialSignatureUrl,
   initialNextNumberOverride,
   nextNumberPreview,
+  initialConcepts,
   dict,
 }: {
   initialTemplateId: string;
@@ -35,6 +38,9 @@ export function InvoicingSettings({
   // the override AND the real max already issued this year).
   initialNextNumberOverride: number | null;
   nextNumberPreview: string;
+  // invoice-concepts-list: the clinic's current billing line-item list,
+  // managed below.
+  initialConcepts: InvoiceConcept[];
   dict: InvoicingDictionary["settings"];
 }) {
   const router = useRouter();
@@ -331,6 +337,8 @@ export function InvoicingSettings({
         </div>
         <p className="mt-2 text-[12px] text-ink-soft">{dict.numberingNextHint}</p>
       </div>
+
+      <InvoiceConceptsSettings initialConcepts={initialConcepts} dict={dict} />
     </div>
   );
 }

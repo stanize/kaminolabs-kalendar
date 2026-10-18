@@ -26,6 +26,7 @@ create extension if not exists "pgcrypto";
 -- Drop existing tables (cascade removes dependent objects: policies, indexes).
 -- Children before parents.
 -- ----------------------------------------------------------------------------
+drop table if exists public.kalendar_invoice_concepts              cascade;
 drop table if exists public.kalendar_invoices                     cascade;
 drop table if exists public.kalendar_rate_limit_hits              cascade;
 drop table if exists public.kalendar_stripe_webhook_events       cascade;
@@ -1066,6 +1067,36 @@ create index kalendar_invoices_booking_id_idx  on public.kalendar_invoices (book
 create index kalendar_invoices_access_token_idx on public.kalendar_invoices (access_token);
 
 alter table public.kalendar_invoices enable row level security;
+
+-- ----------------------------------------------------------------------------
+-- kalendar_invoice_concepts (schema_subset_029.sql, pdf-invoicing.md)
+-- invoice-concepts-list: a per-business, clinic-managed list of billing
+-- line-item descriptions ("Quiropodia", "Matricectomía parcial...") picked
+-- at invoice-generation time instead of always reusing the booking's own
+-- service_name verbatim — a clinic's billing wording for a visit doesn't
+-- always match what the appointment was booked as. Managed from Settings
+-- > Facturación (add/rename/delete); typing a new one in the invoice
+-- confirm modal auto-adds it here too (findOrCreateInvoiceConcept).
+-- Deleting a concept never touches already-generated invoices — the
+-- invoice row's own service_name is frozen text, same as every other
+-- invoice field (business-fields-snapshot/client-identity-for-invoicing).
+-- Blank slate by design — no starter list seeded for any business.
+-- ----------------------------------------------------------------------------
+create table public.kalendar_invoice_concepts (
+  id          uuid        primary key default gen_random_uuid(),
+  business_id uuid        not null references public.kalendar_businesses (id) on delete cascade,
+  label       text        not null,
+  created_at  timestamptz not null default now()
+);
+
+-- Case-insensitive uniqueness per business — the auto-add-on-custom-entry
+-- path (findOrCreateInvoiceConcept) relies on this to dedupe "Quiropodia"
+-- vs "quiropodia" as the same concept.
+create unique index kalendar_invoice_concepts_business_label_idx
+  on public.kalendar_invoice_concepts (business_id, lower(label));
+create index kalendar_invoice_concepts_business_id_idx on public.kalendar_invoice_concepts (business_id);
+
+alter table public.kalendar_invoice_concepts enable row level security;
 
 -- Transactional per-business, per-year sequential number allocation
 -- (sequential-numbering-allocation, the highest-risk piece of this feature —

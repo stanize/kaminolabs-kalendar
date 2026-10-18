@@ -36,6 +36,7 @@ import {
   Eye,
   EyeOff,
   MessageCircle,
+  Trash2,
   type LucideIcon,
 } from "lucide-react";
 
@@ -73,6 +74,7 @@ export const ICONS: Record<string, LucideIcon> = {
   paperclip: Paperclip,
   send: Send,
   pencil: Pencil,
+  trash: Trash2,
   qrCode: QrCode,
   eye: Eye,
   eyeOff: EyeOff,

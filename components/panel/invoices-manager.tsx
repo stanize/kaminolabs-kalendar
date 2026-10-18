@@ -165,6 +165,7 @@ export function InvoicesManager({
           bookingId={generatingBookingId}
           clinicClientId={pendingBookings.find((b) => b.id === generatingBookingId)?.clinicClientId ?? null}
           clientEmail={pendingBookings.find((b) => b.id === generatingBookingId)?.clientEmail ?? ""}
+          initialConcept={pendingBookings.find((b) => b.id === generatingBookingId)?.serviceName ?? ""}
           dict={confirmModalDict}
           onClose={() => setGeneratingBookingId(null)}
           onDone={() => {

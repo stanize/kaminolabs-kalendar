@@ -177,6 +177,10 @@ export interface CreateInvoiceInput {
   // surfacing that as a required-field error.
   clientDni?: string;
   clientAddress?: string;
+  // invoice-concepts-list: overrides the booking's service_name as the
+  // invoice's stored line-item description. Falls back to the booking's
+  // own service name when not provided.
+  concept?: string;
 }
 
 export type CreateInvoiceResult =
@@ -282,7 +286,7 @@ export async function createInvoiceForBooking(input: CreateInvoiceInput): Promis
       client_email: booking.client_email,
       client_dni: finalDni,
       client_address: finalAddress,
-      service_name: booking.service_name,
+      service_name: input.concept?.trim() || booking.service_name,
       payment_method: booking.payment_method,
       amount: booking.service_price,
       access_token: accessToken,

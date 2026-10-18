@@ -40,7 +40,7 @@ export function ClientDetailView({
 }) {
   const d = dict.detail;
   const router = useRouter();
-  const [generatingBookingId, setGeneratingBookingId] = useState<string | null>(null);
+  const [generatingBooking, setGeneratingBooking] = useState<{ id: string; serviceName: string } | null>(null);
 
   return (
     <div className="flex flex-col gap-6">
@@ -62,7 +62,7 @@ export function ClientDetailView({
         dict={dict}
         locale={locale}
         invoicingPageDict={invoicingPageDict}
-        onGenerateInvoice={setGeneratingBookingId}
+        onGenerateInvoice={(id, serviceName) => setGeneratingBooking({ id, serviceName })}
       />
       <BookingListCard
         title={d.historyTitle}
@@ -71,20 +71,21 @@ export function ClientDetailView({
         dict={dict}
         locale={locale}
         invoicingPageDict={invoicingPageDict}
-        onGenerateInvoice={setGeneratingBookingId}
+        onGenerateInvoice={(id, serviceName) => setGeneratingBooking({ id, serviceName })}
       />
 
       <NotesCard clientId={client.id} initialNotes={initialNotes} dict={dict} locale={locale} />
 
-      {generatingBookingId && (
+      {generatingBooking && (
         <InvoiceConfirmModal
-          bookingId={generatingBookingId}
+          bookingId={generatingBooking.id}
           clinicClientId={client.id}
           clientEmail={client.email ?? ""}
+          initialConcept={generatingBooking.serviceName}
           dict={invoicingConfirmModalDict}
-          onClose={() => setGeneratingBookingId(null)}
+          onClose={() => setGeneratingBooking(null)}
           onDone={() => {
-            setGeneratingBookingId(null);
+            setGeneratingBooking(null);
             router.refresh();
           }}
         />
@@ -288,7 +289,7 @@ function BookingListCard({
   dict: ClientsDictionary;
   locale: Locale;
   invoicingPageDict: InvoicingDictionary["page"];
-  onGenerateInvoice: (bookingId: string) => void;
+  onGenerateInvoice: (bookingId: string, serviceName: string) => void;
 }) {
   const d = dict.detail;
   return (
@@ -317,7 +318,7 @@ function BookingListCard({
                     </Btn>
                   </a>
                 ) : (
-                  <Btn variant="outline" size="sm" className="shrink-0" onClick={() => onGenerateInvoice(b.id)}>
+                  <Btn variant="outline" size="sm" className="shrink-0" onClick={() => onGenerateInvoice(b.id, b.serviceName)}>
                     {invoicingPageDict.generateInvoice}
                   </Btn>
                 ))}

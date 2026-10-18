@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { Btn } from "@/components/ui/button";
-import { createAndSendInvoice } from "@/lib/actions/invoices";
+import { createAndSendInvoice, listInvoiceConcepts } from "@/lib/actions/invoices";
 import { getClientIdentity } from "@/lib/actions/clients";
 import type { InvoicingDictionary } from "@/lib/i18n/dictionaries/invoicing";
 import { isWhatsappSentinelEmail } from "@/lib/whatsapp/sentinel-email";
+
+let conceptsDatalistSeq = 0;
 
 /** A synthetic "sin-email+..."/WhatsApp-sentinel address doesn't count as a
  * real, sendable email — shared by every invoice entry point (Cobrar,
@@ -33,6 +35,10 @@ export function InvoiceConfirmModal({
   bookingId,
   clinicClientId,
   clientEmail,
+  // invoice-concepts-list: defaults the concept field to the booking's
+  // current service name, editable/overridable; a custom value is
+  // auto-added to the business's concepts list on submit.
+  initialConcept,
   dict,
   onClose,
   onDone,
@@ -40,16 +46,20 @@ export function InvoiceConfirmModal({
   bookingId: string;
   clinicClientId: string | null;
   clientEmail: string;
+  initialConcept: string;
   dict: InvoicingDictionary["confirmModal"];
   onClose: () => void;
   onDone: () => void;
 }) {
   const realEmail = hasRealEmail(clientEmail);
+  const [datalistId] = useState(() => `invoice-concepts-${++conceptsDatalistSeq}`);
 
   const [emailInput, setEmailInput] = useState("");
   const [sendEmail, setSendEmail] = useState(true);
   const [dniInput, setDniInput] = useState("");
   const [addressInput, setAddressInput] = useState("");
+  const [conceptInput, setConceptInput] = useState(initialConcept);
+  const [concepts, setConcepts] = useState<string[]>([]);
   const [loadingIdentity, setLoadingIdentity] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -57,14 +67,14 @@ export function InvoiceConfirmModal({
   useEffect(() => {
     let cancelled = false;
     async function load() {
-      if (!clinicClientId) {
-        setLoadingIdentity(false);
-        return;
-      }
-      const identity = await getClientIdentity(clinicClientId);
+      const [identity, conceptList] = await Promise.all([
+        clinicClientId ? getClientIdentity(clinicClientId) : Promise.resolve(null),
+        listInvoiceConcepts(),
+      ]);
       if (cancelled) return;
       setDniInput(identity?.dni ?? "");
       setAddressInput(identity?.address ?? "");
+      setConcepts(conceptList.map((c) => c.label));
       setLoadingIdentity(false);
     }
     load();
@@ -90,6 +100,11 @@ export function InvoiceConfirmModal({
       setError(dict.errClientIdentityRequired);
       return;
     }
+    const concept = conceptInput.trim();
+    if (!concept) {
+      setError(dict.errConceptRequired);
+      return;
+    }
 
     setBusy(true);
     setError(null);
@@ -100,6 +115,7 @@ export function InvoiceConfirmModal({
       saveToProfile: sendEmail && !realEmail && !!email,
       clientDni: dni,
       clientAddress: address,
+      concept,
     });
     setBusy(false);
     if (!res.ok) {
@@ -118,6 +134,25 @@ export function InvoiceConfirmModal({
         <h3 className="mb-4 text-[15px] font-bold text-ink">{dict.title}</h3>
 
         <div className="mb-4 flex flex-col gap-3">
+          <div>
+            <label className="mb-1.5 block text-[12.5px] font-medium text-ink-soft">{dict.conceptLabel}</label>
+            <input
+              value={conceptInput}
+              onChange={(e) => {
+                setConceptInput(e.target.value);
+                setError(null);
+              }}
+              placeholder={dict.conceptPlaceholder}
+              list={datalistId}
+              disabled={loadingIdentity}
+              className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[13px] text-ink disabled:opacity-60"
+            />
+            <datalist id={datalistId}>
+              {concepts.map((label) => (
+                <option key={label} value={label} />
+              ))}
+            </datalist>
+          </div>
           <div>
             <label className="mb-1.5 block text-[12.5px] font-medium text-ink-soft">{dict.dniLabel}</label>
             <input

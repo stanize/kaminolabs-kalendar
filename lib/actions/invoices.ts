@@ -6,6 +6,13 @@ import { createClient } from "@/lib/supabase/server";
 import { getBusinessForUser } from "@/lib/business/data";
 import { createInvoiceForBooking, getInvoiceForBooking, formatInvoiceNumber, type InvoiceRow } from "@/lib/invoices/data";
 import { sendEmail, invoiceEmailHtml } from "@/lib/email";
+import {
+  getInvoiceConcepts,
+  findOrCreateInvoiceConcept,
+  renameInvoiceConcept,
+  deleteInvoiceConcept,
+  type InvoiceConcept,
+} from "@/lib/invoices/concepts";
 
 export interface InvoiceActionDict {
   errNoBusiness: string;
@@ -88,6 +95,10 @@ export const createAndSendInvoice = authedAction(
       // createInvoiceForBooking does the actual required-either-way check.
       clientDni?: string;
       clientAddress?: string;
+      // invoice-concepts-list: the chosen/typed concept label, overriding
+      // the booking's service_name on the invoice. A custom (not-yet-listed)
+      // value is auto-added to the business's concepts list.
+      concept?: string;
     },
     dict?: Partial<InvoiceActionDict>
   ): Promise<CreateAndSendInvoiceResult> => {
@@ -101,11 +112,15 @@ export const createAndSendInvoice = authedAction(
       return { ok: false, error: t.errInvalidEmail };
     }
 
+    const concept = input.concept?.trim();
+    if (concept) await findOrCreateInvoiceConcept(business.id, concept);
+
     const created = await createInvoiceForBooking({
       business,
       bookingId: input.bookingId,
       clientDni: input.clientDni,
       clientAddress: input.clientAddress,
+      concept,
     });
     if (!created.ok) {
       const error =
@@ -381,6 +396,57 @@ export const saveNextInvoiceNumber = authedAction(
       .eq("id", business.id)
       .eq("owner_id", session.user.id);
     if (error) return { ok: false, error: t.errSaveFailed };
+    revalidatePath("/panel/settings/invoicing");
+    return { ok: true };
+  }
+);
+
+// ── Settings: invoice concepts list ──────────────────────────────────────
+
+/** invoice-concepts-list: used by the confirm modal's datalist (no dict needed — read-only). */
+export const listInvoiceConcepts = authedAction(async (session): Promise<InvoiceConcept[]> => {
+  const business = await getBusinessForUser(session.user.id);
+  if (!business) return [];
+  return getInvoiceConcepts(business.id);
+});
+
+export type SaveInvoiceConceptResult = { ok: true; concept: InvoiceConcept } | { ok: false; error: string };
+
+export const addInvoiceConcept = authedAction(
+  async (session, label: string, dict?: { errNoBusiness: string; errSaveFailed: string }): Promise<SaveInvoiceConceptResult> => {
+    const t = { errNoBusiness: dict?.errNoBusiness ?? FALLBACK.errNoBusiness, errSaveFailed: dict?.errSaveFailed ?? "No se pudo guardar." };
+    const business = await getBusinessForUser(session.user.id);
+    if (!business) return { ok: false, error: t.errNoBusiness };
+    const concept = await findOrCreateInvoiceConcept(business.id, label);
+    if (!concept) return { ok: false, error: t.errSaveFailed };
+    revalidatePath("/panel/settings/invoicing");
+    return { ok: true, concept };
+  }
+);
+
+export const updateInvoiceConcept = authedAction(
+  async (
+    session,
+    input: { conceptId: string; label: string },
+    dict?: { errNoBusiness: string; errSaveFailed: string }
+  ): Promise<SaveInvoiceConceptResult> => {
+    const t = { errNoBusiness: dict?.errNoBusiness ?? FALLBACK.errNoBusiness, errSaveFailed: dict?.errSaveFailed ?? "No se pudo guardar." };
+    const business = await getBusinessForUser(session.user.id);
+    if (!business) return { ok: false, error: t.errNoBusiness };
+    const concept = await renameInvoiceConcept(business.id, input.conceptId, input.label);
+    if (!concept) return { ok: false, error: t.errSaveFailed };
+    revalidatePath("/panel/settings/invoicing");
+    return { ok: true, concept };
+  }
+);
+
+export const removeInvoiceConcept = authedAction(
+  async (session, conceptId: string, dict?: { errNoBusiness: string; errSaveFailed: string }): Promise<SaveInvoiceSettingResult> => {
+    const t = { errNoBusiness: dict?.errNoBusiness ?? FALLBACK.errNoBusiness, errSaveFailed: dict?.errSaveFailed ?? "No se pudo guardar." };
+    const business = await getBusinessForUser(session.user.id);
+    if (!business) return { ok: false, error: t.errNoBusiness };
+    const ok = await deleteInvoiceConcept(business.id, conceptId);
+    if (!ok) return { ok: false, error: t.errSaveFailed };
     revalidatePath("/panel/settings/invoicing");
     return { ok: true };
   }

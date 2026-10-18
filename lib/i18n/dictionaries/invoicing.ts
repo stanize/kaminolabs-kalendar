@@ -39,9 +39,25 @@ export interface InvoicingDictionary {
     errInvalidFile: string;
     errInvalidNumber: string;
     errSaveFailed: string;
+    // invoice-concepts-list: Settings > Facturación's add/rename/delete
+    // section for the clinic's own list of billing line-item descriptions.
+    conceptsSectionTitle: string;
+    conceptsSectionSubtitle: string;
+    conceptsEmpty: string;
+    conceptsAddPlaceholder: string;
+    conceptsAdd: string;
+    conceptsEdit: string;
+    conceptsSave: string;
+    conceptsCancel: string;
   };
   confirmModal: {
     title: string;
+    // invoice-concepts-list: picked from the business's list or typed
+    // fresh (auto-added to the list either way) at invoice-generation
+    // time, overriding the booking's service name on the invoice.
+    conceptLabel: string;
+    conceptPlaceholder: string;
+    errConceptRequired: string;
     yesGenerateAndSend: string;
     yesGenerateOnly: string;
     no: string;
@@ -136,9 +152,20 @@ const es: InvoicingDictionary = {
     errInvalidFile: "Sube una imagen PNG, JPG o WEBP de hasta 2MB.",
     errInvalidNumber: "Indica un número de factura válido.",
     errSaveFailed: "No se pudo guardar el cambio.",
+    conceptsSectionTitle: "Conceptos de factura",
+    conceptsSectionSubtitle: "La lista de conceptos que puedes elegir al generar una factura. Añade, modifica o elimina los que necesites.",
+    conceptsEmpty: "Todavía no has añadido ningún concepto.",
+    conceptsAddPlaceholder: "Nuevo concepto…",
+    conceptsAdd: "Añadir",
+    conceptsEdit: "Editar",
+    conceptsSave: "Guardar",
+    conceptsCancel: "Cancelar",
   },
   confirmModal: {
     title: "¿Quieres generar una factura?",
+    conceptLabel: "Concepto de la factura",
+    conceptPlaceholder: "ej. Quiropodia",
+    errConceptRequired: "Indica el concepto de la factura.",
     yesGenerateAndSend: "Generar y mandar correo",
     yesGenerateOnly: "Solo generar",
     no: "No",
@@ -226,9 +253,20 @@ const en: InvoicingDictionary = {
     errInvalidFile: "Upload a PNG, JPG, or WEBP image up to 2MB.",
     errInvalidNumber: "Enter a valid invoice number.",
     errSaveFailed: "Couldn't save the change.",
+    conceptsSectionTitle: "Invoice concepts",
+    conceptsSectionSubtitle: "The list of concepts you can pick from when generating an invoice. Add, edit, or remove them as needed.",
+    conceptsEmpty: "You haven't added any concepts yet.",
+    conceptsAddPlaceholder: "New concept…",
+    conceptsAdd: "Add",
+    conceptsEdit: "Edit",
+    conceptsSave: "Save",
+    conceptsCancel: "Cancel",
   },
   confirmModal: {
     title: "Generate an invoice?",
+    conceptLabel: "Invoice concept",
+    conceptPlaceholder: "e.g. Chiropody",
+    errConceptRequired: "Enter the invoice concept.",
     yesGenerateAndSend: "Generate and send email",
     yesGenerateOnly: "Generate only",
     no: "No",
