@@ -11,6 +11,71 @@ Criteria:
 - Prev/Next/Today navigation works for all three view modes
 - Upcoming bookings only show active statuses (pending_confirmation, confirmed) — cancelled/past-cancelled stay hidden going forward
 
+## Step: multi-provider-calendar-display
+Status: not_started
+Criteria (design settled 2026-10, Arun — not yet built):
+- PROBLEM: calendar-grid-view.tsx currently renders a naive cartesian
+  product for multi-provider clinics — every day column is unconditionally
+  split into one sub-column per team member (`DayProviderColumn`, see
+  `calendar-views` step above and `members.length > 1` branches in that
+  file), with no way to narrow it down. In Week view this multiplies to
+  7 days × N providers — a real clinic (Bea's, 2 providers) already shows
+  as a cramped, horizontally-scrolling grid with truncated headers; it
+  gets categorically worse at 3+ providers. Day view has the same
+  multiplication problem on its own axis once a clinic has 5+ providers —
+  always rendering every provider's column forces constant horizontal
+  scrolling even though, in practice, each provider mostly just wants to
+  see (and filter to) their own slots.
+- DECIDED: add one provider filter, shared by Day and Week view, sitting
+  alongside the existing Semana/Clientes/Cancelaciones/Conflictos tabs.
+  - Multi-select (not single-select like the Facturas page's Servicio
+    filter) — covers all three cases naturally: nothing selected = all
+    providers (the default), one selected = just them, a few selected =
+    that subset. No separate "All/One/A few" mode toggle needed, the
+    selection state alone expresses all three.
+  - PERSISTENT across visits (Arun's explicit call), survives
+    reload/new session, not just in-memory for the current render.
+    VERIFIED (2026-10): no existing filter in this codebase persists
+    today — the Clientes-page filters are in-memory only (checked
+    clients-manager.tsx/app/panel/clients/page.tsx, no cookie/
+    localStorage there), so this isn't reusing an existing pattern, it's
+    the first one. The closest real precedent is `lib/i18n/server.ts` +
+    `lib/actions/locale.ts`'s `kalendar_locale` cookie (cookie-based,
+    read server-side via `getLocale()`) — same shape fits here: a
+    `kalendar_calendar_providers` (or similar) cookie holding the
+    selected member IDs, read server-side on `/panel/calendar` so the
+    grid renders already-filtered on first paint (no client-side flash of
+    "all providers" before the saved filter kicks in). localStorage was
+    considered and rejected — it can't be read server-side, so the first
+    render would always show "all" before a client-side effect corrected
+    it, which is exactly the kind of pop-in/layout-shift already flagged
+    as "weird" for the Factura section earlier this same session.
+- Day view: unchanged rendering shape (one side-by-side column per
+  provider), just bounded by the filter — "all" (default) can still be
+  wide for a big team, but the clinic can now narrow it down instead of
+  being forced into it.
+- Week view: when the active set (all, or a few) has more than one
+  provider, MERGE into a single column per day with provider-coded
+  bookings (color/badge per provider, distinct from the existing
+  client-status dot/badge colors) instead of sub-columns. When the filter
+  narrows to exactly one provider, Week view switches to today's
+  per-provider-column rendering (there's nothing left to merge).
+- New-appointment provider default (handleSlotClick in
+  calendar-grid-view.tsx -> AppointmentModal's teamMemberId initial
+  value): Day view and a single-provider-filtered Week view still have a
+  real column to click, so those keep defaulting the modal's provider
+  field to that column's owner, same as today. The merged Week view (more
+  than one provider in the active set) has no per-click provider to
+  default to, so the modal's existing provider `<select>`
+  (`dict.providerLabel`, appointment-modal.tsx) opens UNSELECTED/blank in
+  that case — the clinic must choose explicitly, never silently falls
+  back to `members[0]`.
+- NOT yet decided / needs a follow-up pass before coding: exact visual
+  treatment for provider-coded bookings in the merged Week view (color
+  swatch? left-border stripe? small avatar/initial chip?) — needs a
+  mockup or at least a quick decision once this step is picked up for
+  Code, not blocking the rest of the design above.
+
 ## Step: pending-guest-requests
 Status: done
 Criteria:
