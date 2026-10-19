@@ -18,6 +18,7 @@ import { WeekStatsWidget } from "@/components/panel/week-stats-widget";
 import { getLocale } from "@/lib/i18n/server";
 import { getCalendarDictionary } from "@/lib/i18n/dictionaries/calendar";
 import { getInvoicingDictionary } from "@/lib/i18n/dictionaries/invoicing";
+import { getCalendarProviderFilter } from "@/lib/calendar/provider-filter";
 
 export default async function CalendarPage() {
   const session = await requireSession();
@@ -69,6 +70,7 @@ export default async function CalendarPage() {
   const locale = await getLocale();
   const dict = getCalendarDictionary(locale);
   const invoicingDict = getInvoicingDictionary(locale);
+  const initialProviderFilter = await getCalendarProviderFilter();
   const hoyDayLabel = hoyStats.isToday || !hoyStats.dateIso ? undefined : new Intl.DateTimeFormat(dict.intlLocale, {
     timeZone: "Europe/Madrid", weekday: "long", day: "numeric", month: "long",
   }).format(new Date(`${hoyStats.dateIso}T12:00:00Z`));
@@ -168,6 +170,7 @@ export default async function CalendarPage() {
         initialConflicts={initialConflicts}
         festivos={festivos}
         closures={closureRules}
+        initialProviderFilter={initialProviderFilter}
       />
     </div>
   );

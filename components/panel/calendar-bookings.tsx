@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { Btn } from "@/components/ui/button";
 import { cancelBookingAsOwner, confirmBookingAsOwner, markBookingReviewedAsOwner, fetchWeekBookings, fetchConflictingBookings, reviewCancellationRequest } from "@/lib/actions/booking-owner";
+import { setCalendarProviderFilter } from "@/lib/actions/calendar-preferences";
+import { CalendarProviderFilter } from "@/components/panel/calendar-provider-filter";
 import { reportClientError } from "@/lib/report-client-error";
 import { CalendarHeader, type CalendarViewMode } from "@/components/panel/calendar-header";
 import {
@@ -179,6 +181,7 @@ export function CalendarBookings({
   initialConflicts,
   festivos,
   closures,
+  initialProviderFilter,
 }: {
   bookings: BookingVM[];
   // Separate from `bookings` — `bookings` is deliberately future-only
@@ -214,6 +217,10 @@ export function CalendarBookings({
   // unavailable" warning (holidays-and-time-off's existing-bookings-
   // conflict-alert never blocks the clinic's own manual override).
   closures: ClosureRuleVM[];
+  // multi-provider-calendar-display: persisted selection (empty = all),
+  // read server-side from the kalendar_calendar_providers cookie so the
+  // grid renders already-filtered on first paint.
+  initialProviderFilter: string[];
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -243,6 +250,19 @@ export function CalendarBookings({
   const [selectedBooking, setSelectedBooking] = useState<WeekBookingVM | null>(null);
   const [editingBooking, setEditingBooking] = useState<WeekBookingVM | null>(null);
 
+  // multi-provider-calendar-display: `selectedProviderIds` is the VIEW
+  // filter only — createBookingAsOwner/AppointmentModal still get the full
+  // `weekMembers` roster (passed as CalendarGridView's `allMembers`), so a
+  // clinic can book for someone not currently shown. Empty = all.
+  const [selectedProviderIds, setSelectedProviderIds] = useState<string[]>(initialProviderFilter);
+  const activeMembers = selectedProviderIds.length === 0
+    ? weekMembers
+    : weekMembers.filter((m) => selectedProviderIds.includes(m.id));
+  const handleProviderFilterChange = useCallback((ids: string[]) => {
+    setSelectedProviderIds(ids);
+    setCalendarProviderFilter(ids);
+  }, []);
+
   const computeRange = useCallback((v: CalendarViewMode, date: Date) => {
     if (v === "day") {
       const start = dayStart(date);
@@ -264,6 +284,15 @@ export function CalendarBookings({
     view === "week" && range.start.toISOString() === new Date(weekStartIso).toISOString();
 
   const gridBookings = fetchedBookings ?? (isInitialWeek ? weekInitialBookings : []);
+  // multi-provider-calendar-display: bounds both the Day/Week grid and the
+  // Month overview to the active provider selection — not just which
+  // columns render, which bookings show at all. Plain derivation (not
+  // useMemo) — gridBookings is cheap, and its own identity already
+  // changes on every relevant update (fetch, filter change).
+  const providerFilteredBookings =
+    selectedProviderIds.length === 0
+      ? gridBookings
+      : gridBookings.filter((b) => b.teamMemberId && selectedProviderIds.includes(b.teamMemberId));
 
   const navigateTo = useCallback((targetView: CalendarViewMode, targetDate: Date) => {
     setView(targetView);
@@ -523,22 +552,33 @@ export function CalendarBookings({
 
       {tab === "week" && (
         <div className="flex flex-col gap-3">
-          <CalendarHeader
-            view={view}
-            onViewChange={handleViewChange}
-            rangeLabel={rangeLabel}
-            onPrev={handlePrev}
-            onNext={handleNext}
-            onToday={handleToday}
-            loading={gridLoading}
-            dict={dict.week}
-          />
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <CalendarHeader
+              view={view}
+              onViewChange={handleViewChange}
+              rangeLabel={rangeLabel}
+              onPrev={handlePrev}
+              onNext={handleNext}
+              onToday={handleToday}
+              loading={gridLoading}
+              dict={dict.week}
+            />
+            {weekMembers.length > 1 && (
+              <CalendarProviderFilter
+                members={weekMembers}
+                selectedIds={selectedProviderIds}
+                onChange={handleProviderFilterChange}
+                allLabel={dict.week.providerFilterAll}
+                triggerLabel={dict.week.providerFilterLabel}
+              />
+            )}
+          </div>
 
           {view === "month" ? (
             <CalendarMonthView
               gridStart={range.start}
               currentMonth={tzDateParts(focusDate).month}
-              bookings={gridBookings}
+              bookings={providerFilteredBookings}
               dict={dict}
               onSelectDay={handleSelectDay}
             />
@@ -546,10 +586,11 @@ export function CalendarBookings({
             <CalendarGridView
               view={view}
               days={gridDays}
-              members={weekMembers}
+              members={activeMembers}
+              allMembers={weekMembers}
               hoursByDay={weekHoursByDay}
               services={weekServices}
-              bookings={gridBookings}
+              bookings={providerFilteredBookings}
               closures={closures}
               dict={dict}
               whatsappEnabled={whatsappEnabled}

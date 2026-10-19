@@ -309,7 +309,7 @@ export function AppointmentModal(props: AppointmentModalProps) {
 
   const handleSubmit = async () => {
     setError(null);
-    if (!serviceId || !startDate || conflict) return;
+    if (!serviceId || !teamMemberId || !startDate || conflict) return;
     setSubmitting(true);
     try {
       const payload = {
@@ -389,6 +389,11 @@ export function AppointmentModal(props: AppointmentModalProps) {
                 onChange={(e) => setTeamMemberId(e.target.value)}
                 className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[16px] text-ink"
               >
+                {/* multi-provider-calendar-display: a click from the merged
+                    Week view arrives with no provider defaulted
+                    (teamMemberId === "") — this placeholder forces an
+                    explicit choice instead of silently landing on members[0]. */}
+                {!teamMemberId && <option value="">{dict.providerPlaceholder}</option>}
                 {members.map((m) => (
                   <option key={m.id} value={m.id}>
                     {m.name}
@@ -559,7 +564,7 @@ export function AppointmentModal(props: AppointmentModalProps) {
           </button>
           <button
             onClick={handleSubmit}
-            disabled={submitting || !clientName.trim() || !serviceId || !dateValid || !timeValid || conflict}
+            disabled={submitting || !clientName.trim() || !serviceId || !teamMemberId || !dateValid || !timeValid || conflict}
             className="rounded-lg bg-brand px-4 py-2 text-[13.5px] font-semibold text-white hover:opacity-90 disabled:opacity-50"
           >
             {submitting ? (isEdit ? dict.saving : dict.submitting) : (isEdit ? dict.saveButton : dict.submit)}

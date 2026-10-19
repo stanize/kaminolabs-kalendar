@@ -59,6 +59,10 @@ export interface CalendarDictionary {
     today: string; // "Hoy" jump-to-today button
     allProviders: string; // "Todos" filter option
     noProviders: string; // shown when a solo business has somehow no team member seeded
+    // multi-provider-calendar-display (calendar-management-upcoming.md):
+    // the persistent multi-select provider filter shared by Day/Week view.
+    providerFilterLabel: string; // "Profesionales" — the filter dropdown's trigger button
+    providerFilterAll: string; // "Todos" option inside the dropdown — clears the selection back to "all"
     addAppointment: string; // tooltip/aria-label on an empty slot
     weekRangeTemplate: string; // "{from} – {to}", {from}/{to} pre-formatted date strings
     viewDay: string; // Day/Week/Month dropdown option
@@ -76,6 +80,12 @@ export interface CalendarDictionary {
     serviceLabel: string;
     servicePlaceholder: string;
     providerLabel: string;
+    // multi-provider-calendar-display: shown as the provider <select>'s
+    // blank/unselected option in the merged Week view (more than one
+    // provider active) — created from a day click that doesn't belong to
+    // any one provider's column, so nothing is defaulted; required before
+    // submit (submit button stays disabled, same pattern as service/date).
+    providerPlaceholder: string;
     dateTimeLabel: string; // read-only summary shown above the fields (weekday + full date)
     dateLabel: string; // "Fecha" — editable date field
     timeLabel: string; // "Hora" — editable time field (combobox: dropdown + free typing)
@@ -205,6 +215,8 @@ const es: CalendarDictionary = {
     nextLabel: "Siguiente",
     today: "Hoy",
     allProviders: "Todos",
+    providerFilterLabel: "Profesionales",
+    providerFilterAll: "Todos",
     noProviders: "Añade a tu equipo en Equipo para ver la semana.",
     addAppointment: "Añadir cita",
     weekRangeTemplate: "{from} – {to}",
@@ -220,6 +232,7 @@ const es: CalendarDictionary = {
     serviceLabel: "Servicio",
     servicePlaceholder: "Elige un servicio",
     providerLabel: "Profesional",
+    providerPlaceholder: "Elige un profesional",
     dateTimeLabel: "Fecha y hora",
     dateLabel: "Fecha",
     timeLabel: "Hora",
@@ -342,6 +355,8 @@ const en: CalendarDictionary = {
     nextLabel: "Next",
     today: "Today",
     allProviders: "All",
+    providerFilterLabel: "Providers",
+    providerFilterAll: "All",
     noProviders: "Add team members under Team to see the week view.",
     addAppointment: "Add appointment",
     weekRangeTemplate: "{from} – {to}",
@@ -357,6 +372,7 @@ const en: CalendarDictionary = {
     serviceLabel: "Service",
     servicePlaceholder: "Choose a service",
     providerLabel: "Provider",
+    providerPlaceholder: "Choose a provider",
     dateTimeLabel: "Date and time",
     dateLabel: "Date",
     timeLabel: "Time",

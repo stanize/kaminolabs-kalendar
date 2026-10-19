@@ -251,10 +251,26 @@ export function buildGridDays(
   return days;
 }
 
+// multi-provider-calendar-display (workflows/calendar-management-upcoming.md):
+// the merged Week view's per-booking provider badge color — indexed by the
+// provider's position in the FULL team roster (allMembers), not the
+// filtered/visible list, so a given provider's color never shifts just
+// because the filter selection changed.
+const PROVIDER_COLOR_PALETTE = [
+  "bg-blue-600", "bg-purple-600", "bg-pink-600", "bg-orange-600",
+  "bg-cyan-600", "bg-lime-600", "bg-indigo-600", "bg-fuchsia-600",
+];
+
+function providerColorClass(memberId: string, allMembers: WeekMemberVM[]): string {
+  const idx = allMembers.findIndex((m) => m.id === memberId);
+  return PROVIDER_COLOR_PALETTE[(idx < 0 ? 0 : idx) % PROVIDER_COLOR_PALETTE.length];
+}
+
 export function CalendarGridView({
   view,
   days,
   members,
+  allMembers,
   hoursByDay,
   services,
   bookings,
@@ -266,7 +282,15 @@ export function CalendarGridView({
 }: {
   view: "day" | "week";
   days: GridDay[];
+  // multi-provider-calendar-display: the VISIBLE/filtered provider set —
+  // bounds which column(s) render. Falls back to `allMembers` wherever the
+  // caller passes the same array for both (no filter active).
   members: WeekMemberVM[];
+  // The full team roster, regardless of the active filter — used for the
+  // "Nueva cita" modal's provider dropdown (a clinic can still book for
+  // someone not currently shown) and for stable per-provider color
+  // assignment in the merged Week view.
+  allMembers: WeekMemberVM[];
   hoursByDay: Partial<Record<DayId, TimeRangeVM[]>>;
   services: WeekServiceVM[];
   bookings: WeekBookingVM[];
@@ -349,7 +373,11 @@ export function CalendarGridView({
     return best !== null ? best : Math.round(clickMinute / 15) * 15;
   };
 
-  const handleSlotClick = (day: GridDay, member: WeekMemberVM, clickMinute: number, ranges: TimeRangeVM[]) => {
+  // multi-provider-calendar-display: `member` is null when the click came
+  // from the merged Week view's single day column — there's no per-click
+  // provider to default to there, so the modal opens with the provider
+  // field blank/required instead of silently picking one.
+  const handleSlotClick = (day: GridDay, member: WeekMemberVM | null, clickMinute: number, ranges: TimeRangeVM[]) => {
     const rounded = snapToSlotGrid(clickMinute, ranges);
     const hh = Math.floor(rounded / 60);
     const mm = rounded % 60;
@@ -358,8 +386,8 @@ export function CalendarGridView({
       dayMonth: day.month,
       dayDay: day.day,
       initialTime: `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`,
-      teamMemberId: member.id,
-      providerName: member.name,
+      teamMemberId: member?.id ?? "",
+      providerName: member?.name ?? "",
     });
   };
 
@@ -377,8 +405,27 @@ export function CalendarGridView({
     );
   }
 
+  // multi-provider-calendar-display: Week view merges into one provider-
+  // coded column per day once more than one provider is active — avoids
+  // the 7-days × N-providers column explosion. Day view (and a Week view
+  // narrowed to exactly one provider) keeps the original per-provider
+  // sub-column rendering, where there's always a real column to default
+  // a new appointment's provider to.
+  const merged = view === "week" && members.length > 1;
+
   return (
     <div className="flex flex-col gap-3">
+      {merged && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-1">
+          {members.map((member) => (
+            <span key={member.id} className="flex items-center gap-1.5 text-[12px] text-ink-soft">
+              <span className={`h-2.5 w-2.5 rounded-full ${providerColorClass(member.id, allMembers)}`} />
+              {member.name}
+            </span>
+          ))}
+        </div>
+      )}
+
       <div className="overflow-x-auto overflow-y-visible rounded-2xl border border-line bg-surface">
         <div className={`flex ${view === "week" ? "min-w-[900px]" : "min-w-[420px]"}`}>
           {/* Time gutter */}
@@ -400,6 +447,25 @@ export function CalendarGridView({
           {/* Day columns */}
           {days.map((day) => {
             const ranges = hoursByDay[day.dayId] ?? [];
+            if (merged) {
+              return (
+                <div key={`${day.year}-${day.month}-${day.day}`} className="flex flex-1 border-r border-line last:border-r-0">
+                  <DayMergedColumn
+                    day={day}
+                    members={members}
+                    allMembers={allMembers}
+                    ranges={ranges}
+                    bookings={bookings}
+                    gridStartMin={gridStartMin}
+                    gridEndMin={gridEndMin}
+                    gridHeight={gridHeight}
+                    dict={dict}
+                    onSlotClick={(d, clickMinute, r) => handleSlotClick(d, null, clickMinute, r)}
+                    onBookingClick={onBookingClick}
+                  />
+                </div>
+              );
+            }
             return (
               <div key={`${day.year}-${day.month}-${day.day}`} className="flex flex-1 border-r border-line last:border-r-0">
                 {members.map((member) => (
@@ -431,7 +497,7 @@ export function CalendarGridView({
           hoursByDay={hoursByDay}
           allBookings={bookings}
           services={services.map((s) => ({ id: s.id, name: s.name, durationMin: s.durationMin, price: s.price }))}
-          members={members.map((m) => ({ id: m.id, name: m.name }))}
+          members={allMembers.map((m) => ({ id: m.id, name: m.name }))}
           closures={closures}
           dict={dict.modal}
           errorsDict={dict.manualErrors}
@@ -644,6 +710,152 @@ function DayProviderColumn({
                   />
                 ) : null}
                 {b.serviceName}
+              </div>
+              <div className="truncate opacity-90">
+                {timeLabel(b.startIso)} · {b.clientName}
+              </div>
+              {isPast && pastResultLabel(b, dict) && (
+                <div className="truncate font-semibold">{pastResultLabel(b, dict)}</div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * multi-provider-calendar-display: Week view's merged rendering — one
+ * column per day, every active provider's bookings together, each tagged
+ * with a small colored provider badge (providerColorClass) since the
+ * per-provider sub-column that used to disambiguate them is gone. Shares
+ * DayProviderColumn's visual language (working-hours/past/festivo
+ * layering, chipClasses) deliberately, just without the member-scoped
+ * filtering or the member-name column header.
+ */
+function DayMergedColumn({
+  day,
+  members,
+  allMembers,
+  ranges,
+  bookings,
+  gridStartMin,
+  gridEndMin,
+  gridHeight,
+  dict,
+  onSlotClick,
+  onBookingClick,
+}: {
+  day: GridDay;
+  members: WeekMemberVM[];
+  allMembers: WeekMemberVM[];
+  ranges: TimeRangeVM[];
+  bookings: WeekBookingVM[];
+  gridStartMin: number;
+  gridEndMin: number;
+  gridHeight: number;
+  dict: CalendarDictionary;
+  onSlotClick: (day: GridDay, clickMinute: number, ranges: TimeRangeVM[]) => void;
+  onBookingClick: (booking: WeekBookingVM) => void;
+}) {
+  const memberIds = new Set(members.map((m) => m.id));
+  const dayBookings = bookings.filter((b) => {
+    if (!b.teamMemberId || !memberIds.has(b.teamMemberId)) return false;
+    const parts = tzDateParts(new Date(b.startIso));
+    return parts.year === day.year && parts.month === day.month && parts.day === day.day;
+  });
+
+  const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const offsetY = e.clientY - rect.top;
+    const clickMinute = gridStartMin + offsetY / PX_PER_MIN;
+    onSlotClick(day, clickMinute, ranges);
+  };
+
+  return (
+    <div className="flex-1">
+      <div className="flex h-12 flex-col items-center justify-center border-b border-line px-1">
+        <span className={`text-[12px] font-semibold capitalize ${day.isPast ? "text-ink-soft" : "text-ink"}`}>
+          {day.dateLabel}
+        </span>
+        {day.isFestivo && (
+          <span className="truncate text-[10px] font-medium text-amber-700">
+            ({day.festivoLabel || dict.week.festivoFallbackLabel})
+          </span>
+        )}
+        {day.isToday && <span className="mt-0.5 h-1 w-1 rounded-full bg-brand" />}
+      </div>
+      <div
+        className="relative overflow-hidden cursor-pointer bg-surface-2/50 hover:bg-surface-2/70"
+        style={{
+          height: gridHeight,
+          ...(ranges.length === 0
+            ? {
+                backgroundImage:
+                  "repeating-linear-gradient(135deg, rgba(15,23,42,0.08) 0px, rgba(15,23,42,0.08) 6px, transparent 6px, transparent 14px)",
+              }
+            : {}),
+        }}
+        onClick={handleClick}
+        title={dict.week.addAppointment}
+      >
+        {ranges.map((r, i) => {
+          const [sh, sm] = r.start.split(":").map(Number);
+          const [eh, em] = r.end.split(":").map(Number);
+          const top = (sh * 60 + sm - gridStartMin) * PX_PER_MIN;
+          const height = (eh * 60 + em - (sh * 60 + sm)) * PX_PER_MIN;
+          return (
+            <div
+              key={i}
+              className="pointer-events-none absolute left-0 right-0 bg-surface"
+              style={{ top, height }}
+            />
+          );
+        })}
+
+        {day.isPast && <div className="pointer-events-none absolute inset-0 bg-ink/5" />}
+        {day.isFestivo && <div className="pointer-events-none absolute inset-0 bg-amber-50/60" />}
+
+        {Array.from({ length: Math.floor((gridEndMin - gridStartMin) / 60) + 1 }).map((_, i) => (
+          <div
+            key={i}
+            className="pointer-events-none absolute left-0 right-0 border-t border-line/50"
+            style={{ top: i * 60 * PX_PER_MIN }}
+          />
+        ))}
+
+        {dayBookings.map((b) => {
+          const startMin = minutesInTz(new Date(b.startIso));
+          const top = (startMin - gridStartMin) * PX_PER_MIN;
+          const height = Math.max(b.durationMin * PX_PER_MIN, 30);
+          const isPast = new Date(b.startIso) < new Date();
+          return (
+            <div
+              key={b.id}
+              onClick={(e) => { e.stopPropagation(); onBookingClick(b); }}
+              className={`absolute left-0.5 right-0.5 cursor-pointer overflow-hidden rounded-md px-1.5 py-[3px] text-[10.5px] leading-[1.2] ${chipClasses(b.status, isPast, b.clientStatus, b.clinicReviewedAt)}`}
+              style={{ top, height }}
+            >
+              <div className="flex items-center gap-1 truncate">
+                {b.teamMemberId && (
+                  <span
+                    className={`inline-block h-[7px] w-[7px] shrink-0 rounded-full ${providerColorClass(b.teamMemberId, allMembers)}`}
+                  />
+                )}
+                {b.cancellationRequestedAt && (
+                  <span title="Solicitud de cancelación pendiente" className="text-rose-600">🛑</span>
+                )}
+                {b.reminderSendFailed && (
+                  <span title="Recordatorio no enviado" className="text-amber-600">⚠</span>
+                )}
+                {(b.clientStatus !== "guest_confirmed" && b.clientStatus !== "first_time") || !b.clinicReviewedAt ? (
+                  <span
+                    title={clientStatusLabel(b.clientStatus, b.clinicReviewedAt)}
+                    className={`inline-block h-[7px] w-[7px] shrink-0 rounded-full ${clientStatusDotClass(b.clientStatus, b.clinicReviewedAt)}`}
+                  />
+                ) : null}
+                <span className="truncate">{b.serviceName}</span>
               </div>
               <div className="truncate opacity-90">
                 {timeLabel(b.startIso)} · {b.clientName}

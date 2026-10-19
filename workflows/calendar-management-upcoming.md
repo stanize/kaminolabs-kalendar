@@ -12,8 +12,50 @@ Criteria:
 - Upcoming bookings only show active statuses (pending_confirmation, confirmed) — cancelled/past-cancelled stay hidden going forward
 
 ## Step: multi-provider-calendar-display
-Status: not_started
-Criteria (design settled 2026-10, Arun — not yet built):
+Status: in_progress
+Criteria (design settled 2026-10, Arun; code implemented + typechecked/
+linted/built same session — PENDING MANUAL/LIVE TESTING, not yet
+confirmed working by Arun):
+- IMPLEMENTED: `lib/calendar/provider-filter.ts` (cookie read) +
+  `lib/actions/calendar-preferences.ts` (`setCalendarProviderFilter`,
+  cookie write) — `kalendar_calendar_providers` cookie, comma-separated
+  member ids, empty/absent = all. Read server-side in
+  `app/panel/calendar/page.tsx`, passed to `CalendarBookings` as
+  `initialProviderFilter`.
+- IMPLEMENTED: `components/panel/calendar-provider-filter.tsx` — the
+  multi-select dropdown (checkboxes + "Todos"), rendered next to
+  `CalendarHeader` only when `weekMembers.length > 1`.
+- IMPLEMENTED: `calendar-bookings.tsx` derives `activeMembers`
+  (filtered) and `providerFilteredBookings` (bookings scoped to the
+  active selection) from `selectedProviderIds`; passes `activeMembers`
+  as `CalendarGridView`'s `members` prop and the full `weekMembers` as
+  its new `allMembers` prop.
+- IMPLEMENTED: `calendar-grid-view.tsx` — `merged = view === "week" &&
+  members.length > 1`; new `DayMergedColumn` component renders one
+  provider-coded column per day (small colored dot per booking,
+  `providerColorClass` indexed by position in `allMembers` so colors
+  stay stable across filter changes — an 8-color palette, cycles past
+  8 providers) plus a small color-key legend row above the grid. Day
+  view and a Week view filtered to exactly one provider keep the
+  original `DayProviderColumn` per-provider-column rendering.
+- IMPLEMENTED: new-appointment provider defaulting — merged-view slot
+  clicks call `handleSlotClick` with `member: null`, which sets
+  `SlotSelection.teamMemberId` to `""`; `AppointmentModal`'s provider
+  `<select>` shows a blank placeholder option in that case and the
+  submit button/handler both now also require `teamMemberId` to be
+  non-empty (previously only gated on service/date/time/conflict).
+  `AppointmentModal` always receives the FULL team roster (not the
+  filtered set) for its own dropdown — the filter is a view-only
+  narrowing, never a hard restriction on who a booking can be made for.
+- NOT yet decided (unchanged from the design pass): final visual
+  treatment for provider-coded bookings — shipped as a small colored
+  dot in the chip + a legend row; revisit if Arun wants something
+  bolder (avatar/initial chip, border stripe) once he's seen it live.
+- Still needs: Arun to test live with Bea's 2-provider clinic (and
+  ideally a 3+ provider account) — Day view, Week view (all/one/a-few
+  selected), the persisted-cookie behavior across reloads, and
+  creating an appointment from a merged-view empty slot (provider
+  field should be blank/required). Flip to `done` once confirmed.
 - PROBLEM: calendar-grid-view.tsx currently renders a naive cartesian
   product for multi-provider clinics — every day column is unconditionally
   split into one sub-column per team member (`DayProviderColumn`, see
