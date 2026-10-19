@@ -267,6 +267,57 @@ function providerColorClass(memberId: string, allMembers: WeekMemberVM[]): strin
   return PROVIDER_COLOR_PALETTE[(idx < 0 ? 0 : idx) % PROVIDER_COLOR_PALETTE.length];
 }
 
+/**
+ * multi-provider-calendar-display: side-by-side layout for the merged
+ * Week view, where two different providers can have bookings at the same
+ * (or overlapping) time — without this, every booking was rendered
+ * full-width at the same position, so only the topmost one was visible/
+ * clickable. Standard day-view event layout: group bookings into
+ * maximal clusters of chained overlaps, greedily assign each a column
+ * within its cluster, size every booking in a cluster to 1/clusterWidth
+ * (never 1/wholeDayWidth — an unrelated single booking elsewhere that
+ * day should stay full-width).
+ */
+function layoutDayBookings(dayBookings: WeekBookingVM[]): Map<string, { column: number; totalColumns: number }> {
+  const sorted = [...dayBookings]
+    .map((b) => {
+      const start = new Date(b.startIso).getTime();
+      return { id: b.id, start, end: start + b.durationMin * 60_000 };
+    })
+    .sort((a, b) => a.start - b.start);
+
+  const result = new Map<string, { column: number; totalColumns: number }>();
+  let i = 0;
+  while (i < sorted.length) {
+    let clusterEnd = sorted[i].end;
+    let j = i + 1;
+    while (j < sorted.length && sorted[j].start < clusterEnd) {
+      clusterEnd = Math.max(clusterEnd, sorted[j].end);
+      j++;
+    }
+    const cluster = sorted.slice(i, j);
+    const active: { end: number; column: number }[] = [];
+    let maxConcurrent = 1;
+    for (const item of cluster) {
+      for (let k = active.length - 1; k >= 0; k--) {
+        if (active[k].end <= item.start) active.splice(k, 1);
+      }
+      const usedCols = new Set(active.map((a) => a.column));
+      let col = 0;
+      while (usedCols.has(col)) col++;
+      active.push({ end: item.end, column: col });
+      maxConcurrent = Math.max(maxConcurrent, active.length);
+      result.set(item.id, { column: col, totalColumns: 1 });
+    }
+    for (const item of cluster) {
+      const existing = result.get(item.id)!;
+      result.set(item.id, { column: existing.column, totalColumns: maxConcurrent });
+    }
+    i = j;
+  }
+  return result;
+}
+
 export function CalendarGridView({
   view,
   days,
@@ -774,6 +825,11 @@ function DayMergedColumn({
     const parts = tzDateParts(new Date(b.startIso));
     return parts.year === day.year && parts.month === day.month && parts.day === day.day;
   });
+  // multi-provider-calendar-display: side-by-side positions for any
+  // overlapping bookings (different providers, same/overlapping time) —
+  // without this they all render full-width at the same spot and only
+  // the topmost is visible/clickable.
+  const dayLayout = layoutDayBookings(dayBookings);
 
   const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -839,6 +895,9 @@ function DayMergedColumn({
           const top = (startMin - gridStartMin) * PX_PER_MIN;
           const height = Math.max(b.durationMin * PX_PER_MIN, 30);
           const isPast = new Date(b.startIso) < new Date();
+          const { column, totalColumns } = dayLayout.get(b.id) ?? { column: 0, totalColumns: 1 };
+          const widthPct = 100 / totalColumns;
+          const leftPct = column * widthPct;
 
           // open-slot-plus-badge: another provider is still free during
           // this exact booking's time range — overlap-check against every
@@ -861,8 +920,13 @@ function DayMergedColumn({
           return (
             <div
               key={b.id}
-              className="absolute left-0.5 right-0.5 flex flex-col overflow-hidden rounded-md"
-              style={{ top, height }}
+              className="absolute flex flex-col overflow-hidden rounded-md"
+              style={{
+                top,
+                height,
+                left: `calc(${leftPct}% + 2px)`,
+                width: `calc(${widthPct}% - 4px)`,
+              }}
             >
               {/* open-slot-plus-badge: a separate thin row stacked above
                   the booking's own content, not a hover overlay on top of
