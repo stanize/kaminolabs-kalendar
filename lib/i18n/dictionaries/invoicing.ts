@@ -94,6 +94,10 @@ export interface InvoicingDictionary {
     filterPaymentMethodAll: string;
     filterPatientName: string;
     filterInvoiceNumber: string;
+    // free-text-invoice-search: matches across the whole invoice record
+    // (client, service + any additional concept, payment method, amount,
+    // invoice number) instead of one field at a time.
+    filterSearch: string;
     colNumber: string;
     colClient: string;
     colService: string;
@@ -200,6 +204,7 @@ const es: InvoicingDictionary = {
     filterPaymentMethodAll: "Todos",
     filterPatientName: "Buscar por cliente...",
     filterInvoiceNumber: "Buscar por nº de factura...",
+    filterSearch: "Buscar en la factura...",
     colNumber: "Nº",
     colClient: "Cliente",
     colService: "Servicio",
@@ -301,6 +306,7 @@ const en: InvoicingDictionary = {
     filterPaymentMethodAll: "All",
     filterPatientName: "Search by client...",
     filterInvoiceNumber: "Search by invoice number...",
+    filterSearch: "Search the invoice...",
     colNumber: "No.",
     colClient: "Client",
     colService: "Service",

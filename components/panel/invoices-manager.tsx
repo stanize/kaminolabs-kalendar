@@ -15,6 +15,14 @@ function pdfHref(invoice: InvoiceRow): string {
   return `/api/invoices/${invoice.id}/pdf?token=${invoice.access_token}`;
 }
 
+// invoice-concepts-list: service_name is "Servicio\nConcepto adicional"
+// when an extra concept was added — the Servicio filter should only ever
+// offer/match the first line (the actual appointment type), never the
+// combined string with the additional concept baked in.
+function serviceLine(serviceName: string): string {
+  return serviceName.split("\n")[0];
+}
+
 // facturas-pending-tab (2026-10): Generadas/Pendientes — a paid booking
 // with no invoice yet (the post-Cobrar prompt was declined, or it's from
 // before this feature existed) sits in Pendientes rather than vanishing;
@@ -40,23 +48,46 @@ export function InvoicesManager({
   const [paymentMethod, setPaymentMethod] = useState("");
   const [patientName, setPatientName] = useState("");
   const [invoiceNumber, setInvoiceNumber] = useState("");
+  // free-text-invoice-search: matches across the whole invoice record
+  // (client, service + any additional concept, payment method, amount,
+  // invoice number) rather than one field at a time.
+  const [searchText, setSearchText] = useState("");
 
-  const services = useMemo(() => [...new Set(invoices.map((i) => i.service_name))].sort(), [invoices]);
-
-  const filtered = useMemo(() => {
-    return invoices.filter((inv) => {
-      if (dateFrom && new Date(inv.created_at) < new Date(dateFrom)) return false;
-      if (dateTo && new Date(inv.created_at) > new Date(`${dateTo}T23:59:59`)) return false;
-      if (service && inv.service_name !== service) return false;
-      if (paymentMethod && inv.payment_method !== paymentMethod) return false;
-      if (patientName && !inv.client_name.toLowerCase().includes(patientName.toLowerCase())) return false;
-      if (invoiceNumber && !formatInvoiceNumber(inv.issue_year, inv.invoice_number).includes(invoiceNumber)) return false;
-      return true;
-    });
-  }, [invoices, dateFrom, dateTo, service, paymentMethod, patientName, invoiceNumber]);
+  const services = useMemo(() => [...new Set(invoices.map((i) => serviceLine(i.service_name)))].sort(), [invoices]);
 
   const methodLabel = (m: InvoiceRow["payment_method"]) =>
     m === "cash" ? dict.paymentMethodCash : m === "card" ? dict.paymentMethodCard : m === "bono" ? dict.paymentMethodBono : "—";
+
+  const filtered = useMemo(() => {
+    const q = searchText.trim().toLowerCase();
+    return invoices.filter((inv) => {
+      if (dateFrom && new Date(inv.created_at) < new Date(dateFrom)) return false;
+      if (dateTo && new Date(inv.created_at) > new Date(`${dateTo}T23:59:59`)) return false;
+      if (service && serviceLine(inv.service_name) !== service) return false;
+      if (paymentMethod && inv.payment_method !== paymentMethod) return false;
+      if (patientName && !inv.client_name.toLowerCase().includes(patientName.toLowerCase())) return false;
+      if (invoiceNumber && !formatInvoiceNumber(inv.issue_year, inv.invoice_number).includes(invoiceNumber)) return false;
+      if (q) {
+        const methodText =
+          inv.payment_method === "cash" ? dict.paymentMethodCash
+          : inv.payment_method === "card" ? dict.paymentMethodCard
+          : inv.payment_method === "bono" ? dict.paymentMethodBono
+          : "";
+        const haystack = [
+          inv.client_name,
+          inv.client_email,
+          inv.service_name,
+          formatInvoiceNumber(inv.issue_year, inv.invoice_number),
+          methodText,
+          inv.amount.toFixed(2),
+        ]
+          .join(" ")
+          .toLowerCase();
+        if (!haystack.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [invoices, dateFrom, dateTo, service, paymentMethod, patientName, invoiceNumber, searchText, dict]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -120,6 +151,12 @@ export function InvoicesManager({
                 onChange={(e) => setInvoiceNumber(e.target.value)}
                 placeholder={dict.filterInvoiceNumber}
                 className="min-w-[160px] rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[13px] text-ink"
+              />
+              <input
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+                placeholder={dict.filterSearch}
+                className="min-w-[200px] flex-1 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[13px] text-ink"
               />
             </div>
 
