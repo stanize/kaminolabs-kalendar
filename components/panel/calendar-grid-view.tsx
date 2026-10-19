@@ -861,46 +861,53 @@ function DayMergedColumn({
           return (
             <div
               key={b.id}
-              onClick={(e) => { e.stopPropagation(); onBookingClick(b); }}
-              className={`absolute left-0.5 right-0.5 cursor-pointer overflow-hidden rounded-md px-1.5 py-[3px] text-[10.5px] leading-[1.2] ${chipClasses(b.status, isPast, b.clientStatus, b.clinicReviewedAt)}`}
+              className="absolute left-0.5 right-0.5 flex flex-col overflow-hidden rounded-md"
               style={{ top, height }}
             >
+              {/* open-slot-plus-badge: a separate thin row stacked above
+                  the booking's own content, not a hover overlay on top of
+                  it — its own click target, within the same slot box. */}
               {hasFreeProvider && (
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); onAddAtBooking(day, b, ranges); }}
                   title={dict.week.addAppointment}
-                  className="absolute right-0.5 top-0.5 z-10 grid h-4 w-4 place-items-center rounded-full bg-surface text-ink shadow-sm hover:bg-brand-weak"
+                  className="flex shrink-0 items-center justify-center bg-surface py-[1px] text-ink hover:bg-brand-weak"
                 >
-                  <Icon name="plus" size={10} />
+                  <Icon name="plus" size={9} />
                 </button>
               )}
-              <div className="flex items-center gap-1 truncate pr-4">
-                {b.teamMemberId && (
-                  <span
-                    className={`inline-block h-[7px] w-[7px] shrink-0 rounded-full ${providerColorClass(b.teamMemberId, allMembers)}`}
-                  />
+              <div
+                onClick={(e) => { e.stopPropagation(); onBookingClick(b); }}
+                className={`min-h-0 flex-1 cursor-pointer overflow-hidden px-1.5 py-[3px] text-[10.5px] leading-[1.2] ${chipClasses(b.status, isPast, b.clientStatus, b.clinicReviewedAt)}`}
+              >
+                <div className="flex items-center gap-1 truncate">
+                  {b.teamMemberId && (
+                    <span
+                      className={`inline-block h-[7px] w-[7px] shrink-0 rounded-full ${providerColorClass(b.teamMemberId, allMembers)}`}
+                    />
+                  )}
+                  {b.cancellationRequestedAt && (
+                    <span title="Solicitud de cancelación pendiente" className="text-rose-600">🛑</span>
+                  )}
+                  {b.reminderSendFailed && (
+                    <span title="Recordatorio no enviado" className="text-amber-600">⚠</span>
+                  )}
+                  {(b.clientStatus !== "guest_confirmed" && b.clientStatus !== "first_time") || !b.clinicReviewedAt ? (
+                    <span
+                      title={clientStatusLabel(b.clientStatus, b.clinicReviewedAt)}
+                      className={`inline-block h-[7px] w-[7px] shrink-0 rounded-full ${clientStatusDotClass(b.clientStatus, b.clinicReviewedAt)}`}
+                    />
+                  ) : null}
+                  <span className="truncate">{b.serviceName}</span>
+                </div>
+                <div className="truncate opacity-90">
+                  {timeLabel(b.startIso)} · {b.clientName}
+                </div>
+                {isPast && pastResultLabel(b, dict) && (
+                  <div className="truncate font-semibold">{pastResultLabel(b, dict)}</div>
                 )}
-                {b.cancellationRequestedAt && (
-                  <span title="Solicitud de cancelación pendiente" className="text-rose-600">🛑</span>
-                )}
-                {b.reminderSendFailed && (
-                  <span title="Recordatorio no enviado" className="text-amber-600">⚠</span>
-                )}
-                {(b.clientStatus !== "guest_confirmed" && b.clientStatus !== "first_time") || !b.clinicReviewedAt ? (
-                  <span
-                    title={clientStatusLabel(b.clientStatus, b.clinicReviewedAt)}
-                    className={`inline-block h-[7px] w-[7px] shrink-0 rounded-full ${clientStatusDotClass(b.clientStatus, b.clinicReviewedAt)}`}
-                  />
-                ) : null}
-                <span className="truncate">{b.serviceName}</span>
               </div>
-              <div className="truncate opacity-90">
-                {timeLabel(b.startIso)} · {b.clientName}
-              </div>
-              {isPast && pastResultLabel(b, dict) && (
-                <div className="truncate font-semibold">{pastResultLabel(b, dict)}</div>
-              )}
             </div>
           );
         })}
