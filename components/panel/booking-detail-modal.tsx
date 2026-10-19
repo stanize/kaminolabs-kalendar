@@ -118,13 +118,41 @@ export function BookingDetailModal({
 
   const [resendingInvoice, setResendingInvoice] = useState(false);
   const [resendInvoiceError, setResendInvoiceError] = useState<string | null>(null);
-  async function handleResendInvoice() {
+  // reenviar-missing-email-prompt (2026-10): the invoice's own client_email
+  // might be absent/synthetic (no-email-on-file or a WhatsApp sentinel
+  // address) — same "has a real email" rule the confirm modal uses.
+  // Reenviar then asks for one inline instead of silently failing, and
+  // saves it to the invoice + the linked client's profile, same as the
+  // confirm modal's missing-email case.
+  const [resendEmailPromptOpen, setResendEmailPromptOpen] = useState(false);
+  const [resendEmailInput, setResendEmailInput] = useState("");
+
+  function handleResendInvoice() {
+    if (!existingInvoice) return;
+    if (!hasRealEmail(existingInvoice.client_email)) {
+      setResendEmailPromptOpen(true);
+      setResendInvoiceError(null);
+      return;
+    }
+    doResendInvoice();
+  }
+
+  async function doResendInvoice(alternateEmail?: string) {
     if (!existingInvoice) return;
     setResendingInvoice(true);
     setResendInvoiceError(null);
-    const res = await resendInvoice({ invoiceId: existingInvoice.id });
+    const res = await resendInvoice({
+      invoiceId: existingInvoice.id,
+      alternateEmail,
+      saveToProfile: !!alternateEmail,
+    });
     setResendingInvoice(false);
-    if (!res.ok) setResendInvoiceError(res.error);
+    if (!res.ok) {
+      setResendInvoiceError(res.error);
+      return;
+    }
+    setResendEmailPromptOpen(false);
+    setResendEmailInput("");
   }
 
   // Fetched lazily — only while the Cobrar modal is open, and only when the
@@ -528,6 +556,25 @@ export function BookingDetailModal({
                     {resendingInvoice ? invoicingDict.page.resending : invoicingDict.page.resend}
                   </Btn>
                 </div>
+                {resendEmailPromptOpen && (
+                  <div className="mt-2 flex items-center gap-2">
+                    <input
+                      type="email"
+                      value={resendEmailInput}
+                      onChange={(e) => setResendEmailInput(e.target.value)}
+                      placeholder={invoicingDict.confirmModal.missingEmailPlaceholder}
+                      className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 py-2 text-[13px] text-ink"
+                    />
+                    <Btn
+                      variant="outline"
+                      size="sm"
+                      onClick={() => doResendInvoice(resendEmailInput.trim())}
+                      disabled={resendingInvoice || !resendEmailInput.trim()}
+                    >
+                      {resendingInvoice ? invoicingDict.page.resending : invoicingDict.page.resend}
+                    </Btn>
+                  </div>
+                )}
                 {resendInvoiceError && <p className="mt-1.5 text-[12px] text-error">{resendInvoiceError}</p>}
               </div>
             )}
