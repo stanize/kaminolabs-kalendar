@@ -106,15 +106,27 @@ export function BookingDetailModal({
   // invoice gets created from within this modal (auto-invoice or the
   // confirm modal).
   const [existingInvoice, setExistingInvoice] = useState<InvoiceRow | null>(null);
+  // invoice-section-loading-skeleton (2026-10): the lookup is only ever
+  // relevant once the booking is paid (invoices don't exist otherwise), so
+  // the fetch is skipped entirely outside that case below — avoids both a
+  // wasted request and a Factura section that could pop in after the rest
+  // of the modal has already settled. While paid and still loading, a
+  // same-shaped skeleton (gated on the `booking.paymentStatus === "paid"
+  // && invoiceLoading` check at the render site) holds the section's
+  // place so nothing shifts once the real buttons arrive.
+  const [invoiceLoading, setInvoiceLoading] = useState(booking.paymentStatus === "paid");
   useEffect(() => {
+    if (booking.paymentStatus !== "paid") return;
     let cancelled = false;
     checkExistingInvoiceForBooking(booking.id).then((inv) => {
-      if (!cancelled) setExistingInvoice(inv);
+      if (cancelled) return;
+      setExistingInvoice(inv);
+      setInvoiceLoading(false);
     });
     return () => {
       cancelled = true;
     };
-  }, [booking.id]);
+  }, [booking.id, booking.paymentStatus]);
 
   const [resendingInvoice, setResendingInvoice] = useState(false);
   const [resendInvoiceError, setResendInvoiceError] = useState<string | null>(null);
@@ -540,7 +552,17 @@ export function BookingDetailModal({
               )}
             </div>
 
-            {existingInvoice && (
+            {booking.paymentStatus === "paid" && invoiceLoading ? (
+              <div>
+                <p className="mb-1.5 text-[12px] font-bold uppercase tracking-[.05em] text-ink-soft">
+                  {d.invoiceLabel}
+                </p>
+                <div className="flex items-center gap-2">
+                  <div className="h-8 w-[110px] animate-pulse rounded-lg bg-surface-2" />
+                  <div className="h-8 w-[90px] animate-pulse rounded-lg bg-surface-2" />
+                </div>
+              </div>
+            ) : existingInvoice && (
               <div>
                 <p className="mb-1.5 text-[12px] font-bold uppercase tracking-[.05em] text-ink-soft">
                   {d.invoiceLabel}
