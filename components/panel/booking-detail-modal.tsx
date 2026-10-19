@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Icon } from "@/components/ui/icon";
 import { Btn } from "@/components/ui/button";
 import {
@@ -14,11 +15,16 @@ import {
 import { getActiveBonosForClientAction } from "@/lib/actions/bonos";
 import type { ClientActiveBono } from "@/lib/bonos/data";
 import { checkExistingInvoiceForBooking, createAndSendInvoice } from "@/lib/actions/invoices";
+import type { InvoiceRow } from "@/lib/invoices/data";
 import { getClientIdentity } from "@/lib/actions/clients";
 import type { CalendarDictionary } from "@/lib/i18n/dictionaries/calendar";
 import type { InvoicingDictionary } from "@/lib/i18n/dictionaries/invoicing";
 import { clientStatusLabel, clientStatusBadgeClass, needsClinicFollowUp, type WeekBookingVM } from "@/components/panel/calendar-grid-view";
 import { InvoiceConfirmModal, hasRealEmail } from "@/components/panel/invoice-confirm-modal";
+
+function invoicePdfHref(invoice: { id: string; access_token: string }): string {
+  return `/api/invoices/${invoice.id}/pdf?token=${invoice.access_token}`;
+}
 
 const TZ = "Europe/Madrid";
 
@@ -92,6 +98,23 @@ export function BookingDetailModal({
   // second one).
   const [invoiceConfirmOpen, setInvoiceConfirmOpen] = useState(false);
   const invoiceDict = invoicingDict.confirmModal;
+
+  // view-invoice-from-booking-modal (2026-10): lets the clinic see/download
+  // the invoice right from this modal once one exists for the booking,
+  // instead of having to go find it on the Facturas page or the client's
+  // own page. Fetched once per booking — refreshed below whenever a new
+  // invoice gets created from within this modal (auto-invoice or the
+  // confirm modal).
+  const [existingInvoice, setExistingInvoice] = useState<InvoiceRow | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    checkExistingInvoiceForBooking(booking.id).then((inv) => {
+      if (!cancelled) setExistingInvoice(inv);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [booking.id]);
 
   // Fetched lazily — only while the Cobrar modal is open, and only when the
   // clinic has bonos enabled at all (bonos-visibility-flag-interaction,
@@ -313,7 +336,18 @@ export function BookingDetailModal({
           </div>
           <div className="flex items-center gap-2 text-ink">
             <Icon name="user" size={14} className="shrink-0 text-ink-soft" />
-            <span>{booking.clientName}</span>
+            {/* client-link-from-appointment (2026-10): a booking linked to a
+                clinic client opens straight to that client's profile — lets
+                the clinic jump calendar -> patient profile without leaving
+                the appointment detail first. Guest/unlinked bookings (no
+                clinic_client_id yet) stay plain text. */}
+            {booking.clinicClientId ? (
+              <Link href={`/panel/clients/${booking.clinicClientId}`} className="font-medium text-brand hover:underline">
+                {booking.clientName}
+              </Link>
+            ) : (
+              <span>{booking.clientName}</span>
+            )}
           </div>
           {isAwaitingConfirmation && (
             <div className="flex items-center gap-2 text-orange-700">
@@ -436,13 +470,29 @@ export function BookingDetailModal({
               ) : !editingPayment && paidSummaryText ? (
                 <div className="flex items-center justify-between gap-2 rounded-lg border border-line bg-surface-2/50 px-3 py-2">
                   <p className="text-[12.5px] font-medium text-ink">{paidSummaryText}</p>
-                  <button
-                    type="button"
-                    onClick={() => setEditingPayment(true)}
-                    className="shrink-0 text-[12.5px] font-semibold text-brand hover:underline"
-                  >
-                    {d.editPaymentButton}
-                  </button>
+                  <div className="flex shrink-0 items-center gap-3">
+                    {/* view-invoice-from-booking-modal: once an invoice
+                        exists for this booking, it's viewable right here —
+                        no need to leave the calendar for Facturas or the
+                        client page. */}
+                    {existingInvoice && (
+                      <a
+                        href={invoicePdfHref(existingInvoice)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[12.5px] font-semibold text-brand hover:underline"
+                      >
+                        {invoicingDict.page.download}
+                      </a>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setEditingPayment(true)}
+                      className="text-[12.5px] font-semibold text-brand hover:underline"
+                    >
+                      {d.editPaymentButton}
+                    </button>
+                  </div>
                 </div>
               ) : !editingPayment && booking.status === "no_show" ? (
                 <div className="flex items-center justify-between gap-2 rounded-lg border border-line bg-surface-2/50 px-3 py-2">
