@@ -122,6 +122,11 @@ export interface CalendarDictionary {
     resultNoShow: string;
     resultCancelled: string;
     editPaymentButton: string; // "Editar" — small link next to a resolved Pago state (paid/no-show), reopens Cobrar/No-show
+    // view-invoice-from-booking-modal: a separate "Factura" section below
+    // Pago, shown once an invoice exists for the booking — its own
+    // Descargar/Reenviar buttons, distinct from the Pago box so it never
+    // reads as a payment-editing option.
+    invoiceLabel: string; // "Factura"
     paymentLabel: string; // "Pago"
     paymentPaid: string;
     paymentPending: string;
@@ -260,6 +265,7 @@ const es: CalendarDictionary = {
     resultNoShow: "No-show",
     resultCancelled: "Cancelada",
     editPaymentButton: "Editar",
+    invoiceLabel: "Factura",
     paymentLabel: "Pago",
     paymentPaid: "Pagado",
     paymentPending: "Pendiente",
@@ -396,6 +402,7 @@ const en: CalendarDictionary = {
     resultNoShow: "No-show",
     resultCancelled: "Cancelled",
     editPaymentButton: "Edit",
+    invoiceLabel: "Invoice",
     paymentLabel: "Payment",
     paymentPaid: "Paid",
     paymentPending: "Pending",

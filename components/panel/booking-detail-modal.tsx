@@ -14,7 +14,7 @@ import {
 } from "@/lib/actions/booking-owner";
 import { getActiveBonosForClientAction } from "@/lib/actions/bonos";
 import type { ClientActiveBono } from "@/lib/bonos/data";
-import { checkExistingInvoiceForBooking, createAndSendInvoice } from "@/lib/actions/invoices";
+import { checkExistingInvoiceForBooking, createAndSendInvoice, resendInvoice } from "@/lib/actions/invoices";
 import type { InvoiceRow } from "@/lib/invoices/data";
 import { getClientIdentity } from "@/lib/actions/clients";
 import type { CalendarDictionary } from "@/lib/i18n/dictionaries/calendar";
@@ -115,6 +115,17 @@ export function BookingDetailModal({
       cancelled = true;
     };
   }, [booking.id]);
+
+  const [resendingInvoice, setResendingInvoice] = useState(false);
+  const [resendInvoiceError, setResendInvoiceError] = useState<string | null>(null);
+  async function handleResendInvoice() {
+    if (!existingInvoice) return;
+    setResendingInvoice(true);
+    setResendInvoiceError(null);
+    const res = await resendInvoice({ invoiceId: existingInvoice.id });
+    setResendingInvoice(false);
+    if (!res.ok) setResendInvoiceError(res.error);
+  }
 
   // Fetched lazily — only while the Cobrar modal is open, and only when the
   // clinic has bonos enabled at all (bonos-visibility-flag-interaction,
@@ -470,29 +481,13 @@ export function BookingDetailModal({
               ) : !editingPayment && paidSummaryText ? (
                 <div className="flex items-center justify-between gap-2 rounded-lg border border-line bg-surface-2/50 px-3 py-2">
                   <p className="text-[12.5px] font-medium text-ink">{paidSummaryText}</p>
-                  <div className="flex shrink-0 items-center gap-3">
-                    {/* view-invoice-from-booking-modal: once an invoice
-                        exists for this booking, it's viewable right here —
-                        no need to leave the calendar for Facturas or the
-                        client page. */}
-                    {existingInvoice && (
-                      <a
-                        href={invoicePdfHref(existingInvoice)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-[12.5px] font-semibold text-brand hover:underline"
-                      >
-                        {invoicingDict.page.download}
-                      </a>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => setEditingPayment(true)}
-                      className="text-[12.5px] font-semibold text-brand hover:underline"
-                    >
-                      {d.editPaymentButton}
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setEditingPayment(true)}
+                    className="shrink-0 text-[12.5px] font-semibold text-brand hover:underline"
+                  >
+                    {d.editPaymentButton}
+                  </button>
                 </div>
               ) : !editingPayment && booking.status === "no_show" ? (
                 <div className="flex items-center justify-between gap-2 rounded-lg border border-line bg-surface-2/50 px-3 py-2">
@@ -516,6 +511,27 @@ export function BookingDetailModal({
                 </div>
               )}
             </div>
+
+            {existingInvoice && (
+              <div>
+                <p className="mb-1.5 text-[12px] font-bold uppercase tracking-[.05em] text-ink-soft">
+                  {d.invoiceLabel}
+                </p>
+                <div className="flex items-center gap-2">
+                  <a href={invoicePdfHref(existingInvoice)} target="_blank" rel="noopener noreferrer">
+                    <Btn variant="outline" size="sm">
+                      <Icon name="externalLink" size={13} />
+                      {invoicingDict.page.download}
+                    </Btn>
+                  </a>
+                  <Btn variant="outline" size="sm" onClick={handleResendInvoice} disabled={resendingInvoice}>
+                    {resendingInvoice ? invoicingDict.page.resending : invoicingDict.page.resend}
+                  </Btn>
+                </div>
+                {resendInvoiceError && <p className="mt-1.5 text-[12px] text-error">{resendInvoiceError}</p>}
+              </div>
+            )}
+
             <div className="flex justify-end">
               <Btn variant="ghost" onClick={onClose} disabled={busy}>
                 {d.dismissButton}
