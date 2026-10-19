@@ -267,26 +267,30 @@ function providerColorClass(memberId: string, allMembers: WeekMemberVM[]): strin
   return PROVIDER_COLOR_PALETTE[(idx < 0 ? 0 : idx) % PROVIDER_COLOR_PALETTE.length];
 }
 
+export interface DayBookingCluster {
+  bookings: WeekBookingVM[];
+  startMs: number;
+  endMs: number;
+}
+
 /**
- * multi-provider-calendar-display: side-by-side layout for the merged
- * Week view, where two different providers can have bookings at the same
- * (or overlapping) time — without this, every booking was rendered
- * full-width at the same position, so only the topmost one was visible/
- * clickable. Standard day-view event layout: group bookings into
- * maximal clusters of chained overlaps, greedily assign each a column
- * within its cluster, size every booking in a cluster to 1/clusterWidth
- * (never 1/wholeDayWidth — an unrelated single booking elsewhere that
- * day should stay full-width).
+ * multi-provider-calendar-display: groups a day's bookings into maximal
+ * clusters of chained time overlaps — the merged Week view renders each
+ * cluster as one box (a single booking rendered as today's normal
+ * multi-line chip; 2+ overlapping bookings from different providers
+ * rendered as compact single-line rows stacked inside one shared box,
+ * per Arun's call — NOT side by side, which made everything too narrow
+ * to read at a glance).
  */
-function layoutDayBookings(dayBookings: WeekBookingVM[]): Map<string, { column: number; totalColumns: number }> {
+function clusterDayBookings(dayBookings: WeekBookingVM[]): DayBookingCluster[] {
   const sorted = [...dayBookings]
     .map((b) => {
       const start = new Date(b.startIso).getTime();
-      return { id: b.id, start, end: start + b.durationMin * 60_000 };
+      return { booking: b, start, end: start + b.durationMin * 60_000 };
     })
     .sort((a, b) => a.start - b.start);
 
-  const result = new Map<string, { column: number; totalColumns: number }>();
+  const clusters: DayBookingCluster[] = [];
   let i = 0;
   while (i < sorted.length) {
     let clusterEnd = sorted[i].end;
@@ -295,27 +299,11 @@ function layoutDayBookings(dayBookings: WeekBookingVM[]): Map<string, { column: 
       clusterEnd = Math.max(clusterEnd, sorted[j].end);
       j++;
     }
-    const cluster = sorted.slice(i, j);
-    const active: { end: number; column: number }[] = [];
-    let maxConcurrent = 1;
-    for (const item of cluster) {
-      for (let k = active.length - 1; k >= 0; k--) {
-        if (active[k].end <= item.start) active.splice(k, 1);
-      }
-      const usedCols = new Set(active.map((a) => a.column));
-      let col = 0;
-      while (usedCols.has(col)) col++;
-      active.push({ end: item.end, column: col });
-      maxConcurrent = Math.max(maxConcurrent, active.length);
-      result.set(item.id, { column: col, totalColumns: 1 });
-    }
-    for (const item of cluster) {
-      const existing = result.get(item.id)!;
-      result.set(item.id, { column: existing.column, totalColumns: maxConcurrent });
-    }
+    const items = sorted.slice(i, j);
+    clusters.push({ bookings: items.map((it) => it.booking), startMs: items[0].start, endMs: clusterEnd });
     i = j;
   }
-  return result;
+  return clusters;
 }
 
 export function CalendarGridView({
@@ -825,11 +813,7 @@ function DayMergedColumn({
     const parts = tzDateParts(new Date(b.startIso));
     return parts.year === day.year && parts.month === day.month && parts.day === day.day;
   });
-  // multi-provider-calendar-display: side-by-side positions for any
-  // overlapping bookings (different providers, same/overlapping time) —
-  // without this they all render full-width at the same spot and only
-  // the topmost is visible/clickable.
-  const dayLayout = layoutDayBookings(dayBookings);
+  const clusters = clusterDayBookings(dayBookings);
 
   const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -890,88 +874,130 @@ function DayMergedColumn({
           />
         ))}
 
-        {dayBookings.map((b) => {
-          const startMin = minutesInTz(new Date(b.startIso));
+        {clusters.map((cluster) => {
+          const startMin = minutesInTz(new Date(cluster.startMs));
           const top = (startMin - gridStartMin) * PX_PER_MIN;
-          const height = Math.max(b.durationMin * PX_PER_MIN, 30);
-          const isPast = new Date(b.startIso) < new Date();
-          const { column, totalColumns } = dayLayout.get(b.id) ?? { column: 0, totalColumns: 1 };
-          const widthPct = 100 / totalColumns;
-          const leftPct = column * widthPct;
-
-          // open-slot-plus-badge: another provider is still free during
-          // this exact booking's time range — overlap-check against every
-          // OTHER dayBooking (not just same-start-time ones), since a
-          // longer appointment can straddle a shorter one's whole slot.
-          const bStart = new Date(b.startIso).getTime();
-          const bEnd = bStart + b.durationMin * 60_000;
-          const busyProviderIds = new Set(
-            dayBookings
-              .filter((o) => {
-                if (!o.teamMemberId) return false;
-                const oStart = new Date(o.startIso).getTime();
-                const oEnd = oStart + o.durationMin * 60_000;
-                return oStart < bEnd && bStart < oEnd;
-              })
-              .map((o) => o.teamMemberId as string)
-          );
+          const naturalHeight = Math.max(((cluster.endMs - cluster.startMs) / 60_000) * PX_PER_MIN, 30);
+          const busyProviderIds = new Set(cluster.bookings.map((b) => b.teamMemberId).filter(Boolean) as string[]);
           const hasFreeProvider = members.some((m) => !busyProviderIds.has(m.id));
+          const clusterKey = cluster.bookings.map((b) => b.id).join("-");
+
+          // 1 booking in the cluster: today's normal multi-line chip,
+          // untouched — no overlap to resolve, nothing to compact.
+          if (cluster.bookings.length === 1) {
+            const b = cluster.bookings[0];
+            const isPast = new Date(b.startIso) < new Date();
+            return (
+              <div
+                key={clusterKey}
+                className="absolute left-0.5 right-0.5 flex flex-col overflow-hidden rounded-md"
+                style={{ top, height: naturalHeight }}
+              >
+                {hasFreeProvider && (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); onAddAtBooking(day, b, ranges); }}
+                    title={dict.week.addAppointment}
+                    className="flex shrink-0 items-center justify-center bg-surface py-[1px] text-ink hover:bg-brand-weak"
+                  >
+                    <Icon name="plus" size={9} />
+                  </button>
+                )}
+                <div
+                  onClick={(e) => { e.stopPropagation(); onBookingClick(b); }}
+                  className={`min-h-0 flex-1 cursor-pointer overflow-hidden px-1.5 py-[3px] text-[10.5px] leading-[1.2] ${chipClasses(b.status, isPast, b.clientStatus, b.clinicReviewedAt)}`}
+                >
+                  <div className="flex items-center gap-1 truncate">
+                    {b.teamMemberId && (
+                      <span
+                        className={`inline-block h-[7px] w-[7px] shrink-0 rounded-full ${providerColorClass(b.teamMemberId, allMembers)}`}
+                      />
+                    )}
+                    {b.cancellationRequestedAt && (
+                      <span title="Solicitud de cancelación pendiente" className="text-rose-600">🛑</span>
+                    )}
+                    {b.reminderSendFailed && (
+                      <span title="Recordatorio no enviado" className="text-amber-600">⚠</span>
+                    )}
+                    {(b.clientStatus !== "guest_confirmed" && b.clientStatus !== "first_time") || !b.clinicReviewedAt ? (
+                      <span
+                        title={clientStatusLabel(b.clientStatus, b.clinicReviewedAt)}
+                        className={`inline-block h-[7px] w-[7px] shrink-0 rounded-full ${clientStatusDotClass(b.clientStatus, b.clinicReviewedAt)}`}
+                      />
+                    ) : null}
+                    <span className="truncate">{b.serviceName}</span>
+                  </div>
+                  <div className="truncate opacity-90">
+                    {timeLabel(b.startIso)} · {b.clientName}
+                  </div>
+                  {isPast && pastResultLabel(b, dict) && (
+                    <div className="truncate font-semibold">{pastResultLabel(b, dict)}</div>
+                  )}
+                </div>
+              </div>
+            );
+          }
+
+          // 2+ overlapping bookings from different providers: per Arun's
+          // call, these stack as compact single-line rows (provider dot +
+          // name, service if it fits) inside ONE shared box — not split
+          // side by side, which made everything unreadably narrow. The
+          // grid's own time scale never changes; the box itself only
+          // grows past its natural duration-based height once there isn't
+          // room for every row (3+ bookings, typically) — up to 2 compact
+          // rows almost always already fit inside a normal appointment's
+          // natural height. Hovering a row shows the full detail via the
+          // native title tooltip.
+          const ROW_HEIGHT = 16;
+          const rowsNeeded = cluster.bookings.length + (hasFreeProvider ? 1 : 0);
+          const height = Math.max(naturalHeight, rowsNeeded * ROW_HEIGHT);
 
           return (
             <div
-              key={b.id}
-              className="absolute flex flex-col overflow-hidden rounded-md"
-              style={{
-                top,
-                height,
-                left: `calc(${leftPct}% + 2px)`,
-                width: `calc(${widthPct}% - 4px)`,
-              }}
+              key={clusterKey}
+              className="absolute left-0.5 right-0.5 flex flex-col overflow-hidden rounded-md border border-line/60 bg-surface"
+              style={{ top, height }}
             >
-              {/* open-slot-plus-badge: a separate thin row stacked above
-                  the booking's own content, not a hover overlay on top of
-                  it — its own click target, within the same slot box. */}
               {hasFreeProvider && (
                 <button
                   type="button"
-                  onClick={(e) => { e.stopPropagation(); onAddAtBooking(day, b, ranges); }}
+                  onClick={(e) => { e.stopPropagation(); onAddAtBooking(day, cluster.bookings[0], ranges); }}
                   title={dict.week.addAppointment}
                   className="flex shrink-0 items-center justify-center bg-surface py-[1px] text-ink hover:bg-brand-weak"
+                  style={{ height: ROW_HEIGHT }}
                 >
                   <Icon name="plus" size={9} />
                 </button>
               )}
-              <div
-                onClick={(e) => { e.stopPropagation(); onBookingClick(b); }}
-                className={`min-h-0 flex-1 cursor-pointer overflow-hidden px-1.5 py-[3px] text-[10.5px] leading-[1.2] ${chipClasses(b.status, isPast, b.clientStatus, b.clinicReviewedAt)}`}
-              >
-                <div className="flex items-center gap-1 truncate">
-                  {b.teamMemberId && (
-                    <span
-                      className={`inline-block h-[7px] w-[7px] shrink-0 rounded-full ${providerColorClass(b.teamMemberId, allMembers)}`}
-                    />
-                  )}
-                  {b.cancellationRequestedAt && (
-                    <span title="Solicitud de cancelación pendiente" className="text-rose-600">🛑</span>
-                  )}
-                  {b.reminderSendFailed && (
-                    <span title="Recordatorio no enviado" className="text-amber-600">⚠</span>
-                  )}
-                  {(b.clientStatus !== "guest_confirmed" && b.clientStatus !== "first_time") || !b.clinicReviewedAt ? (
-                    <span
-                      title={clientStatusLabel(b.clientStatus, b.clinicReviewedAt)}
-                      className={`inline-block h-[7px] w-[7px] shrink-0 rounded-full ${clientStatusDotClass(b.clientStatus, b.clinicReviewedAt)}`}
-                    />
-                  ) : null}
-                  <span className="truncate">{b.serviceName}</span>
-                </div>
-                <div className="truncate opacity-90">
-                  {timeLabel(b.startIso)} · {b.clientName}
-                </div>
-                {isPast && pastResultLabel(b, dict) && (
-                  <div className="truncate font-semibold">{pastResultLabel(b, dict)}</div>
-                )}
-              </div>
+              {cluster.bookings.map((b) => {
+                const isPast = new Date(b.startIso) < new Date();
+                const providerName = allMembers.find((m) => m.id === b.teamMemberId)?.name ?? "";
+                const fullDetail = [
+                  providerName,
+                  b.serviceName,
+                  `${timeLabel(b.startIso)} · ${b.clientName}`,
+                  isPast ? pastResultLabel(b, dict) : null,
+                ]
+                  .filter(Boolean)
+                  .join(" — ");
+                return (
+                  <div
+                    key={b.id}
+                    onClick={(e) => { e.stopPropagation(); onBookingClick(b); }}
+                    title={fullDetail}
+                    style={{ height: ROW_HEIGHT }}
+                    className={`flex shrink-0 cursor-pointer items-center gap-1 overflow-hidden px-1.5 text-[9.5px] leading-none ${chipClasses(b.status, isPast, b.clientStatus, b.clinicReviewedAt)}`}
+                  >
+                    {b.teamMemberId && (
+                      <span
+                        className={`inline-block h-[6px] w-[6px] shrink-0 rounded-full ${providerColorClass(b.teamMemberId, allMembers)}`}
+                      />
+                    )}
+                    <span className="truncate font-medium">{providerName}</span>
+                    {b.serviceName && <span className="truncate opacity-80">· {b.serviceName}</span>}
+                  </div>
+                );
+              })}
             </div>
           );
         })}
