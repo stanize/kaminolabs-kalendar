@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Icon } from "@/components/ui/icon";
 import type { CalendarDictionary } from "@/lib/i18n/dictionaries/calendar";
 import type { DayId } from "@/lib/onboarding/types";
 import { AppointmentModal, type SlotSelection, type ClosureRuleVM } from "@/components/panel/appointment-modal";
@@ -462,6 +463,7 @@ export function CalendarGridView({
                     dict={dict}
                     onSlotClick={(d, clickMinute, r) => handleSlotClick(d, null, clickMinute, r)}
                     onBookingClick={onBookingClick}
+                    onAddAtBooking={(d, booking, r) => handleSlotClick(d, null, minutesInTz(new Date(booking.startIso)), r)}
                   />
                 </div>
               );
@@ -746,6 +748,7 @@ function DayMergedColumn({
   dict,
   onSlotClick,
   onBookingClick,
+  onAddAtBooking,
 }: {
   day: GridDay;
   members: WeekMemberVM[];
@@ -758,6 +761,12 @@ function DayMergedColumn({
   dict: CalendarDictionary;
   onSlotClick: (day: GridDay, clickMinute: number, ranges: TimeRangeVM[]) => void;
   onBookingClick: (booking: WeekBookingVM) => void;
+  // open-slot-plus-badge (2026-10): a small "+" on top of an existing
+  // chip, shown only when at least one active provider is still free
+  // during that booking's time range — clicking it opens the same
+  // no-default create flow as an empty-slot click, pinned to that
+  // booking's own start time instead of a raw click offset.
+  onAddAtBooking: (day: GridDay, booking: WeekBookingVM, ranges: TimeRangeVM[]) => void;
 }) {
   const memberIds = new Set(members.map((m) => m.id));
   const dayBookings = bookings.filter((b) => {
@@ -830,6 +839,25 @@ function DayMergedColumn({
           const top = (startMin - gridStartMin) * PX_PER_MIN;
           const height = Math.max(b.durationMin * PX_PER_MIN, 30);
           const isPast = new Date(b.startIso) < new Date();
+
+          // open-slot-plus-badge: another provider is still free during
+          // this exact booking's time range — overlap-check against every
+          // OTHER dayBooking (not just same-start-time ones), since a
+          // longer appointment can straddle a shorter one's whole slot.
+          const bStart = new Date(b.startIso).getTime();
+          const bEnd = bStart + b.durationMin * 60_000;
+          const busyProviderIds = new Set(
+            dayBookings
+              .filter((o) => {
+                if (!o.teamMemberId) return false;
+                const oStart = new Date(o.startIso).getTime();
+                const oEnd = oStart + o.durationMin * 60_000;
+                return oStart < bEnd && bStart < oEnd;
+              })
+              .map((o) => o.teamMemberId as string)
+          );
+          const hasFreeProvider = members.some((m) => !busyProviderIds.has(m.id));
+
           return (
             <div
               key={b.id}
@@ -837,7 +865,17 @@ function DayMergedColumn({
               className={`absolute left-0.5 right-0.5 cursor-pointer overflow-hidden rounded-md px-1.5 py-[3px] text-[10.5px] leading-[1.2] ${chipClasses(b.status, isPast, b.clientStatus, b.clinicReviewedAt)}`}
               style={{ top, height }}
             >
-              <div className="flex items-center gap-1 truncate">
+              {hasFreeProvider && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); onAddAtBooking(day, b, ranges); }}
+                  title={dict.week.addAppointment}
+                  className="absolute right-0.5 top-0.5 z-10 grid h-4 w-4 place-items-center rounded-full bg-surface text-ink shadow-sm hover:bg-brand-weak"
+                >
+                  <Icon name="plus" size={10} />
+                </button>
+              )}
+              <div className="flex items-center gap-1 truncate pr-4">
                 {b.teamMemberId && (
                   <span
                     className={`inline-block h-[7px] w-[7px] shrink-0 rounded-full ${providerColorClass(b.teamMemberId, allMembers)}`}

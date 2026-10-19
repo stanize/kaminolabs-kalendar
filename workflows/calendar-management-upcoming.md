@@ -51,11 +51,22 @@ confirmed working by Arun):
   treatment for provider-coded bookings — shipped as a small colored
   dot in the chip + a legend row; revisit if Arun wants something
   bolder (avatar/initial chip, border stripe) once he's seen it live.
+- IMPLEMENTED (2026-10, Arun, open-slot-plus-badge): a small "+" button
+  on top of a merged-view booking chip, shown only when at least one
+  active provider is still free during that booking's exact time range
+  (overlap-checked against every other booking that day, not just
+  same-start-time ones — a longer appointment can straddle a shorter
+  one's whole slot). Clicking it opens the same no-default create flow
+  as an empty-slot click, pinned to that booking's own start time.
+  Hidden entirely once every active provider is booked for that slot.
+  Day view / single-provider Week view unaffected (each provider
+  already has their own column there, no overlap ambiguity to solve).
 - Still needs: Arun to test live with Bea's 2-provider clinic (and
   ideally a 3+ provider account) — Day view, Week view (all/one/a-few
-  selected), the persisted-cookie behavior across reloads, and
-  creating an appointment from a merged-view empty slot (provider
-  field should be blank/required). Flip to `done` once confirmed.
+  selected), the persisted-cookie behavior across reloads, creating an
+  appointment from a merged-view empty slot (provider field should be
+  blank/required), and the new "+" badge (appears/disappears correctly
+  as providers fill up for a given slot). Flip to `done` once confirmed.
 - PROBLEM: calendar-grid-view.tsx currently renders a naive cartesian
   product for multi-provider clinics — every day column is unconditionally
   split into one sub-column per team member (`DayProviderColumn`, see
