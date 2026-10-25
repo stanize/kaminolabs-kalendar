@@ -1,15 +1,16 @@
 import "server-only";
-import { randomBytes } from "crypto";
+import { randomBytes, randomUUID } from "crypto";
 import { createClient } from "@/lib/supabase/server";
 import { resolveClinicClientId } from "@/lib/booking/client-link";
 import type { Business } from "@/lib/business/data";
 import type { InvoiceBusinessSnapshot, InvoiceRow } from "@/lib/invoices/types";
+import { buildVerificationUrl } from "@/lib/invoices/qr";
 
 export type { InvoiceRow } from "@/lib/invoices/types";
 export { formatInvoiceNumber } from "@/lib/invoices/types";
 
 const INVOICE_COLUMNS =
-  "id, business_id, booking_id, invoice_number, issue_year, client_name, client_email, client_dni, client_address, service_name, payment_method, amount, access_token, sent_at, created_at, business_snapshot";
+  "id, business_id, booking_id, invoice_number, issue_year, client_name, client_email, client_dni, client_address, service_name, payment_method, amount, access_token, sent_at, created_at, business_snapshot, verification_url";
 
 /**
  * business-fields-snapshot: freezes everything the PDF template reads, at
@@ -274,10 +275,16 @@ export async function createInvoiceForBooking(input: CreateInvoiceInput): Promis
   if (numberError || !numberData) return { ok: false, error: "create_failed" };
 
   const accessToken = randomBytes(24).toString("base64url");
+  // invoice-qr-verification: the id is generated here (not left to the
+  // column default) so the verification_url — and the QR encoding it —
+  // can be computed and stored in this same insert, rather than a
+  // second UPDATE after the row exists.
+  const id = randomUUID();
 
   const { data: created, error } = await supabase
     .from("kalendar_invoices")
     .insert({
+      id,
       business_id: businessId,
       booking_id: booking.id,
       invoice_number: numberData,
@@ -291,6 +298,7 @@ export async function createInvoiceForBooking(input: CreateInvoiceInput): Promis
       amount: booking.service_price,
       access_token: accessToken,
       business_snapshot: buildBusinessSnapshot(input.business, provider),
+      verification_url: buildVerificationUrl(id),
     })
     .select(INVOICE_COLUMNS)
     .single();

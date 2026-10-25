@@ -152,6 +152,63 @@ Criteria:
 - SHARED ALTERNATE-EMAIL OVERRIDE (per invoice-on-payment-trigger's identically-named note): "Reenviar" also offers the same one-off "¿Enviar a otro email?" field regardless of whether `client_email` is already set — sends this one resend to a different address (e.g. an accountant) without touching the client's saved profile or this invoice row's own stored `client_email`.
 - No edit/void/re-issue actions in this pass — a wrong invoice (wrong amount, wrong service, etc.) is still handled manually/offline, unchanged from the earlier version's explicit design decision. Resend is the only per-invoice action beyond viewing/downloading.
 
+## Step: invoice-qr-verification
+Status: in_progress
+Criteria (2026-10-25, Arun — "I want to develop this", from an uploaded
+spec-invoice-qr.md handoff doc; code implemented + typechecked/linted/built
+same session, PENDING MANUAL/LIVE TESTING):
+- SCOPE: a pre-VeriFACTU public verification QR on every invoice PDF —
+  explicitly NOT VeriFACTU itself (no hash chain, no AEAT submission, no
+  clinic-side VeriFACTU toggle — see `verifactu-compliance.md`, which
+  remains not_started and still blocked on its own
+  `verifactu-scope-and-regulation-check` step). This step only lays
+  groundwork compatible with that later work: the QR embed code and PDF
+  placement never change when VeriFACTU lands, only the URL fed into it
+  does (gated on a future `kalendar_businesses.verifactu_enabled` flag,
+  not yet built).
+- Schema: `kalendar_invoices.verification_url` (nullable text,
+  `supabase/schema_subset_030.sql` + folded into `schema_001.sql`) — set
+  at generation time so a re-download/re-send reproduces the exact same
+  QR. A legacy invoice with no stored value computes it on the fly in
+  `lib/invoices/render.ts` instead of requiring a backfill.
+- `lib/invoices/qr.ts` — `buildVerificationUrl(invoiceId)` (always the
+  Kalendar-hosted page for now) and `generateQrDataUri(url)` (`qrcode`
+  npm package, already a dependency for the booking-page QR — PNG data
+  URI, embeds directly as a react-pdf `<Image>`, same pattern the
+  signature image already uses).
+- `createInvoiceForBooking` (lib/invoices/data.ts) now pre-generates the
+  invoice's `id` via `randomUUID()` (instead of leaving it to the column
+  default) so `verification_url` can be computed and stored in the same
+  insert, no second UPDATE round trip.
+- `vat-exempt.tsx` — QR + "Verificar factura" + the plain-text URL,
+  bottom-right, below the signature row (own row, never crowds the
+  signature image), ~2.5cm square (70pt).
+- Public, no-auth surfaces, both new:
+  - `GET /api/invoice/verify/[id]` — JSON with ONLY non-personal fields
+    (invoice number, issue date, issuer NIF/name, total, currency,
+    status) — no client name/DNI/address/email, no booking id. Built
+    entirely from the invoice row's own frozen `business_snapshot`, never
+    a live join to `kalendar_businesses` — consistent with this file's
+    "frozen at generation" invoice model.
+  - `/invoice/verify/[id]` — the page the QR actually opens, styled like
+    the existing `/bookings/cancel/[token]` public page (centered card,
+    Logo, Icon). Calls `getInvoiceById` directly rather than round-
+    tripping through its own API route (that route exists for external
+    callers, not for this page to hit itself). Neither route needs a
+    `proxy.ts` exemption — `/invoice` and `/api/invoice` were never
+    inside its `/panel`/`/patient` auth gates to begin with.
+- NOT changed: `access_token`-gated `/api/invoices/[id]/pdf` (the actual
+  PDF download/email link) — the QR/verify page is a separate, public,
+  deliberately lower-detail surface, not a replacement for it.
+- Still needs: Arun to generate a real invoice, scan the QR on an actual
+  phone (iOS + Android per the spec's testing checklist), confirm the
+  verify page opens with no login and shows correct non-personal fields,
+  confirm `verification_url` is stored on the row, confirm re-downloading
+  the same invoice reproduces the identical QR, and confirm the
+  generate-on-request flow still works for an invoice created before this
+  column existed (the legacy-row fallback path). Flip to `done` once
+  confirmed.
+
 ## Notes / Deviations
 - FUTURE DEPENDENCY (2026-09-27): `workflows/verifactu-compliance.md` (Spain's
   anti-fraud invoicing regulation — hash-chained records, QR codes,

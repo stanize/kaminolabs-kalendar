@@ -10,6 +10,18 @@ invoice, so this feature only makes sense once that base invoicing feature
 exists, and needs to satisfy VERI*FACTU's record-keeping/hash-chain/QR
 requirements from the point that base feature is built, not bolted on after.
 
+**GROUNDWORK ALREADY LAID (2026-10-25)**: `pdf-invoicing.md`'s
+`invoice-qr-verification` step shipped a NON-VeriFACTU QR — every invoice PDF
+now carries a QR pointing at a Kalendar-hosted public verification page
+(`/invoice/verify/[id]`), with the URL stored on `kalendar_invoices.
+verification_url`. This was explicitly scoped to NOT be VeriFACTU (no hash
+chain, no AEAT submission) — but it was built so that switching to real
+VeriFACTU later only means changing which URL gets fed into the existing QR
+embed code (gated on a future `kalendar_businesses.verifactu_enabled` flag),
+not re-doing the QR/PDF-placement work itself. When this file's scope is
+finally settled with a real client, re-read that step before assuming a QR
+mechanism needs to be built from scratch.
+
 **Surfaced 2026-09-27 (Arun, late-session, not yet designed):** the plan is
 to build this WITH Kalendar's first real client rather than speculatively in
 isolation — VERI*FACTU compliance is genuinely valuable as a sales/acquisition

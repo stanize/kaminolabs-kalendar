@@ -56,6 +56,11 @@ export interface InvoiceRow {
   sent_at: string | null;
   created_at: string;
   business_snapshot: InvoiceBusinessSnapshot;
+  // invoice-qr-verification: the public verification-page URL encoded in
+  // the PDF's QR, frozen at generation time. Null on a legacy row created
+  // before this feature — lib/invoices/render.ts computes it on the fly
+  // in that case rather than requiring a backfill.
+  verification_url: string | null;
 }
 
 /** "2026-0001" — the display/content format, per sequential-numbering-allocation. */

@@ -79,6 +79,15 @@ const styles = StyleSheet.create({
   signatureBlock: { alignItems: "flex-end" },
   signatureImage: { width: 130, height: 50, objectFit: "contain", marginBottom: 4 },
   signatureName: { fontSize: 9.5, fontWeight: 700, color: "#111827" },
+
+  // invoice-qr-verification (spec-invoice-qr.md): bottom-right corner,
+  // ~2.5cm square (70pt at 72dpi) — separate from the signature row above
+  // it so it never crowds the signature image.
+  qrRow: { flexDirection: "row", justifyContent: "flex-end", marginTop: 16 },
+  qrBlock: { alignItems: "center" },
+  qrImage: { width: 70, height: 70 },
+  qrCaption: { fontSize: 6.5, color: "#94a3b8", marginTop: 2 },
+  qrUrl: { fontSize: 6, color: "#cbd5e1" },
 });
 
 function fullAddressLine(b: InvoiceTemplateProps["business"]): string {
@@ -87,7 +96,7 @@ function fullAddressLine(b: InvoiceTemplateProps["business"]): string {
 }
 
 export function VatExemptInvoice(props: InvoiceTemplateProps) {
-  const { business, client, invoiceNumberFormatted, issueDate, serviceName, amount, paid } = props;
+  const { business, client, invoiceNumberFormatted, issueDate, serviceName, amount, paid, verificationUrl, qrDataUri } = props;
   const amountFormatted = amount.toFixed(2).replace(".", ",");
 
   return (
@@ -183,6 +192,15 @@ export function VatExemptInvoice(props: InvoiceTemplateProps) {
             {/* eslint-disable-next-line jsx-a11y/alt-text -- react-pdf's Image has no alt prop (not a DOM element) */}
             {business.signatureUrl && <Image style={styles.signatureImage} src={business.signatureUrl} />}
             <Text style={styles.signatureName}>Fdo: {business.professionalName || business.name}</Text>
+          </View>
+        </View>
+
+        <View style={styles.qrRow}>
+          <View style={styles.qrBlock}>
+            {/* eslint-disable-next-line jsx-a11y/alt-text -- react-pdf's Image has no alt prop (not a DOM element) */}
+            <Image style={styles.qrImage} src={qrDataUri} />
+            <Text style={styles.qrCaption}>Verificar factura</Text>
+            <Text style={styles.qrUrl}>{verificationUrl}</Text>
           </View>
         </View>
       </Page>

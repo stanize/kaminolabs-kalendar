@@ -5,6 +5,7 @@ import type { InvoiceRow } from "@/lib/invoices/data";
 import { getInvoiceTemplate } from "@/lib/invoices/templates";
 import type { InvoiceTemplateProps } from "@/lib/invoices/templates/types";
 import { formatInvoiceNumber } from "@/lib/invoices/data";
+import { buildVerificationUrl, generateQrDataUri } from "@/lib/invoices/qr";
 
 const INTL_LOCALE = "es-ES";
 const TZ = "Europe/Madrid";
@@ -22,6 +23,13 @@ const TZ = "Europe/Madrid";
 export async function renderInvoicePdf(invoice: InvoiceRow, paid: boolean): Promise<Buffer> {
   const snapshot = invoice.business_snapshot;
   const template = getInvoiceTemplate(snapshot.templateId);
+
+  // invoice-qr-verification: a legacy invoice created before this feature
+  // has no stored verification_url — computed here instead of requiring a
+  // backfill, so the generate-on-request model (no stored file) keeps
+  // working unchanged for every existing invoice, not just new ones.
+  const verificationUrl = invoice.verification_url ?? buildVerificationUrl(invoice.id);
+  const qrDataUri = await generateQrDataUri(verificationUrl);
 
   const props: InvoiceTemplateProps = {
     business: {
@@ -52,6 +60,8 @@ export async function renderInvoicePdf(invoice: InvoiceRow, paid: boolean): Prom
     serviceName: invoice.service_name,
     amount: invoice.amount,
     paid,
+    verificationUrl,
+    qrDataUri,
   };
 
   // Our template components render a <Document> internally, but TS only

@@ -1055,7 +1055,13 @@ create table public.kalendar_invoices (
   -- signature, template id), frozen at creation time — a later edit to the
   -- business (DNI change, new signature, etc.) must never alter an
   -- already-generated invoice. See InvoiceBusinessSnapshot (lib/invoices/types.ts).
-  business_snapshot jsonb     not null default '{}'::jsonb
+  business_snapshot jsonb     not null default '{}'::jsonb,
+  -- invoice-qr-verification (schema_subset_030.sql): the public
+  -- verification-page URL encoded in the invoice PDF's QR, stored at
+  -- generation time so a re-download/re-send reproduces the exact same
+  -- QR. Nullable — a legacy row computes it on the fly at render time
+  -- instead (see lib/invoices/render.ts).
+  verification_url  text
 );
 
 -- Not globally unique — only unique within a business + year (per-business,

@@ -32,4 +32,10 @@ export interface InvoiceTemplateProps {
   serviceName: string;
   amount: number;
   paid: boolean; // whether the underlying booking is marked paid
+  // invoice-qr-verification (spec-invoice-qr.md): the public verification
+  // page's URL and a ready-to-embed PNG data URI QR encoding it, computed
+  // by lib/invoices/render.ts (not the template's job to generate the QR
+  // image itself).
+  verificationUrl: string;
+  qrDataUri: string;
 }
