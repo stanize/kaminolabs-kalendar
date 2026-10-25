@@ -180,9 +180,20 @@ same session, PENDING MANUAL/LIVE TESTING):
   invoice's `id` via `randomUUID()` (instead of leaving it to the column
   default) so `verification_url` can be computed and stored in the same
   insert, no second UPDATE round trip.
-- `vat-exempt.tsx` — QR + "Verificar factura" + the plain-text URL,
-  bottom-right, below the signature row (own row, never crowds the
-  signature image), ~2.5cm square (70pt).
+- REVISED (2026-10-25, same session, Arun): placement/size matched to
+  VeriFactu's own QR rules (Royal Decree 1007/2023 / Order HAC/1177/2024
+  — Arun-supplied summary, NOT independently confirmed against the actual
+  regulation text, which `verifactu-compliance.md`'s still-not-started
+  `verifactu-scope-and-regulation-check` step is the place to do before
+  anything VeriFactu-specific is built) — top-left, right after the
+  header row and before the itemized table, ~35mm square (99pt), with a
+  proper quiet zone (`generateQrDataUri`'s `margin: 4`). Used
+  UNCONDITIONALLY — VeriFactu-enabled or not — specifically so the PDF
+  layout never has to move again once real VeriFactu lands; only the
+  URL/caption text would change then. Caption stays "Verificar factura" +
+  our own URL, deliberately NOT the regulation's required "VERI\*FACTU"/
+  AEAT wording — using that text now would be a false compliance claim,
+  since this QR isn't AEAT-verifiable yet.
 - Public, no-auth surfaces, both new:
   - `GET /api/invoice/verify/[id]` — JSON with ONLY non-personal fields
     (invoice number, issue date, issuer NIF/name, total, currency,

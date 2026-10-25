@@ -14,11 +14,18 @@ export function buildVerificationUrl(invoiceId: string): string {
   return `${base}/invoice/verify/${invoiceId}`;
 }
 
-/** A PNG data URI embeddable directly as a react-pdf <Image src=.../>. */
+/**
+ * A PNG data URI embeddable directly as a react-pdf <Image src=.../>.
+ * `margin: 4` (the library's own default — restored explicitly here so a
+ * future change to that default doesn't silently shrink it) gives a
+ * proper quiet zone around the code, needed at the ~35mm print size the
+ * VeriFactu-matched PDF layout renders this at (lib/invoices/templates/
+ * vat-exempt.tsx) for reliable scanning.
+ */
 export async function generateQrDataUri(url: string): Promise<string> {
   return QRCode.toDataURL(url, {
-    width: 300,
-    margin: 1,
+    width: 400,
+    margin: 4,
     color: { dark: "#111827", light: "#ffffff" },
   });
 }

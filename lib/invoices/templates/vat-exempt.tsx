@@ -80,14 +80,22 @@ const styles = StyleSheet.create({
   signatureImage: { width: 130, height: 50, objectFit: "contain", marginBottom: 4 },
   signatureName: { fontSize: 9.5, fontWeight: 700, color: "#111827" },
 
-  // invoice-qr-verification (spec-invoice-qr.md): bottom-right corner,
-  // ~2.5cm square (70pt at 72dpi) — separate from the signature row above
-  // it so it never crowds the signature image.
-  qrRow: { flexDirection: "row", justifyContent: "flex-end", marginTop: 16 },
-  qrBlock: { alignItems: "center" },
-  qrImage: { width: 70, height: 70 },
-  qrCaption: { fontSize: 6.5, color: "#94a3b8", marginTop: 2 },
-  qrUrl: { fontSize: 6, color: "#cbd5e1" },
+  // invoice-qr-verification (2026-10-25, Arun — matched to VeriFactu's QR
+  // placement/size rules per Royal Decree 1007/2023 / Order HAC/1177/2024,
+  // used unconditionally, VeriFactu-enabled or not, so the layout never
+  // needs to move again once real VeriFactu lands — only the URL/caption
+  // text would change then, per Arun's explicit call. ~35mm square (within
+  // the regulation's 30–40mm range), near the top-left, before the
+  // itemized table — NOT the regulation's required "VERI*FACTU"/AEAT
+  // wording, since this QR is NOT yet VeriFactu-verifiable (it points at
+  // Kalendar's own page); that text would be a false compliance claim
+  // until the feature is actually built. Quiet zone handled by
+  // generateQrDataUri's own margin, not by extra space here.
+  qrTopRow: { flexDirection: "row", alignItems: "flex-start", marginBottom: 16 },
+  qrImage: { width: 99, height: 99, marginRight: 10 },
+  qrCaptionBlock: { justifyContent: "center" },
+  qrCaption: { fontSize: 7, fontWeight: 700, color: "#475569" },
+  qrUrl: { fontSize: 6, color: "#94a3b8", marginTop: 2 },
 });
 
 function fullAddressLine(b: InvoiceTemplateProps["business"]): string {
@@ -137,6 +145,15 @@ export function VatExemptInvoice(props: InvoiceTemplateProps) {
             <Text style={styles.badge}>FACTURA</Text>
             <Text style={styles.invoiceNumber}>Nº {invoiceNumberFormatted}</Text>
             <Text style={styles.issueDateText}>Fecha de emisión: {issueDate}</Text>
+          </View>
+        </View>
+
+        <View style={styles.qrTopRow}>
+          {/* eslint-disable-next-line jsx-a11y/alt-text -- react-pdf's Image has no alt prop (not a DOM element) */}
+          <Image style={styles.qrImage} src={qrDataUri} />
+          <View style={styles.qrCaptionBlock}>
+            <Text style={styles.qrCaption}>Verificar factura</Text>
+            <Text style={styles.qrUrl}>{verificationUrl}</Text>
           </View>
         </View>
 
@@ -192,15 +209,6 @@ export function VatExemptInvoice(props: InvoiceTemplateProps) {
             {/* eslint-disable-next-line jsx-a11y/alt-text -- react-pdf's Image has no alt prop (not a DOM element) */}
             {business.signatureUrl && <Image style={styles.signatureImage} src={business.signatureUrl} />}
             <Text style={styles.signatureName}>Fdo: {business.professionalName || business.name}</Text>
-          </View>
-        </View>
-
-        <View style={styles.qrRow}>
-          <View style={styles.qrBlock}>
-            {/* eslint-disable-next-line jsx-a11y/alt-text -- react-pdf's Image has no alt prop (not a DOM element) */}
-            <Image style={styles.qrImage} src={qrDataUri} />
-            <Text style={styles.qrCaption}>Verificar factura</Text>
-            <Text style={styles.qrUrl}>{verificationUrl}</Text>
           </View>
         </View>
       </Page>
