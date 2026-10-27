@@ -141,16 +141,91 @@ Criteria:
 - Generated at creation time: formatted invoice_number, issue_date
 - Manual/booking-less invoicing (a clinic invoicing for something not tracked as a Kalendar booking) is assumed OUT of scope for MVP — confirm this assumption still holds before building, per the spec's own open question
 
+## Step: invoice-concepts-list
+Status: in_progress
+Criteria (design + build 2026-10, Arun, from real clinic feedback via Bea's
+translated voice memo — code implemented + typechecked/linted/built same
+session, PENDING MANUAL/LIVE TESTING; this step existed only as scattered
+backlog-entry references until this pass, written up properly now):
+- PROBLEM: a clinic sometimes wants a predefined, reusable list of extra
+  billing line-item text to pick from at invoice-generation time (Bea's
+  example: "Quiropodia"), on top of the booking's own service name, rather
+  than typing something ad hoc every time.
+- Blank slate by design (explicit Arun call, point 5 of the design
+  discussion) — no starter list seeded for any business; each clinic
+  builds its own from scratch.
+- Schema: `kalendar_invoice_concepts` (`schema_subset_029.sql`, folded
+  into `schema_001.sql`) — `id`, `business_id`, `label`, case-insensitive
+  unique per business (`(business_id, lower(label))`).
+- `lib/invoices/concepts.ts` — `getInvoiceConcepts`,
+  `findOrCreateInvoiceConcept` (case-insensitive lookup-or-insert, shared
+  by both the explicit Settings "add" action and the confirm modal's
+  auto-add-on-custom-entry path), `renameInvoiceConcept`,
+  `deleteInvoiceConcept`.
+- Settings → Facturación gets a "Conceptos de factura" section
+  (`components/panel/invoice-concepts-settings.tsx`) — add/rename/delete,
+  wired through `lib/actions/invoices.ts`'s `listInvoiceConcepts`/
+  `addInvoiceConcept`/`updateInvoiceConcept`/`removeInvoiceConcept`.
+- REVISED MID-BUILD (same session, per a follow-up screenshot from Arun):
+  the confirm modal's field was first built as a single "Concepto de
+  factura" input that REPLACED the booking's service name outright —
+  corrected to a two-field layout instead: a read-only "Servicio" line
+  (always the booking's actual service name, always the invoice's first
+  line — changing it is the separate, parked
+  `backlog.md` Cobrar-time-override idea, not this feature) plus an
+  OPTIONAL "Concepto de factura adicional" field (datalist-backed against
+  the business's list, auto-adds a typed custom value to that list on
+  submit). The invoice's stored `service_name` is
+  `Servicio\nConcepto adicional` when a concept was added, else just the
+  service name. The service name itself is NEVER auto-added to the
+  concepts list — confirmed explicitly, only the extra concept is
+  (`createAndSendInvoice`'s `extraConcept` param, kept separate from the
+  combined `concept` param that becomes the stored value).
+- Still single line item per invoice (see `backlog.md`'s parked
+  multi-line-invoices entry — that's a bigger, separate schema change,
+  deliberately not bundled into this one).
+- facturas-page's Servicio filter and dropdown options key off the first
+  line only (`serviceLine()` helper, splits on `\n`) so an additional
+  concept never shows up as a spurious distinct "service" in that filter
+  — see that step below for the rest of the Facturas-page filtering.
+
 ## Step: facturas-page
 Status: in_progress
 Criteria:
 - RENAMED + EXPANDED (2026-10-15, fifth pass) from this file's earlier, simpler invoice-history-view — Arun asked for real filtering and a resend action, not just a read-only list. Panel placement: new `/panel/invoices` (or `/panel/facturas` — exact route TBD, label "Facturas" in the sidebar either way) route, fills the nav slot post-mvp-menu-items.md's invoices-page step already tracked as superseded/absorbed into this file; mark that step accordingly once this lands.
 - Lists every invoice for the business: invoice_number, client_name, service_name, payment_method, amount, sent_at, with a download link (generate-on-request PDF route, same `?token=` link shape as the emailed one — per kalendar-invoices-schema's `access_token` and in-app-pdf-generation's decision; the owner is already authorized by seeing the row in their own page at all, no separate owner-only auth path needed).
 - FILTERS, per Arun ("filter through date, type, patient name... actually both, services and payment method, and also invoice number"): date range (on `created_at`/`sent_at`), service (`service_name`), payment method (`payment_method` — cash/card/bono), patient name (`client_name`, text search), and invoice number (`invoice_number`, text search). All client-side over the business's already-loaded invoice list is likely sufficient at MVP scale (mirrors bonos.md's bono-usage-report's client-side filter/sort pattern) — revisit with server-side filtering only if invoice volume ever makes that genuinely necessary.
+- ADDED (2026-10, same session as invoice-concepts-list): a free-text
+  search box matching across the whole invoice record (client name/email,
+  service + additional concept, invoice number, payment method, amount)
+  — on top of, not instead of, the five per-field filters above.
 - RESEND ACTION, per Arun ("the invoice can have send email feature"): a "Reenviar" action per row, reusing send-invoice-action's underlying email step (NOT allocating a new invoice number or creating a new row — same invoice, same number, just re-sent). Updates `sent_at` to the new send time (last-sent, not first-sent, since a resend is itself a real send event worth reflecting).
-- SHARED MISSING-EMAIL HANDLING (same mechanism as invoice-on-payment-trigger's, not a second implementation): if an invoice's `client_email` is empty/a placeholder (can happen for an older row, or one whose booking never had a real email), clicking "Reenviar" prompts inline for an email before sending — entered email updates `kalendar_clients` (when the invoice's booking has a `clinic_client_id` link) AND this invoice row's own `client_email`, so both the client's profile and this specific invoice's email are corrected going forward.
+- SHARED MISSING-EMAIL HANDLING (same mechanism as invoice-on-payment-trigger's, not a second implementation): if an invoice's `client_email` is empty/a placeholder (can happen for an older row, or one whose booking never had a real email), clicking "Reenviar" prompts inline for an email before sending — entered email updates `kalendar_clients` (when the invoice's booking has a `clinic_client_id` link) AND this invoice row's own `client_email`, so both the client's profile and this specific invoice's email are corrected going forward. The SAME prompt now also exists on the Factura section's "Reenviar" in the booking detail modal (`booking-detail-modal.tsx`) — not a second implementation, one `hasRealEmail` check shared by both entry points.
 - SHARED ALTERNATE-EMAIL OVERRIDE (per invoice-on-payment-trigger's identically-named note): "Reenviar" also offers the same one-off "¿Enviar a otro email?" field regardless of whether `client_email` is already set — sends this one resend to a different address (e.g. an accountant) without touching the client's saved profile or this invoice row's own stored `client_email`.
 - No edit/void/re-issue actions in this pass — a wrong invoice (wrong amount, wrong service, etc.) is still handled manually/offline, unchanged from the earlier version's explicit design decision. Resend is the only per-invoice action beyond viewing/downloading.
+
+## Step: facturas-pending-tab
+Status: in_progress
+Criteria (2026-10, Arun — from Bea's "send it to me afterward" feedback;
+written up here now, was previously undocumented despite being built):
+- A paid booking with no invoice yet (the post-Cobrar Sí/No prompt was
+  declined, or it predates this feature) doesn't just disappear — it
+  sits in a "Pendientes" tab on the Facturas page
+  (`getPendingInvoiceBookings`, `lib/invoices/data.ts`) until generated.
+  "No" at Cobrar time means "later," not "never."
+- Includes bono-paid sessions (Arun's explicit call) — the bono purchase
+  itself getting its own invoice is a separate, not-yet-built feature.
+- Same generate-invoice entry point also added directly to a client's own
+  booking history on their client-detail page ("Generar factura"/
+  "Descargar factura" per paid row) — both this tab and the client page
+  share one `InvoiceConfirmModal` component
+  (`components/panel/invoice-confirm-modal.tsx`), not two separate
+  implementations of the DNI/address/email/concept logic.
+- A separate "Factura" section (Descargar/Reenviar, own missing-email
+  prompt) was also added to the booking detail modal itself
+  (`booking-detail-modal.tsx`) once an invoice exists for that booking —
+  not a Pendientes-tab feature exactly, but the same "generate/view an
+  invoice without leaving wherever you are" goal, built in the same pass.
 
 ## Step: invoice-qr-verification
 Status: in_progress
