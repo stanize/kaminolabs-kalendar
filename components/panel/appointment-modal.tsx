@@ -370,7 +370,7 @@ export function AppointmentModal(props: AppointmentModalProps) {
         aria-hidden
       />
       <div
-        className={`absolute inset-y-0 right-0 flex h-full w-full max-w-[440px] flex-col overflow-y-auto bg-surface p-5 shadow-2xl transition-transform duration-200 ease-out ${
+        className={`absolute inset-y-0 right-0 flex h-full w-full flex-col overflow-y-auto bg-surface p-5 shadow-2xl transition-transform duration-200 ease-out sm:w-1/2 sm:min-w-[480px] sm:p-8 ${
           visible ? "translate-x-0" : "translate-x-full"
         }`}
       >
