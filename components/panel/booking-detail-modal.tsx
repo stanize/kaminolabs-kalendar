@@ -542,11 +542,11 @@ export function BookingDetailModal({
                 on a future appointment too (prepayment) — not just past.
                 Paying doesn't mark it completed (handleCobrar omits
                 `status` when isFuture); it only sets the payment fields. */}
-            <div>
-              <p className="mb-1.5 text-[12px] font-bold uppercase tracking-[.05em] text-ink-soft">
-                {d.paymentLabel}
-              </p>
-              {!editingPayment && paidSummaryText ? (
+            {!editingPayment && paidSummaryText ? (
+              <div>
+                <p className="mb-1.5 text-[12px] font-bold uppercase tracking-[.05em] text-ink-soft">
+                  {d.paymentLabel}
+                </p>
                 <div className="flex items-center justify-between gap-2 rounded-lg border border-line bg-surface-2/50 px-3 py-2">
                   <p className="text-[12.5px] font-medium text-ink">{paidSummaryText}</p>
                   <button
@@ -557,12 +557,12 @@ export function BookingDetailModal({
                     {d.editPaymentButton}
                   </button>
                 </div>
-              ) : (
-                <Btn variant="outline" size="sm" onClick={() => setCobrarModalOpen(true)} disabled={busy}>
-                  {d.cobrarButton}
-                </Btn>
-              )}
-            </div>
+              </div>
+            ) : (
+              <Btn variant="outline" size="sm" onClick={() => setCobrarModalOpen(true)} disabled={busy}>
+                {d.cobrarButton}
+              </Btn>
+            )}
 
             <div className="flex flex-wrap justify-end gap-2">
               <Btn variant="outline" onClick={handleCancel} disabled={busy}>

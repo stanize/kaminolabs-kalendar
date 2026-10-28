@@ -156,7 +156,7 @@ export interface CalendarDictionary {
     saveButton: string;
     saving: string;
     // cobrar-button-and-paid-at (calendar-management-past.md)
-    cobrarButton: string; // "Cobrar" — shown instead of a payment toggle on an unpaid past appointment
+    cobrarButton: string; // "Caja" — shown instead of a payment toggle on an unpaid appointment (future or past)
     cobrarModalTitle: string;
     cobrarCancel: string; // closes the Cobrar modal without charging
     paidWithTemplate: string; // "Pagado con {method} · {time}" — {method} and {time} replaced client-side
@@ -313,7 +313,7 @@ const es: CalendarDictionary = {
     paymentMethodLockedNote: "Este pago ya está aplicado a un bono. Para cambiarlo, ve a la página de Bonos.",
     saveButton: "Guardar",
     saving: "Guardando…",
-    cobrarButton: "Cobrar",
+    cobrarButton: "Caja",
     cobrarModalTitle: "¿Cómo ha pagado?",
     cobrarCancel: "Cancelar",
     paidWithTemplate: "Pagado con {method} · {time}",
@@ -465,7 +465,7 @@ const en: CalendarDictionary = {
     paymentMethodLockedNote: "This payment is already applied to a bono. To change it, go to the Bonos page.",
     saveButton: "Save",
     saving: "Saving…",
-    cobrarButton: "Charge",
+    cobrarButton: "Payment",
     cobrarModalTitle: "How did they pay?",
     cobrarCancel: "Cancel",
     paidWithTemplate: "Paid with {method} · {time}",
