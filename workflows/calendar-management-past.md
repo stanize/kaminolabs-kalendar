@@ -63,9 +63,11 @@ Criteria:
 - Migration: add `paid_at` via a new `supabase/schema_subset_NNN.sql` (next sequential number) plus folding into `schema_001.sql`, per CLAUDE.md's migration convention — this table already has real rows.
 
 ## Step: payment-cancellation-flow-expansion
-Status: not_started
+Status: in_progress
 Criteria (design settled 2026-10-28, Arun, from an uploaded
-spec-appointment-modal-payment.md handoff doc — not yet built):
+spec-appointment-modal-payment.md handoff doc; code implemented +
+typechecked/linted/built same session, PENDING MANUAL/LIVE TESTING and
+the live-DB migration):
 - SOURCE SPEC WAS STALE: the handoff doc's own "Current state" section
   (PAGO only on past bookings, Efectivo/Tarjeta only, no invoice trigger)
   doesn't match this repo — it was written without seeing
@@ -161,6 +163,58 @@ spec-appointment-modal-payment.md handoff doc — not yet built):
   session-deduction/one-directional-lock rules, the existing
   `chipClasses()` color scheme for every status other than
   cancelled/no_show, and the multi-provider calendar display work.
+
+- IMPLEMENTED: `schema_subset_031.sql` (folded into `schema_001.sql`) —
+  `payment_method` check constraint widened to add `bank_transfer`,
+  `bizum`, `direct_debit`, `paypal`, `other` (English codes); new
+  `cancellation_reason` text column. `lib/booking/payment-methods.ts`
+  holds the frontend's `PAYMENT_METHOD_CODES` constant. Every TS type
+  that mirrors the old 3-value payment-method union (`WeekBookingVM`,
+  `InvoiceRow`, `PendingInvoiceBooking`, `WeekViewBooking`, the two
+  inline `owner-data.ts` query types, `BookingPaymentMethod`) widened to
+  match — found via a repo-wide grep for the literal union string, not
+  guessed. `invoicing.ts`'s dictionary + the Facturas page's payment-
+  method filter/display also got the new labels, so an invoice paid via
+  one of the new methods doesn't show a bare "—".
+- IMPLEMENTED: `handleCobrar` (`booking-detail-modal.tsx`) now reachable
+  from a future booking too — when `isFuture`, the `updateBookingResult`
+  call omits `status` entirely (the function's existing optional-status
+  support), so prepaying never silently marks a future appointment
+  completed. The Cobrar modal's two hardcoded buttons became a 2-column
+  grid over `PAYMENT_METHOD_CODES`, with the bono option(s) kept as a
+  separate full-width list below it (a bono names a specific purchase,
+  doesn't fit the fixed-label grid cells).
+- IMPLEMENTED, WITH A DEVIATION FROM THIS STEP'S OWN EARLIER CRITERIA:
+  the past-cancel reason prompt ships with only **Error de agenda** and
+  **Otro** (free text) — "No-show" was dropped from the options despite
+  being listed above as "pre-selected" (copied from the spec without
+  re-checking it against the rest of this step's own decision to keep
+  no-show as its own status). Including it would have meant two
+  different ways to reach "didn't show up" — the existing dedicated
+  No-show button (sets `status = 'no_show'`) and this new path (sets
+  `status = 'cancelled'`, reason = "No-show" text) — recording the same
+  real-world event two different ways depending on which button was
+  clicked. Dropped as redundant; **Error de agenda** is the pre-selected
+  default instead. Flag for Arun to confirm this reads right once tested
+  live — easy to add back if the two are meant to be genuinely distinct.
+  `cancelBookingAsOwner` takes an optional `reason` param, only ever sent
+  by this new flow — the existing future-appointment cancel (and the
+  patient-cancellation-request approve path) keep calling it with none.
+- IMPLEMENTED: `chipClasses()` (`calendar-grid-view.tsx`) — an early
+  return for `status === "cancelled" || status === "no_show"`, before
+  every other branch, grey (`bg-slate-200`/`text-slate-500`) +
+  `line-through`. Applies in both `DayProviderColumn` and
+  `DayMergedColumn` since both call the same shared function — no
+  separate change needed per rendering mode.
+- Still needs: Arun to run `schema_subset_031.sql` against the live DB,
+  then live-test — Cobrar on a future appointment (confirm it stays
+  `confirmed`/`pending_confirmation`, not auto-completed), all 7+bono
+  methods selectable, the past-unresolved "Cancelar cita" reason flow
+  (including whether dropping "No-show" as a reason reads right),
+  cancelled/no-show chips rendering grey+strikethrough on both Day and
+  Week (including the merged multi-provider view) — and the Facturas
+  page correctly labels an invoice paid via one of the new methods.
+  Flip to `done` once confirmed.
 
 ## Step: past-appointment-editing
 Status: done

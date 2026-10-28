@@ -894,8 +894,12 @@ create table public.kalendar_bookings (
   -- How a 'paid' booking was paid. NULL unless payment_status = 'paid'.
   -- Selector only appears in the booking-detail modal once the owner flips
   -- payment_status to paid (bonos.md's session-deduction-on-payment).
+  -- payment-cancellation-flow-expansion (schema_subset_031.sql): expanded
+  -- past cash/card/bono with more real-world methods, still a plain text
+  -- check constraint (not an enum) so a future per-clinic payment-methods
+  -- config table can drive this list without a schema change.
   payment_method       text                  check (
-    payment_method in ('cash', 'card', 'bono')
+    payment_method in ('cash', 'card', 'bono', 'bank_transfer', 'bizum', 'direct_debit', 'paypal', 'other')
   ),
   -- When payment_status last transitioned to 'paid' (schema_subset_022.sql,
   -- calendar-management-past.md's cobrar-button-and-paid-at). Set to now()
@@ -955,6 +959,13 @@ create table public.kalendar_bookings (
   -- (set back to null) on either approve (status also becomes 'cancelled')
   -- or deny (status unchanged) — never left set after a decision.
   cancellation_requested_at timestamptz,
+  -- payment-cancellation-flow-expansion (schema_subset_031.sql): free-text
+  -- reason captured only for the new past-appointment-cancel flow (an
+  -- UNRESOLVED past booking — still pending_confirmation/confirmed — being
+  -- retroactively cancelled, not a reversal of an already-paid/no_show
+  -- one). NULL for every other cancellation path (a future-appointment
+  -- cancel stays the simple confirm, no reason asked).
+  cancellation_reason  text,
   -- Set by an explicit clinic action ("Contacted / Confirmed" button, panel
   -- calendar) once they've proactively reached out to a guest OR first-time
   -- patient booking that hasn't been reviewed yet (2026-09: first-time

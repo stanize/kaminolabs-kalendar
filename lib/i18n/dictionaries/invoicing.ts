@@ -111,6 +111,12 @@ export interface InvoicingDictionary {
     paymentMethodCash: string;
     paymentMethodCard: string;
     paymentMethodBono: string;
+    // payment-cancellation-flow-expansion (calendar-management-past.md)
+    paymentMethodBankTransfer: string;
+    paymentMethodBizum: string;
+    paymentMethodDirectDebit: string;
+    paymentMethodPaypal: string;
+    paymentMethodOther: string;
     neverSent: string;
     // facturas-pending-tab (2026-10): Generadas/Pendientes split — a paid
     // booking with no invoice yet (declined at Cobrar time, or from
@@ -218,6 +224,11 @@ const es: InvoicingDictionary = {
     paymentMethodCash: "Efectivo",
     paymentMethodCard: "Tarjeta",
     paymentMethodBono: "Bono",
+    paymentMethodBankTransfer: "Transferencia",
+    paymentMethodBizum: "Bizum",
+    paymentMethodDirectDebit: "Domiciliado",
+    paymentMethodPaypal: "PayPal",
+    paymentMethodOther: "Otro",
     neverSent: "—",
     tabGenerated: "Generadas",
     tabPending: "Pendientes",
@@ -320,6 +331,11 @@ const en: InvoicingDictionary = {
     paymentMethodCash: "Cash",
     paymentMethodCard: "Card",
     paymentMethodBono: "Bono",
+    paymentMethodBankTransfer: "Bank transfer",
+    paymentMethodBizum: "Bizum",
+    paymentMethodDirectDebit: "Direct debit",
+    paymentMethodPaypal: "PayPal",
+    paymentMethodOther: "Other",
     neverSent: "—",
     tabGenerated: "Generated",
     tabPending: "Pending",

@@ -138,7 +138,7 @@ export interface WeekViewBooking {
   // How a 'paid' booking was paid, and which specific bono (if any) it was
   // deducted from — session-deduction-on-payment (bonos.md). Both null
   // whenever paymentStatus is 'unpaid'.
-  paymentMethod: "cash" | "card" | "bono" | null;
+  paymentMethod: "cash" | "card" | "bono" | "bank_transfer" | "bizum" | "direct_debit" | "paypal" | "other" | null;
   bonoPurchaseId: string | null;
   // When payment_status last transitioned to 'paid' — cobrar-button-and-
   // paid-at (calendar-management-past.md). Null whenever paymentStatus is
@@ -252,7 +252,7 @@ export async function getWeekCalendarData(
           ends_at: string;
           status: BookingStatus;
           payment_status: PaymentStatus;
-          payment_method: "cash" | "card" | "bono" | null;
+          payment_method: "cash" | "card" | "bono" | "bank_transfer" | "bizum" | "direct_debit" | "paypal" | "other" | null;
           bono_purchase_id: string | null;
           paid_at: string | null;
           clinic_client_id: string | null;
@@ -586,7 +586,7 @@ export async function getConflictingBookingsForUser(userId: string): Promise<Con
           ends_at: string;
           status: BookingStatus;
           payment_status: PaymentStatus;
-          payment_method: "cash" | "card" | "bono" | null;
+          payment_method: "cash" | "card" | "bono" | "bank_transfer" | "bizum" | "direct_debit" | "paypal" | "other" | null;
           bono_purchase_id: string | null;
           paid_at: string | null;
           clinic_client_id: string | null;

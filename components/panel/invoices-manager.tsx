@@ -55,8 +55,19 @@ export function InvoicesManager({
 
   const services = useMemo(() => [...new Set(invoices.map((i) => serviceLine(i.service_name)))].sort(), [invoices]);
 
-  const methodLabel = (m: InvoiceRow["payment_method"]) =>
-    m === "cash" ? dict.paymentMethodCash : m === "card" ? dict.paymentMethodCard : m === "bono" ? dict.paymentMethodBono : "—";
+  const methodLabel = (m: InvoiceRow["payment_method"]) => {
+    switch (m) {
+      case "cash": return dict.paymentMethodCash;
+      case "card": return dict.paymentMethodCard;
+      case "bono": return dict.paymentMethodBono;
+      case "bank_transfer": return dict.paymentMethodBankTransfer;
+      case "bizum": return dict.paymentMethodBizum;
+      case "direct_debit": return dict.paymentMethodDirectDebit;
+      case "paypal": return dict.paymentMethodPaypal;
+      case "other": return dict.paymentMethodOther;
+      default: return "—";
+    }
+  };
 
   const filtered = useMemo(() => {
     const q = searchText.trim().toLowerCase();
@@ -138,6 +149,11 @@ export function InvoicesManager({
                   <option value="cash">{dict.paymentMethodCash}</option>
                   <option value="card">{dict.paymentMethodCard}</option>
                   <option value="bono">{dict.paymentMethodBono}</option>
+                  <option value="bank_transfer">{dict.paymentMethodBankTransfer}</option>
+                  <option value="bizum">{dict.paymentMethodBizum}</option>
+                  <option value="direct_debit">{dict.paymentMethodDirectDebit}</option>
+                  <option value="paypal">{dict.paymentMethodPaypal}</option>
+                  <option value="other">{dict.paymentMethodOther}</option>
                 </select>
               </div>
               <input

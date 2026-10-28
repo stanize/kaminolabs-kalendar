@@ -122,7 +122,7 @@ export interface PendingInvoiceBooking {
   clientEmail: string;
   serviceName: string;
   amount: number;
-  paymentMethod: "cash" | "card" | "bono" | null;
+  paymentMethod: "cash" | "card" | "bono" | "bank_transfer" | "bizum" | "direct_debit" | "paypal" | "other" | null;
   paidAt: string | null;
 }
 
@@ -153,7 +153,7 @@ export async function getPendingInvoiceBookings(businessId: string): Promise<Pen
 
   return ((paidBookings ?? []) as {
     id: string; clinic_client_id: string | null; client_name: string; client_email: string;
-    service_name: string; service_price: number; payment_method: "cash" | "card" | "bono" | null; paid_at: string | null;
+    service_name: string; service_price: number; payment_method: "cash" | "card" | "bono" | "bank_transfer" | "bizum" | "direct_debit" | "paypal" | "other" | null; paid_at: string | null;
   }[])
     .filter((b) => !invoicedIds.has(b.id))
     .map((b) => ({

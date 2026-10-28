@@ -50,7 +50,7 @@ export interface InvoiceRow {
   client_dni: string;
   client_address: string;
   service_name: string;
-  payment_method: "cash" | "card" | "bono" | null;
+  payment_method: "cash" | "card" | "bono" | "bank_transfer" | "bizum" | "direct_debit" | "paypal" | "other" | null;
   amount: number;
   access_token: string;
   sent_at: string | null;

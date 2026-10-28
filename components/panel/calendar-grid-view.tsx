@@ -151,7 +151,7 @@ export interface WeekBookingVM {
   durationMin: number;
   status: "pending_confirmation" | "confirmed" | "cancelled" | "completed" | "no_show";
   paymentStatus: "unpaid" | "paid";
-  paymentMethod: "cash" | "card" | "bono" | null;
+  paymentMethod: "cash" | "card" | "bono" | "bank_transfer" | "bizum" | "direct_debit" | "paypal" | "other" | null;
   bonoPurchaseId: string | null;
   paidAt: string | null;
   clinicClientId: string | null;
@@ -574,12 +574,23 @@ export function chipClasses(
   clientStatus: ClientStatusValue,
   clinicReviewedAt: string | null
 ): string {
+  // payment-cancellation-flow-expansion: a cancelled or no-show booking
+  // always renders grey + strikethrough, regardless of past/future and
+  // regardless of the usual follow-up-urgency color scheme below — same
+  // treatment for both, no visual distinction between "cancelled ahead of
+  // time" and "no-show after the fact". Still fully clickable (no
+  // pointer-events change), just visually receded.
+  if (status === "cancelled" || status === "no_show") {
+    return "bg-slate-200 text-slate-500 border-l-4 border-slate-400 line-through decoration-slate-400";
+  }
   if (!isPast) {
     return needsClinicFollowUp(clientStatus, clinicReviewedAt)
       ? "bg-amber-50 text-amber-900 border-l-4 border-amber-500"
       : "bg-teal-50 text-teal-900 border-l-4 border-teal-600";
   }
-  const isReviewed = status === "completed" || status === "no_show" || status === "cancelled";
+  // cancelled/no_show are already handled by the early return above —
+  // only "completed" counts as reviewed here.
+  const isReviewed = status === "completed";
   return isReviewed
     ? "bg-slate-100 text-slate-500 border-l-4 border-slate-300"
     : "bg-rose-50 text-rose-900 border-l-4 border-rose-500";

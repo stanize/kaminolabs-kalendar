@@ -49,7 +49,13 @@ export const cancelBookingAsOwner = authedAction(
   async (
     session,
     bookingId: string,
-    dict?: Partial<BookingOwnerActionDict>
+    dict?: Partial<BookingOwnerActionDict>,
+    // payment-cancellation-flow-expansion: only ever sent by the NEW
+    // past-appointment-cancel flow (an unresolved past booking — still
+    // pending_confirmation/confirmed, time just passed). The existing
+    // future-appointment cancel keeps calling this with no reason, same
+    // as always.
+    reason?: string
   ): Promise<OwnerBookingResult> => {
     const t = { ...FALLBACK, ...dict };
 
@@ -75,7 +81,11 @@ export const cancelBookingAsOwner = authedAction(
 
     const { error } = await supabase
       .from("kalendar_bookings")
-      .update({ status: "cancelled", status_updated_at: new Date().toISOString() })
+      .update({
+        status: "cancelled",
+        status_updated_at: new Date().toISOString(),
+        ...(reason?.trim() ? { cancellation_reason: reason.trim() } : {}),
+      })
       .eq("id", bookingId)
       .eq("business_id", business.id)
       .in("status", ["pending_confirmation", "confirmed"]);
@@ -284,7 +294,12 @@ export type BookingPaymentStatus = "unpaid" | "paid";
 // in the booking-detail modal only ever sends one of these three shapes.
 // A plain "bono" literal is never sent from the client; which bono is
 // implicit in the id itself (see session-deduction-on-payment).
-export type BookingPaymentMethod = "cash" | "card" | { bonoPurchaseId: string };
+// payment-cancellation-flow-expansion: expanded beyond cash/card/bono —
+// see lib/booking/payment-methods.ts for the full code list + display
+// labels.
+export type BookingPaymentMethod =
+  | "cash" | "card" | "bank_transfer" | "bizum" | "direct_debit" | "paypal" | "other"
+  | { bonoPurchaseId: string };
 
 /** The translation slice updateBookingResult needs for its own error messages. */
 export interface UpdateBookingResultDict {
@@ -367,7 +382,9 @@ export const updateBookingResult = authedAction(
     // exists purely to require going through the dedicated reversal flow
     // rather than an easy accidental click here, not as a data-integrity
     // mechanism.
-    let newPaymentMethod: "cash" | "card" | "bono" | null = null;
+    let newPaymentMethod:
+      | "cash" | "card" | "bono" | "bank_transfer" | "bizum" | "direct_debit" | "paypal" | "other"
+      | null = null;
     let newBonoPurchaseId: string | null = null;
     let bonoToDeduct: string | null = null; // set only when a fresh deduction is needed
 
@@ -393,7 +410,8 @@ export const updateBookingResult = authedAction(
           bonoToDeduct = requestedBonoId;
         }
       } else {
-        newPaymentMethod = input.paymentMethod as "cash" | "card";
+        newPaymentMethod = input.paymentMethod as
+          | "cash" | "card" | "bank_transfer" | "bizum" | "direct_debit" | "paypal" | "other";
         newBonoPurchaseId = null;
       }
     }

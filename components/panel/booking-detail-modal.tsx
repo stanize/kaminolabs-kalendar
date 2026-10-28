@@ -21,9 +21,28 @@ import type { CalendarDictionary } from "@/lib/i18n/dictionaries/calendar";
 import type { InvoicingDictionary } from "@/lib/i18n/dictionaries/invoicing";
 import { clientStatusLabel, clientStatusBadgeClass, needsClinicFollowUp, type WeekBookingVM } from "@/components/panel/calendar-grid-view";
 import { InvoiceConfirmModal, hasRealEmail } from "@/components/panel/invoice-confirm-modal";
+import { PAYMENT_METHOD_CODES, type PaymentMethodCode } from "@/lib/booking/payment-methods";
 
 function invoicePdfHref(invoice: { id: string; access_token: string }): string {
   return `/api/invoices/${invoice.id}/pdf?token=${invoice.access_token}`;
+}
+
+// payment-cancellation-flow-expansion: shared by the paid-summary line and
+// the Cobrar modal's button labels, so the two never drift apart.
+function paymentMethodLabel(
+  method: PaymentMethodCode | "bono",
+  d: CalendarDictionary["detailModal"]
+): string {
+  switch (method) {
+    case "cash": return d.paymentMethodCash;
+    case "card": return d.paymentMethodCard;
+    case "bank_transfer": return d.paymentMethodBankTransfer;
+    case "bizum": return d.paymentMethodBizum;
+    case "direct_debit": return d.paymentMethodDirectDebit;
+    case "paypal": return d.paymentMethodPaypal;
+    case "other": return d.paymentMethodOther;
+    case "bono": return d.paymentMethodBono;
+  }
 }
 
 const TZ = "Europe/Madrid";
@@ -69,6 +88,20 @@ export function BookingDetailModal({
   const d = dict.detailModal;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // payment-cancellation-flow-expansion: "Cancelar cita" for a PAST,
+  // UNRESOLVED booking (still pending_confirmation/confirmed — nothing
+  // was ever Cobrado/No-show'd for it, just its time has passed) — a
+  // retroactive cancel, distinct from the existing No-show button
+  // (which is its own status, not a cancellation reason). Scoped
+  // deliberately to the unresolved case only; an already-paid or
+  // already-no_show booking has no cancel entry point here (open
+  // question flagged in workflows/calendar-management-past.md — what a
+  // reversal should actually do to a deducted bono session or an
+  // already-generated invoice was never addressed, so it's not built).
+  const [pastCancelOpen, setPastCancelOpen] = useState(false);
+  const [pastCancelReason, setPastCancelReason] = useState<"schedule_error" | "other">("schedule_error");
+  const [pastCancelOtherText, setPastCancelOtherText] = useState("");
 
   // ── Payment / Resultado (cobrar-button-and-paid-at, 2026-10) ────────────
   // Simplified per Arun: a past appointment only ever ends up in one of
@@ -223,14 +256,7 @@ export function BookingDetailModal({
   const paidSummaryText =
     booking.paymentStatus === "paid" && booking.paidAt
       ? d.paidWithTemplate
-          .replace(
-            "{method}",
-            booking.paymentMethod === "cash"
-              ? d.paymentMethodCash
-              : booking.paymentMethod === "card"
-                ? d.paymentMethodCard
-                : d.paymentMethodBono
-          )
+          .replace("{method}", booking.paymentMethod ? paymentMethodLabel(booking.paymentMethod, d) : "")
           .replace(
             "{time}",
             new Intl.DateTimeFormat(intlLocale, { timeZone: TZ, hour: "2-digit", minute: "2-digit" }).format(
@@ -244,6 +270,18 @@ export function BookingDetailModal({
     setError(null);
     const res = await cancelBookingAsOwner(booking.id, dict.errors);
     setBusy(false);
+    if (!res.ok) { setError(res.error); return; }
+    onUpdated();
+    onClose();
+  };
+
+  const handlePastCancel = async () => {
+    const reasonText = pastCancelReason === "other" ? pastCancelOtherText.trim() : d.pastCancelReasonScheduleError;
+    setBusy(true);
+    setError(null);
+    const res = await cancelBookingAsOwner(booking.id, dict.errors, reasonText);
+    setBusy(false);
+    setPastCancelOpen(false);
     if (!res.ok) { setError(res.error); return; }
     onUpdated();
     onClose();
@@ -281,18 +319,22 @@ export function BookingDetailModal({
   };
 
   // cobrar-button-and-paid-at: charges immediately on selection (no separate
-  // Guardar step). DECIDED (2026-10): paying also marks the appointment
-  // completed in the same write — a past appointment that's been paid is,
-  // by definition, one that happened, so there's no separate Resultado
-  // choice to make.
+  // Guardar step). DECIDED (2026-10): paying a PAST appointment also marks
+  // it completed in the same write — by definition, one that happened, so
+  // there's no separate Resultado choice to make.
+  // payment-cancellation-flow-expansion: Cobrar is now also reachable on a
+  // FUTURE appointment (prepayment) — that write omits `status` entirely
+  // (updateBookingResult's existing optional-status behavior), since the
+  // appointment hasn't happened yet and shouldn't be silently marked
+  // completed just because it was paid for in advance.
   const handleCobrar = async (methodValue: string) => {
     setBusy(true);
     setError(null);
     const paymentMethod: BookingPaymentMethod = methodValue.startsWith("bono:")
       ? { bonoPurchaseId: methodValue.slice("bono:".length) }
-      : (methodValue as "cash" | "card");
+      : (methodValue as PaymentMethodCode);
     const res = await updateBookingResult(
-      { bookingId: booking.id, status: "completed", paymentStatus: "paid", paymentMethod },
+      { bookingId: booking.id, ...(isFuture ? {} : { status: "completed" as const }), paymentStatus: "paid", paymentMethod },
       dict.errors
     );
     setBusy(false);
@@ -495,18 +537,46 @@ export function BookingDetailModal({
         )}
 
         {isFuture ? (
-          <div className="flex flex-wrap justify-end gap-2">
-            <Btn variant="outline" onClick={handleCancel} disabled={busy}>
-              {busy ? d.cancelling : d.cancelButton}
-            </Btn>
-            <Btn variant="outline" onClick={() => onModify(booking)} disabled={busy}>
-              {d.modifyButton}
-            </Btn>
-            {isAwaitingConfirmation && (
-              <Btn onClick={handleConfirm} disabled={busy}>
-                {busy ? dict.manager.confirming : dict.manager.confirm}
+          <div className="flex flex-col gap-4">
+            {/* payment-cancellation-flow-expansion: Cobrar is now reachable
+                on a future appointment too (prepayment) — not just past.
+                Paying doesn't mark it completed (handleCobrar omits
+                `status` when isFuture); it only sets the payment fields. */}
+            <div>
+              <p className="mb-1.5 text-[12px] font-bold uppercase tracking-[.05em] text-ink-soft">
+                {d.paymentLabel}
+              </p>
+              {!editingPayment && paidSummaryText ? (
+                <div className="flex items-center justify-between gap-2 rounded-lg border border-line bg-surface-2/50 px-3 py-2">
+                  <p className="text-[12.5px] font-medium text-ink">{paidSummaryText}</p>
+                  <button
+                    type="button"
+                    onClick={() => setEditingPayment(true)}
+                    className="shrink-0 text-[12.5px] font-semibold text-brand hover:underline"
+                  >
+                    {d.editPaymentButton}
+                  </button>
+                </div>
+              ) : (
+                <Btn variant="outline" size="sm" onClick={() => setCobrarModalOpen(true)} disabled={busy}>
+                  {d.cobrarButton}
+                </Btn>
+              )}
+            </div>
+
+            <div className="flex flex-wrap justify-end gap-2">
+              <Btn variant="outline" onClick={handleCancel} disabled={busy}>
+                {busy ? d.cancelling : d.cancelButton}
               </Btn>
-            )}
+              <Btn variant="outline" onClick={() => onModify(booking)} disabled={busy}>
+                {d.modifyButton}
+              </Btn>
+              {isAwaitingConfirmation && (
+                <Btn onClick={handleConfirm} disabled={busy}>
+                  {busy ? dict.manager.confirming : dict.manager.confirm}
+                </Btn>
+              )}
+            </div>
           </div>
         ) : (
           <div className="flex flex-col gap-4">
@@ -541,12 +611,18 @@ export function BookingDetailModal({
                   </button>
                 </div>
               ) : (
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <Btn variant="primary" onClick={() => setCobrarModalOpen(true)} disabled={busy}>
                     {d.cobrarButton}
                   </Btn>
                   <Btn variant="outline" size="sm" onClick={handleNoShow} disabled={busy}>
                     {d.resultNoShow}
+                  </Btn>
+                  {/* payment-cancellation-flow-expansion: a retroactive
+                      cancel for an unresolved past booking — distinct from
+                      No-show above, which is its own status/button. */}
+                  <Btn variant="outline" size="sm" onClick={() => setPastCancelOpen(true)} disabled={busy}>
+                    {d.pastCancelButton}
                   </Btn>
                 </div>
               )}
@@ -620,28 +696,30 @@ export function BookingDetailModal({
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="mb-4 text-[15px] font-bold text-ink">{d.cobrarModalTitle}</h3>
-            <div className="flex flex-col gap-2.5">
-              <button
-                type="button"
-                onClick={() => handleCobrar("cash")}
-                disabled={busy}
-                className="rounded-xl border border-line bg-surface px-4 py-4 text-[15px] font-semibold text-ink transition-colors hover:border-brand-line hover:bg-brand-weak disabled:opacity-60"
-              >
-                {d.paymentMethodCash}
-              </button>
-              <button
-                type="button"
-                onClick={() => handleCobrar("card")}
-                disabled={busy}
-                className="rounded-xl border border-line bg-surface px-4 py-4 text-[15px] font-semibold text-ink transition-colors hover:border-brand-line hover:bg-brand-weak disabled:opacity-60"
-              >
-                {d.paymentMethodCard}
-              </button>
-              {/* bonos-visibility-flag-interaction (bonos.md): only ever
-                  offered when the clinic has bonos enabled AND the client
-                  has at least one active bono. */}
-              {bonosEnabled &&
-                (activeBonos ?? []).map((b) => (
+            {/* payment-cancellation-flow-expansion: expanded from
+                Efectivo/Tarjeta to the full PAYMENT_METHOD_CODES list — a
+                2-column grid, same button style as before. */}
+            <div className="grid grid-cols-2 gap-2.5">
+              {PAYMENT_METHOD_CODES.map((code) => (
+                <button
+                  key={code}
+                  type="button"
+                  onClick={() => handleCobrar(code)}
+                  disabled={busy}
+                  className="rounded-xl border border-line bg-surface px-3 py-4 text-[14px] font-semibold text-ink transition-colors hover:border-brand-line hover:bg-brand-weak disabled:opacity-60"
+                >
+                  {paymentMethodLabel(code, d)}
+                </button>
+              ))}
+            </div>
+            {/* bonos-visibility-flag-interaction (bonos.md): only ever
+                offered when the clinic has bonos enabled AND the client
+                has at least one active bono. Full-width, below the method
+                grid — a bono option names a specific purchase, doesn't fit
+                the fixed-label grid cells above. */}
+            {(bonosEnabled && ((activeBonos ?? []).length > 0 || bonosLoading)) && (
+              <div className="mt-2.5 flex flex-col gap-2.5">
+                {(activeBonos ?? []).map((b) => (
                   <button
                     key={b.id}
                     type="button"
@@ -654,13 +732,65 @@ export function BookingDetailModal({
                       .replace("{n}", String(b.sessionsRemaining))}
                   </button>
                 ))}
-              {bonosEnabled && bonosLoading && (
-                <p className="text-center text-[12.5px] text-ink-soft">…</p>
-              )}
-            </div>
+                {bonosLoading && <p className="text-center text-[12.5px] text-ink-soft">…</p>}
+              </div>
+            )}
             <div className="mt-4 flex justify-end">
               <Btn variant="ghost" onClick={() => setCobrarModalOpen(false)} disabled={busy}>
                 {d.cobrarCancel}
+              </Btn>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pastCancelOpen && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 px-4"
+          onClick={() => !busy && setPastCancelOpen(false)}
+        >
+          <div
+            className="w-full max-w-[360px] rounded-2xl bg-surface p-5 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="mb-4 text-[15px] font-bold text-ink">{d.pastCancelModalTitle}</h3>
+            <div className="flex flex-col gap-2">
+              <label className="flex items-center gap-2 rounded-lg border border-line px-3 py-2.5 text-[13.5px] text-ink">
+                <input
+                  type="radio"
+                  checked={pastCancelReason === "schedule_error"}
+                  onChange={() => setPastCancelReason("schedule_error")}
+                  className="h-4 w-4"
+                />
+                {d.pastCancelReasonScheduleError}
+              </label>
+              <label className="flex items-center gap-2 rounded-lg border border-line px-3 py-2.5 text-[13.5px] text-ink">
+                <input
+                  type="radio"
+                  checked={pastCancelReason === "other"}
+                  onChange={() => setPastCancelReason("other")}
+                  className="h-4 w-4"
+                />
+                {d.pastCancelReasonOther}
+              </label>
+              {pastCancelReason === "other" && (
+                <input
+                  value={pastCancelOtherText}
+                  onChange={(e) => setPastCancelOtherText(e.target.value)}
+                  placeholder={d.pastCancelOtherPlaceholder}
+                  className="rounded-lg border border-line bg-surface px-3 py-2 text-[13px] text-ink"
+                />
+              )}
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <Btn variant="ghost" onClick={() => setPastCancelOpen(false)} disabled={busy}>
+                {d.pastCancelBack}
+              </Btn>
+              <Btn
+                onClick={handlePastCancel}
+                disabled={busy || (pastCancelReason === "other" && !pastCancelOtherText.trim())}
+              >
+                {busy ? d.cancelling : d.pastCancelConfirm}
               </Btn>
             </div>
           </div>

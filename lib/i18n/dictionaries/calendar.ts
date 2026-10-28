@@ -143,6 +143,13 @@ export interface CalendarDictionary {
     paymentMethodLabel: string; // "Método de pago" — inline selector shown once paymentPaid is chosen
     paymentMethodCash: string;
     paymentMethodCard: string;
+    // payment-cancellation-flow-expansion: the expanded Cobrar method list
+    // beyond cash/card — lib/booking/payment-methods.ts's PAYMENT_METHOD_CODES.
+    paymentMethodBankTransfer: string;
+    paymentMethodBizum: string;
+    paymentMethodDirectDebit: string;
+    paymentMethodPaypal: string;
+    paymentMethodOther: string;
     paymentMethodBono: string; // generic short label ("Bono") used in the paid-summary line, no name/count
     paymentMethodBonoTemplate: string; // "{bonoName} ({n} restantes)" — one option per active bono
     paymentMethodLockedNote: string; // shown instead of the selector once a bono is already applied
@@ -153,6 +160,17 @@ export interface CalendarDictionary {
     cobrarModalTitle: string;
     cobrarCancel: string; // closes the Cobrar modal without charging
     paidWithTemplate: string; // "Pagado con {method} · {time}" — {method} and {time} replaced client-side
+    // payment-cancellation-flow-expansion: past-appointment "Cancelar
+    // cita" — only offered for an UNRESOLVED past booking (still
+    // pending_confirmation/confirmed, just its time has passed). A
+    // future-appointment cancel keeps the plain confirm dialog, no reason.
+    pastCancelButton: string; // same label as cancelButton, reused — kept separate in case the two ever need to diverge
+    pastCancelModalTitle: string; // "Esta cita ya ha pasado. ¿Por qué se cancela?"
+    pastCancelReasonScheduleError: string; // "Error de agenda"
+    pastCancelReasonOther: string; // "Otro"
+    pastCancelOtherPlaceholder: string;
+    pastCancelBack: string; // "Volver"
+    pastCancelConfirm: string; // "Confirmar cancelación"
   };
   widget: {
     title: string; // "Hoy"
@@ -285,6 +303,11 @@ const es: CalendarDictionary = {
     paymentMethodLabel: "Método de pago",
     paymentMethodCash: "Efectivo",
     paymentMethodCard: "Tarjeta",
+    paymentMethodBankTransfer: "Transferencia",
+    paymentMethodBizum: "Bizum",
+    paymentMethodDirectDebit: "Domiciliado",
+    paymentMethodPaypal: "PayPal",
+    paymentMethodOther: "Otro",
     paymentMethodBono: "Bono",
     paymentMethodBonoTemplate: "{bonoName} ({n} restantes)",
     paymentMethodLockedNote: "Este pago ya está aplicado a un bono. Para cambiarlo, ve a la página de Bonos.",
@@ -294,6 +317,13 @@ const es: CalendarDictionary = {
     cobrarModalTitle: "¿Cómo ha pagado?",
     cobrarCancel: "Cancelar",
     paidWithTemplate: "Pagado con {method} · {time}",
+    pastCancelButton: "Cancelar cita",
+    pastCancelModalTitle: "Esta cita ya ha pasado. ¿Por qué se cancela?",
+    pastCancelReasonScheduleError: "Error de agenda",
+    pastCancelReasonOther: "Otro",
+    pastCancelOtherPlaceholder: "Describe el motivo…",
+    pastCancelBack: "Volver",
+    pastCancelConfirm: "Confirmar cancelación",
   },
   widget: {
     title: "Hoy",
@@ -425,6 +455,11 @@ const en: CalendarDictionary = {
     paymentMethodLabel: "Payment method",
     paymentMethodCash: "Cash",
     paymentMethodCard: "Card",
+    paymentMethodBankTransfer: "Bank transfer",
+    paymentMethodBizum: "Bizum",
+    paymentMethodDirectDebit: "Direct debit",
+    paymentMethodPaypal: "PayPal",
+    paymentMethodOther: "Other",
     paymentMethodBono: "Bono",
     paymentMethodBonoTemplate: "{bonoName} ({n} left)",
     paymentMethodLockedNote: "This payment is already applied to a bono. To change it, go to the Bonos page.",
@@ -434,6 +469,13 @@ const en: CalendarDictionary = {
     cobrarModalTitle: "How did they pay?",
     cobrarCancel: "Cancel",
     paidWithTemplate: "Paid with {method} · {time}",
+    pastCancelButton: "Cancel appointment",
+    pastCancelModalTitle: "This appointment has already passed. Why is it being cancelled?",
+    pastCancelReasonScheduleError: "Scheduling error",
+    pastCancelReasonOther: "Other",
+    pastCancelOtherPlaceholder: "Describe the reason…",
+    pastCancelBack: "Back",
+    pastCancelConfirm: "Confirm cancellation",
   },
   widget: {
     title: "Today",
