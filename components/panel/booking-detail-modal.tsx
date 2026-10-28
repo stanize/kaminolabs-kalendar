@@ -543,20 +543,15 @@ export function BookingDetailModal({
                 Paying doesn't mark it completed (handleCobrar omits
                 `status` when isFuture); it only sets the payment fields. */}
             {!editingPayment && paidSummaryText ? (
-              <div>
-                <p className="mb-1.5 text-[12px] font-bold uppercase tracking-[.05em] text-ink-soft">
-                  {d.paymentLabel}
-                </p>
-                <div className="flex items-center justify-between gap-2 rounded-lg border border-line bg-surface-2/50 px-3 py-2">
-                  <p className="text-[12.5px] font-medium text-ink">{paidSummaryText}</p>
-                  <button
-                    type="button"
-                    onClick={() => setEditingPayment(true)}
-                    className="shrink-0 text-[12.5px] font-semibold text-brand hover:underline"
-                  >
-                    {d.editPaymentButton}
-                  </button>
-                </div>
+              <div className="flex items-center justify-between gap-2 rounded-lg border border-line bg-surface-2/50 px-3 py-2">
+                <p className="text-[12.5px] font-medium text-ink">{paidSummaryText}</p>
+                <button
+                  type="button"
+                  onClick={() => setEditingPayment(true)}
+                  className="shrink-0 text-[12.5px] font-semibold text-brand hover:underline"
+                >
+                  {d.editPaymentButton}
+                </button>
               </div>
             ) : (
               <Btn variant="outline" size="sm" onClick={() => setCobrarModalOpen(true)} disabled={busy}>
@@ -581,45 +576,30 @@ export function BookingDetailModal({
         ) : (
           <div className="flex flex-col gap-4">
             {booking.status === "cancelled" ? (
-              <div>
-                <p className="mb-1.5 text-[12px] font-bold uppercase tracking-[.05em] text-ink-soft">
-                  {d.paymentLabel}
-                </p>
-                <p className="rounded-lg border border-line bg-surface-2/50 px-3 py-2 text-[12.5px] font-medium text-ink">
-                  {d.resultCancelled}
-                </p>
-              </div>
+              <p className="rounded-lg border border-line bg-surface-2/50 px-3 py-2 text-[12.5px] font-medium text-ink">
+                {d.resultCancelled}
+              </p>
             ) : !editingPayment && paidSummaryText ? (
-              <div>
-                <p className="mb-1.5 text-[12px] font-bold uppercase tracking-[.05em] text-ink-soft">
-                  {d.paymentLabel}
-                </p>
-                <div className="flex items-center justify-between gap-2 rounded-lg border border-line bg-surface-2/50 px-3 py-2">
-                  <p className="text-[12.5px] font-medium text-ink">{paidSummaryText}</p>
-                  <button
-                    type="button"
-                    onClick={() => setEditingPayment(true)}
-                    className="shrink-0 text-[12.5px] font-semibold text-brand hover:underline"
-                  >
-                    {d.editPaymentButton}
-                  </button>
-                </div>
+              <div className="flex items-center justify-between gap-2 rounded-lg border border-line bg-surface-2/50 px-3 py-2">
+                <p className="text-[12.5px] font-medium text-ink">{paidSummaryText}</p>
+                <button
+                  type="button"
+                  onClick={() => setEditingPayment(true)}
+                  className="shrink-0 text-[12.5px] font-semibold text-brand hover:underline"
+                >
+                  {d.editPaymentButton}
+                </button>
               </div>
             ) : !editingPayment && booking.status === "no_show" ? (
-              <div>
-                <p className="mb-1.5 text-[12px] font-bold uppercase tracking-[.05em] text-ink-soft">
-                  {d.paymentLabel}
-                </p>
-                <div className="flex items-center justify-between gap-2 rounded-lg border border-line bg-surface-2/50 px-3 py-2">
-                  <p className="text-[12.5px] font-medium text-ink">{d.resultNoShow}</p>
-                  <button
-                    type="button"
-                    onClick={() => setEditingPayment(true)}
-                    className="shrink-0 text-[12.5px] font-semibold text-brand hover:underline"
-                  >
-                    {d.editPaymentButton}
-                  </button>
-                </div>
+              <div className="flex items-center justify-between gap-2 rounded-lg border border-line bg-surface-2/50 px-3 py-2">
+                <p className="text-[12.5px] font-medium text-ink">{d.resultNoShow}</p>
+                <button
+                  type="button"
+                  onClick={() => setEditingPayment(true)}
+                  className="shrink-0 text-[12.5px] font-semibold text-brand hover:underline"
+                >
+                  {d.editPaymentButton}
+                </button>
               </div>
             ) : (
               <div className="flex flex-wrap items-center gap-2">

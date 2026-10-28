@@ -136,7 +136,6 @@ export interface CalendarDictionary {
     // Descargar/Reenviar buttons, distinct from the Pago box so it never
     // reads as a payment-editing option.
     invoiceLabel: string; // "Factura"
-    paymentLabel: string; // "Pago"
     paymentPaid: string;
     paymentPending: string;
     paymentMethodLabel: string; // "Método de pago" — inline selector shown once paymentPaid is chosen
@@ -295,7 +294,6 @@ const es: CalendarDictionary = {
     resultCancelled: "Cancelada",
     editPaymentButton: "Editar",
     invoiceLabel: "Factura",
-    paymentLabel: "Pago",
     paymentPaid: "Pagado",
     paymentPending: "Pendiente",
     paymentMethodLabel: "Método de pago",
@@ -446,7 +444,6 @@ const en: CalendarDictionary = {
     resultCancelled: "Cancelled",
     editPaymentButton: "Edit",
     invoiceLabel: "Invoice",
-    paymentLabel: "Payment",
     paymentPaid: "Paid",
     paymentPending: "Pending",
     paymentMethodLabel: "Payment method",
