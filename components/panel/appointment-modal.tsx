@@ -158,6 +158,26 @@ export function AppointmentModal(props: AppointmentModalProps) {
   const [error, setError] = useState<string | null>(null);
   const [timeMenuOpen, setTimeMenuOpen] = useState(false);
 
+  // side-panel-pattern (first rollout, 2026-10): slides in from the right
+  // over the main content area (leaving the sidebar visible on desktop,
+  // handled by the wrapper's `md:left-[240px]` backdrop inset below)
+  // instead of the old centered modal. `visible` drives the transform —
+  // starts closed, flips open one frame after mount so the transition
+  // actually runs, and flips closed again before telling the parent to
+  // unmount us, so the close has the same slide animation as the open.
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setVisible(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
+  const closingRef = useRef(false);
+  function requestClose(after: () => void) {
+    if (closingRef.current) return;
+    closingRef.current = true;
+    setVisible(false);
+    setTimeout(after, 200);
+  }
+
   // Auto-check behavior for the two confirmation checkboxes: each starts
   // unchecked and auto-checks itself the moment its field transitions from
   // empty to non-empty (typing the first character, or — in edit mode —
@@ -332,7 +352,7 @@ export function AppointmentModal(props: AppointmentModalProps) {
         setSubmitting(false);
         return;
       }
-      onSaved();
+      requestClose(onSaved);
     } catch (e) {
       reportClientError(isEdit ? "updateBookingAsOwner" : "createBookingAsOwner", e);
       setError(isEdit ? errorsDict.errUpdateFailed : errorsDict.errCreateFailed);
@@ -340,13 +360,24 @@ export function AppointmentModal(props: AppointmentModalProps) {
     }
   };
 
+  const close = () => requestClose(onClose);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 px-4 py-6">
-      <div className="max-h-[90vh] w-full max-w-[440px] overflow-y-auto rounded-2xl bg-surface p-5 shadow-xl">
+    <div className="fixed inset-y-0 left-0 right-0 z-50 md:left-[240px]">
+      <div
+        className={`absolute inset-0 bg-black/40 transition-opacity duration-200 ${visible ? "opacity-100" : "opacity-0"}`}
+        onClick={close}
+        aria-hidden
+      />
+      <div
+        className={`absolute inset-y-0 right-0 flex h-full w-full max-w-[440px] flex-col overflow-y-auto bg-surface p-5 shadow-2xl transition-transform duration-200 ease-out ${
+          visible ? "translate-x-0" : "translate-x-full"
+        }`}
+      >
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-[17px] font-bold text-ink">{isEdit ? dict.editTitle : dict.title}</h2>
           <button
-            onClick={onClose}
+            onClick={close}
             aria-label={dict.close}
             className="grid h-8 w-8 place-items-center rounded-lg text-ink-soft hover:bg-surface-2"
           >
@@ -556,7 +587,7 @@ export function AppointmentModal(props: AppointmentModalProps) {
 
         <div className="mt-5 flex justify-end gap-2">
           <button
-            onClick={onClose}
+            onClick={close}
             disabled={submitting}
             className="rounded-lg px-3.5 py-2 text-[13.5px] font-semibold text-ink-soft hover:bg-surface-2"
           >
