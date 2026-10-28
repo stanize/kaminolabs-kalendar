@@ -580,15 +580,20 @@ export function BookingDetailModal({
           </div>
         ) : (
           <div className="flex flex-col gap-4">
-            <div>
-              <p className="mb-1.5 text-[12px] font-bold uppercase tracking-[.05em] text-ink-soft">
-                {d.paymentLabel}
-              </p>
-              {booking.status === "cancelled" ? (
+            {booking.status === "cancelled" ? (
+              <div>
+                <p className="mb-1.5 text-[12px] font-bold uppercase tracking-[.05em] text-ink-soft">
+                  {d.paymentLabel}
+                </p>
                 <p className="rounded-lg border border-line bg-surface-2/50 px-3 py-2 text-[12.5px] font-medium text-ink">
                   {d.resultCancelled}
                 </p>
-              ) : !editingPayment && paidSummaryText ? (
+              </div>
+            ) : !editingPayment && paidSummaryText ? (
+              <div>
+                <p className="mb-1.5 text-[12px] font-bold uppercase tracking-[.05em] text-ink-soft">
+                  {d.paymentLabel}
+                </p>
                 <div className="flex items-center justify-between gap-2 rounded-lg border border-line bg-surface-2/50 px-3 py-2">
                   <p className="text-[12.5px] font-medium text-ink">{paidSummaryText}</p>
                   <button
@@ -599,7 +604,12 @@ export function BookingDetailModal({
                     {d.editPaymentButton}
                   </button>
                 </div>
-              ) : !editingPayment && booking.status === "no_show" ? (
+              </div>
+            ) : !editingPayment && booking.status === "no_show" ? (
+              <div>
+                <p className="mb-1.5 text-[12px] font-bold uppercase tracking-[.05em] text-ink-soft">
+                  {d.paymentLabel}
+                </p>
                 <div className="flex items-center justify-between gap-2 rounded-lg border border-line bg-surface-2/50 px-3 py-2">
                   <p className="text-[12.5px] font-medium text-ink">{d.resultNoShow}</p>
                   <button
@@ -610,23 +620,23 @@ export function BookingDetailModal({
                     {d.editPaymentButton}
                   </button>
                 </div>
-              ) : (
-                <div className="flex flex-wrap items-center gap-2">
-                  <Btn variant="primary" onClick={() => setCobrarModalOpen(true)} disabled={busy}>
-                    {d.cobrarButton}
-                  </Btn>
-                  <Btn variant="outline" size="sm" onClick={handleNoShow} disabled={busy}>
-                    {d.resultNoShow}
-                  </Btn>
-                  {/* payment-cancellation-flow-expansion: a retroactive
-                      cancel for an unresolved past booking — distinct from
-                      No-show above, which is its own status/button. */}
-                  <Btn variant="outline" size="sm" onClick={() => setPastCancelOpen(true)} disabled={busy}>
-                    {d.pastCancelButton}
-                  </Btn>
-                </div>
-              )}
-            </div>
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-center gap-2">
+                <Btn variant="primary" onClick={() => setCobrarModalOpen(true)} disabled={busy}>
+                  {d.cobrarButton}
+                </Btn>
+                <Btn variant="outline" size="sm" onClick={handleNoShow} disabled={busy}>
+                  {d.resultNoShow}
+                </Btn>
+                {/* payment-cancellation-flow-expansion: a retroactive
+                    cancel for an unresolved past booking — distinct from
+                    No-show above, which is its own status/button. */}
+                <Btn variant="outline" size="sm" onClick={() => setPastCancelOpen(true)} disabled={busy}>
+                  {d.pastCancelButton}
+                </Btn>
+              </div>
+            )}
 
             {booking.paymentStatus === "paid" && invoiceLoading ? (
               <div>
@@ -676,12 +686,6 @@ export function BookingDetailModal({
                 {resendInvoiceError && <p className="mt-1.5 text-[12px] text-error">{resendInvoiceError}</p>}
               </div>
             )}
-
-            <div className="flex justify-end">
-              <Btn variant="ghost" onClick={onClose} disabled={busy}>
-                {d.dismissButton}
-              </Btn>
-            </div>
           </div>
         )}
       </div>

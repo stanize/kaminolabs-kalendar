@@ -124,7 +124,6 @@ export interface CalendarDictionary {
   };
   detailModal: {
     close: string; // aria-label for the X button
-    dismissButton: string; // "Cancelar" — closes the modal without saving (past bookings)
     notesLabel: string; // "Comentarios"
     modifyButton: string; // "Modificar" — opens the appointment editor (future bookings)
     cancelButton: string;
@@ -288,7 +287,6 @@ const es: CalendarDictionary = {
   },
   detailModal: {
     close: "Cerrar",
-    dismissButton: "Cancelar",
     notesLabel: "Comentarios",
     modifyButton: "Modificar",
     cancelButton: "Cancelar cita",
@@ -440,7 +438,6 @@ const en: CalendarDictionary = {
   },
   detailModal: {
     close: "Close",
-    dismissButton: "Cancel",
     notesLabel: "Comments",
     modifyButton: "Modify",
     cancelButton: "Cancel appointment",
