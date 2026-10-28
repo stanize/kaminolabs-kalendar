@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Icon } from "@/components/ui/icon";
 import { Btn } from "@/components/ui/button";
@@ -88,6 +88,24 @@ export function BookingDetailModal({
   const d = dict.detailModal;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // side-panel-pattern (rollout, 2026-10) — same shell/transition as
+  // AppointmentModal: slides in from the right over the main content,
+  // leaving the sidebar visible on desktop. See that component for the
+  // full rationale on the enter/exit timing.
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setVisible(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
+  const closingRef = useRef(false);
+  function requestClose(after: () => void) {
+    if (closingRef.current) return;
+    closingRef.current = true;
+    setVisible(false);
+    setTimeout(after, 200);
+  }
+  const close = () => requestClose(onClose);
 
   // payment-cancellation-flow-expansion: "Cancelar cita" for a PAST,
   // UNRESOLVED booking (still pending_confirmation/confirmed — nothing
@@ -272,7 +290,7 @@ export function BookingDetailModal({
     setBusy(false);
     if (!res.ok) { setError(res.error); return; }
     onUpdated();
-    onClose();
+    requestClose(onClose);
   };
 
   const handlePastCancel = async () => {
@@ -284,7 +302,7 @@ export function BookingDetailModal({
     setPastCancelOpen(false);
     if (!res.ok) { setError(res.error); return; }
     onUpdated();
-    onClose();
+    requestClose(onClose);
   };
 
   const handleConfirm = async () => {
@@ -294,7 +312,7 @@ export function BookingDetailModal({
     setBusy(false);
     if (!res.ok) { setError(res.error); return; }
     onUpdated();
-    onClose();
+    requestClose(onClose);
   };
 
   const handleMarkReviewed = async () => {
@@ -304,7 +322,7 @@ export function BookingDetailModal({
     setBusy(false);
     if (!res.ok) { setError(res.error); return; }
     onUpdated();
-    onClose();
+    requestClose(onClose);
   };
 
   const handleReviewRequest = async (decision: "approve" | "deny") => {
@@ -315,7 +333,7 @@ export function BookingDetailModal({
     if (!res.ok) { setError(res.error); return; }
     onUpdated();
     onCancellationReviewed?.();
-    onClose();
+    requestClose(onClose);
   };
 
   // cobrar-button-and-paid-at: charges immediately on selection (no separate
@@ -347,7 +365,7 @@ export function BookingDetailModal({
     const existingInvoice = await checkExistingInvoiceForBooking(booking.id);
     if (existingInvoice) {
       onUpdated();
-      onClose();
+      requestClose(onClose);
       return;
     }
 
@@ -365,7 +383,7 @@ export function BookingDetailModal({
       // and never errors/prompts when there isn't one.
       await createAndSendInvoice({ bookingId: booking.id, sendEmail: clientHasRealEmail, clientDni: dni, clientAddress: address });
       onUpdated();
-      onClose();
+      requestClose(onClose);
       return;
     }
 
@@ -400,12 +418,21 @@ export function BookingDetailModal({
     setBusy(false);
     if (!res.ok) { setError(res.error); return; }
     onUpdated();
-    onClose();
+    requestClose(onClose);
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" onClick={onClose}>
-      <div className="w-full max-w-[420px] rounded-2xl bg-surface p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-y-0 left-0 right-0 z-50 md:left-[240px]">
+      <div
+        className={`absolute inset-0 bg-black/40 transition-opacity duration-200 ${visible ? "opacity-100" : "opacity-0"}`}
+        onClick={close}
+        aria-hidden
+      />
+      <div
+        className={`absolute inset-y-0 right-0 flex h-full w-full flex-col overflow-y-auto bg-surface p-5 shadow-2xl transition-transform duration-200 ease-out sm:w-1/2 sm:min-w-[480px] sm:p-8 ${
+          visible ? "translate-x-0" : "translate-x-full"
+        }`}
+      >
         <div className="mb-4 flex items-center justify-between">
           <div className="flex min-w-0 items-center gap-2">
             <h2 className="truncate text-[17px] font-bold text-ink">{booking.serviceName}</h2>
@@ -414,7 +441,7 @@ export function BookingDetailModal({
             </span>
           </div>
           <button
-            onClick={onClose}
+            onClick={close}
             aria-label={d.close}
             className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-ink-soft hover:bg-surface-2"
           >
@@ -791,12 +818,12 @@ export function BookingDetailModal({
           onClose={() => {
             setInvoiceConfirmOpen(false);
             onUpdated();
-            onClose();
+            requestClose(onClose);
           }}
           onDone={() => {
             setInvoiceConfirmOpen(false);
             onUpdated();
-            onClose();
+            requestClose(onClose);
           }}
         />
       )}
