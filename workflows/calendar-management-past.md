@@ -62,6 +62,106 @@ Criteria:
 - Everything else about mark-payment's already-decided behavior (bono default-oldest-selection, the one-directional bono lock, outcome independence) is unchanged — this step only changes the entry point (button instead of toggle, modal instead of inline) and adds `paid_at`.
 - Migration: add `paid_at` via a new `supabase/schema_subset_NNN.sql` (next sequential number) plus folding into `schema_001.sql`, per CLAUDE.md's migration convention — this table already has real rows.
 
+## Step: payment-cancellation-flow-expansion
+Status: not_started
+Criteria (design settled 2026-10-28, Arun, from an uploaded
+spec-appointment-modal-payment.md handoff doc — not yet built):
+- SOURCE SPEC WAS STALE: the handoff doc's own "Current state" section
+  (PAGO only on past bookings, Efectivo/Tarjeta only, no invoice trigger)
+  doesn't match this repo — it was written without seeing
+  `cobrar-button-and-paid-at` (above) or `pdf-invoicing.md`'s
+  invoice-on-payment-trigger, both already built and working. Checked the
+  spec's proposals against real schema/code before accepting any of them;
+  several conflicted and are explicitly NOT being built as specced — see
+  below. This step is the reconciled version: the spec's genuinely new
+  ideas, layered onto what already exists, not a replacement for it.
+- NOT BUILDING, and why:
+  - A separate `kalendar_payments` table — payment already lives directly
+    on `kalendar_bookings` (`payment_status`, `payment_method`, `paid_at`,
+    `bono_purchase_id`), and that existing model is what makes bono
+    payments work (session deduction, the one-directional bono lock). The
+    spec's proposed table and its 7-method list have no bono option at
+    all; a parallel payments table would either drop bono support or
+    require reconciling two different payment representations for no
+    real benefit. Extending the existing `payment_method` check
+    constraint's allowed values (see below) gets the spec's actual goal
+    — more methods, still text not an enum — without any of that.
+  - No-show folded into "cancelled + reason" — `no_show` is already its
+    own `booking_status` enum value, with its own button, its own chip
+    styling, and other code already branching on it (stats, Clientes-page
+    history). Keeping it exactly as-is; the new cancellation-reason
+    capture (below) is for an ACTUAL cancellation, not a no-show.
+  - "Generate the invoice PDF immediately, no preview step" — this repo's
+    `InvoiceConfirmModal` deliberately requires client DNI/domicilio
+    (legally required on a Spanish factura) and offers the
+    invoice-concepts-list picker before generating. `auto_invoice_enabled`
+    already covers the "skip the modal, just generate" case once DNI/
+    address are on file — that's not missing, it's an existing per-clinic
+    setting. No change to invoice generation in this step at all.
+  - Spanish-language stored values (`'efectivo'`, `'tarjeta'`, etc.) —
+    violates this file's own English-only-code convention (CLAUDE.md "Key
+    Conventions" — business type/weekday codes are English, Spanish is
+    display-label-only). Store English codes, map to the spec's Spanish
+    button labels for display — see the method list below.
+- BUILDING:
+  - Expand `kalendar_bookings.payment_method`'s check constraint from
+    `('cash', 'card', 'bono')` to add `bank_transfer`, `bizum`,
+    `direct_debit`, `paypal`, `other` (English codes; display labels
+    TRANSFERENCIA/BIZUM/DOMICILIADO/PAYPAL/OTRO) — a `schema_subset_NNN.sql`
+    + `schema_001.sql` change, same pattern as every other migration this
+    session. The method list lives in a named frontend constant now (per
+    the spec's own explicit ask), ready to swap for a DB-driven
+    `clinic_payment_methods` table later (backlog, not this pass).
+  - Cobrar becomes reachable on a FUTURE appointment too, not just past
+    (the spec's actual complaint #1, and a real gap — e.g. a clinic
+    collecting payment at booking time or over the phone before the
+    visit). DECIDED: on a future booking, Cobrar sets
+    `payment_status`/`payment_method`/`paid_at` only — it does NOT also
+    set `status = 'completed'` the way past-Cobrar does, since the
+    appointment hasn't happened yet. `updateBookingResult`'s existing
+    optional-`status` behavior already supports this (omit `status`,
+    same as the existing No-show-leaves-payment-untouched pattern) — no
+    new server logic needed, just a new call site in the modal's
+    non-past branch.
+  - NEW: `kalendar_bookings.cancellation_reason` (text, nullable) +
+    reason capture on a PAST-appointment cancel only (future-appointment
+    cancel keeps today's simple confirm-dialog, per the spec). Reason
+    options: No-show (pre-selected), Error de agenda, Otro (reveals a
+    free-text field) — stored as entered, no new enum.
+  - OPEN QUESTION, not decided by the spec or here — needs Arun's call
+    before coding: today `cancelBookingAsOwner` only allows cancelling a
+    booking still in `pending_confirmation`/`confirmed`
+    (`lib/actions/booking-owner.ts`) — a past booking that's already been
+    resolved (Cobrado → `completed`, or `no_show`) currently CANNOT be
+    cancelled at all, and the spec's "Cancelar cita always visible,
+    regardless of status" doesn't address what cancelling an
+    already-paid/already-no-show booking should actually do: does it
+    reverse a bono session deduction? What happens to an invoice already
+    generated for it? Recommend scoping this step's past-cancel-with-
+    reason to an UNRESOLVED past booking (time has passed, but nothing
+    was ever done with it) — i.e. extending the existing guard to also
+    allow `pending_confirmation`/`confirmed` bookings whose time has
+    passed (no status change needed, just the time check), NOT to
+    already-`completed`/`no_show` bookings. Confirm this scoping before
+    building; reversing an already-resolved booking is a bigger, separate
+    feature if it turns out to be needed.
+  - Calendar grid: a `cancelled` (or `no_show`) booking's chip gets a
+    grey background + strikethrough on the client name/service text,
+    replacing today's status-color coding for those two statuses only
+    (the amber/teal/rose/slate scheme in `chipClasses()`,
+    `calendar-grid-view.tsx`, is otherwise untouched — this only adds a
+    new visual case for an already-resolved-as-cancelled/no-show
+    booking). Same treatment for both — no visual distinction between a
+    future cancel and a past no-show/cancel, per the spec. Applies in
+    both the per-provider and the merged multi-provider Week view
+    (`DayProviderColumn`/`DayMergedColumn`).
+- Explicitly UNCHANGED by this step (confirming nothing here overwrites
+  earlier decisions): `pdf-invoicing.md`'s entire invoice pipeline
+  (concepts list, confirm modal, auto-invoice setting, QR), bono
+  session-deduction/one-directional-lock rules, the existing
+  `chipClasses()` color scheme for every status other than
+  cancelled/no_show, and the multi-provider calendar display work.
+
 ## Step: past-appointment-editing
 Status: done
 Criteria:
