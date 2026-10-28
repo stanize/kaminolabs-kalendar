@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Icon } from "@/components/ui/icon";
 import { Btn } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import {
   cancelBookingAsOwner,
   confirmBookingAsOwner,
   markBookingReviewedAsOwner,
+  updateBookingAsOwner,
   updateBookingResult,
   reviewCancellationRequest,
   type BookingPaymentMethod,
@@ -17,11 +18,24 @@ import type { ClientActiveBono } from "@/lib/bonos/data";
 import { checkExistingInvoiceForBooking, createAndSendInvoice, resendInvoice } from "@/lib/actions/invoices";
 import type { InvoiceRow } from "@/lib/invoices/data";
 import { getClientIdentity } from "@/lib/actions/clients";
+import { zonedTimeToUtc, dayIdInTz, tzDateParts } from "@/lib/calendar/client-date";
 import type { CalendarDictionary } from "@/lib/i18n/dictionaries/calendar";
 import type { InvoicingDictionary } from "@/lib/i18n/dictionaries/invoicing";
+import type { DayId } from "@/lib/onboarding/types";
 import { clientStatusLabel, clientStatusBadgeClass, needsClinicFollowUp, type WeekBookingVM } from "@/components/panel/calendar-grid-view";
 import { InvoiceConfirmModal, hasRealEmail } from "@/components/panel/invoice-confirm-modal";
+import type { ClosureRuleVM } from "@/components/panel/appointment-modal";
 import { PAYMENT_METHOD_CODES, type PaymentMethodCode } from "@/lib/booking/payment-methods";
+import { isWhatsappSentinelEmail } from "@/lib/whatsapp/sentinel-email";
+import {
+  type ServiceVM,
+  type MemberVM,
+  type TimeRangeVM,
+  toMinutes,
+  ymd,
+  hhmmFromIso,
+  buildSuggestedTimes,
+} from "@/lib/booking/appointment-fields";
 
 function invoicePdfHref(invoice: { id: string; access_token: string }): string {
   return `/api/invoices/${invoice.id}/pdf?token=${invoice.access_token}`;
@@ -54,9 +68,14 @@ export function BookingDetailModal({
   invoicingDict,
   bonosEnabled,
   autoInvoiceEnabled,
+  hoursByDay,
+  allBookings,
+  services,
+  members,
+  closures,
+  whatsappEnabled,
   onClose,
   onUpdated,
-  onModify,
   onCancellationReviewed,
 }: {
   booking: WeekBookingVM;
@@ -72,9 +91,18 @@ export function BookingDetailModal({
   // auto-invoice-setting — when true, Cobrar generates+sends the invoice
   // immediately with no confirm modal at all.
   autoInvoiceEnabled: boolean;
+  // detail-panel-inline-edit (2026-10): this panel now edits the
+  // appointment's own fields directly (service/provider/date/time/client)
+  // instead of handing off to a separate AppointmentModal edit step — same
+  // data AppointmentModal needs for its conflict/closure checks.
+  hoursByDay: Partial<Record<DayId, TimeRangeVM[]>>;
+  allBookings: WeekBookingVM[];
+  services: ServiceVM[];
+  members: MemberVM[];
+  closures: ClosureRuleVM[];
+  whatsappEnabled: boolean;
   onClose: () => void;
   onUpdated: () => void;
-  onModify: (booking: WeekBookingVM) => void;
   // Fired specifically after a successful approve/deny — distinct from
   // onUpdated (which just refetches the grid) because the caller may also
   // be showing this booking in a separate flat list (e.g. the calendar
@@ -105,7 +133,164 @@ export function BookingDetailModal({
     setVisible(false);
     setTimeout(after, 200);
   }
-  const close = () => requestClose(onClose);
+  // detail-panel-inline-edit (2026-10): the appointment's own fields,
+  // editable directly in this panel instead of a separate "Modificar" step
+  // — same field set/validation AppointmentModal's edit mode used to own.
+  // `md` is dict.modal, reused as-is (same labels/placeholders) rather than
+  // duplicated under detailModal.
+  const md = dict.modal;
+  const initialDateParts = tzDateParts(new Date(booking.startIso));
+  const initialFields = {
+    serviceId: booking.serviceId ?? services[0]?.id ?? "",
+    teamMemberId: booking.teamMemberId ?? members[0]?.id ?? "",
+    dateStr: ymd(initialDateParts.year, initialDateParts.month, initialDateParts.day),
+    timeStr: hhmmFromIso(booking.startIso),
+    clientName: booking.clientName,
+    clientEmail:
+      booking.clientEmail && !booking.clientEmail.startsWith("sin-email+") && !isWhatsappSentinelEmail(booking.clientEmail)
+        ? booking.clientEmail
+        : "",
+    clientPhone: booking.clientPhone ?? "",
+    notes: booking.notes ?? "",
+  };
+
+  const [serviceId, setServiceId] = useState(initialFields.serviceId);
+  const [teamMemberId, setTeamMemberId] = useState(initialFields.teamMemberId);
+  const [dateStr, setDateStr] = useState(initialFields.dateStr);
+  const [timeStr, setTimeStr] = useState(initialFields.timeStr);
+  const [clientName, setClientName] = useState(initialFields.clientName);
+  const [clientEmail, setClientEmail] = useState(initialFields.clientEmail);
+  const [clientPhone, setClientPhone] = useState(initialFields.clientPhone);
+  const [fieldsNotes, setFieldsNotes] = useState(initialFields.notes);
+  const [sendEmail, setSendEmail] = useState(false);
+  const [sendWhatsapp, setSendWhatsapp] = useState(false);
+  const [timeMenuOpen, setTimeMenuOpen] = useState(false);
+  const [savingFields, setSavingFields] = useState(false);
+  const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false);
+
+  const isDirty =
+    serviceId !== initialFields.serviceId ||
+    teamMemberId !== initialFields.teamMemberId ||
+    dateStr !== initialFields.dateStr ||
+    timeStr !== initialFields.timeStr ||
+    clientName !== initialFields.clientName ||
+    clientEmail !== initialFields.clientEmail ||
+    clientPhone !== initialFields.clientPhone ||
+    fieldsNotes !== initialFields.notes;
+
+  const dateValid = /^\d{4}-\d{2}-\d{2}$/.test(dateStr);
+  const timeValid = /^\d{2}:\d{2}$/.test(timeStr);
+
+  const selectedDateParts = useMemo(() => {
+    if (!dateValid) return null;
+    const [y, m, dd] = dateStr.split("-").map(Number);
+    return { year: y, month: m, day: dd };
+  }, [dateValid, dateStr]);
+
+  const selectedDayRanges = useMemo(() => {
+    if (!selectedDateParts) return [];
+    const dayId = dayIdInTz(zonedTimeToUtc(selectedDateParts.year, selectedDateParts.month, selectedDateParts.day, 12, 0));
+    return hoursByDay[dayId] ?? [];
+  }, [selectedDateParts, hoursByDay]);
+
+  const selectedDayBookings = useMemo(() => {
+    if (!selectedDateParts) return [];
+    return allBookings.filter((b) => {
+      if (b.id === booking.id) return false; // exclude itself from conflict checks
+      const p = tzDateParts(new Date(b.startIso));
+      return p.year === selectedDateParts.year && p.month === selectedDateParts.month && p.day === selectedDateParts.day;
+    });
+  }, [selectedDateParts, allBookings, booking.id]);
+
+  const suggestedTimes = useMemo(() => buildSuggestedTimes(selectedDayRanges), [selectedDayRanges]);
+  const isOutsideHours = timeValid && !suggestedTimes.includes(timeStr);
+
+  const startDate = useMemo(() => {
+    if (!selectedDateParts || !timeValid) return null;
+    const [hh, mm] = timeStr.split(":").map(Number);
+    return zonedTimeToUtc(selectedDateParts.year, selectedDateParts.month, selectedDateParts.day, hh, mm);
+  }, [selectedDateParts, timeValid, timeStr]);
+
+  const selectedService = services.find((s) => s.id === serviceId);
+  const durationMin = selectedService?.durationMin ?? 30;
+
+  const isTimeTaken = useMemo(() => {
+    return (candidate: string): boolean => {
+      if (!selectedDateParts) return false;
+      const [hh, mm] = candidate.split(":").map(Number);
+      const start = zonedTimeToUtc(selectedDateParts.year, selectedDateParts.month, selectedDateParts.day, hh, mm);
+      const startMs = start.getTime();
+      const endMs = startMs + durationMin * 60_000;
+      return selectedDayBookings.some((b) => {
+        if (b.teamMemberId !== teamMemberId) return false;
+        if (b.status !== "pending_confirmation" && b.status !== "confirmed") return false;
+        const bStart = new Date(b.startIso).getTime();
+        const bEnd = new Date(b.endIso).getTime();
+        return bStart < endMs && bEnd > startMs;
+      });
+    };
+  }, [selectedDateParts, durationMin, teamMemberId, selectedDayBookings]);
+
+  const fieldsConflict = timeValid ? isTimeTaken(timeStr) : false;
+
+  const closureWarningLabel = useMemo(() => {
+    if (!selectedDateParts) return null;
+    const dStr = ymd(selectedDateParts.year, selectedDateParts.month, selectedDateParts.day);
+    const apptStart = timeValid ? toMinutes(timeStr) : null;
+    const apptEnd = apptStart !== null ? apptStart + durationMin : null;
+    for (const c of closures) {
+      if (c.teamMemberId && c.teamMemberId !== teamMemberId) continue;
+      if (c.recurring) {
+        if (c.month === selectedDateParts.month && c.day === selectedDateParts.day) {
+          return c.label || md.closureGenericLabel;
+        }
+        continue;
+      }
+      if (!c.startDate || !c.endDate) continue;
+      if (dStr < c.startDate || dStr > c.endDate) continue;
+      if (c.startTime && c.endTime && apptStart !== null && apptEnd !== null) {
+        const cStart = toMinutes(c.startTime);
+        const cEnd = toMinutes(c.endTime);
+        if (apptStart >= cEnd || apptEnd <= cStart) continue; // no overlap
+      }
+      return c.label || md.closureGenericLabel;
+    }
+    return null;
+  }, [selectedDateParts, timeStr, timeValid, durationMin, teamMemberId, closures, md.closureGenericLabel]);
+
+  const handleSaveFields = async () => {
+    if (!serviceId || !teamMemberId || !startDate || fieldsConflict) return;
+    setSavingFields(true);
+    setError(null);
+    const res = await updateBookingAsOwner(
+      {
+        bookingId: booking.id,
+        serviceId,
+        teamMemberId,
+        startIso: startDate.toISOString(),
+        clientName,
+        clientEmail: clientEmail || undefined,
+        clientPhone: clientPhone || undefined,
+        notes: fieldsNotes || undefined,
+        sendConfirmationEmail: sendEmail,
+        sendConfirmationWhatsapp: whatsappEnabled && sendWhatsapp,
+      },
+      dict.manualErrors
+    );
+    setSavingFields(false);
+    if (!res.ok) { setError(res.error); return; }
+    onUpdated();
+    requestClose(onClose);
+  };
+
+  // detail-panel-inline-edit: closing with unsaved field changes asks for
+  // confirmation first instead of silently discarding them — every other
+  // close path (actions below that already committed something server-
+  // side) goes straight through requestClose, unaffected.
+  function guardedClose() {
+    if (isDirty) { setDiscardConfirmOpen(true); return; }
+    close();
+  }
 
   // payment-cancellation-flow-expansion: "Cancelar cita" for a PAST,
   // UNRESOLVED booking (still pending_confirmation/confirmed — nothing
@@ -262,10 +447,6 @@ export function BookingDetailModal({
   // too, but is still someone the clinic hasn't met, same as a guest.
   const needsReview = needsClinicFollowUp(booking.clientStatus, booking.clinicReviewedAt) && booking.clientStatus !== "guest_unconfirmed";
   const clientHasRealEmail = hasRealEmail(booking.clientEmail);
-
-  const dateTimeLabel = new Intl.DateTimeFormat(intlLocale, {
-    timeZone: TZ, weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit",
-  }).format(new Date(booking.startIso));
 
   // cobrar-button-and-paid-at: "Pagado con {método} · {hora}" — only shown
   // for a booking that's ALREADY saved as paid (booking.paymentStatus, not
@@ -425,7 +606,7 @@ export function BookingDetailModal({
     <div className="fixed inset-y-0 left-0 right-0 z-50 md:left-[240px]">
       <div
         className={`absolute inset-0 bg-black/40 transition-opacity duration-200 ${visible ? "opacity-100" : "opacity-0"}`}
-        onClick={close}
+        onClick={guardedClose}
         aria-hidden
       />
       <div
@@ -441,7 +622,7 @@ export function BookingDetailModal({
             </span>
           </div>
           <button
-            onClick={close}
+            onClick={guardedClose}
             aria-label={d.close}
             className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-ink-soft hover:bg-surface-2"
           >
@@ -449,63 +630,205 @@ export function BookingDetailModal({
           </button>
         </div>
 
-        <div className="mb-4 flex flex-col gap-1.5 rounded-xl bg-surface-2/50 px-3.5 py-3 text-[13.5px]">
-          <div className="flex items-center gap-2 text-ink">
-            <Icon name="calendar" size={14} className="shrink-0 text-ink-soft" />
-            <span className="capitalize">{dateTimeLabel}</span>
-          </div>
-          <div className="flex items-center gap-2 text-ink">
-            <Icon name="user" size={14} className="shrink-0 text-ink-soft" />
-            {/* client-link-from-appointment (2026-10): a booking linked to a
-                clinic client opens straight to that client's profile — lets
-                the clinic jump calendar -> patient profile without leaving
-                the appointment detail first. Guest/unlinked bookings (no
-                clinic_client_id yet) stay plain text. */}
-            {booking.clinicClientId ? (
-              <Link href={`/panel/clients/${booking.clinicClientId}`} className="font-medium text-brand hover:underline">
-                {booking.clientName}
-              </Link>
-            ) : (
-              <span>{booking.clientName}</span>
-            )}
-          </div>
-          {isAwaitingConfirmation && (
-            <div className="flex items-center gap-2 text-orange-700">
-              <Icon name="bell" size={14} className="shrink-0" />
-              <span className="font-semibold">Pendiente de confirmación</span>
-            </div>
-          )}
-          {booking.clientPhone && (
-            <div className="flex items-center gap-2 text-ink-soft">
-              <Icon name="phone" size={14} className="shrink-0" />
-              <span>{booking.clientPhone}</span>
-            </div>
-          )}
-          {clientHasRealEmail && (
-            <div className="flex items-center gap-2 text-ink-soft">
-              <Icon name="mail" size={14} className="shrink-0" />
-              <span className="truncate">{booking.clientEmail}</span>
-            </div>
-          )}
-          {booking.reminderSendFailed && (
-            <div className="flex items-center gap-2 text-amber-700" title={booking.lastReminderError ?? undefined}>
-              <Icon name="bell" size={14} className="shrink-0" />
-              <span className="font-semibold">
-                Recordatorio no enviado{booking.lastReminderError ? `: ${booking.lastReminderError}` : ""}
-              </span>
-            </div>
-          )}
-        </div>
-
-        {booking.notes && (
-          <div className="mb-4 rounded-xl border border-line bg-surface px-3.5 py-3 text-[13px]">
-            <p className="mb-1 flex items-center gap-1.5 font-semibold text-ink-soft">
-              <Icon name="fileText" size={13} className="shrink-0" />
-              {d.notesLabel}
-            </p>
-            <p className="whitespace-pre-wrap text-ink">{booking.notes}</p>
+        {isAwaitingConfirmation && (
+          <div className="mb-3 flex items-center gap-2 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-orange-700">
+            <Icon name="bell" size={14} className="shrink-0" />
+            <span className="text-[13px] font-semibold">Pendiente de confirmación</span>
           </div>
         )}
+        {booking.reminderSendFailed && (
+          <div
+            className="mb-3 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-amber-700"
+            title={booking.lastReminderError ?? undefined}
+          >
+            <Icon name="bell" size={14} className="shrink-0" />
+            <span className="text-[13px] font-semibold">
+              Recordatorio no enviado{booking.lastReminderError ? `: ${booking.lastReminderError}` : ""}
+            </span>
+          </div>
+        )}
+
+        {/* detail-panel-inline-edit: the appointment's own fields, editable
+            directly — replaces the old read-only summary + separate
+            "Modificar" step. Guardar cambios only lights up once something
+            actually changed from the booking's current saved state. */}
+        <div className="mb-4 flex flex-col gap-3">
+          <Field label={md.serviceLabel}>
+            <select
+              value={serviceId}
+              onChange={(e) => setServiceId(e.target.value)}
+              className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[16px] text-ink"
+            >
+              {services.length === 0 && <option value="">{md.servicePlaceholder}</option>}
+              {services.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name} · {s.durationMin} min
+                </option>
+              ))}
+            </select>
+          </Field>
+
+          {members.length > 1 && (
+            <Field label={md.providerLabel}>
+              <select
+                value={teamMemberId}
+                onChange={(e) => setTeamMemberId(e.target.value)}
+                className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[16px] text-ink"
+              >
+                {members.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
+
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <div className="flex-1">
+              <Field label={md.dateLabel}>
+                <input
+                  type="date"
+                  value={dateStr}
+                  onChange={(e) => setDateStr(e.target.value)}
+                  className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[16px] text-ink"
+                />
+              </Field>
+            </div>
+            <div className="relative flex-1">
+              <Field label={md.timeLabel}>
+                <input
+                  type="text"
+                  value={timeStr}
+                  onChange={(e) => setTimeStr(e.target.value)}
+                  onFocus={() => setTimeMenuOpen(true)}
+                  onBlur={() => setTimeMenuOpen(false)}
+                  placeholder="HH:MM"
+                  autoComplete="off"
+                  className={`w-full rounded-lg border bg-surface px-3 py-2 text-[16px] text-ink ${
+                    fieldsConflict ? "border-error" : "border-line"
+                  }`}
+                />
+              </Field>
+              {timeMenuOpen && suggestedTimes.length > 0 && (
+                <div className="absolute left-0 right-0 top-full z-10 mt-1 max-h-[220px] overflow-y-auto rounded-lg border border-line bg-surface py-1 shadow-lg">
+                  {suggestedTimes.map((t) => {
+                    const taken = isTimeTaken(t);
+                    return (
+                      <button
+                        key={t}
+                        type="button"
+                        onMouseDown={() => setTimeStr(t)}
+                        className={`block w-full px-3 py-1.5 text-left text-[13.5px] hover:bg-surface-2 ${
+                          taken ? "text-ink-soft" : "font-bold text-green-600"
+                        }`}
+                      >
+                        {t}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+          {isOutsideHours && !fieldsConflict && (
+            <span className="-mt-2 text-[12px] text-ink-soft">{md.outsideHoursNote}</span>
+          )}
+          {closureWarningLabel && !fieldsConflict && (
+            <span className="-mt-2 text-[12px] text-amber-600">
+              {md.closureWarningNote.replace("{label}", closureWarningLabel)}
+            </span>
+          )}
+          {fieldsConflict && (
+            <div className="rounded-lg border border-error bg-error-weak px-3 py-2 text-[12.5px] text-error">
+              {dict.manualErrors.errSlotTaken}
+            </div>
+          )}
+
+          <Field label={md.clientNameLabel}>
+            <input
+              value={clientName}
+              onChange={(e) => setClientName(e.target.value)}
+              placeholder={md.clientNamePlaceholder}
+              className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[16px] text-ink"
+            />
+          </Field>
+          {/* client-link-from-appointment (2026-10): a booking linked to a
+              clinic client still jumps to that client's profile — now a
+              small link under the name field since the name itself is an
+              editable input. Guest/unlinked bookings show nothing here. */}
+          {booking.clinicClientId && (
+            <Link
+              href={`/panel/clients/${booking.clinicClientId}`}
+              className="-mt-2 self-start text-[12.5px] font-semibold text-brand hover:underline"
+            >
+              Ver perfil del cliente
+            </Link>
+          )}
+
+          <Field label={md.clientEmailLabel}>
+            <input
+              value={clientEmail}
+              onChange={(e) => setClientEmail(e.target.value)}
+              placeholder={md.clientEmailPlaceholder}
+              type="email"
+              className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[16px] text-ink"
+            />
+          </Field>
+
+          <Field label={md.clientPhoneLabel}>
+            <input
+              value={clientPhone}
+              onChange={(e) => setClientPhone(e.target.value)}
+              placeholder={md.clientPhonePlaceholder}
+              className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[16px] text-ink"
+            />
+          </Field>
+
+          <Field label={md.notesLabel}>
+            <textarea
+              value={fieldsNotes}
+              onChange={(e) => setFieldsNotes(e.target.value)}
+              placeholder={md.notesPlaceholder}
+              rows={2}
+              className="w-full resize-none rounded-lg border border-line bg-surface px-3 py-2 text-[16px] text-ink"
+            />
+          </Field>
+
+          <label className="flex items-center gap-2 text-[13px] text-ink-soft">
+            <input
+              type="checkbox"
+              checked={sendEmail}
+              onChange={(e) => setSendEmail(e.target.checked)}
+              className="h-4 w-4 rounded border-line"
+            />
+            {md.sendEmailLabel}
+          </label>
+
+          {whatsappEnabled && (
+            <label className="flex items-center gap-2 text-[13px] text-ink-soft">
+              <input
+                type="checkbox"
+                checked={sendWhatsapp}
+                onChange={(e) => setSendWhatsapp(e.target.checked)}
+                className="h-4 w-4 rounded border-line"
+              />
+              {md.sendWhatsappLabel}
+            </label>
+          )}
+
+          <div className="flex justify-end">
+            <Btn
+              variant={isDirty ? "primary" : "outline"}
+              onClick={handleSaveFields}
+              disabled={
+                !isDirty || savingFields || !clientName.trim() || !serviceId || !teamMemberId || !dateValid || !timeValid || fieldsConflict
+              }
+            >
+              {savingFields ? md.saving : md.saveButton}
+            </Btn>
+          </div>
+        </div>
 
         {booking.cancellationRequestedAt && (
           <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-3">
@@ -589,9 +912,6 @@ export function BookingDetailModal({
             <div className="flex flex-wrap justify-end gap-2">
               <Btn variant="outline" onClick={handleCancel} disabled={busy}>
                 {busy ? d.cancelling : d.cancelButton}
-              </Btn>
-              <Btn variant="outline" onClick={() => onModify(booking)} disabled={busy}>
-                {d.modifyButton}
               </Btn>
               {isAwaitingConfirmation && (
                 <Btn onClick={handleConfirm} disabled={busy}>
@@ -827,6 +1147,44 @@ export function BookingDetailModal({
           }}
         />
       )}
+
+      {discardConfirmOpen && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 px-4"
+          onClick={() => setDiscardConfirmOpen(false)}
+        >
+          <div
+            className="w-full max-w-[360px] rounded-2xl bg-surface p-5 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="mb-2 text-[15px] font-bold text-ink">{d.discardTitle}</h3>
+            <p className="mb-4 text-[13px] text-ink-soft">{d.discardBody}</p>
+            <div className="flex justify-end gap-2">
+              <Btn variant="ghost" onClick={() => setDiscardConfirmOpen(false)}>
+                {d.discardStay}
+              </Btn>
+              <Btn
+                variant="outline"
+                onClick={() => {
+                  setDiscardConfirmOpen(false);
+                  close();
+                }}
+              >
+                {d.discardConfirm}
+              </Btn>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="flex flex-col gap-1">
+      <span className="text-[12.5px] font-semibold text-ink-soft">{label}</span>
+      {children}
+    </label>
   );
 }

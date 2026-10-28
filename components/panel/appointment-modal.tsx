@@ -5,23 +5,20 @@ import { Icon } from "@/components/ui/icon";
 import { createBookingAsOwner, updateBookingAsOwner } from "@/lib/actions/booking-owner";
 import { searchClients, type ClientSearchResult } from "@/lib/actions/clients";
 import { reportClientError } from "@/lib/report-client-error";
-import { zonedTimeToUtc, dayIdInTz, tzDateParts, TZ } from "@/lib/calendar/client-date";
+import { zonedTimeToUtc, dayIdInTz, tzDateParts } from "@/lib/calendar/client-date";
 import type { CalendarDictionary } from "@/lib/i18n/dictionaries/calendar";
 import type { DayId } from "@/lib/onboarding/types";
 import type { WeekBookingVM } from "@/components/panel/calendar-grid-view";
 import { isWhatsappSentinelEmail } from "@/lib/whatsapp/sentinel-email";
-
-interface ServiceVM {
-  id: string;
-  name: string;
-  durationMin: number;
-  price: number;
-}
-
-interface MemberVM {
-  id: string;
-  name: string;
-}
+import {
+  type ServiceVM,
+  type MemberVM,
+  type TimeRangeVM,
+  toMinutes,
+  ymd,
+  hhmmFromIso,
+  buildSuggestedTimes,
+} from "@/lib/booking/appointment-fields";
 
 // A client-safe projection of BusinessClosure (lib/closures/data.ts) — just
 // the fields needed to check whether a picked date/time falls on a festivo
@@ -38,16 +35,6 @@ export interface ClosureRuleVM {
   label: string | null;
 }
 
-function toMinutes(t: string): number {
-  const [h, m] = t.slice(0, 5).split(":").map(Number);
-  return h * 60 + m;
-}
-
-interface TimeRangeVM {
-  start: string; // "HH:MM"
-  end: string; // "HH:MM"
-}
-
 export interface SlotSelection {
   dayYear: number;
   dayMonth: number;
@@ -55,34 +42,6 @@ export interface SlotSelection {
   initialTime: string; // "HH:MM" — the slot that was clicked, editable from here on
   teamMemberId: string;
   providerName: string;
-}
-
-function ymd(year: number, month: number, day: number): string {
-  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-}
-
-function hhmmFromIso(iso: string): string {
-  return new Intl.DateTimeFormat("en-GB", {
-    timeZone: TZ, hour: "2-digit", minute: "2-digit", hour12: false,
-  }).format(new Date(iso));
-}
-
-/** Every hourly slot across a day's working-hours ranges — offered in the
- * time field's dropdown as a convenience, not a restriction: the field
- * itself accepts any typed value too, in or out of business hours. */
-function buildSuggestedTimes(ranges: TimeRangeVM[]): string[] {
-  const times: string[] = [];
-  for (const r of ranges) {
-    const [sh, sm] = r.start.split(":").map(Number);
-    const [eh, em] = r.end.split(":").map(Number);
-    let t = sh * 60 + sm;
-    const end = eh * 60 + em;
-    while (t < end) {
-      times.push(`${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`);
-      t += 60;
-    }
-  }
-  return times;
 }
 
 type AppointmentModalProps =

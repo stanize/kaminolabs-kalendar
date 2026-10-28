@@ -26,7 +26,7 @@ import {
 import { CalendarMonthView } from "@/components/panel/calendar-month-view";
 import { BookingDetailModal } from "@/components/panel/booking-detail-modal";
 import type { InvoicingDictionary } from "@/lib/i18n/dictionaries/invoicing";
-import { AppointmentModal, type ClosureRuleVM } from "@/components/panel/appointment-modal";
+import type { ClosureRuleVM } from "@/components/panel/appointment-modal";
 import {
   dayStart,
   mondayStart,
@@ -199,9 +199,8 @@ export function CalendarBookings({
   weekStartIso: string;
   whatsappEnabled: boolean;
   // clinic-configuration.md's bonos-visibility-toggle — gates the bono
-  // option(s) in the Cobrar modal (BookingDetailModal) and in
-  // AppointmentModal's edit flow, forward-looking only (never hides
-  // already-recorded bono history elsewhere).
+  // option(s) in the Cobrar modal (BookingDetailModal), forward-looking
+  // only (never hides already-recorded bono history elsewhere).
   bonosEnabled: boolean;
   // auto-invoice-setting/invoice-on-payment-trigger (pdf-invoicing.md)
   autoInvoiceEnabled: boolean;
@@ -248,7 +247,6 @@ export function CalendarBookings({
   const [fetchedBookings, setFetchedBookings] = useState<WeekBookingVM[] | null>(null);
   const [gridLoading, setGridLoading] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<WeekBookingVM | null>(null);
-  const [editingBooking, setEditingBooking] = useState<WeekBookingVM | null>(null);
 
   // multi-provider-calendar-display: `selectedProviderIds` is the VIEW
   // filter only — createBookingAsOwner/AppointmentModal still get the full
@@ -609,36 +607,18 @@ export function CalendarBookings({
           invoicingDict={invoicingDict}
           bonosEnabled={bonosEnabled}
           autoInvoiceEnabled={autoInvoiceEnabled}
+          hoursByDay={weekHoursByDay}
+          allBookings={gridBookings}
+          services={weekServices}
+          members={weekMembers}
+          closures={closures}
+          whatsappEnabled={whatsappEnabled}
           onClose={() => setSelectedBooking(null)}
           onUpdated={handleGridBookingCreated}
           onCancellationReviewed={() => {
             const id = selectedBooking.id;
             setCancellationList((l) => l.filter((b) => b.id !== id));
             setList((l) => l.map((b) => (b.id === id ? { ...b, cancellationRequestedAt: null } : b)));
-          }}
-          onModify={(booking) => {
-            setSelectedBooking(null);
-            setEditingBooking(booking);
-          }}
-        />
-      )}
-
-      {editingBooking && (
-        <AppointmentModal
-          mode="edit"
-          booking={editingBooking}
-          hoursByDay={weekHoursByDay}
-          allBookings={gridBookings}
-          services={weekServices}
-          members={weekMembers}
-          closures={closures}
-          dict={dict.modal}
-          errorsDict={dict.manualErrors}
-          whatsappEnabled={whatsappEnabled}
-          onClose={() => setEditingBooking(null)}
-          onSaved={() => {
-            setEditingBooking(null);
-            handleGridBookingCreated();
           }}
         />
       )}
@@ -862,14 +842,10 @@ export function CalendarBookings({
                   className="flex shrink-0 items-center gap-2 pl-[82px] sm:pl-0"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <Btn
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setEditingBooking(row.booking)}
-                    disabled={busyId === row.booking.id}
-                  >
-                    {dict.detailModal.modifyButton}
-                  </Btn>
+                  {/* detail-panel-inline-edit (2026-10): the row's own
+                      onClick already opens BookingDetailModal, now the
+                      single editable surface — the old dedicated
+                      "Modificar" shortcut button here is redundant with it. */}
                   <Btn
                     size="sm"
                     variant="ghost"

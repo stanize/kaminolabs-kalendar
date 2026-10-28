@@ -125,7 +125,13 @@ export interface CalendarDictionary {
   detailModal: {
     close: string; // aria-label for the X button
     notesLabel: string; // "Comentarios"
-    modifyButton: string; // "Modificar" — opens the appointment editor (future bookings)
+    // detail-panel-inline-edit (2026-10): confirm dialog shown when closing
+    // with unsaved field changes (the fields themselves reuse dict.modal's
+    // labels/saveButton — only this dialog's own copy lives here).
+    discardTitle: string;
+    discardBody: string;
+    discardStay: string; // "Seguir editando" — closes the dialog, keeps the panel open
+    discardConfirm: string; // "Descartar cambios" — closes the panel, discarding edits
     cancelButton: string;
     cancelling: string;
     resultNoShow: string;
@@ -151,8 +157,6 @@ export interface CalendarDictionary {
     paymentMethodBono: string; // generic short label ("Bono") used in the paid-summary line, no name/count
     paymentMethodBonoTemplate: string; // "{bonoName} ({n} restantes)" — one option per active bono
     paymentMethodLockedNote: string; // shown instead of the selector once a bono is already applied
-    saveButton: string;
-    saving: string;
     // cobrar-button-and-paid-at (calendar-management-past.md)
     cobrarButton: string; // "Caja" — shown instead of a payment toggle on an unpaid appointment (future or past)
     cobrarModalTitle: string;
@@ -287,7 +291,10 @@ const es: CalendarDictionary = {
   detailModal: {
     close: "Cerrar",
     notesLabel: "Comentarios",
-    modifyButton: "Modificar",
+    discardTitle: "¿Descartar cambios?",
+    discardBody: "Has modificado esta cita pero no has guardado los cambios.",
+    discardStay: "Seguir editando",
+    discardConfirm: "Descartar cambios",
     cancelButton: "Cancelar cita",
     cancelling: "Cancelando…",
     resultNoShow: "No-show",
@@ -307,8 +314,6 @@ const es: CalendarDictionary = {
     paymentMethodBono: "Bono",
     paymentMethodBonoTemplate: "{bonoName} ({n} restantes)",
     paymentMethodLockedNote: "Este pago ya está aplicado a un bono. Para cambiarlo, ve a la página de Bonos.",
-    saveButton: "Guardar",
-    saving: "Guardando…",
     cobrarButton: "Caja",
     cobrarModalTitle: "¿Cómo ha pagado?",
     cobrarCancel: "Cancelar",
@@ -437,7 +442,10 @@ const en: CalendarDictionary = {
   detailModal: {
     close: "Close",
     notesLabel: "Comments",
-    modifyButton: "Modify",
+    discardTitle: "Discard changes?",
+    discardBody: "You've made changes to this appointment that haven't been saved.",
+    discardStay: "Keep editing",
+    discardConfirm: "Discard changes",
     cancelButton: "Cancel appointment",
     cancelling: "Cancelling…",
     resultNoShow: "No-show",
@@ -457,8 +465,6 @@ const en: CalendarDictionary = {
     paymentMethodBono: "Bono",
     paymentMethodBonoTemplate: "{bonoName} ({n} left)",
     paymentMethodLockedNote: "This payment is already applied to a bono. To change it, go to the Bonos page.",
-    saveButton: "Save",
-    saving: "Saving…",
     cobrarButton: "Payment",
     cobrarModalTitle: "How did they pay?",
     cobrarCancel: "Cancel",
