@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { requireSession } from "@/lib/auth-session";
+import { getBusinessForUser } from "@/lib/business/data";
 import { getClientDetail, getClientNotes } from "@/lib/clients/data";
 import { getBonosForClient } from "@/lib/bonos/data";
 import { getLocale } from "@/lib/i18n/server";
@@ -20,10 +21,11 @@ export default async function ClientDetailPage({
   const dict = getClientsDictionary(locale);
   const invoicingDict = getInvoicingDictionary(locale);
 
-  const [client, notes, bonos] = await Promise.all([
+  const [client, notes, bonos, business] = await Promise.all([
     getClientDetail(session.user.id, id),
     getClientNotes(session.user.id, id),
     getBonosForClient(session.user.id, id),
+    getBusinessForUser(session.user.id),
   ]);
 
   if (!client) notFound();
@@ -41,6 +43,7 @@ export default async function ClientDetailPage({
         client={client}
         initialNotes={notes}
         bonos={bonos}
+        bonosEnabled={business?.bonos_enabled ?? false}
         dict={dict}
         locale={locale}
         invoicingPageDict={invoicingDict.page}

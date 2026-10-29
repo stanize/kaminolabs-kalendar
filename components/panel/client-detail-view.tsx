@@ -25,11 +25,17 @@ const inputClass =
   "w-full rounded-lg border border-line bg-surface px-3 py-2 text-[14px] text-ink outline-none focus:border-brand";
 
 export function ClientDetailView({
-  client, initialNotes, bonos, dict, locale, invoicingPageDict, invoicingConfirmModalDict,
+  client, initialNotes, bonos, bonosEnabled, dict, locale, invoicingPageDict, invoicingConfirmModalDict,
 }: {
   client: ClientDetail;
   initialNotes: ClientNote[];
   bonos: ClientBonoSummary[];
+  // bonos-visibility-flag-interaction (bonos.md, clinic-configuration.md):
+  // same flag that gates the Bonos page and the Cobrar modal's bono
+  // option(s) — the client page's Bonos card follows it too now, forward-
+  // looking only (an already-recorded bono still shows if the clinic later
+  // flips this off, same as everywhere else this flag is checked).
+  bonosEnabled: boolean;
   dict: ClientsDictionary;
   locale: Locale;
   // generate-invoice-from-client-page: "Generar factura"/"Descargar
@@ -53,7 +59,7 @@ export function ClientDetailView({
 
       <StatsCard client={client} dict={dict} locale={locale} />
       <ContactCard client={client} dict={dict} />
-      <BonosCard bonos={bonos} dict={dict} locale={locale} />
+      {bonosEnabled && <BonosCard bonos={bonos} dict={dict} locale={locale} />}
 
       <BookingListCard
         title={d.upcomingTitle}
