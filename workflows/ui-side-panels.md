@@ -109,11 +109,36 @@ button, X/backdrop actually closes now), plus the new invoice flow
 (Cobrar stays open + shows paid state immediately, Generar factura
 button appears and works, future-prepay also gets a Factura section).
 
+## Step: invoice-confirm-panel
+
+Status: in_progress — code implemented and typechecked/linted, pending
+live testing.
+
+IMPLEMENTED (2026-10-29, Arun):
+- `InvoiceConfirmModal` converted to the same side-panel shell (it's
+  reused by 3 entry points — the Factura section's "Generar factura"
+  button, Facturas > Pendientes, and a client's own booking history — all
+  three pick this up automatically, same `onClose`/`onDone` props).
+- Title changed from the question "¿Quieres generar una factura?" to a
+  plain "Factura" header, with a standard X close button — matching
+  every other panel now instead of being the one modal phrased as a
+  yes/no question. The bottom "No" button is gone; the X/backdrop is the
+  decline path (both still call `onClose`, same as before, just no
+  longer via the "No" button specifically). `dict.no` removed as unused.
+- The "Generar factura" button in BookingDetailModal's Factura section
+  restyled from `outline`/`sm` to `primary` (default size) — same visual
+  weight as the Caja button rather than reading as a secondary action.
+
+Still needs: live-test (panel slides in from the right over the Factura
+section, X/backdrop closes without generating, DNI/Domicilio/concept
+flow unchanged, success closes the panel and the Factura section updates
+to show Descargar/Reenviar — verify this from all 3 entry points, not
+just Cobrar).
+
 ## Not yet converted
 
-- `invoice-confirm-modal.tsx`, `availability-manager.tsx`'s edit-hours
-  modal, `payment-method-modal.tsx`, `subscribe-modal.tsx` — candidates,
-  same side-panel shell.
+- `availability-manager.tsx`'s edit-hours modal, `payment-method-modal.tsx`,
+  `subscribe-modal.tsx` — candidates, same side-panel shell.
 - `closure-conflict-dialog.tsx`, `booking-page-card.tsx`, `save-overlay.tsx`
   — deliberately staying centered modals (small confirm/preview dialogs,
   not forms).

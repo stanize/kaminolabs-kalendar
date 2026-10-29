@@ -51,7 +51,8 @@ export interface InvoicingDictionary {
     conceptsCancel: string;
   };
   confirmModal: {
-    title: string;
+    title: string; // "Factura" — side-panel-pattern: simple title, not a question (the X button/backdrop is the decline path now)
+    close: string; // aria-label for the X button
     // invoice-concepts-list: `serviceLabel` shows the booking's own
     // appointment type (always the invoice's first line, read-only here);
     // `conceptLabel`/`conceptPlaceholder` are for the OPTIONAL extra line
@@ -62,7 +63,6 @@ export interface InvoicingDictionary {
     conceptPlaceholder: string;
     yesGenerateAndSend: string;
     yesGenerateOnly: string;
-    no: string;
     sendEmailCheckboxLabel: string;
     alternateEmailLabel: string;
     alternateEmailPlaceholder: string;
@@ -174,13 +174,13 @@ const es: InvoicingDictionary = {
     conceptsCancel: "Cancelar",
   },
   confirmModal: {
-    title: "¿Quieres generar una factura?",
+    title: "Factura",
+    close: "Cerrar",
     serviceLabel: "Servicio",
     conceptLabel: "Concepto de factura adicional (opcional)",
     conceptPlaceholder: "ej. Quiropodia",
     yesGenerateAndSend: "Generar y mandar correo",
     yesGenerateOnly: "Solo generar",
-    no: "No",
     sendEmailCheckboxLabel: "Enviar factura al cliente por email",
     alternateEmailLabel: "¿Enviar a otro email? (opcional)",
     alternateEmailPlaceholder: "otro@email.com",
@@ -281,13 +281,13 @@ const en: InvoicingDictionary = {
     conceptsCancel: "Cancel",
   },
   confirmModal: {
-    title: "Generate an invoice?",
+    title: "Invoice",
+    close: "Close",
     serviceLabel: "Service",
     conceptLabel: "Additional invoice concept (optional)",
     conceptPlaceholder: "e.g. Chiropody",
     yesGenerateAndSend: "Generate and send email",
     yesGenerateOnly: "Generate only",
-    no: "No",
     sendEmailCheckboxLabel: "Email the invoice to the client",
     alternateEmailLabel: "Send to a different email? (optional)",
     alternateEmailPlaceholder: "other@email.com",

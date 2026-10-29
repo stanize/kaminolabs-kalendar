@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Icon } from "@/components/ui/icon";
 import { Btn } from "@/components/ui/button";
 import { createAndSendInvoice, listInvoiceConcepts } from "@/lib/actions/invoices";
 import { getClientIdentity } from "@/lib/actions/clients";
@@ -68,6 +69,23 @@ export function InvoiceConfirmModal({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // side-panel-pattern (rollout, 2026-10) — same shell/transition as
+  // AppointmentModal/BookingDetailModal: slides in from the right over
+  // the main content, leaving the sidebar visible on desktop.
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setVisible(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
+  const closingRef = useRef(false);
+  function requestClose(after: () => void) {
+    if (closingRef.current) return;
+    closingRef.current = true;
+    setVisible(false);
+    setTimeout(after, 200);
+  }
+  const closePanel = () => requestClose(onClose);
+
   useEffect(() => {
     let cancelled = false;
     async function load() {
@@ -89,7 +107,7 @@ export function InvoiceConfirmModal({
 
   async function handleConfirm(wantsInvoice: boolean) {
     if (!wantsInvoice) {
-      onClose();
+      requestClose(onClose);
       return;
     }
 
@@ -124,16 +142,31 @@ export function InvoiceConfirmModal({
       setError(res.error);
       return;
     }
-    onDone();
+    requestClose(onDone);
   }
 
   return (
-    <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 px-4"
-      onClick={() => !busy && handleConfirm(false)}
-    >
-      <div className="w-full max-w-[360px] rounded-2xl bg-surface p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
-        <h3 className="mb-4 text-[15px] font-bold text-ink">{dict.title}</h3>
+    <div className="fixed inset-y-0 left-0 right-0 z-[60] md:left-[240px]">
+      <div
+        className={`absolute inset-0 bg-black/40 transition-opacity duration-200 ${visible ? "opacity-100" : "opacity-0"}`}
+        onClick={() => !busy && closePanel()}
+        aria-hidden
+      />
+      <div
+        className={`absolute inset-y-0 right-0 flex h-full w-full flex-col overflow-y-auto bg-surface p-5 shadow-2xl transition-transform duration-200 ease-out sm:w-1/2 sm:min-w-[480px] sm:p-8 ${
+          visible ? "translate-x-0" : "translate-x-full"
+        }`}
+      >
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-[17px] font-bold text-ink">{dict.title}</h2>
+          <button
+            onClick={() => !busy && closePanel()}
+            aria-label={dict.close}
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-ink-soft hover:bg-surface-2"
+          >
+            <Icon name="x" size={16} />
+          </button>
+        </div>
 
         <div className="mb-4 flex flex-col gap-3">
           <div>
@@ -221,10 +254,7 @@ export function InvoiceConfirmModal({
           </div>
         )}
 
-        <div className="flex justify-end gap-2">
-          <Btn variant="ghost" onClick={() => handleConfirm(false)} disabled={busy}>
-            {dict.no}
-          </Btn>
+        <div className="flex justify-end">
           <Btn onClick={() => handleConfirm(true)} disabled={busy || loadingIdentity}>
             {busy ? dict.sending : sendEmail ? dict.yesGenerateAndSend : dict.yesGenerateOnly}
           </Btn>

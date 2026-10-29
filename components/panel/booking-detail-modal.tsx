@@ -669,7 +669,7 @@ export function BookingDetailModal({
         <p className="mb-1.5 text-[12px] font-bold uppercase tracking-[.05em] text-ink-soft">
           {d.invoiceLabel}
         </p>
-        <Btn variant="outline" size="sm" onClick={() => setInvoiceConfirmOpen(true)}>
+        <Btn variant="primary" onClick={() => setInvoiceConfirmOpen(true)}>
           {d.generateInvoiceButton}
         </Btn>
       </div>
