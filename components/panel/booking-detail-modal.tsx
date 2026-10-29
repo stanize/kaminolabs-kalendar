@@ -133,6 +133,16 @@ export function BookingDetailModal({
     setVisible(false);
     setTimeout(after, 200);
   }
+  // BUG FOUND + FIXED (2026-10-29, Arun, live testing): this used to be
+  // named `close` — which collides with the browser's global
+  // `window.close()` (declared in lib.dom, so it compiles/lints clean).
+  // guardedClose()'s `close()` call and the discard dialog's button were
+  // silently resolving to that global no-op instead of this function, so
+  // the X button and backdrop click did nothing unless the booking was
+  // actually dirty-and-saved (the one path that went through
+  // requestClose(onClose) directly, in handleSaveFields, never through
+  // this helper). Renamed to avoid shadowing a global ever again.
+  const closePanel = () => requestClose(onClose);
   // detail-panel-inline-edit (2026-10): the appointment's own fields,
   // editable directly in this panel instead of a separate "Modificar" step
   // — same field set/validation AppointmentModal's edit mode used to own.
@@ -289,7 +299,7 @@ export function BookingDetailModal({
   // side) goes straight through requestClose, unaffected.
   function guardedClose() {
     if (isDirty) { setDiscardConfirmOpen(true); return; }
-    close();
+    closePanel();
   }
 
   // payment-cancellation-flow-expansion: "Cancelar cita" for a PAST,
@@ -1167,7 +1177,7 @@ export function BookingDetailModal({
                 variant="outline"
                 onClick={() => {
                   setDiscardConfirmOpen(false);
-                  close();
+                  closePanel();
                 }}
               >
                 {d.discardConfirm}
