@@ -142,6 +142,11 @@ export interface CalendarDictionary {
     // Descargar/Reenviar buttons, distinct from the Pago box so it never
     // reads as a payment-editing option.
     invoiceLabel: string; // "Factura"
+    // invoice-generation-now-manual-only (2026-10): shown in the Factura
+    // section once paid and no invoice exists yet — opens the same
+    // Sí/No confirm modal that used to pop up automatically right after
+    // Cobrar.
+    generateInvoiceButton: string; // "Generar factura"
     paymentPaid: string;
     paymentPending: string;
     paymentMethodLabel: string; // "Método de pago" — inline selector shown once paymentPaid is chosen
@@ -301,6 +306,7 @@ const es: CalendarDictionary = {
     resultCancelled: "Cancelada",
     editPaymentButton: "Editar",
     invoiceLabel: "Factura",
+    generateInvoiceButton: "Generar factura",
     paymentPaid: "Pagado",
     paymentPending: "Pendiente",
     paymentMethodLabel: "Método de pago",
@@ -452,6 +458,7 @@ const en: CalendarDictionary = {
     resultCancelled: "Cancelled",
     editPaymentButton: "Edit",
     invoiceLabel: "Invoice",
+    generateInvoiceButton: "Generate invoice",
     paymentPaid: "Paid",
     paymentPending: "Pending",
     paymentMethodLabel: "Payment method",

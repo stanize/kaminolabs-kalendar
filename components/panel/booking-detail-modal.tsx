@@ -15,9 +15,8 @@ import {
 } from "@/lib/actions/booking-owner";
 import { getActiveBonosForClientAction } from "@/lib/actions/bonos";
 import type { ClientActiveBono } from "@/lib/bonos/data";
-import { checkExistingInvoiceForBooking, createAndSendInvoice, resendInvoice } from "@/lib/actions/invoices";
+import { checkExistingInvoiceForBooking, resendInvoice } from "@/lib/actions/invoices";
 import type { InvoiceRow } from "@/lib/invoices/data";
-import { getClientIdentity } from "@/lib/actions/clients";
 import { zonedTimeToUtc, dayIdInTz, tzDateParts } from "@/lib/calendar/client-date";
 import type { CalendarDictionary } from "@/lib/i18n/dictionaries/calendar";
 import type { InvoicingDictionary } from "@/lib/i18n/dictionaries/invoicing";
@@ -114,6 +113,10 @@ export function BookingDetailModal({
   onCancellationReviewed?: () => void;
 }) {
   const d = dict.detailModal;
+  // invoice-generation-now-manual-only (2026-10): auto-invoice is on hold
+  // per Arun — kept as an accepted prop (the setting itself still exists
+  // in Ajustes) but deliberately not read anywhere below for now.
+  void autoInvoiceEnabled;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -336,12 +339,23 @@ export function BookingDetailModal({
   // instead of the read-only summary. Not offered for an already-cancelled
   // booking (cancelling is a separate, unrelated flow).
   const [editingPayment, setEditingPayment] = useState(false);
+  // invoice-generation-now-manual-only (2026-10): Cobrar no longer closes
+  // this panel, so its result has to be reflected locally — `booking` is
+  // a stale prop snapshot from the moment the panel opened, only
+  // refreshed when the parent list itself refetches. Preferred over
+  // `booking.paymentStatus`/`paymentMethod`/`paidAt` everywhere below via
+  // the `effective*` values.
+  const [paidOverride, setPaidOverride] = useState<{ paymentMethod: PaymentMethodCode | "bono"; paidAt: string } | null>(null);
+  const effectivePaymentStatus = paidOverride ? "paid" : booking.paymentStatus;
+  const effectivePaymentMethod = paidOverride?.paymentMethod ?? booking.paymentMethod;
+  const effectivePaidAt = paidOverride?.paidAt ?? booking.paidAt;
 
   // ── Invoice confirm (invoice-on-payment-trigger, pdf-invoicing.md) ──────
-  // Shown after a successful Cobrar, unless auto-invoice is on (skipped
-  // entirely) or an invoice already exists for this booking (one-invoice-
-  // per-booking — a correction via Editar never re-prompts or creates a
-  // second one).
+  // invoice-generation-now-manual-only (2026-10): no longer auto-opened
+  // right after Cobrar — the clinic opens it explicitly via the "Generar
+  // factura" button in the Factura section below, once the booking is
+  // paid and has no invoice yet. Auto-invoice (autoInvoiceEnabled) is on
+  // hold for now, not read anywhere in this component.
   const [invoiceConfirmOpen, setInvoiceConfirmOpen] = useState(false);
   const invoiceDict = invoicingDict.confirmModal;
 
@@ -349,20 +363,22 @@ export function BookingDetailModal({
   // the invoice right from this modal once one exists for the booking,
   // instead of having to go find it on the Facturas page or the client's
   // own page. Fetched once per booking — refreshed below whenever a new
-  // invoice gets created from within this modal (auto-invoice or the
-  // confirm modal).
+  // invoice gets created from within this modal.
   const [existingInvoice, setExistingInvoice] = useState<InvoiceRow | null>(null);
   // invoice-section-loading-skeleton (2026-10): the lookup is only ever
   // relevant once the booking is paid (invoices don't exist otherwise), so
   // the fetch is skipped entirely outside that case below — avoids both a
   // wasted request and a Factura section that could pop in after the rest
   // of the modal has already settled. While paid and still loading, a
-  // same-shaped skeleton (gated on the `booking.paymentStatus === "paid"
+  // same-shaped skeleton (gated on the `effectivePaymentStatus === "paid"
   // && invoiceLoading` check at the render site) holds the section's
-  // place so nothing shifts once the real buttons arrive.
+  // place so nothing shifts once the real buttons/Generar factura arrive.
+  // Re-runs off `effectivePaymentStatus` (not the stale `booking.
+  // paymentStatus`) so a Cobrar done from within this open panel also
+  // triggers the lookup.
   const [invoiceLoading, setInvoiceLoading] = useState(booking.paymentStatus === "paid");
   useEffect(() => {
-    if (booking.paymentStatus !== "paid") return;
+    if (effectivePaymentStatus !== "paid") return;
     let cancelled = false;
     checkExistingInvoiceForBooking(booking.id).then((inv) => {
       if (cancelled) return;
@@ -372,7 +388,7 @@ export function BookingDetailModal({
     return () => {
       cancelled = true;
     };
-  }, [booking.id, booking.paymentStatus]);
+  }, [booking.id, effectivePaymentStatus]);
 
   const [resendingInvoice, setResendingInvoice] = useState(false);
   const [resendInvoiceError, setResendInvoiceError] = useState<string | null>(null);
@@ -456,20 +472,17 @@ export function BookingDetailModal({
   // bookings (2026-09) — a first-time patient is confirmed immediately
   // too, but is still someone the clinic hasn't met, same as a guest.
   const needsReview = needsClinicFollowUp(booking.clientStatus, booking.clinicReviewedAt) && booking.clientStatus !== "guest_unconfirmed";
-  const clientHasRealEmail = hasRealEmail(booking.clientEmail);
-
-  // cobrar-button-and-paid-at: "Pagado con {método} · {hora}" — only shown
-  // for a booking that's ALREADY saved as paid (booking.paymentStatus, not
-  // the mid-edit `payment`/effectiveMethodChoice state), using the real
-  // persisted payment_method + paid_at rather than whatever's being edited.
+  // cobrar-button-and-paid-at: "Pagado con {método} · {hora}" — uses the
+  // effective* values (the real persisted state, or this panel's own
+  // paidOverride right after a Cobrar done without closing).
   const paidSummaryText =
-    booking.paymentStatus === "paid" && booking.paidAt
+    effectivePaymentStatus === "paid" && effectivePaidAt
       ? d.paidWithTemplate
-          .replace("{method}", booking.paymentMethod ? paymentMethodLabel(booking.paymentMethod, d) : "")
+          .replace("{method}", effectivePaymentMethod ? paymentMethodLabel(effectivePaymentMethod, d) : "")
           .replace(
             "{time}",
             new Intl.DateTimeFormat(intlLocale, { timeZone: TZ, hour: "2-digit", minute: "2-digit" }).format(
-              new Date(booking.paidAt)
+              new Date(effectivePaidAt)
             )
           )
       : null;
@@ -550,38 +563,24 @@ export function BookingDetailModal({
     setCobrarModalOpen(false);
     if (!res.ok) { setError(res.error); return; }
 
-    // invoice-on-payment-trigger: one-invoice-per-booking — a correction
-    // via Editar (re-running Cobrar) never re-prompts or creates a second
-    // invoice for the same booking.
-    const existingInvoice = await checkExistingInvoiceForBooking(booking.id);
-    if (existingInvoice) {
-      onUpdated();
-      requestClose(onClose);
-      return;
-    }
-
-    // client-identity-for-invoicing: fetched up front either way — to
-    // decide whether auto-invoice can actually proceed, and to pre-fill
-    // the manual modal's DNI/Domicilio inputs when it can't (or auto-
-    // invoice is off).
-    const identity = booking.clinicClientId ? await getClientIdentity(booking.clinicClientId) : null;
-    const dni = identity?.dni ?? "";
-    const address = identity?.address ?? "";
-
-    if (autoInvoiceEnabled && dni && address) {
-      // invoice-generation-without-send: auto-invoice always generates;
-      // it only emails when the client already has a real email on file,
-      // and never errors/prompts when there isn't one.
-      await createAndSendInvoice({ bookingId: booking.id, sendEmail: clientHasRealEmail, clientDni: dni, clientAddress: address });
-      onUpdated();
-      requestClose(onClose);
-      return;
-    }
-
-    // Auto-invoice is either off, or on but missing required DNI/Domicilio
-    // — falls back to the manual modal that one time so the clinic can
-    // fill it in, per Arun's call on that edge case.
-    setInvoiceConfirmOpen(true);
+    // invoice-generation-now-manual-only (2026-10, Arun): Cobrar used to
+    // auto-check for an existing invoice and either skip, auto-generate
+    // (autoInvoiceEnabled), or auto-open the confirm modal — then close
+    // this panel either way. Per Arun, invoice generation is on hold as a
+    // manual-only, clinic-initiated step for now: Cobrar just records the
+    // payment, stays on this panel (paidOverride below reflects it
+    // immediately), and the Factura section's new "Generar factura"
+    // button is what starts that flow, whenever the clinic chooses to.
+    setPaidOverride({
+      paymentMethod: methodValue.startsWith("bono:") ? "bono" : (methodValue as PaymentMethodCode),
+      paidAt: new Date().toISOString(),
+    });
+    setEditingPayment(false);
+    // Was unpaid (or no_show) a moment ago, so no invoice lookup has run
+    // yet for this booking — show the Factura skeleton until the effect
+    // above resolves it, instead of a one-tick gap with nothing there.
+    setInvoiceLoading(true);
+    onUpdated();
   };
 
   // No-show: the other terminal state for a past appointment, saved
@@ -611,6 +610,70 @@ export function BookingDetailModal({
     onUpdated();
     requestClose(onClose);
   };
+
+  // Shared by the future- and past-appointment branches below — a paid
+  // booking (prepaid or paid-on-the-day) can generate a factura either
+  // way. invoice-generation-now-manual-only: the "Generar factura" button
+  // is the only thing that opens invoiceConfirmOpen now.
+  const invoiceSection =
+    effectivePaymentStatus === "paid" &&
+    (invoiceLoading ? (
+      <div>
+        <p className="mb-1.5 text-[12px] font-bold uppercase tracking-[.05em] text-ink-soft">
+          {d.invoiceLabel}
+        </p>
+        <div className="flex items-center gap-2">
+          <div className="h-8 w-[110px] animate-pulse rounded-lg bg-surface-2" />
+          <div className="h-8 w-[90px] animate-pulse rounded-lg bg-surface-2" />
+        </div>
+      </div>
+    ) : existingInvoice ? (
+      <div>
+        <p className="mb-1.5 text-[12px] font-bold uppercase tracking-[.05em] text-ink-soft">
+          {d.invoiceLabel}
+        </p>
+        <div className="flex items-center gap-2">
+          <a href={invoicePdfHref(existingInvoice)} target="_blank" rel="noopener noreferrer">
+            <Btn variant="outline" size="sm">
+              <Icon name="externalLink" size={13} />
+              {invoicingDict.page.download}
+            </Btn>
+          </a>
+          <Btn variant="outline" size="sm" onClick={handleResendInvoice} disabled={resendingInvoice}>
+            {resendingInvoice ? invoicingDict.page.resending : invoicingDict.page.resend}
+          </Btn>
+        </div>
+        {resendEmailPromptOpen && (
+          <div className="mt-2 flex items-center gap-2">
+            <input
+              type="email"
+              value={resendEmailInput}
+              onChange={(e) => setResendEmailInput(e.target.value)}
+              placeholder={invoicingDict.confirmModal.missingEmailPlaceholder}
+              className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 py-2 text-[13px] text-ink"
+            />
+            <Btn
+              variant="outline"
+              size="sm"
+              onClick={() => doResendInvoice(resendEmailInput.trim())}
+              disabled={resendingInvoice || !resendEmailInput.trim()}
+            >
+              {resendingInvoice ? invoicingDict.page.resending : invoicingDict.page.resend}
+            </Btn>
+          </div>
+        )}
+        {resendInvoiceError && <p className="mt-1.5 text-[12px] text-error">{resendInvoiceError}</p>}
+      </div>
+    ) : (
+      <div>
+        <p className="mb-1.5 text-[12px] font-bold uppercase tracking-[.05em] text-ink-soft">
+          {d.invoiceLabel}
+        </p>
+        <Btn variant="outline" size="sm" onClick={() => setInvoiceConfirmOpen(true)}>
+          {d.generateInvoiceButton}
+        </Btn>
+      </div>
+    ));
 
   return (
     <div className="fixed inset-y-0 left-0 right-0 z-50 md:left-[240px]">
@@ -929,6 +992,8 @@ export function BookingDetailModal({
                 </Btn>
               )}
             </div>
+
+            {invoiceSection}
           </div>
         ) : (
           <div className="flex flex-col gap-4">
@@ -975,54 +1040,7 @@ export function BookingDetailModal({
               </div>
             )}
 
-            {booking.paymentStatus === "paid" && invoiceLoading ? (
-              <div>
-                <p className="mb-1.5 text-[12px] font-bold uppercase tracking-[.05em] text-ink-soft">
-                  {d.invoiceLabel}
-                </p>
-                <div className="flex items-center gap-2">
-                  <div className="h-8 w-[110px] animate-pulse rounded-lg bg-surface-2" />
-                  <div className="h-8 w-[90px] animate-pulse rounded-lg bg-surface-2" />
-                </div>
-              </div>
-            ) : existingInvoice && (
-              <div>
-                <p className="mb-1.5 text-[12px] font-bold uppercase tracking-[.05em] text-ink-soft">
-                  {d.invoiceLabel}
-                </p>
-                <div className="flex items-center gap-2">
-                  <a href={invoicePdfHref(existingInvoice)} target="_blank" rel="noopener noreferrer">
-                    <Btn variant="outline" size="sm">
-                      <Icon name="externalLink" size={13} />
-                      {invoicingDict.page.download}
-                    </Btn>
-                  </a>
-                  <Btn variant="outline" size="sm" onClick={handleResendInvoice} disabled={resendingInvoice}>
-                    {resendingInvoice ? invoicingDict.page.resending : invoicingDict.page.resend}
-                  </Btn>
-                </div>
-                {resendEmailPromptOpen && (
-                  <div className="mt-2 flex items-center gap-2">
-                    <input
-                      type="email"
-                      value={resendEmailInput}
-                      onChange={(e) => setResendEmailInput(e.target.value)}
-                      placeholder={invoicingDict.confirmModal.missingEmailPlaceholder}
-                      className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 py-2 text-[13px] text-ink"
-                    />
-                    <Btn
-                      variant="outline"
-                      size="sm"
-                      onClick={() => doResendInvoice(resendEmailInput.trim())}
-                      disabled={resendingInvoice || !resendEmailInput.trim()}
-                    >
-                      {resendingInvoice ? invoicingDict.page.resending : invoicingDict.page.resend}
-                    </Btn>
-                  </div>
-                )}
-                {resendInvoiceError && <p className="mt-1.5 text-[12px] text-error">{resendInvoiceError}</p>}
-              </div>
-            )}
+            {invoiceSection}
           </div>
         )}
       </div>
@@ -1145,15 +1163,14 @@ export function BookingDetailModal({
           clientEmail={booking.clientEmail}
           serviceName={booking.serviceName}
           dict={invoiceDict}
-          onClose={() => {
+          onClose={() => setInvoiceConfirmOpen(false)}
+          onDone={async () => {
             setInvoiceConfirmOpen(false);
+            setInvoiceLoading(true);
+            const inv = await checkExistingInvoiceForBooking(booking.id);
+            setExistingInvoice(inv);
+            setInvoiceLoading(false);
             onUpdated();
-            requestClose(onClose);
-          }}
-          onDone={() => {
-            setInvoiceConfirmOpen(false);
-            onUpdated();
-            requestClose(onClose);
           }}
         />
       )}

@@ -72,13 +72,42 @@ IMPLEMENTED (2026-10):
   - Client name field is now an editable input, not a link — the
     "Ver perfil del cliente" link (for a `clinicClientId`-linked booking)
     moved to a small link under the field instead.
+- **BUG FOUND + FIXED (2026-10-29, Arun, live testing):** the X button and
+  backdrop click did nothing — turned out `close` (the helper that calls
+  `requestClose(onClose)`) had gotten dropped from an earlier edit,
+  leaving `guardedClose()`'s `close()` call silently resolving to the
+  browser's own global `window.close()` (a no-op in a normal tab; `close`
+  is a real `lib.dom` global so neither tsc nor eslint caught it). Only
+  the save-success path worked, since it called `requestClose(onClose)`
+  directly. Renamed the helper to `closePanel` to not shadow a global
+  again.
+- **invoice-generation-now-manual-only (2026-10-29, Arun):** Cobrar no
+  longer auto-pops the "¿Quieres generar una factura?" confirm — it just
+  records the payment and the panel STAYS OPEN (previously it always
+  closed the panel one way or another: existing invoice, auto-invoice
+  success, or by opening that confirm modal). Since `booking` is a stale
+  prop snapshot from when the panel opened, a `paidOverride` local state
+  (`{paymentMethod, paidAt}`, set right after a successful Cobrar) is
+  layered over `booking.paymentStatus`/`paymentMethod`/`paidAt` via
+  `effective*` values used everywhere the panel previously read the raw
+  booking fields for payment display. A "Generar factura" button now
+  lives in the Factura section (added to both the future- and
+  past-appointment branches, via a shared `invoiceSection` — previously
+  that section only existed for past bookings, a pre-existing gap since a
+  future prepayment could still auto-trigger the old modal but never
+  showed anywhere to view/resend it) once paid and no invoice exists yet;
+  clicking it opens `InvoiceConfirmModal` on demand. Full detail in
+  `workflows/pdf-invoicing.md` → invoice-on-payment-trigger/
+  auto-invoice-setting (now `on_hold`).
 
 Still needs: live-test opening an existing appointment (fields prefilled
 correctly, Guardar cambios lights up on an actual change and stays muted
 otherwise, save actually updates the booking + grid, conflict/closure
 warnings still fire, discard-changes dialog on X/backdrop with unsaved
 edits, Conflictos tab row still opens the panel correctly without its old
-button).
+button, X/backdrop actually closes now), plus the new invoice flow
+(Cobrar stays open + shows paid state immediately, Generar factura
+button appears and works, future-prepay also gets a Factura section).
 
 ## Not yet converted
 
