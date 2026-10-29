@@ -601,6 +601,15 @@ export function CalendarBookings({
 
       {selectedBooking && (
         <BookingDetailModal
+          // BUG FOUND + FIXED (2026-10-29, Arun, live testing): no `key`
+          // meant switching straight from one appointment to another (new
+          // row click without closing first) reused the same component
+          // instance, leaking its local state — paidOverride, the inline-
+          // edit fields, etc. — into the newly selected booking. Showed up
+          // as "Generar factura" appearing on an unrelated no-show
+          // appointment that was never paid. The key forces a fresh
+          // mount per booking.
+          key={selectedBooking.id}
           booking={selectedBooking}
           intlLocale={dict.intlLocale}
           dict={dict}
