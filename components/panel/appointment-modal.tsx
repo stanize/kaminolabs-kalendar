@@ -156,7 +156,7 @@ export function AppointmentModal({
     if (clientSearchDebounceRef.current) clearTimeout(clientSearchDebounceRef.current);
     const q = clientName.trim();
     clientSearchDebounceRef.current = setTimeout(async () => {
-      if (q.length < 2) {
+      if (q.length < 1) {
         setClientResults([]);
         setShowClientResults(false);
         return;

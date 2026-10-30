@@ -27,7 +27,7 @@ export interface ClientSearchResult {
 export const searchClients = authedAction(
   async (session, query: string): Promise<ClientSearchResult[]> => {
     const trimmed = query.trim();
-    if (trimmed.length < 2) return [];
+    if (trimmed.length < 1) return [];
 
     const business = await getBusinessForUser(session.user.id);
     if (!business) return [];
@@ -35,22 +35,34 @@ export const searchClients = authedAction(
     const supabase = await createClient();
     const like = `%${trimmed}%`;
 
+    // Fetched wider than the final 8 so the starts-with-first re-rank
+    // below (Arun: "Ig" should surface Ignacio/Ignatius before Miguel,
+    // not just whoever was seen most recently) has enough rows to work
+    // with before trimming down.
     const { data } = await supabase
       .from("kalendar_clients")
       .select("id, name, email, phone, total_sessions, last_visit_at")
       .eq("business_id", business.id)
       .or(`name.ilike.${like},email.ilike.${like},phone.ilike.${like}`)
       .order("last_visit_at", { ascending: false, nullsFirst: false })
-      .limit(8);
+      .limit(25);
 
-    return ((data as {
+    const rows = (data as {
       id: string;
       name: string;
       email: string | null;
       phone: string | null;
       total_sessions: number;
       last_visit_at: string | null;
-    }[] | null) ?? []).map((c) => ({
+    }[] | null) ?? [];
+
+    const lowerQuery = trimmed.toLowerCase();
+    const startsWith = (name: string) => name.toLowerCase().startsWith(lowerQuery);
+    // Stable sort: names starting with the query first, each group keeping
+    // its existing most-recently-seen order from the query above.
+    const ranked = [...rows].sort((a, b) => Number(startsWith(b.name)) - Number(startsWith(a.name)));
+
+    return ranked.slice(0, 8).map((c) => ({
       id: c.id,
       name: c.name,
       email: c.email,
