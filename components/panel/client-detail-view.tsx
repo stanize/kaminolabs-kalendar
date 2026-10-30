@@ -138,6 +138,7 @@ function ContactCard({ client, dict }: { client: ClientDetail; dict: ClientsDict
   const [phone, setPhone] = useState(client.phone ?? "");
   const [dni, setDni] = useState(client.dni ?? "");
   const [address, setAddress] = useState(client.address ?? "");
+  const [dateOfBirth, setDateOfBirth] = useState(client.dateOfBirth ?? "");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -147,7 +148,7 @@ function ContactCard({ client, dict }: { client: ClientDetail; dict: ClientsDict
     setSaving(true);
     try {
       const result = await updateClientContactInfo(
-        { clientId: client.id, name, email, phone, dni, address },
+        { clientId: client.id, name, email, phone, dni, address, dateOfBirth },
         dict.errors
       );
       if (!result.ok) {
@@ -172,6 +173,7 @@ function ContactCard({ client, dict }: { client: ClientDetail; dict: ClientsDict
     setPhone(client.phone ?? "");
     setDni(client.dni ?? "");
     setAddress(client.address ?? "");
+    setDateOfBirth(client.dateOfBirth ?? "");
     setEditing(false);
     setError(null);
   }
@@ -209,6 +211,10 @@ function ContactCard({ client, dict }: { client: ClientDetail; dict: ClientsDict
             <label className="mb-1 block text-[12px] font-medium text-ink-soft">{d.addressLabel}</label>
             <input value={address} onChange={(e) => setAddress(e.target.value)} className={inputClass} />
           </div>
+          <div>
+            <label className="mb-1 block text-[12px] font-medium text-ink-soft">{d.dateOfBirthLabel}</label>
+            <input type="date" value={dateOfBirth} onChange={(e) => setDateOfBirth(e.target.value)} className={inputClass} />
+          </div>
           {error && <p className="text-[12.5px] text-error">{error}</p>}
           <div className="flex items-center gap-2">
             <Btn size="sm" onClick={handleSave} disabled={saving}>{saving ? d.saving : d.save}</Btn>
@@ -222,6 +228,7 @@ function ContactCard({ client, dict }: { client: ClientDetail; dict: ClientsDict
           <Row label={d.phoneLabel} value={client.phone ?? "—"} />
           <Row label={d.dniLabel} value={client.dni ?? "—"} />
           <Row label={d.addressLabel} value={client.address ?? "—"} />
+          <Row label={d.dateOfBirthLabel} value={client.dateOfBirth ?? "—"} />
           {saved && <p className="mt-1 text-[12.5px] text-brand-ink">{d.saved}</p>}
         </dl>
       )}

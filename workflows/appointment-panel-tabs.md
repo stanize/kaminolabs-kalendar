@@ -187,6 +187,50 @@ consolidation rather than building a third parallel structure.
 
 ## Status
 
-Status: not_started — design only, verified against the real schema/
-components above but no code written yet. Awaiting Arun's go-ahead to
-build.
+Status: in_progress — code implemented and typechecked/linted/built,
+pending Arun's live testing + running `schema_subset_032.sql`.
+
+IMPLEMENTED (2026-10-30):
+- `date_of_birth` added to `kalendar_clients` (schema_subset_032.sql,
+  not yet run against the live DB).
+- New shared `components/panel/client-profile-tabs.tsx`: Cliente (live
+  edit via `updateClientContactInfo`, now also carrying dateOfBirth) /
+  Historial (merged+sorted via new `getClientPanelData` action,
+  cancelled/no_show greyed+struck, current booking highlighted) / Notas
+  (full reuse of the existing `kalendar_client_notes` add/edit/delete
+  actions) — used by both panels.
+- `BookingDetailModal` (existing appointment): tab bar added, Cita
+  content unchanged (just moved under the "cita" tab), other 3 tabs
+  always live (`clientId = booking.clinicClientId`) since an existing
+  booking always has one. A legacy booking with no `clinicClientId`
+  falls back to a plain empty-state message rather than rendering the
+  tabs in a misleading "will save later" staged mode.
+- `AppointmentModal` (create): **simplified from a create/edit union
+  down to create-only** — its `mode: "edit"` branch had zero remaining
+  call sites (superseded entirely by detail-panel-inline-edit last
+  session) and would have meant duplicating/complicating the new tabs
+  logic for a dead code path. Tab bar added; Cliente/Historial/Notas
+  render live the instant an existing client is picked from the name
+  search (`clinicClientId` set), otherwise staged (local state only) —
+  Historial is always empty for a staged/brand-new client (nothing
+  exists yet). On a successful create, if no existing client was picked
+  and any field was staged, `createBookingAsOwner`'s now-returned
+  `clinicClientId` is used to flush the staged dni/address/dateOfBirth
+  (`updateClientContactInfo`) and note (`addClientNote`) — best-effort,
+  never blocks the already-succeeded booking.
+- Confirmed (already existed, not newly built): `createBookingAsOwner`
+  already mirrors a non-empty Comentarios field into the client's note
+  history on create, tagged with the appointment's date/service —
+  exactly the behavior Arun asked for. Deliberately NOT extended to
+  `updateBookingAsOwner`/Guardar cambios, matching that code's own
+  existing "avoid a duplicate note on every edit/re-save" rationale —
+  flagging this so it's an explicit, known scope line, not a gap.
+
+Still needs: live-test both panels (existing-booking tabs show the
+right client/history/notes; create-flow tabs switch from staged to live
+the moment an existing client is picked; a brand-new client's staged
+dni/domicilio/fecha de nacimiento/note actually land after Crear cita;
+Historial's highlight/strikethrough/empty states; Notas add/edit/delete
+from within the panel), run schema_subset_032.sql, and confirm the
+`/panel/clients/[id]` page's own Cliente card still saves correctly now
+that `updateClientContactInfo` also carries `dateOfBirth`.

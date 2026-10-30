@@ -2,21 +2,26 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "@/components/ui/icon";
-import { createBookingAsOwner, updateBookingAsOwner } from "@/lib/actions/booking-owner";
-import { searchClients, type ClientSearchResult } from "@/lib/actions/clients";
+import { createBookingAsOwner } from "@/lib/actions/booking-owner";
+import { searchClients, updateClientContactInfo, addClientNote, type ClientSearchResult } from "@/lib/actions/clients";
 import { reportClientError } from "@/lib/report-client-error";
 import { zonedTimeToUtc, dayIdInTz, tzDateParts } from "@/lib/calendar/client-date";
 import type { CalendarDictionary } from "@/lib/i18n/dictionaries/calendar";
 import type { DayId } from "@/lib/onboarding/types";
 import type { WeekBookingVM } from "@/components/panel/calendar-grid-view";
-import { isWhatsappSentinelEmail } from "@/lib/whatsapp/sentinel-email";
+import {
+  ClientProfileTabs,
+  EMPTY_STAGED_CLIENT_FIELDS,
+  TAB_ORDER,
+  TAB_LABEL,
+  type FullTab,
+} from "@/components/panel/client-profile-tabs";
 import {
   type ServiceVM,
   type MemberVM,
   type TimeRangeVM,
   toMinutes,
   ymd,
-  hhmmFromIso,
   buildSuggestedTimes,
 } from "@/lib/booking/appointment-fields";
 
@@ -44,73 +49,58 @@ export interface SlotSelection {
   providerName: string;
 }
 
-type AppointmentModalProps =
-  | {
-      mode: "create";
-      slot: SlotSelection;
-      hoursByDay: Partial<Record<DayId, TimeRangeVM[]>>;
-      allBookings: WeekBookingVM[];
-      services: ServiceVM[];
-      members: MemberVM[];
-      closures: ClosureRuleVM[];
-      dict: CalendarDictionary["modal"];
-      errorsDict: CalendarDictionary["manualErrors"];
-      whatsappEnabled: boolean;
-      onClose: () => void;
-      onSaved: () => void;
-    }
-  | {
-      mode: "edit";
-      booking: WeekBookingVM;
-      hoursByDay: Partial<Record<DayId, TimeRangeVM[]>>;
-      allBookings: WeekBookingVM[];
-      services: ServiceVM[];
-      members: MemberVM[];
-      closures: ClosureRuleVM[];
-      dict: CalendarDictionary["modal"];
-      errorsDict: CalendarDictionary["manualErrors"];
-      whatsappEnabled: boolean;
-      onClose: () => void;
-      onSaved: () => void;
-    };
+// appointment-panel-tabs (2026-10): this component is CREATE-ONLY now — its
+// old "edit" mode (`mode: "edit"`, reusing this same form to modify an
+// existing booking) was superseded by detail-panel-inline-edit, which
+// folded appointment editing straight into BookingDetailModal. Nothing
+// called `mode="edit"` anymore (verified: no call sites left), so the
+// union/isEdit branching was dead weight — removed rather than carried
+// forward, same session convention as everywhere else dead code gets
+// found.
+interface AppointmentModalProps {
+  slot: SlotSelection;
+  hoursByDay: Partial<Record<DayId, TimeRangeVM[]>>;
+  allBookings: WeekBookingVM[];
+  services: ServiceVM[];
+  members: MemberVM[];
+  closures: ClosureRuleVM[];
+  dict: CalendarDictionary;
+  errorsDict: CalendarDictionary["manualErrors"];
+  whatsappEnabled: boolean;
+  onClose: () => void;
+  onSaved: () => void;
+}
 
-export function AppointmentModal(props: AppointmentModalProps) {
-  const { hoursByDay, allBookings, services, members, closures, dict, errorsDict, whatsappEnabled, onClose, onSaved } = props;
-  const isEdit = props.mode === "edit";
-  const editBookingId = isEdit ? props.booking.id : null;
+export function AppointmentModal({
+  slot, hoursByDay, allBookings, services, members, closures, dict, errorsDict, whatsappEnabled, onClose, onSaved,
+}: AppointmentModalProps) {
+  const md = dict.modal;
+  const ct = dict.clientTabs;
+  const [activeTab, setActiveTab] = useState<FullTab>("cita");
+  const [staged, setStaged] = useState(EMPTY_STAGED_CLIENT_FIELDS);
 
-  const initialDateParts = isEdit
-    ? tzDateParts(new Date(props.booking.startIso))
-    : { year: props.slot.dayYear, month: props.slot.dayMonth, day: props.slot.dayDay };
-  const initialTeamMemberId = isEdit ? (props.booking.teamMemberId ?? members[0]?.id ?? "") : props.slot.teamMemberId;
-  const initialTimeStr = isEdit ? hhmmFromIso(props.booking.startIso) : props.slot.initialTime;
-  const initialServiceId = isEdit ? (props.booking.serviceId ?? services[0]?.id ?? "") : (services[0]?.id ?? "");
-  const initialClientEmail =
-    isEdit &&
-    props.booking.clientEmail &&
-    !props.booking.clientEmail.startsWith("sin-email+") &&
-    !isWhatsappSentinelEmail(props.booking.clientEmail)
-      ? props.booking.clientEmail
-      : "";
+  const initialDateParts = { year: slot.dayYear, month: slot.dayMonth, day: slot.dayDay };
 
-  const [serviceId, setServiceId] = useState(initialServiceId);
-  const [teamMemberId, setTeamMemberId] = useState(initialTeamMemberId);
+  const [serviceId, setServiceId] = useState(services[0]?.id ?? "");
+  const [teamMemberId, setTeamMemberId] = useState(slot.teamMemberId);
   const [dateStr, setDateStr] = useState(ymd(initialDateParts.year, initialDateParts.month, initialDateParts.day));
-  const [timeStr, setTimeStr] = useState(initialTimeStr);
-  const [clientName, setClientName] = useState(isEdit ? props.booking.clientName : "");
-  const [clientEmail, setClientEmail] = useState(initialClientEmail);
-  const [clientPhone, setClientPhone] = useState(isEdit ? props.booking.clientPhone ?? "" : "");
+  const [timeStr, setTimeStr] = useState(slot.initialTime);
+  const [clientName, setClientName] = useState("");
+  const [clientEmail, setClientEmail] = useState("");
+  const [clientPhone, setClientPhone] = useState("");
   // client-linking-on-booking: set when the owner picks an existing client
   // from the search results below; cleared the moment they type anything
   // afterward, since editing the fields after picking means they're now
   // diverging from that client's stored data — safer to fall back to
   // creating a fresh kalendar_clients row than silently keep a stale link.
-  // Only offered for NEW bookings (isEdit already has a fixed client).
+  // Also drives the Cliente/Historial/Notas tabs below: set = those tabs
+  // show the real picked client live; null = a brand-new client, tabs
+  // operate on `staged` instead (see client-profile-tabs.tsx).
   const [clinicClientId, setClinicClientId] = useState<string | null>(null);
   const [clientResults, setClientResults] = useState<ClientSearchResult[]>([]);
   const [showClientResults, setShowClientResults] = useState(false);
   const clientSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [notes, setNotes] = useState(isEdit ? props.booking.notes ?? "" : "");
+  const [notes, setNotes] = useState("");
   const [sendEmail, setSendEmail] = useState(false);
   const [sendWhatsapp, setSendWhatsapp] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -139,12 +129,10 @@ export function AppointmentModal(props: AppointmentModalProps) {
 
   // Auto-check behavior for the two confirmation checkboxes: each starts
   // unchecked and auto-checks itself the moment its field transitions from
-  // empty to non-empty (typing the first character, or — in edit mode —
-  // already having a value at mount, which is itself an empty-ref->
-  // non-empty-value transition since the ref always starts "empty").
-  // Tracked with a ref (not derived from state) so a later manual uncheck
-  // is never fought — only the transition triggers the auto-check, not
-  // every keystroke afterward.
+  // empty to non-empty (typing the first character). Tracked with a ref
+  // (not derived from state) so a later manual uncheck is never fought —
+  // only the transition triggers the auto-check, not every keystroke
+  // afterward.
   const prevEmailEmptyRef = useRef(true);
   const prevPhoneEmptyRef = useRef(true);
 
@@ -160,13 +148,11 @@ export function AppointmentModal(props: AppointmentModalProps) {
     prevPhoneEmptyRef.current = isEmptyNow;
   }, [clientPhone]);
 
-  // client-linking-on-booking: type-ahead search on the name field, new
-  // bookings only. Debounced to avoid a request per keystroke; the "clear
-  // results" case is also inside the timeout (not called synchronously in
-  // the effect body) to avoid the cascading-render setState-in-effect
-  // pattern.
+  // client-linking-on-booking: type-ahead search on the name field.
+  // Debounced to avoid a request per keystroke; the "clear results" case
+  // is also inside the timeout (not called synchronously in the effect
+  // body) to avoid the cascading-render setState-in-effect pattern.
   useEffect(() => {
-    if (isEdit) return;
     if (clientSearchDebounceRef.current) clearTimeout(clientSearchDebounceRef.current);
     const q = clientName.trim();
     clientSearchDebounceRef.current = setTimeout(async () => {
@@ -186,7 +172,7 @@ export function AppointmentModal(props: AppointmentModalProps) {
     return () => {
       if (clientSearchDebounceRef.current) clearTimeout(clientSearchDebounceRef.current);
     };
-  }, [clientName, isEdit]);
+  }, [clientName]);
 
   function selectExistingClient(c: ClientSearchResult) {
     setClientName(c.name);
@@ -217,11 +203,10 @@ export function AppointmentModal(props: AppointmentModalProps) {
   const selectedDayBookings = useMemo(() => {
     if (!selectedDateParts) return [];
     return allBookings.filter((b) => {
-      if (editBookingId && b.id === editBookingId) return false; // exclude itself from conflict checks
       const p = tzDateParts(new Date(b.startIso));
       return p.year === selectedDateParts.year && p.month === selectedDateParts.month && p.day === selectedDateParts.day;
     });
-  }, [selectedDateParts, allBookings, editBookingId]);
+  }, [selectedDateParts, allBookings]);
 
   const suggestedTimes = useMemo(() => buildSuggestedTimes(selectedDayRanges), [selectedDayRanges]);
   const isOutsideHours = timeValid && !suggestedTimes.includes(timeStr);
@@ -270,7 +255,7 @@ export function AppointmentModal(props: AppointmentModalProps) {
       if (c.teamMemberId && c.teamMemberId !== teamMemberId) continue;
       if (c.recurring) {
         if (c.month === selectedDateParts.month && c.day === selectedDateParts.day) {
-          return c.label || dict.closureGenericLabel;
+          return c.label || md.closureGenericLabel;
         }
         continue;
       }
@@ -281,40 +266,72 @@ export function AppointmentModal(props: AppointmentModalProps) {
         const cEnd = toMinutes(c.endTime);
         if (apptStart >= cEnd || apptEnd <= cStart) continue; // no overlap
       }
-      return c.label || dict.closureGenericLabel;
+      return c.label || md.closureGenericLabel;
     }
     return null;
-  }, [selectedDateParts, timeStr, timeValid, durationMin, teamMemberId, closures, dict.closureGenericLabel]);
+  }, [selectedDateParts, timeStr, timeValid, durationMin, teamMemberId, closures, md.closureGenericLabel]);
 
   const handleSubmit = async () => {
     setError(null);
     if (!serviceId || !teamMemberId || !startDate || conflict) return;
     setSubmitting(true);
     try {
-      const payload = {
-        serviceId,
-        teamMemberId,
-        startIso: startDate.toISOString(),
-        clientName,
-        clientEmail: clientEmail || undefined,
-        clientPhone: clientPhone || undefined,
-        notes: notes || undefined,
-        sendConfirmationEmail: sendEmail,
-        sendConfirmationWhatsapp: whatsappEnabled && sendWhatsapp,
-        clinicClientId: clinicClientId || undefined,
-      };
-      const res = isEdit
-        ? await updateBookingAsOwner({ bookingId: editBookingId as string, ...payload }, errorsDict)
-        : await createBookingAsOwner(payload, errorsDict);
+      const res = await createBookingAsOwner(
+        {
+          serviceId,
+          teamMemberId,
+          startIso: startDate.toISOString(),
+          clientName,
+          clientEmail: clientEmail || undefined,
+          clientPhone: clientPhone || undefined,
+          notes: notes || undefined,
+          sendConfirmationEmail: sendEmail,
+          sendConfirmationWhatsapp: whatsappEnabled && sendWhatsapp,
+          clinicClientId: clinicClientId || undefined,
+        },
+        errorsDict
+      );
       if (!res.ok) {
         setError(res.error);
         setSubmitting(false);
         return;
       }
+
+      // appointment-panel-tabs: a BRAND-NEW client (nothing picked from
+      // the search above) only gets a real kalendar_clients row the
+      // moment createBookingAsOwner makes one — apply whatever was typed
+      // into the staged Cliente/Notas tabs now, using that id. An
+      // EXISTING picked client already wrote any edits live (through
+      // ClientProfileTabs itself, below), so `staged` stays untouched in
+      // that case and this is a no-op. Best-effort, same as every other
+      // clinic_client_id-dependent side effect in this codebase — never
+      // blocks the appointment, which already succeeded above.
+      if (!clinicClientId && res.clinicClientId) {
+        const hasStagedFields = staged.dni || staged.address || staged.dateOfBirth;
+        try {
+          if (hasStagedFields) {
+            await updateClientContactInfo({
+              clientId: res.clinicClientId,
+              name: clientName,
+              email: clientEmail,
+              phone: clientPhone,
+              dni: staged.dni,
+              address: staged.address,
+              dateOfBirth: staged.dateOfBirth,
+            });
+          }
+          if (staged.note.trim()) {
+            await addClientNote({ clientId: res.clinicClientId, body: staged.note.trim() });
+          }
+        } catch (e) {
+          reportClientError("applyStagedClientFields", e);
+        }
+      }
+
       requestClose(onSaved);
     } catch (e) {
-      reportClientError(isEdit ? "updateBookingAsOwner" : "createBookingAsOwner", e);
-      setError(isEdit ? errorsDict.errUpdateFailed : errorsDict.errCreateFailed);
+      reportClientError("createBookingAsOwner", e);
+      setError(errorsDict.errCreateFailed);
       setSubmitting(false);
     }
   };
@@ -334,16 +351,43 @@ export function AppointmentModal(props: AppointmentModalProps) {
         }`}
       >
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-[17px] font-bold text-ink">{isEdit ? dict.editTitle : dict.title}</h2>
+          <h2 className="text-[17px] font-bold text-ink">{md.title}</h2>
           <button
             onClick={close}
-            aria-label={dict.close}
+            aria-label={md.close}
             className="grid h-8 w-8 place-items-center rounded-lg text-ink-soft hover:bg-surface-2"
           >
             <Icon name="x" size={16} />
           </button>
         </div>
 
+        {/* appointment-panel-tabs */}
+        <div className="mb-4 flex gap-1 border-b border-line">
+          {TAB_ORDER.map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => setActiveTab(tab)}
+              className={`-mb-px border-b-2 px-3 py-2 text-[13px] font-semibold transition-colors ${
+                activeTab === tab ? "border-brand text-brand" : "border-transparent text-ink-soft hover:text-ink"
+              }`}
+            >
+              {TAB_LABEL[tab](ct)}
+            </button>
+          ))}
+        </div>
+
+        {activeTab !== "cita" && (
+          <ClientProfileTabs
+            activeTab={activeTab}
+            clientId={clinicClientId}
+            staged={staged}
+            onStagedChange={setStaged}
+            dict={ct}
+          />
+        )}
+
+        {activeTab === "cita" && <>
         {error && (
           <div className="mb-3 rounded-lg border border-error bg-error-weak px-3 py-2 text-[12.5px] text-error">
             {error}
@@ -357,13 +401,13 @@ export function AppointmentModal(props: AppointmentModalProps) {
         )}
 
         <div className="flex flex-col gap-3">
-          <Field label={dict.serviceLabel}>
+          <Field label={md.serviceLabel}>
             <select
               value={serviceId}
               onChange={(e) => setServiceId(e.target.value)}
               className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[16px] text-ink"
             >
-              {services.length === 0 && <option value="">{dict.servicePlaceholder}</option>}
+              {services.length === 0 && <option value="">{md.servicePlaceholder}</option>}
               {services.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name} · {s.durationMin} min
@@ -373,7 +417,7 @@ export function AppointmentModal(props: AppointmentModalProps) {
           </Field>
 
           {members.length > 1 && (
-            <Field label={dict.providerLabel}>
+            <Field label={md.providerLabel}>
               <select
                 value={teamMemberId}
                 onChange={(e) => setTeamMemberId(e.target.value)}
@@ -383,7 +427,7 @@ export function AppointmentModal(props: AppointmentModalProps) {
                     Week view arrives with no provider defaulted
                     (teamMemberId === "") — this placeholder forces an
                     explicit choice instead of silently landing on members[0]. */}
-                {!teamMemberId && <option value="">{dict.providerPlaceholder}</option>}
+                {!teamMemberId && <option value="">{md.providerPlaceholder}</option>}
                 {members.map((m) => (
                   <option key={m.id} value={m.id}>
                     {m.name}
@@ -395,7 +439,7 @@ export function AppointmentModal(props: AppointmentModalProps) {
 
           <div className="flex flex-col gap-3 sm:flex-row">
             <div className="flex-1">
-              <Field label={dict.dateLabel}>
+              <Field label={md.dateLabel}>
                 <input
                   type="date"
                   value={dateStr}
@@ -405,7 +449,7 @@ export function AppointmentModal(props: AppointmentModalProps) {
               </Field>
             </div>
             <div className="relative flex-1">
-              <Field label={dict.timeLabel}>
+              <Field label={md.timeLabel}>
                 <input
                   type="text"
                   value={timeStr}
@@ -442,22 +486,22 @@ export function AppointmentModal(props: AppointmentModalProps) {
             </div>
           </div>
           {isOutsideHours && !conflict && (
-            <span className="-mt-2 text-[12px] text-ink-soft">{dict.outsideHoursNote}</span>
+            <span className="-mt-2 text-[12px] text-ink-soft">{md.outsideHoursNote}</span>
           )}
           {closureWarningLabel && !conflict && (
             <span className="-mt-2 text-[12px] text-amber-600">
-              {dict.closureWarningNote.replace("{label}", closureWarningLabel)}
+              {md.closureWarningNote.replace("{label}", closureWarningLabel)}
             </span>
           )}
 
-          <Field label={dict.clientNameLabel}>
+          <Field label={md.clientNameLabel}>
             <div className="relative">
               <input
                 value={clientName}
                 onChange={(e) => { setClientName(e.target.value); setClinicClientId(null); }}
                 onFocus={() => setShowClientResults(clientResults.length > 0)}
                 onBlur={() => setTimeout(() => setShowClientResults(false), 150)}
-                placeholder={dict.clientNamePlaceholder}
+                placeholder={md.clientNamePlaceholder}
                 className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[16px] text-ink"
                 autoComplete="off"
               />
@@ -470,7 +514,7 @@ export function AppointmentModal(props: AppointmentModalProps) {
                   Cliente
                 </span>
               )}
-              {showClientResults && !isEdit && (
+              {showClientResults && (
                 <div className="absolute left-0 right-0 top-full z-10 mt-1 max-h-52 overflow-y-auto rounded-lg border border-line bg-surface shadow-lg">
                   {clientResults.map((c) => (
                     <button
@@ -492,30 +536,30 @@ export function AppointmentModal(props: AppointmentModalProps) {
             </div>
           </Field>
 
-          <Field label={dict.clientEmailLabel}>
+          <Field label={md.clientEmailLabel}>
             <input
               value={clientEmail}
               onChange={(e) => { setClientEmail(e.target.value); setClinicClientId(null); }}
-              placeholder={dict.clientEmailPlaceholder}
+              placeholder={md.clientEmailPlaceholder}
               type="email"
               className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[16px] text-ink"
             />
           </Field>
 
-          <Field label={dict.clientPhoneLabel}>
+          <Field label={md.clientPhoneLabel}>
             <input
               value={clientPhone}
               onChange={(e) => { setClientPhone(e.target.value); setClinicClientId(null); }}
-              placeholder={dict.clientPhonePlaceholder}
+              placeholder={md.clientPhonePlaceholder}
               className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[16px] text-ink"
             />
           </Field>
 
-          <Field label={dict.notesLabel}>
+          <Field label={md.notesLabel}>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder={dict.notesPlaceholder}
+              placeholder={md.notesPlaceholder}
               rows={2}
               className="w-full resize-none rounded-lg border border-line bg-surface px-3 py-2 text-[16px] text-ink"
             />
@@ -528,7 +572,7 @@ export function AppointmentModal(props: AppointmentModalProps) {
               onChange={(e) => setSendEmail(e.target.checked)}
               className="h-4 w-4 rounded border-line"
             />
-            {dict.sendEmailLabel}
+            {md.sendEmailLabel}
           </label>
 
           {whatsappEnabled && (
@@ -539,7 +583,7 @@ export function AppointmentModal(props: AppointmentModalProps) {
                 onChange={(e) => setSendWhatsapp(e.target.checked)}
                 className="h-4 w-4 rounded border-line"
               />
-              {dict.sendWhatsappLabel}
+              {md.sendWhatsappLabel}
             </label>
           )}
         </div>
@@ -550,16 +594,17 @@ export function AppointmentModal(props: AppointmentModalProps) {
             disabled={submitting}
             className="rounded-lg px-3.5 py-2 text-[13.5px] font-semibold text-ink-soft hover:bg-surface-2"
           >
-            {dict.cancel}
+            {md.cancel}
           </button>
           <button
             onClick={handleSubmit}
             disabled={submitting || !clientName.trim() || !serviceId || !teamMemberId || !dateValid || !timeValid || conflict}
             className="rounded-lg bg-brand px-4 py-2 text-[13.5px] font-semibold text-white hover:opacity-90 disabled:opacity-50"
           >
-            {submitting ? (isEdit ? dict.saving : dict.submitting) : (isEdit ? dict.saveButton : dict.submit)}
+            {submitting ? md.submitting : md.submit}
           </button>
         </div>
+        </>}
       </div>
     </div>
   );

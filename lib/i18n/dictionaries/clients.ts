@@ -35,6 +35,8 @@ export interface ClientsDictionary {
     // CLIENTE block.
     dniLabel: string;
     addressLabel: string;
+    // appointment-panel-tabs: new field, also editable from here.
+    dateOfBirthLabel: string;
     edit: string;
     save: string;
     saving: string;
@@ -100,6 +102,7 @@ const es: ClientsDictionary = {
     phoneLabel: "Teléfono",
     dniLabel: "DNI",
     addressLabel: "Domicilio",
+    dateOfBirthLabel: "Fecha de nacimiento",
     edit: "Editar",
     save: "Guardar",
     saving: "Guardando…",
@@ -165,6 +168,7 @@ const en: ClientsDictionary = {
     phoneLabel: "Phone",
     dniLabel: "DNI",
     addressLabel: "Address",
+    dateOfBirthLabel: "Date of birth",
     edit: "Edit",
     save: "Save",
     saving: "Saving…",

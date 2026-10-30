@@ -533,14 +533,13 @@ export function CalendarGridView({
 
       {modalSlot && (
         <AppointmentModal
-          mode="create"
           slot={modalSlot}
           hoursByDay={hoursByDay}
           allBookings={bookings}
           services={services.map((s) => ({ id: s.id, name: s.name, durationMin: s.durationMin, price: s.price }))}
           members={allMembers.map((m) => ({ id: m.id, name: m.name }))}
           closures={closures}
-          dict={dict.modal}
+          dict={dict}
           errorsDict={dict.manualErrors}
           whatsappEnabled={whatsappEnabled}
           onClose={() => setModalSlot(null)}
