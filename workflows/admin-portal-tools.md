@@ -373,6 +373,16 @@ Criteria:
 - OPEN QUESTION (needs a design call before building): how the tool determines which schema file is "latest/unfrozen" — a naming convention (always run the highest-numbered schema_NNN.sql) vs. an explicit marker (e.g. a comment header in the file, or a config value) it reads. Not decided yet.
 - Depends on: schema_001.sql actually being frozen, and schema_002.sql existing — not buildable until both are true
 
+## Step: run-migrations-tool
+Status: in_progress
+Criteria:
+- NEW STEP (2026-10-30, Arun — "build a feature in the admin portal which will run the schema and also store the results, and the date time it was run. Right now I have to go to GitHub copy the schema and run it in Supabase"). Separate from `schema-reset-tool` above: this runs ONE `supabase/schema_subset_NNN.sql` file at a time against the live DB, not a full destructive reset — much lower risk, since every subset file is additive/idempotent by this repo's own migrations convention (CLAUDE.md), safe to run more than once.
+- CODE IMPLEMENTED 2026-10-30 (both repos, typechecked/linted/built clean), PENDING MANUAL TESTING:
+  - Main repo: `app/api/internal/migrations/route.ts` — read-only, lists `supabase/schema_subset_*.sql` files (name + contents). Reuses `INTERNAL_SCHEMA_API_SECRET` (same trust boundary as the existing `/api/internal/schema` route schema-reset-tool already uses — no new secret needed). No DB credentials in this route, same as that one.
+  - Admin repo: `/admin/migrations` (sidebar, not marked dev-only — this is meant to stay a normal ops tool, unlike the schema-reset/appointment-gen/date-cycler dev-only group). `lib/admin/migrations.ts` fetches the file list from the main app, runs the picked file against `DIRECT_DATABASE_URL` (same direct-connection + `NOTIFY pgrst, 'reload schema'` pattern as `runSchemaReset`), and logs every attempt — success or failure — to the same `kalendar_admin_audit_log` table `schema-reset-tool` already writes to, with `action: "migration_run"`, `metadata: {fileName, success, error?}`. The picked filename is re-validated server-side against the list the main app's own endpoint returned — never a free-form path or raw SQL from the client, so this can't become an arbitrary-SQL-execution hole.
+  - UI: each file shows its last-run status inline (never run / ✓ ran \<when\> by \<who\> / ✗ failed \<when\>: \<error\>, derived from the audit log — answers Arun's "not sure if I ran this already" directly), a View SQL toggle, and a two-click Run/Confirm run (lighter than schema-reset-tool's type-to-confirm phrase, matching the lower risk here).
+- Still needs: live testing (the admin repo's `MAIN_APP_URL`/`INTERNAL_SCHEMA_API_SECRET`/`DIRECT_DATABASE_URL` env vars are already configured there for schema-reset-tool, so no new env setup expected — but unverified).
+
 ## Step: incident-contact-path
 Status: not_started
 Criteria:
