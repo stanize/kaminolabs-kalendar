@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { authedAction } from "@/lib/auth-action";
 import { createClient } from "@/lib/supabase/server";
 import { getBusinessForUser } from "@/lib/business/data";
+import { getClientDetail, getClientNotes, type ClientBookingSummary, type ClientNote } from "@/lib/clients/data";
 
 export interface ClientSearchResult {
   id: string;
@@ -87,7 +88,18 @@ const CLIENT_FALLBACK: ClientActionDict = {
 export const updateClientContactInfo = authedAction(
   async (
     session,
-    input: { clientId: string; name: string; email: string; phone: string; dni: string; address: string },
+    input: {
+      clientId: string;
+      name: string;
+      email: string;
+      phone: string;
+      dni: string;
+      address: string;
+      // appointment-panel-tabs: optional so the create-mode "apply staged
+      // Cliente fields" call site (which always sends it) and the existing
+      // client-detail-view/panel calls (same) all go through this one path.
+      dateOfBirth?: string;
+    },
     dict?: Partial<ClientActionDict>
   ): Promise<UpdateClientResult> => {
     const t = { ...CLIENT_FALLBACK, ...dict };
@@ -115,6 +127,7 @@ export const updateClientContactInfo = authedAction(
         phone: input.phone.trim() || null,
         dni: input.dni.trim() || null,
         address: input.address.trim() || null,
+        date_of_birth: input.dateOfBirth?.trim() || null,
       })
       .eq("id", input.clientId)
       .eq("business_id", business.id);
@@ -151,6 +164,60 @@ export const getClientIdentity = authedAction(
       .maybeSingle();
 
     return data ? { dni: data.dni, address: data.address } : null;
+  }
+);
+
+export interface ClientPanelProfile {
+  name: string;
+  email: string | null;
+  phone: string | null;
+  dni: string | null;
+  address: string | null;
+  dateOfBirth: string | null;
+}
+
+export interface ClientPanelData {
+  profile: ClientPanelProfile;
+  notes: ClientNote[];
+  // appointment-panel-tabs, Tab 3 — upcoming+history merged and re-sorted
+  // most-recent-first for the panel's single reverse-chronological
+  // Historial list, instead of getClientDetail's own upcoming(asc)/
+  // history(desc) split (which the client-detail-view page still uses
+  // as-is, unaffected by this).
+  history: ClientBookingSummary[];
+}
+
+/**
+ * appointment-panel-tabs — everything the Cliente/Historial/Notas tabs need
+ * for an already-linked client, fetched together once when the panel opens
+ * on an existing booking (or the moment a create-mode search picks an
+ * existing client). Reuses getClientDetail/getClientNotes rather than a
+ * fourth parallel query shape.
+ */
+export const getClientPanelData = authedAction(
+  async (session, clientId: string): Promise<ClientPanelData | null> => {
+    const [detail, notes] = await Promise.all([
+      getClientDetail(session.user.id, clientId),
+      getClientNotes(session.user.id, clientId),
+    ]);
+    if (!detail) return null;
+
+    const history = [...detail.upcoming, ...detail.history].sort(
+      (a, b) => new Date(b.startIso).getTime() - new Date(a.startIso).getTime()
+    );
+
+    return {
+      profile: {
+        name: detail.name,
+        email: detail.email,
+        phone: detail.phone,
+        dni: detail.dni,
+        address: detail.address,
+        dateOfBirth: detail.dateOfBirth,
+      },
+      notes,
+      history,
+    };
   }
 );
 

@@ -24,6 +24,13 @@ import type { DayId } from "@/lib/onboarding/types";
 import { clientStatusLabel, clientStatusBadgeClass, needsClinicFollowUp, type WeekBookingVM } from "@/components/panel/calendar-grid-view";
 import { InvoiceConfirmModal, hasRealEmail } from "@/components/panel/invoice-confirm-modal";
 import type { ClosureRuleVM } from "@/components/panel/appointment-modal";
+import {
+  ClientProfileTabs,
+  EMPTY_STAGED_CLIENT_FIELDS,
+  TAB_ORDER,
+  TAB_LABEL,
+  type FullTab,
+} from "@/components/panel/client-profile-tabs";
 import { PAYMENT_METHOD_CODES, type PaymentMethodCode } from "@/lib/booking/payment-methods";
 import { isWhatsappSentinelEmail } from "@/lib/whatsapp/sentinel-email";
 import {
@@ -113,6 +120,8 @@ export function BookingDetailModal({
   onCancellationReviewed?: () => void;
 }) {
   const d = dict.detailModal;
+  const ct = dict.clientTabs;
+  const [activeTab, setActiveTab] = useState<FullTab>("cita");
   // invoice-generation-now-manual-only (2026-10): auto-invoice is on hold
   // per Arun — kept as an accepted prop (the setting itself still exists
   // in Ajustes) but deliberately not read anywhere below for now.
@@ -703,6 +712,38 @@ export function BookingDetailModal({
           </button>
         </div>
 
+        {/* appointment-panel-tabs */}
+        <div className="mb-4 flex gap-1 border-b border-line">
+          {TAB_ORDER.map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => setActiveTab(tab)}
+              className={`-mb-px border-b-2 px-3 py-2 text-[13px] font-semibold transition-colors ${
+                activeTab === tab ? "border-brand text-brand" : "border-transparent text-ink-soft hover:text-ink"
+              }`}
+            >
+              {TAB_LABEL[tab](ct)}
+            </button>
+          ))}
+        </div>
+
+        {activeTab !== "cita" && (
+          booking.clinicClientId ? (
+            <ClientProfileTabs
+              activeTab={activeTab}
+              clientId={booking.clinicClientId}
+              currentBookingId={booking.id}
+              staged={EMPTY_STAGED_CLIENT_FIELDS}
+              onStagedChange={() => {}}
+              dict={ct}
+            />
+          ) : (
+            <p className="text-[13px] text-ink-soft">{ct.historialEmptyNewClient}</p>
+          )
+        )}
+
+        {activeTab === "cita" && <>
         {isAwaitingConfirmation && (
           <div className="mb-3 flex items-center gap-2 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-orange-700">
             <Icon name="bell" size={14} className="shrink-0" />
@@ -1043,6 +1084,7 @@ export function BookingDetailModal({
             {invoiceSection}
           </div>
         )}
+        </>}
       </div>
 
       {cobrarModalOpen && (

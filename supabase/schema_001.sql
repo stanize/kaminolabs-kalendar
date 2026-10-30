@@ -699,6 +699,9 @@ create table public.kalendar_clients (
   -- reused across all their invoices and bookings.
   dni             text,
   address         text,
+  -- appointment-panel-tabs (schema_subset_032.sql): the Cliente tab's
+  -- "Fecha de nacimiento" field.
+  date_of_birth   date,
   total_sessions  integer     not null default 0,
   completed_count integer     not null default 0,
   no_show_count   integer     not null default 0,

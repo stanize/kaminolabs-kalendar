@@ -179,6 +179,56 @@ export interface CalendarDictionary {
     pastCancelBack: string; // "Volver"
     pastCancelConfirm: string; // "Confirmar cancelación"
   };
+  // appointment-panel-tabs: Cliente/Historial/Notas, shared by both
+  // AppointmentModal (create) and BookingDetailModal (existing booking) —
+  // same tab bar, same field labels either way.
+  clientTabs: {
+    tabCita: string;
+    tabCliente: string;
+    tabHistorial: string;
+    tabNotas: string;
+
+    // Cliente
+    nameLabel: string;
+    emailLabel: string;
+    phoneLabel: string;
+    dniLabel: string;
+    addressLabel: string;
+    dateOfBirthLabel: string;
+    editButton: string;
+    saveButton: string;
+    saving: string;
+    saved: string; // "Guardado ✓" — brief inline confirmation after a successful save
+    // Shown instead of the live form while creating an appointment for a
+    // brand-new client (no kalendar_clients row exists yet to load/save
+    // against) — the fields are still editable, just held locally and
+    // applied once the appointment itself is saved.
+    newClientNote: string;
+
+    // Historial
+    historialEmpty: string;
+    historialEmptyNewClient: string;
+    currentAppointmentBadge: string;
+    statusConfirmed: string;
+    statusPending: string;
+    statusCompleted: string;
+    statusNoShow: string;
+    statusCancelled: string;
+    paidLabel: string;
+    unpaidLabel: string;
+
+    // Notas
+    notesEmpty: string;
+    notesPlaceholder: string;
+    addNoteButton: string;
+    saveNoteButton: string;
+    editNoteButton: string;
+    deleteNoteButton: string;
+    cancelEditButton: string;
+    savingNote: string;
+    // Staged note while creating an appointment for a brand-new client.
+    newClientNotePlaceholder: string;
+  };
   widget: {
     title: string; // "Hoy"
     appointmentsLabel: string; // "Citas"
@@ -332,6 +382,42 @@ const es: CalendarDictionary = {
     pastCancelBack: "Volver",
     pastCancelConfirm: "Confirmar cancelación",
   },
+  clientTabs: {
+    tabCita: "Cita",
+    tabCliente: "Cliente",
+    tabHistorial: "Historial",
+    tabNotas: "Notas",
+    nameLabel: "Nombre completo",
+    emailLabel: "Email",
+    phoneLabel: "Teléfono",
+    dniLabel: "DNI",
+    addressLabel: "Domicilio",
+    dateOfBirthLabel: "Fecha de nacimiento",
+    editButton: "Editar",
+    saveButton: "Guardar cambios",
+    saving: "Guardando…",
+    saved: "Guardado ✓",
+    newClientNote: "Cliente nuevo — esta información se guardará junto con la cita.",
+    historialEmpty: "Este cliente no tiene otras citas.",
+    historialEmptyNewClient: "Este cliente es nuevo — no tiene citas anteriores.",
+    currentAppointmentBadge: "Actual",
+    statusConfirmed: "Confirmada",
+    statusPending: "Pendiente",
+    statusCompleted: "Completada",
+    statusNoShow: "No-show",
+    statusCancelled: "Cancelada",
+    paidLabel: "Pagado",
+    unpaidLabel: "No pagado",
+    notesEmpty: "Este cliente no tiene notas todavía.",
+    notesPlaceholder: "Escribe una nota…",
+    addNoteButton: "Añadir nota",
+    saveNoteButton: "Guardar nota",
+    editNoteButton: "Editar",
+    deleteNoteButton: "Eliminar",
+    cancelEditButton: "Cancelar",
+    savingNote: "Guardando…",
+    newClientNotePlaceholder: "Nota sobre este cliente (opcional) — se guardará junto con la cita.",
+  },
   widget: {
     title: "Hoy",
     appointmentsLabel: "Citas",
@@ -483,6 +569,42 @@ const en: CalendarDictionary = {
     pastCancelOtherPlaceholder: "Describe the reason…",
     pastCancelBack: "Back",
     pastCancelConfirm: "Confirm cancellation",
+  },
+  clientTabs: {
+    tabCita: "Appointment",
+    tabCliente: "Client",
+    tabHistorial: "History",
+    tabNotas: "Notes",
+    nameLabel: "Full name",
+    emailLabel: "Email",
+    phoneLabel: "Phone",
+    dniLabel: "ID number",
+    addressLabel: "Address",
+    dateOfBirthLabel: "Date of birth",
+    editButton: "Edit",
+    saveButton: "Save changes",
+    saving: "Saving…",
+    saved: "Saved ✓",
+    newClientNote: "New client — this information will be saved along with the appointment.",
+    historialEmpty: "This client has no other appointments.",
+    historialEmptyNewClient: "This is a new client — no past appointments.",
+    currentAppointmentBadge: "Current",
+    statusConfirmed: "Confirmed",
+    statusPending: "Pending",
+    statusCompleted: "Completed",
+    statusNoShow: "No-show",
+    statusCancelled: "Cancelled",
+    paidLabel: "Paid",
+    unpaidLabel: "Unpaid",
+    notesEmpty: "This client has no notes yet.",
+    notesPlaceholder: "Write a note…",
+    addNoteButton: "Add note",
+    saveNoteButton: "Save note",
+    editNoteButton: "Edit",
+    deleteNoteButton: "Delete",
+    cancelEditButton: "Cancel",
+    savingNote: "Saving…",
+    newClientNotePlaceholder: "Note about this client (optional) — will be saved with the appointment.",
   },
   widget: {
     title: "Today",

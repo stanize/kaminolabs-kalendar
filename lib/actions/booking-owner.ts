@@ -678,7 +678,13 @@ const MANUAL_FALLBACK: ManualBookingActionDict = {
   errUpdateFailed: "No se pudo actualizar la cita. Inténtalo de nuevo.",
 };
 
-export type CreateManualBookingResult = { ok: true } | { ok: false; error: string };
+// appointment-panel-tabs: `clinicClientId` on success — createBookingAsOwner
+// always has a real one (picked or freshly created) by the time it returns
+// ok; the create-mode panel needs it to flush any staged Cliente/Notas
+// tab edits for a brand-new client right after the booking is saved.
+export type CreateManualBookingResult =
+  | { ok: true; clinicClientId: string | null }
+  | { ok: false; error: string };
 
 /**
  * Creates an appointment directly from the owner's week-grid (walk-in/phone
@@ -928,7 +934,7 @@ export const createBookingAsOwner = authedAction(
 
     revalidatePath("/panel/calendar");
     revalidatePath("/panel");
-    return { ok: true };
+    return { ok: true, clinicClientId };
   }
 );
 
@@ -977,7 +983,7 @@ export const updateBookingAsOwner = authedAction(
         .maybeSingle(),
       supabase
         .from("kalendar_bookings")
-        .select("id, confirm_token")
+        .select("id, confirm_token, clinic_client_id")
         .eq("id", input.bookingId)
         .eq("business_id", business.id)
         .maybeSingle(),
@@ -1076,7 +1082,7 @@ export const updateBookingAsOwner = authedAction(
 
     revalidatePath("/panel/calendar");
     revalidatePath("/panel");
-    return { ok: true };
+    return { ok: true, clinicClientId: existing.clinic_client_id };
   }
 );
 
