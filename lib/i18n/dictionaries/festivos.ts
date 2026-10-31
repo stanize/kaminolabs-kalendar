@@ -21,6 +21,9 @@ export interface FestivosDictionary {
   edit: string; // aria-label on the edit-pencil button
   saveEdit: string; // "Guardar cambios" — inline-edit form's submit button
   cancelEdit: string; // aria-label on the inline-edit form's cancel/X button
+  searchPlaceholder: string;
+  noResults: string; // shown when the search query matches nothing
+  statusClosed: string; // "No laborable" pill on each festivo row
   errUnexpected: string;
   errors: {
     errNoBusiness: string;
@@ -47,6 +50,9 @@ const es: FestivosDictionary = {
   edit: "Editar festivo",
   saveEdit: "Guardar cambios",
   cancelEdit: "Cancelar edición",
+  searchPlaceholder: "Buscar día festivo o fecha...",
+  noResults: "Ningún festivo coincide con tu búsqueda.",
+  statusClosed: "No laborable",
   errUnexpected: "Ocurrió un error inesperado. Inténtalo de nuevo.",
   errors: {
     errNoBusiness: "Primero configura tu negocio.",
@@ -73,6 +79,9 @@ const en: FestivosDictionary = {
   edit: "Edit holiday",
   saveEdit: "Save changes",
   cancelEdit: "Cancel editing",
+  searchPlaceholder: "Search holiday or date...",
+  noResults: "No holidays match your search.",
+  statusClosed: "Closed",
   errUnexpected: "Something went wrong. Please try again.",
   errors: {
     errNoBusiness: "Set up your business first.",

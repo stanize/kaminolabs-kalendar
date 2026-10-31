@@ -37,6 +37,7 @@ import {
   EyeOff,
   MessageCircle,
   Trash2,
+  Search,
   type LucideIcon,
 } from "lucide-react";
 
@@ -82,6 +83,7 @@ export const ICONS: Record<string, LucideIcon> = {
   // closest generic chat-bubble icon, used for the WhatsApp booking settings
   // section (workflows/whatsapp-booking.md).
   whatsapp: MessageCircle,
+  search: Search,
 };
 
 export function Icon({

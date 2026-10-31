@@ -12,6 +12,7 @@ export interface TimeOffDictionary {
   subtitle: string;
   toggleShow: string; // "Vacaciones / ausencias"
   toggleHide: string;
+  providerLabel: string; // provider select inside the add/edit panel
   startDate: string;
   endDate: string;
   dayLabel: string; // replaces startDate's label when singleDay is checked
@@ -47,6 +48,7 @@ const es: TimeOffDictionary = {
   subtitle: "Días u horas concretas en que un profesional no está disponible.",
   toggleShow: "Vacaciones / ausencias",
   toggleHide: "Ocultar vacaciones / ausencias",
+  providerLabel: "Profesional",
   startDate: "Desde",
   endDate: "Hasta",
   dayLabel: "Día",
@@ -82,6 +84,7 @@ const en: TimeOffDictionary = {
   subtitle: "Specific days or hours when a provider is unavailable.",
   toggleShow: "Time off",
   toggleHide: "Hide time off",
+  providerLabel: "Provider",
   startDate: "From",
   endDate: "To",
   dayLabel: "Day",

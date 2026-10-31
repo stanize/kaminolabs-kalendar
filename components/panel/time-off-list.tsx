@@ -14,6 +14,11 @@ import type { ClosureConflictDictionary } from "@/lib/i18n/dictionaries/closure-
 const inputBase =
   "w-full rounded-[10px] border border-line bg-surface px-3 py-2.5 text-[14px] text-ink outline-none transition-all focus:border-brand focus:shadow-[0_0_0_3px_var(--color-brand-weak)] placeholder:text-ink-soft/60";
 
+interface MemberOption {
+  id: string;
+  name: string;
+}
+
 function formatRange(c: BusinessClosure, intlLocale: string): string {
   const fmt = new Intl.DateTimeFormat(intlLocale, { day: "numeric", month: "short", year: "numeric" });
   const start = fmt.format(new Date(`${c.start_date}T00:00:00`));
@@ -26,23 +31,23 @@ function formatRange(c: BusinessClosure, intlLocale: string): string {
 }
 
 /**
- * One provider's time-off list (one-off vacations/absences) — rendered
- * inline under a team-member row on the Vacaciones tab
- * (/panel/availability/time-off, via ProviderTimeOffManager). Each add/
- * delete commits immediately.
+ * Team-wide vacations/time-off list — the "Vacaciones y ausencias" tab on
+ * Disponibilidad. Flattened (2026-10-31, per Arun) from a per-provider
+ * expand/add-each UI into a single list across every provider, with ONE
+ * "+ Añadir" button; the provider is now picked inside the panel itself
+ * instead of being implied by which member's section was expanded.
  *
  * side-panel-pattern: Añadir/Editar both open the same right-docked panel
- * (TimeOffPanel below) instead of the old inline expand-in-place forms —
- * same fields, same actions, only the shell changed.
+ * (TimeOffPanel below).
  */
-export function TimeOffList({
-  teamMemberId,
+export function TimeOffManager({
+  members,
   initialEntries,
   intlLocale,
   dict,
   conflictDict,
 }: {
-  teamMemberId: string;
+  members: MemberOption[];
   initialEntries: BusinessClosure[];
   intlLocale: string;
   dict: TimeOffDictionary;
@@ -53,6 +58,10 @@ export function TimeOffList({
   const [panelEntry, setPanelEntry] = useState<BusinessClosure | "new" | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  function memberName(id: string | null): string {
+    return members.find((m) => m.id === id)?.name ?? "?";
+  }
 
   async function handleDelete(id: string) {
     if (!window.confirm(dict.confirmDelete)) return;
@@ -75,39 +84,56 @@ export function TimeOffList({
     }
   }
 
-  return (
-    <div className="mt-2 flex flex-col gap-2">
-      <div className="rounded-lg border border-line bg-surface-2/50 p-3">
-        {error && (
-          <div className="mb-2 flex items-start gap-2 rounded-lg border border-error bg-error-weak px-3 py-2 text-[12.5px] text-error">
-            <Icon name="x" size={14} className="mt-0.5 shrink-0" />
-            <span>{error}</span>
-          </div>
-        )}
+  if (members.length === 0) return null;
 
+  return (
+    <div className="flex flex-col gap-4">
+      {error && (
+        <div className="flex items-start gap-2 rounded-xl border border-error bg-error-weak px-3.5 py-2.5 text-[13px] text-error">
+          <Icon name="x" size={15} className="mt-0.5 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+
+      <Btn variant="primary" size="sm" onClick={() => setPanelEntry("new")} className="self-start">
+        <Icon name="plus" size={15} /> {dict.add}
+      </Btn>
+
+      <div className="rounded-xl border border-line bg-surface px-4 py-4 sm:px-6">
         {entries.length > 0 ? (
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-2">
             {entries.map((e) => (
-              <div key={e.id} className="flex items-center justify-between gap-2 rounded-lg bg-surface px-2.5 py-2">
-                <div className="flex flex-col">
-                  <span className="text-[13px] font-medium text-ink">{formatRange(e, intlLocale)}</span>
-                  {e.label && <span className="text-[12px] text-ink-soft">{e.label}</span>}
+              <div
+                key={e.id}
+                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line px-3.5 py-3"
+              >
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-brand-weak text-brand">
+                    <Icon name="user" size={16} />
+                  </div>
+                  <div className="flex min-w-0 flex-col">
+                    <span className="truncate text-[14px] font-semibold text-ink">{memberName(e.team_member_id)}</span>
+                    <span className="truncate text-[12.5px] text-ink-soft">
+                      {formatRange(e, intlLocale)}
+                      {e.label ? ` · ${e.label}` : ""}
+                    </span>
+                  </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
                   <button
                     onClick={() => setPanelEntry(e)}
-                    className="grid h-7 w-7 place-items-center rounded-lg text-ink-soft hover:bg-brand-weak hover:text-brand"
+                    className="grid h-8 w-8 place-items-center rounded-lg text-ink-soft hover:bg-brand-weak hover:text-brand"
                     aria-label={dict.edit}
                   >
-                    <Icon name="pencil" size={14} />
+                    <Icon name="pencil" size={15} />
                   </button>
                   <button
                     onClick={() => handleDelete(e.id)}
                     disabled={deletingId === e.id}
-                    className="grid h-7 w-7 place-items-center rounded-lg text-ink-soft hover:bg-error-weak hover:text-error"
+                    className="grid h-8 w-8 place-items-center rounded-lg text-ink-soft hover:bg-error-weak hover:text-error"
                     aria-label={dict.delete}
                   >
-                    <Icon name="x" size={14} />
+                    <Icon name="x" size={15} />
                   </button>
                 </div>
               </div>
@@ -118,14 +144,10 @@ export function TimeOffList({
         )}
       </div>
 
-      <Btn variant="outline" size="sm" onClick={() => setPanelEntry("new")} className="self-start">
-        <Icon name="plus" size={14} /> {dict.add}
-      </Btn>
-
       {panelEntry && (
         <TimeOffPanel
           entry={panelEntry === "new" ? null : panelEntry}
-          teamMemberId={teamMemberId}
+          members={members}
           intlLocale={intlLocale}
           dict={dict}
           conflictDict={conflictDict}
@@ -147,7 +169,7 @@ export function TimeOffList({
 
 function TimeOffPanel({
   entry,
-  teamMemberId,
+  members,
   intlLocale,
   dict,
   conflictDict,
@@ -155,13 +177,14 @@ function TimeOffPanel({
   onSaved,
 }: {
   entry: BusinessClosure | null;
-  teamMemberId: string;
+  members: MemberOption[];
   intlLocale: string;
   dict: TimeOffDictionary;
   conflictDict: ClosureConflictDictionary;
   onClose: () => void;
   onSaved: (entry: BusinessClosure) => void;
 }) {
+  const [teamMemberId, setTeamMemberId] = useState(entry?.team_member_id ?? members[0]?.id ?? "");
   const [startDate, setStartDate] = useState(entry?.start_date ?? "");
   const [endDate, setEndDate] = useState(entry?.end_date ?? "");
   const [singleDay, setSingleDay] = useState(entry ? entry.start_date === entry.end_date : false);
@@ -185,13 +208,17 @@ function TimeOffPanel({
     setVisible(false);
     setTimeout(after, 200);
   }
-  const close = () => requestClose(onClose);
+  const closePanel = () => requestClose(onClose);
 
   async function handleSave(confirmed?: boolean) {
     setError(null);
     const effectiveEndDate = singleDay ? startDate : endDate;
     if (!startDate || !effectiveEndDate) {
       setError(dict.errors.errInvalidDateRange);
+      return;
+    }
+    if (!entry && !teamMemberId) {
+      setError(dict.errors.errNoBusiness);
       return;
     }
     setSaving(true);
@@ -240,7 +267,7 @@ function TimeOffPanel({
     <div className="fixed inset-y-0 left-0 right-0 z-50 md:left-[240px]">
       <div
         className={`absolute inset-0 bg-black/40 transition-opacity duration-200 ${visible ? "opacity-100" : "opacity-0"}`}
-        onClick={close}
+        onClick={closePanel}
         aria-hidden
       />
       <div
@@ -251,7 +278,7 @@ function TimeOffPanel({
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-[17px] font-bold text-ink">{entry ? dict.edit : dict.add}</h2>
           <button
-            onClick={close}
+            onClick={closePanel}
             aria-label={dict.cancelAdd}
             className="grid h-8 w-8 place-items-center rounded-lg text-ink-soft hover:bg-surface-2"
           >
@@ -264,6 +291,19 @@ function TimeOffPanel({
         )}
 
         <div className="flex flex-col gap-3">
+          <div>
+            <label className="mb-1 block text-[12px] font-semibold text-ink-soft">{dict.providerLabel}</label>
+            {entry ? (
+              <p className="text-[14px] font-medium text-ink">{members.find((m) => m.id === entry.team_member_id)?.name ?? "?"}</p>
+            ) : (
+              <select value={teamMemberId} onChange={(ev) => setTeamMemberId(ev.target.value)} className={inputBase}>
+                {members.map((m) => (
+                  <option key={m.id} value={m.id}>{m.name}</option>
+                ))}
+              </select>
+            )}
+          </div>
+
           <label className="flex w-fit cursor-pointer items-center gap-2">
             <input
               type="checkbox"
@@ -340,7 +380,7 @@ function TimeOffPanel({
 
         <div className="mt-5 flex justify-end gap-2">
           <button
-            onClick={close}
+            onClick={closePanel}
             disabled={saving}
             className="rounded-lg px-3.5 py-2 text-[13.5px] font-semibold text-ink-soft hover:bg-surface-2"
           >

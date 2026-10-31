@@ -56,6 +56,16 @@ export function FestivosManager({
   const [panelFestivo, setPanelFestivo] = useState<BusinessClosure | "new" | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+
+  const visibleFestivos =
+    query.trim().length === 0
+      ? festivos
+      : festivos.filter((f) => {
+          const q = query.trim().toLowerCase();
+          const dateLabel = formatMonthDay(f.month!, f.day!, intlLocale).toLowerCase();
+          return dateLabel.includes(q) || (f.label ?? "").toLowerCase().includes(q);
+        });
 
   async function handleDelete(id: string) {
     if (!window.confirm(dict.confirmDelete)) return;
@@ -87,25 +97,46 @@ export function FestivosManager({
         </div>
       )}
 
-      <Btn variant="outline" onClick={() => setPanelFestivo("new")} className="self-start">
-        <Icon name="plus" size={15} /> {dict.add}
-      </Btn>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Btn variant="primary" size="sm" onClick={() => setPanelFestivo("new")}>
+          <Icon name="plus" size={15} /> {dict.add}
+        </Btn>
+        <div className="relative min-w-[220px] flex-1 sm:flex-none sm:w-[280px]">
+          <Icon name="search" size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={dict.searchPlaceholder}
+            className="w-full rounded-[10px] border border-line bg-surface py-2 pl-8 pr-3 text-[13px] text-ink outline-none transition-all focus:border-brand focus:shadow-[0_0_0_3px_var(--color-brand-weak)] placeholder:text-ink-soft/60"
+          />
+        </div>
+      </div>
 
       <div className="rounded-xl border border-line bg-surface px-4 py-4 sm:px-6">
-        {festivos.length > 0 ? (
+        {visibleFestivos.length > 0 ? (
           <div className="flex flex-col gap-2">
-            {festivos.map((f) => (
+            {visibleFestivos.map((f) => (
               <div
                 key={f.id}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line px-3 py-2.5"
+                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line px-3.5 py-3"
               >
-                <div className="flex flex-col">
-                  <span className="text-[14px] font-medium text-ink">
-                    {formatMonthDay(f.month!, f.day!, intlLocale)}
-                  </span>
-                  {f.label && <span className="text-[12.5px] text-ink-soft">{f.label}</span>}
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-brand-weak text-brand">
+                    <Icon name="calendar" size={16} />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[14px] font-semibold text-ink">
+                      {f.label || formatMonthDay(f.month!, f.day!, intlLocale)}
+                    </span>
+                    <span className="text-[12.5px] text-ink-soft">
+                      {formatMonthDay(f.month!, f.day!, intlLocale)}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex shrink-0 items-center gap-1">
+                <div className="flex shrink-0 items-center gap-2">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-brand-weak px-2.5 py-1 text-[11.5px] font-semibold text-brand-ink">
+                    <Icon name="check" size={11} /> {dict.statusClosed}
+                  </span>
                   <button
                     onClick={() => setPanelFestivo(f)}
                     className="grid h-8 w-8 place-items-center rounded-lg text-ink-soft hover:bg-brand-weak hover:text-brand"
@@ -126,7 +157,7 @@ export function FestivosManager({
             ))}
           </div>
         ) : (
-          <p className="px-1 py-1 text-[12.5px] text-ink-soft">{dict.noEntries}</p>
+          <p className="px-1 py-1 text-[12.5px] text-ink-soft">{query ? dict.noResults : dict.noEntries}</p>
         )}
       </div>
 
