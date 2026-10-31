@@ -68,8 +68,8 @@ export function CustomTimeSlotsManager({
         <div className="rounded-lg border border-error bg-error-weak px-3 py-2 text-[13px] text-error">{error}</div>
       )}
 
-      <Btn variant="outline" size="sm" onClick={() => setPanelRule("new")} className="self-start">
-        {dict.addButton}
+      <Btn variant="primary" size="sm" onClick={() => setPanelRule("new")} className="self-start">
+        <Icon name="plus" size={15} /> {dict.addButton}
       </Btn>
 
       {rules.length === 0 ? (
