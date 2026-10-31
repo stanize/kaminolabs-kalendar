@@ -179,6 +179,38 @@ function RulePanel({
   }
   const close = () => requestClose(onClose);
 
+  // custom-time-slots: normalizes a single typed time to "HH:MM" — accepts
+  // "9", "9:45", "09:45"; left as-is (and later flagged by the save-time
+  // validator) if it doesn't look like a time at all.
+  function normalizeTime(raw: string): string {
+    const s = raw.trim();
+    const m = /^(\d{1,2})(?::(\d{2}))?$/.exec(s);
+    if (!m) return s;
+    const hh = m[1].padStart(2, "0");
+    const mm = m[2] ?? "00";
+    return `${hh}:${mm}`;
+  }
+
+  // Lets the clinic paste/type a comma-separated batch into one row
+  // ("9:45,10:30,12,14:30") and have it split into one normalized row per
+  // entry, instead of typing "Añadir hora" repeatedly.
+  function handleTimeChange(i: number, value: string) {
+    if (value.includes(",")) {
+      const parts = value.split(",").map((p) => normalizeTime(p)).filter((p) => p.length > 0);
+      setTimes((ts) => {
+        const next = [...ts];
+        next.splice(i, 1, ...(parts.length > 0 ? parts : [""]));
+        return next;
+      });
+      return;
+    }
+    setTimes((ts) => ts.map((x, idx) => (idx === i ? value : x)));
+  }
+
+  function handleTimeBlur(i: number) {
+    setTimes((ts) => ts.map((x, idx) => (idx === i ? normalizeTime(x) : x)));
+  }
+
   function toggleDay(d: DayId) {
     setDays((ds) => (ds.includes(d) ? ds.filter((x) => x !== d) : [...ds, d]));
   }
@@ -300,6 +332,7 @@ function RulePanel({
 
           <div>
             <p className="mb-1.5 text-[12.5px] font-semibold text-ink-soft">{dict.timesLabel}</p>
+            <p className="mb-2 text-[12px] text-ink-soft">{dict.timesHint}</p>
             <div className="flex flex-col gap-2">
               {times.map((t, i) => {
                 const outside = isTimeOutsideHours(t);
@@ -308,7 +341,8 @@ function RulePanel({
                     <input
                       type="text"
                       value={t}
-                      onChange={(e) => setTimes((ts) => ts.map((x, idx) => (idx === i ? e.target.value : x)))}
+                      onChange={(e) => handleTimeChange(i, e.target.value)}
+                      onBlur={() => handleTimeBlur(i)}
                       placeholder={dict.timePlaceholder}
                       className={`w-28 rounded-lg border bg-surface px-3 py-2 text-[14px] text-ink ${
                         outside ? "border-amber-400" : "border-line"

@@ -26,6 +26,7 @@ export interface CustomSlotsDictionary {
   allProviders: string; // toggle option
   specificProviders: string; // toggle option
   timesLabel: string;
+  timesHint: string; // tip: paste comma-separated times, HH:MM or HH
   timePlaceholder: string; // "HH:MM"
   addTimeButton: string;
   removeTimeAria: string;
@@ -74,6 +75,7 @@ const es: CustomSlotsDictionary = {
   allProviders: "Todos los profesionales",
   specificProviders: "Profesionales concretos",
   timesLabel: "Horarios",
+  timesHint: "Consejo: puedes pegar varias horas separadas por comas (ej. 9:45,10:30,12,14:30) y se crearán filas automáticamente.",
   timePlaceholder: "HH:MM",
   addTimeButton: "Añadir hora",
   removeTimeAria: "Eliminar hora",
@@ -121,6 +123,7 @@ const en: CustomSlotsDictionary = {
   allProviders: "All providers",
   specificProviders: "Specific providers",
   timesLabel: "Times",
+  timesHint: "Tip: you can paste several times separated by commas (e.g. 9:45,10:30,12,14:30) and rows will be created automatically.",
   timePlaceholder: "HH:MM",
   addTimeButton: "Add time",
   removeTimeAria: "Remove time",
