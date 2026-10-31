@@ -698,7 +698,7 @@ export function BookingDetailModal({
       >
         <div className="mb-4 flex items-center justify-between">
           <div className="flex min-w-0 items-center gap-2">
-            <h2 className="truncate text-[17px] font-bold text-ink">{booking.serviceName}</h2>
+            <h2 className="truncate text-[17px] font-bold text-ink">{booking.clientName}</h2>
             <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${clientStatusBadgeClass(booking.clientStatus, booking.clinicReviewedAt)}`}>
               {clientStatusLabel(booking.clientStatus, booking.clinicReviewedAt)}
             </span>

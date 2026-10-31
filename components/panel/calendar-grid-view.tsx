@@ -760,10 +760,10 @@ function DayProviderColumn({
                     className={`mr-1 inline-block h-[7px] w-[7px] rounded-full align-middle ${clientStatusDotClass(b.clientStatus, b.clinicReviewedAt)}`}
                   />
                 ) : null}
-                {b.serviceName}
+                {b.clientName}
               </div>
               <div className="truncate opacity-90">
-                {timeLabel(b.startIso)} · {b.clientName}
+                {timeLabel(b.startIso)} · {b.serviceName}
               </div>
               {isPast && pastResultLabel(b, dict) && (
                 <div className="truncate font-semibold">{pastResultLabel(b, dict)}</div>
@@ -935,10 +935,10 @@ function DayMergedColumn({
                         className={`inline-block h-[7px] w-[7px] shrink-0 rounded-full ${clientStatusDotClass(b.clientStatus, b.clinicReviewedAt)}`}
                       />
                     ) : null}
-                    <span className="truncate">{b.serviceName}</span>
+                    <span className="truncate">{b.clientName}</span>
                   </div>
                   <div className="truncate opacity-90">
-                    {timeLabel(b.startIso)} · {b.clientName}
+                    {timeLabel(b.startIso)} · {b.serviceName}
                   </div>
                   {isPast && pastResultLabel(b, dict) && (
                     <div className="truncate font-semibold">{pastResultLabel(b, dict)}</div>
