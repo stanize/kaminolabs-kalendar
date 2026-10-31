@@ -153,7 +153,38 @@ Converting that to the panel pattern:
 
 ## Status
 
-Status: not_started — design only, verified against the real schema/
-components above (AvailabilityTabs, buildSuggestedTimes, the closures/
-time-off precedents) but no code written yet. Awaiting Arun's go-ahead
-to build.
+Status: in_progress — code implemented and typechecked/linted/built
+clean, pending Arun's live testing + running `schema_subset_034.sql`.
+
+IMPLEMENTED (2026-10-31):
+- `kalendar_custom_time_slots` (schema_subset_034.sql, not yet run) +
+  `lib/custom-slots/data.ts` (read) + `lib/actions/custom-slots.ts`
+  (create/update/delete, server-side validation of times/days/provider
+  ids).
+- `resolveCustomSuggestedTimes`/`isOutsideBusinessHours`
+  (`lib/booking/appointment-fields.ts`), wired into both
+  `AppointmentModal` and `BookingDetailModal`'s suggested-times logic —
+  a matching rule's times replace the generic hourly list; no match
+  falls through unchanged. Out-of-hours slots flagged amber/⚠ in the
+  dropdown, never blocked.
+- `customSlotRules` threaded from `app/panel/calendar/page.tsx` through
+  `calendar-bookings.tsx` → `calendar-grid-view.tsx`/
+  `BookingDetailModal`, same pattern as the existing `closures` prop.
+- New "Horarios personalizados" tab (2nd, after Horarios) at
+  `/panel/availability/custom-slots` — rule list + side-panel create/
+  edit (label, days all-or-specific chips, providers all-or-specific
+  real multi-select checkboxes, add/remove times list with the same
+  out-of-hours flag).
+- Festivos and Vacaciones (`festivos-manager.tsx`, `time-off-list.tsx`)
+  converted from inline expand-in-place forms to the same side-panel
+  shell — same fields/actions, only the shell changed.
+  `ClosureConflictDialog` stays a small centered modal on top, as
+  decided.
+
+Still needs: live-test (a rule's slots actually override the generic
+suggestion for the right day+provider combos; out-of-hours flag shows
+correctly in both the rule editor and the booking form; Festivos/
+Vacaciones add/edit/delete + the conflict-dialog override flow all
+still work through the new panel shell), and run
+`schema_subset_034.sql` against the live DB (through the admin
+Run-migrations tool).
