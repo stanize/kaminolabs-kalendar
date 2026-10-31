@@ -37,10 +37,13 @@ import {
   type ServiceVM,
   type MemberVM,
   type TimeRangeVM,
+  type CustomTimeSlotRuleVM,
   toMinutes,
   ymd,
   hhmmFromIso,
   buildSuggestedTimes,
+  resolveCustomSuggestedTimes,
+  isOutsideBusinessHours,
 } from "@/lib/booking/appointment-fields";
 
 function invoicePdfHref(invoice: { id: string; access_token: string }): string {
@@ -79,6 +82,7 @@ export function BookingDetailModal({
   services,
   members,
   closures,
+  customSlotRules,
   whatsappEnabled,
   onClose,
   onUpdated,
@@ -106,6 +110,7 @@ export function BookingDetailModal({
   services: ServiceVM[];
   members: MemberVM[];
   closures: ClosureRuleVM[];
+  customSlotRules: CustomTimeSlotRuleVM[];
   whatsappEnabled: boolean;
   onClose: () => void;
   onUpdated: () => void;
@@ -209,11 +214,15 @@ export function BookingDetailModal({
     return { year: y, month: m, day: dd };
   }, [dateValid, dateStr]);
 
+  const selectedDayId = useMemo(() => {
+    if (!selectedDateParts) return null;
+    return dayIdInTz(zonedTimeToUtc(selectedDateParts.year, selectedDateParts.month, selectedDateParts.day, 12, 0));
+  }, [selectedDateParts]);
+
   const selectedDayRanges = useMemo(() => {
-    if (!selectedDateParts) return [];
-    const dayId = dayIdInTz(zonedTimeToUtc(selectedDateParts.year, selectedDateParts.month, selectedDateParts.day, 12, 0));
-    return hoursByDay[dayId] ?? [];
-  }, [selectedDateParts, hoursByDay]);
+    if (!selectedDayId) return [];
+    return hoursByDay[selectedDayId] ?? [];
+  }, [selectedDayId, hoursByDay]);
 
   const selectedDayBookings = useMemo(() => {
     if (!selectedDateParts) return [];
@@ -224,7 +233,16 @@ export function BookingDetailModal({
     });
   }, [selectedDateParts, allBookings, booking.id]);
 
-  const suggestedTimes = useMemo(() => buildSuggestedTimes(selectedDayRanges), [selectedDayRanges]);
+  // custom-time-slots: a matching rule's slot list replaces the generic
+  // hourly suggestions for this (day, provider); no match falls through to
+  // buildSuggestedTimes, unchanged.
+  const suggestedTimes = useMemo(() => {
+    if (selectedDayId && teamMemberId) {
+      const custom = resolveCustomSuggestedTimes(customSlotRules, selectedDayId, teamMemberId);
+      if (custom) return custom;
+    }
+    return buildSuggestedTimes(selectedDayRanges);
+  }, [selectedDayId, teamMemberId, customSlotRules, selectedDayRanges]);
   const isOutsideHours = timeValid && !suggestedTimes.includes(timeStr);
 
   const startDate = useMemo(() => {
@@ -828,16 +846,19 @@ export function BookingDetailModal({
                 <div className="absolute left-0 right-0 top-full z-10 mt-1 max-h-[220px] overflow-y-auto rounded-lg border border-line bg-surface py-1 shadow-lg">
                   {suggestedTimes.map((t) => {
                     const taken = isTimeTaken(t);
+                    const outsideHours = !taken && isOutsideBusinessHours(t, selectedDayRanges);
                     return (
                       <button
                         key={t}
                         type="button"
                         onMouseDown={() => setTimeStr(t)}
+                        title={outsideHours ? md.outsideHoursNote : undefined}
                         className={`block w-full px-3 py-1.5 text-left text-[13.5px] hover:bg-surface-2 ${
-                          taken ? "text-ink-soft" : "font-bold text-green-600"
+                          taken ? "text-ink-soft" : outsideHours ? "font-bold text-amber-600" : "font-bold text-green-600"
                         }`}
                       >
                         {t}
+                        {outsideHours && <span className="ml-1 text-[11px] font-normal text-amber-600">⚠</span>}
                       </button>
                     );
                   })}

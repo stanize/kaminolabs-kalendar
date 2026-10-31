@@ -27,6 +27,7 @@ import { CalendarMonthView } from "@/components/panel/calendar-month-view";
 import { BookingDetailModal } from "@/components/panel/booking-detail-modal";
 import type { InvoicingDictionary } from "@/lib/i18n/dictionaries/invoicing";
 import type { ClosureRuleVM } from "@/components/panel/appointment-modal";
+import type { CustomTimeSlotRuleVM } from "@/lib/booking/appointment-fields";
 import {
   dayStart,
   mondayStart,
@@ -181,6 +182,7 @@ export function CalendarBookings({
   initialConflicts,
   festivos,
   closures,
+  customSlotRules,
   initialProviderFilter,
 }: {
   bookings: BookingVM[];
@@ -216,6 +218,9 @@ export function CalendarBookings({
   // unavailable" warning (holidays-and-time-off's existing-bookings-
   // conflict-alert never blocks the clinic's own manual override).
   closures: ClosureRuleVM[];
+  // custom-time-slots: additive, opt-in per (day, provider) suggestion
+  // override — see workflows/custom-time-slots.md.
+  customSlotRules: CustomTimeSlotRuleVM[];
   // multi-provider-calendar-display: persisted selection (empty = all),
   // read server-side from the kalendar_calendar_providers cookie so the
   // grid renders already-filtered on first paint.
@@ -590,6 +595,7 @@ export function CalendarBookings({
               services={weekServices}
               bookings={providerFilteredBookings}
               closures={closures}
+              customSlotRules={customSlotRules}
               dict={dict}
               whatsappEnabled={whatsappEnabled}
               onBookingCreated={handleGridBookingCreated}
@@ -621,6 +627,7 @@ export function CalendarBookings({
           services={weekServices}
           members={weekMembers}
           closures={closures}
+          customSlotRules={customSlotRules}
           whatsappEnabled={whatsappEnabled}
           onClose={() => setSelectedBooking(null)}
           onUpdated={handleGridBookingCreated}

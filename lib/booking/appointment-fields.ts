@@ -53,3 +53,41 @@ export function buildSuggestedTimes(ranges: TimeRangeVM[]): string[] {
   }
   return times;
 }
+
+// custom-time-slots (workflows/custom-time-slots.md) — a client-safe
+// projection of CustomTimeSlotRule (lib/custom-slots/data.ts), same shape
+// as ClosureRuleVM elsewhere: just what the booking form needs.
+export interface CustomTimeSlotRuleVM {
+  days: string[]; // DayId[], empty = every open day
+  teamMemberIds: string[]; // empty = all providers
+  times: string[]; // "HH:MM"
+}
+
+/** Additive, opt-in on top of buildSuggestedTimes above — returns the
+ * union of every matching rule's times for this (day, provider), or null
+ * when nothing matches (caller falls back to buildSuggestedTimes,
+ * completely unchanged from before this feature existed). */
+export function resolveCustomSuggestedTimes(
+  rules: CustomTimeSlotRuleVM[],
+  dayId: string,
+  teamMemberId: string
+): string[] | null {
+  const matching = rules.filter(
+    (r) =>
+      (r.days.length === 0 || r.days.includes(dayId)) &&
+      (r.teamMemberIds.length === 0 || r.teamMemberIds.includes(teamMemberId))
+  );
+  if (matching.length === 0) return null;
+  const union = new Set<string>();
+  for (const r of matching) for (const t of r.times) union.add(t);
+  return [...union];
+}
+
+/** Non-blocking "is this time actually within the day's working hours" —
+ * used to flag (never block/remove) a custom-slot suggestion that falls
+ * outside Horarios, both in the rule editor and the booking form's own
+ * dropdown. */
+export function isOutsideBusinessHours(time: string, ranges: TimeRangeVM[]): boolean {
+  const mins = toMinutes(time);
+  return !ranges.some((r) => mins >= toMinutes(r.start) && mins < toMinutes(r.end));
+}

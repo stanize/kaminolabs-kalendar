@@ -20,9 +20,12 @@ import {
   type ServiceVM,
   type MemberVM,
   type TimeRangeVM,
+  type CustomTimeSlotRuleVM,
   toMinutes,
   ymd,
   buildSuggestedTimes,
+  resolveCustomSuggestedTimes,
+  isOutsideBusinessHours,
 } from "@/lib/booking/appointment-fields";
 
 // A client-safe projection of BusinessClosure (lib/closures/data.ts) — just
@@ -64,6 +67,7 @@ interface AppointmentModalProps {
   services: ServiceVM[];
   members: MemberVM[];
   closures: ClosureRuleVM[];
+  customSlotRules: CustomTimeSlotRuleVM[];
   dict: CalendarDictionary;
   errorsDict: CalendarDictionary["manualErrors"];
   whatsappEnabled: boolean;
@@ -72,7 +76,7 @@ interface AppointmentModalProps {
 }
 
 export function AppointmentModal({
-  slot, hoursByDay, allBookings, services, members, closures, dict, errorsDict, whatsappEnabled, onClose, onSaved,
+  slot, hoursByDay, allBookings, services, members, closures, customSlotRules, dict, errorsDict, whatsappEnabled, onClose, onSaved,
 }: AppointmentModalProps) {
   const md = dict.modal;
   const ct = dict.clientTabs;
@@ -194,11 +198,15 @@ export function AppointmentModal({
   // Ranges/bookings for whichever date is currently selected — recomputed
   // reactively so changing the date (not just the time) stays accurate,
   // instead of being pinned to the originally-clicked day's data.
+  const selectedDayId = useMemo(() => {
+    if (!selectedDateParts) return null;
+    return dayIdInTz(zonedTimeToUtc(selectedDateParts.year, selectedDateParts.month, selectedDateParts.day, 12, 0));
+  }, [selectedDateParts]);
+
   const selectedDayRanges = useMemo(() => {
-    if (!selectedDateParts) return [];
-    const dayId = dayIdInTz(zonedTimeToUtc(selectedDateParts.year, selectedDateParts.month, selectedDateParts.day, 12, 0));
-    return hoursByDay[dayId] ?? [];
-  }, [selectedDateParts, hoursByDay]);
+    if (!selectedDayId) return [];
+    return hoursByDay[selectedDayId] ?? [];
+  }, [selectedDayId, hoursByDay]);
 
   const selectedDayBookings = useMemo(() => {
     if (!selectedDateParts) return [];
@@ -208,7 +216,16 @@ export function AppointmentModal({
     });
   }, [selectedDateParts, allBookings]);
 
-  const suggestedTimes = useMemo(() => buildSuggestedTimes(selectedDayRanges), [selectedDayRanges]);
+  // custom-time-slots: a matching rule's slot list replaces the generic
+  // hourly suggestions entirely for this (day, provider); no match falls
+  // through to buildSuggestedTimes, unchanged from before this feature.
+  const suggestedTimes = useMemo(() => {
+    if (selectedDayId && teamMemberId) {
+      const custom = resolveCustomSuggestedTimes(customSlotRules, selectedDayId, teamMemberId);
+      if (custom) return custom;
+    }
+    return buildSuggestedTimes(selectedDayRanges);
+  }, [selectedDayId, teamMemberId, customSlotRules, selectedDayRanges]);
   const isOutsideHours = timeValid && !suggestedTimes.includes(timeStr);
 
   const startDate = useMemo(() => {
@@ -470,17 +487,23 @@ export function AppointmentModal({
                 <div className="absolute left-0 right-0 top-full z-10 mt-1 max-h-[220px] overflow-y-auto rounded-lg border border-line bg-surface py-1 shadow-lg">
                   {suggestedTimes.map((t) => {
                     const taken = isTimeTaken(t);
+                    // custom-time-slots: non-blocking heads-up when a
+                    // custom slot falls outside the day's actual working
+                    // hours — the clinic can still pick it.
+                    const outsideHours = !taken && isOutsideBusinessHours(t, selectedDayRanges);
                     return (
                       <button
                         key={t}
                         type="button"
                         // onMouseDown (not onClick) fires before the input's onBlur closes the menu
                         onMouseDown={() => setTimeStr(t)}
+                        title={outsideHours ? md.outsideHoursNote : undefined}
                         className={`block w-full px-3 py-1.5 text-left text-[13.5px] hover:bg-surface-2 ${
-                          taken ? "text-ink-soft" : "font-bold text-green-600"
+                          taken ? "text-ink-soft" : outsideHours ? "font-bold text-amber-600" : "font-bold text-green-600"
                         }`}
                       >
                         {t}
+                        {outsideHours && <span className="ml-1 text-[11px] font-normal text-amber-600">⚠</span>}
                       </button>
                     );
                   })}

@@ -6,6 +6,7 @@ import { Icon } from "@/components/ui/icon";
 import type { CalendarDictionary } from "@/lib/i18n/dictionaries/calendar";
 import type { DayId } from "@/lib/onboarding/types";
 import { AppointmentModal, type SlotSelection, type ClosureRuleVM } from "@/components/panel/appointment-modal";
+import type { CustomTimeSlotRuleVM } from "@/lib/booking/appointment-fields";
 import {
   TZ,
   tzDateParts,
@@ -315,6 +316,7 @@ export function CalendarGridView({
   services,
   bookings,
   closures,
+  customSlotRules,
   dict,
   whatsappEnabled,
   onBookingCreated,
@@ -335,6 +337,7 @@ export function CalendarGridView({
   services: WeekServiceVM[];
   bookings: WeekBookingVM[];
   closures: ClosureRuleVM[];
+  customSlotRules: CustomTimeSlotRuleVM[];
   dict: CalendarDictionary;
   whatsappEnabled: boolean;
   onBookingCreated: () => void;
@@ -539,6 +542,7 @@ export function CalendarGridView({
           services={services.map((s) => ({ id: s.id, name: s.name, durationMin: s.durationMin, price: s.price }))}
           members={allMembers.map((m) => ({ id: m.id, name: m.name }))}
           closures={closures}
+          customSlotRules={customSlotRules}
           dict={dict}
           errorsDict={dict.manualErrors}
           whatsappEnabled={whatsappEnabled}
