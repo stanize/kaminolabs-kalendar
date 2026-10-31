@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { Btn } from "@/components/ui/button";
@@ -27,9 +27,13 @@ function formatRange(c: BusinessClosure, intlLocale: string): string {
 
 /**
  * One provider's time-off list (one-off vacations/absences) — rendered
- * inline under a team-member row on /panel/team. Each add/delete commits
- * immediately, same pattern as FestivosManager. teamMemberId is a saved
- * member's real id (this only renders for saved rows).
+ * inline under a team-member row on the Vacaciones tab
+ * (/panel/availability/time-off, via ProviderTimeOffManager). Each add/
+ * delete commits immediately.
+ *
+ * side-panel-pattern: Añadir/Editar both open the same right-docked panel
+ * (TimeOffPanel below) instead of the old inline expand-in-place forms —
+ * same fields, same actions, only the shell changed.
  */
 export function TimeOffList({
   teamMemberId,
@@ -46,153 +50,9 @@ export function TimeOffList({
 }) {
   const router = useRouter();
   const [entries, setEntries] = useState(initialEntries);
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [singleDay, setSingleDay] = useState(false);
-  const [partialHours, setPartialHours] = useState(false);
-  const [startTime, setStartTime] = useState("");
-  const [endTime, setEndTime] = useState("");
-  const [label, setLabel] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [panelEntry, setPanelEntry] = useState<BusinessClosure | "new" | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [conflicts, setConflicts] = useState<ConflictSummary | null>(null);
-
-  // Inline edit — reuses the add form's fields, pre-filled, rendered in
-  // place of the row being edited. Only one row editable at a time.
-  // editX state is separate from the add form's own state above so editing
-  // one doesn't disturb whatever's half-typed into the "add" form.
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editStartDate, setEditStartDate] = useState("");
-  const [editEndDate, setEditEndDate] = useState("");
-  const [editSingleDay, setEditSingleDay] = useState(false);
-  const [editPartialHours, setEditPartialHours] = useState(false);
-  const [editStartTime, setEditStartTime] = useState("");
-  const [editEndTime, setEditEndTime] = useState("");
-  const [editLabel, setEditLabel] = useState("");
-
-  // Which save the pending conflict dialog's "Guardar de todas formas"
-  // should retry — the add form, or an in-place edit of a specific entry.
-  const [pendingConfirm, setPendingConfirm] = useState<{ kind: "add" } | { kind: "edit"; id: string } | null>(null);
-
-  async function handleAdd(confirmed?: boolean) {
-    setError(null);
-    // singleDay drives the UI (hides Hasta, relabels Desde as "Día"), but
-    // the underlying tracking is unchanged — a single-day entry is just a
-    // range whose start and end are the same date.
-    const effectiveEndDate = singleDay ? startDate : endDate;
-    if (!startDate || !effectiveEndDate) {
-      setError(dict.errors.errInvalidDateRange);
-      return;
-    }
-    setSaving(true);
-    try {
-      const result = await createTimeOff({
-        teamMemberId,
-        startDate,
-        endDate: effectiveEndDate,
-        startTime: partialHours ? startTime : null,
-        endTime: partialHours ? endTime : null,
-        label,
-        confirmed,
-        dict: dict.errors,
-      });
-      if (!result.ok) {
-        setError(result.error);
-        setSaving(false);
-        return;
-      }
-      if ("needsConfirmation" in result) {
-        setConflicts(result.conflicts);
-        setPendingConfirm({ kind: "add" });
-        setSaving(false);
-        return;
-      }
-      setConflicts(null);
-      setPendingConfirm(null);
-      setEntries((prev) =>
-        [...prev, result.closure].sort((a, b) => (a.start_date ?? "").localeCompare(b.start_date ?? ""))
-      );
-      setStartDate("");
-      setEndDate("");
-      setSingleDay(false);
-      setPartialHours(false);
-      setStartTime("");
-      setEndTime("");
-      setLabel("");
-      setShowAddForm(false);
-      setSaving(false);
-      router.refresh();
-    } catch (e) {
-      reportClientError("createTimeOff", e);
-      setError(dict.errUnexpected);
-      setSaving(false);
-    }
-  }
-
-  function startEdit(e: BusinessClosure) {
-    setError(null);
-    setEditingId(e.id);
-    setEditStartDate(e.start_date ?? "");
-    setEditEndDate(e.end_date ?? "");
-    setEditSingleDay(e.start_date === e.end_date);
-    setEditPartialHours(!!(e.start_time && e.end_time));
-    setEditStartTime(e.start_time?.slice(0, 5) ?? "");
-    setEditEndTime(e.end_time?.slice(0, 5) ?? "");
-    setEditLabel(e.label ?? "");
-  }
-
-  function cancelEdit() {
-    setEditingId(null);
-  }
-
-  async function handleEditSave(id: string, confirmed?: boolean) {
-    setError(null);
-    const effectiveEndDate = editSingleDay ? editStartDate : editEndDate;
-    if (!editStartDate || !effectiveEndDate) {
-      setError(dict.errors.errInvalidDateRange);
-      return;
-    }
-    setSaving(true);
-    try {
-      const result = await updateTimeOff({
-        id,
-        startDate: editStartDate,
-        endDate: effectiveEndDate,
-        startTime: editPartialHours ? editStartTime : null,
-        endTime: editPartialHours ? editEndTime : null,
-        label: editLabel,
-        confirmed,
-        dict: dict.errors,
-      });
-      if (!result.ok) {
-        setError(result.error);
-        setSaving(false);
-        return;
-      }
-      if ("needsConfirmation" in result) {
-        setConflicts(result.conflicts);
-        setPendingConfirm({ kind: "edit", id });
-        setSaving(false);
-        return;
-      }
-      setConflicts(null);
-      setPendingConfirm(null);
-      setEntries((prev) =>
-        prev
-          .map((e) => (e.id === id ? result.closure : e))
-          .sort((a, b) => (a.start_date ?? "").localeCompare(b.start_date ?? ""))
-      );
-      setEditingId(null);
-      setSaving(false);
-      router.refresh();
-    } catch (e) {
-      reportClientError("updateTimeOff", e);
-      setError(dict.errUnexpected);
-      setSaving(false);
-    }
-  }
 
   async function handleDelete(id: string) {
     if (!window.confirm(dict.confirmDelete)) return;
@@ -206,7 +66,6 @@ export function TimeOffList({
         return;
       }
       setEntries((prev) => prev.filter((e) => e.id !== id));
-      if (editingId === id) setEditingId(null);
       setDeletingId(null);
       router.refresh();
     } catch (e) {
@@ -228,252 +87,283 @@ export function TimeOffList({
 
         {entries.length > 0 ? (
           <div className="flex flex-col gap-1.5">
-            {entries.map((e) =>
-              editingId === e.id ? (
-                <div key={e.id} className="flex flex-col gap-2 rounded-lg border border-brand-line bg-brand-weak px-2.5 py-2.5">
-                  <label className="flex w-fit cursor-pointer items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={editSingleDay}
-                      onChange={(ev) => {
-                        const checked = ev.target.checked;
-                        setEditSingleDay(checked);
-                        if (checked) setEditEndDate(editStartDate);
-                        else setEditPartialHours(false);
-                      }}
-                      className="h-4 w-4 accent-brand"
-                    />
-                    <span className="text-[12.5px] text-ink-soft">{dict.singleDay}</span>
-                  </label>
-
-                  <div className="flex flex-wrap items-end gap-2">
-                    <div className="flex flex-col gap-1">
-                      <label className="text-[11.5px] font-semibold text-ink-soft">
-                        {editSingleDay ? dict.dayLabel : dict.startDate}
-                      </label>
-                      <input
-                        type="date"
-                        value={editStartDate}
-                        onChange={(ev) => {
-                          setEditStartDate(ev.target.value);
-                          if (editSingleDay) setEditEndDate(ev.target.value);
-                        }}
-                        className={`${inputBase} w-[150px]`}
-                      />
-                    </div>
-                    {!editSingleDay && (
-                      <div className="flex flex-col gap-1">
-                        <label className="text-[11.5px] font-semibold text-ink-soft">{dict.endDate}</label>
-                        <input
-                          type="date"
-                          value={editEndDate}
-                          onChange={(ev) => setEditEndDate(ev.target.value)}
-                          className={`${inputBase} w-[150px]`}
-                        />
-                      </div>
-                    )}
-                  </div>
-
-                  {editSingleDay && (
-                    <label className="flex w-fit cursor-pointer items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={editPartialHours}
-                        onChange={(ev) => setEditPartialHours(ev.target.checked)}
-                        disabled={!editStartDate}
-                        className="h-4 w-4 accent-brand"
-                      />
-                      <span className="text-[12.5px] text-ink-soft">{dict.partialHours}</span>
-                    </label>
-                  )}
-
-                  {editPartialHours && (
-                    <div className="flex flex-wrap items-end gap-2">
-                      <div className="flex flex-col gap-1">
-                        <label className="text-[11.5px] font-semibold text-ink-soft">{dict.startTime}</label>
-                        <input
-                          type="time"
-                          value={editStartTime}
-                          onChange={(ev) => setEditStartTime(ev.target.value)}
-                          className={`${inputBase} w-[110px]`}
-                        />
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        <label className="text-[11.5px] font-semibold text-ink-soft">{dict.endTime}</label>
-                        <input
-                          type="time"
-                          value={editEndTime}
-                          onChange={(ev) => setEditEndTime(ev.target.value)}
-                          className={`${inputBase} w-[110px]`}
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="flex flex-wrap items-end gap-2">
-                    <div className="min-w-[140px] flex-1">
-                      <label className="mb-1 block text-[11.5px] font-semibold text-ink-soft">{dict.nameLabel}</label>
-                      <input
-                        value={editLabel}
-                        onChange={(ev) => setEditLabel(ev.target.value)}
-                        placeholder={dict.namePlaceholder}
-                        maxLength={80}
-                        className={inputBase}
-                      />
-                    </div>
-                    <Btn variant="outline" size="sm" onClick={() => handleEditSave(e.id)} disabled={saving}>
-                      {dict.saveEdit}
-                    </Btn>
-                    <button
-                      onClick={cancelEdit}
-                      disabled={saving}
-                      className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-ink-soft hover:bg-surface-2"
-                      aria-label={dict.cancelEdit}
-                    >
-                      <Icon name="x" size={15} />
-                    </button>
-                  </div>
+            {entries.map((e) => (
+              <div key={e.id} className="flex items-center justify-between gap-2 rounded-lg bg-surface px-2.5 py-2">
+                <div className="flex flex-col">
+                  <span className="text-[13px] font-medium text-ink">{formatRange(e, intlLocale)}</span>
+                  {e.label && <span className="text-[12px] text-ink-soft">{e.label}</span>}
                 </div>
-              ) : (
-                <div key={e.id} className="flex items-center justify-between gap-2 rounded-lg bg-surface px-2.5 py-2">
-                  <div className="flex flex-col">
-                    <span className="text-[13px] font-medium text-ink">{formatRange(e, intlLocale)}</span>
-                    {e.label && <span className="text-[12px] text-ink-soft">{e.label}</span>}
-                  </div>
-                  <div className="flex shrink-0 items-center gap-1">
-                    <button
-                      onClick={() => startEdit(e)}
-                      className="grid h-7 w-7 place-items-center rounded-lg text-ink-soft hover:bg-brand-weak hover:text-brand"
-                      aria-label={dict.edit}
-                    >
-                      <Icon name="pencil" size={14} />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(e.id)}
-                      disabled={deletingId === e.id}
-                      className="grid h-7 w-7 place-items-center rounded-lg text-ink-soft hover:bg-error-weak hover:text-error"
-                      aria-label={dict.delete}
-                    >
-                      <Icon name="x" size={14} />
-                    </button>
-                  </div>
+                <div className="flex shrink-0 items-center gap-1">
+                  <button
+                    onClick={() => setPanelEntry(e)}
+                    className="grid h-7 w-7 place-items-center rounded-lg text-ink-soft hover:bg-brand-weak hover:text-brand"
+                    aria-label={dict.edit}
+                  >
+                    <Icon name="pencil" size={14} />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(e.id)}
+                    disabled={deletingId === e.id}
+                    className="grid h-7 w-7 place-items-center rounded-lg text-ink-soft hover:bg-error-weak hover:text-error"
+                    aria-label={dict.delete}
+                  >
+                    <Icon name="x" size={14} />
+                  </button>
                 </div>
-              )
-            )}
+              </div>
+            ))}
           </div>
         ) : (
           <p className="px-1 py-1 text-[12.5px] text-ink-soft">{dict.noEntries}</p>
         )}
       </div>
 
-      <div className="rounded-lg border border-line bg-surface-2/50 p-3">
-        {showAddForm ? (
-          <div className="flex flex-col gap-2">
+      <Btn variant="outline" size="sm" onClick={() => setPanelEntry("new")} className="self-start">
+        <Icon name="plus" size={14} /> {dict.add}
+      </Btn>
+
+      {panelEntry && (
+        <TimeOffPanel
+          entry={panelEntry === "new" ? null : panelEntry}
+          teamMemberId={teamMemberId}
+          intlLocale={intlLocale}
+          dict={dict}
+          conflictDict={conflictDict}
+          onClose={() => setPanelEntry(null)}
+          onSaved={(saved) => {
+            setPanelEntry(null);
+            setEntries((prev) => {
+              const exists = prev.some((e) => e.id === saved.id);
+              const next = exists ? prev.map((e) => (e.id === saved.id ? saved : e)) : [...prev, saved];
+              return next.sort((a, b) => (a.start_date ?? "").localeCompare(b.start_date ?? ""));
+            });
+            router.refresh();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function TimeOffPanel({
+  entry,
+  teamMemberId,
+  intlLocale,
+  dict,
+  conflictDict,
+  onClose,
+  onSaved,
+}: {
+  entry: BusinessClosure | null;
+  teamMemberId: string;
+  intlLocale: string;
+  dict: TimeOffDictionary;
+  conflictDict: ClosureConflictDictionary;
+  onClose: () => void;
+  onSaved: (entry: BusinessClosure) => void;
+}) {
+  const [startDate, setStartDate] = useState(entry?.start_date ?? "");
+  const [endDate, setEndDate] = useState(entry?.end_date ?? "");
+  const [singleDay, setSingleDay] = useState(entry ? entry.start_date === entry.end_date : false);
+  const [partialHours, setPartialHours] = useState(entry ? !!(entry.start_time && entry.end_time) : false);
+  const [startTime, setStartTime] = useState(entry?.start_time?.slice(0, 5) ?? "");
+  const [endTime, setEndTime] = useState(entry?.end_time?.slice(0, 5) ?? "");
+  const [label, setLabel] = useState(entry?.label ?? "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [conflicts, setConflicts] = useState<ConflictSummary | null>(null);
+
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setVisible(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
+  const closingRef = useRef(false);
+  function requestClose(after: () => void) {
+    if (closingRef.current) return;
+    closingRef.current = true;
+    setVisible(false);
+    setTimeout(after, 200);
+  }
+  const close = () => requestClose(onClose);
+
+  async function handleSave(confirmed?: boolean) {
+    setError(null);
+    const effectiveEndDate = singleDay ? startDate : endDate;
+    if (!startDate || !effectiveEndDate) {
+      setError(dict.errors.errInvalidDateRange);
+      return;
+    }
+    setSaving(true);
+    try {
+      const result = entry
+        ? await updateTimeOff({
+            id: entry.id,
+            startDate,
+            endDate: effectiveEndDate,
+            startTime: partialHours ? startTime : null,
+            endTime: partialHours ? endTime : null,
+            label,
+            confirmed,
+            dict: dict.errors,
+          })
+        : await createTimeOff({
+            teamMemberId,
+            startDate,
+            endDate: effectiveEndDate,
+            startTime: partialHours ? startTime : null,
+            endTime: partialHours ? endTime : null,
+            label,
+            confirmed,
+            dict: dict.errors,
+          });
+      if (!result.ok) {
+        setError(result.error);
+        setSaving(false);
+        return;
+      }
+      if ("needsConfirmation" in result) {
+        setConflicts(result.conflicts);
+        setSaving(false);
+        return;
+      }
+      setSaving(false);
+      requestClose(() => onSaved(result.closure));
+    } catch (e) {
+      reportClientError(entry ? "updateTimeOff" : "createTimeOff", e);
+      setError(dict.errUnexpected);
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-y-0 left-0 right-0 z-50 md:left-[240px]">
+      <div
+        className={`absolute inset-0 bg-black/40 transition-opacity duration-200 ${visible ? "opacity-100" : "opacity-0"}`}
+        onClick={close}
+        aria-hidden
+      />
+      <div
+        className={`absolute inset-y-0 right-0 flex h-full w-full flex-col overflow-y-auto bg-surface p-5 shadow-2xl transition-transform duration-200 ease-out sm:w-1/2 sm:min-w-[480px] sm:p-8 ${
+          visible ? "translate-x-0" : "translate-x-full"
+        }`}
+      >
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-[17px] font-bold text-ink">{entry ? dict.edit : dict.add}</h2>
+          <button
+            onClick={close}
+            aria-label={dict.cancelAdd}
+            className="grid h-8 w-8 place-items-center rounded-lg text-ink-soft hover:bg-surface-2"
+          >
+            <Icon name="x" size={16} />
+          </button>
+        </div>
+
+        {error && (
+          <div className="mb-3 rounded-lg border border-error bg-error-weak px-3 py-2 text-[12.5px] text-error">{error}</div>
+        )}
+
+        <div className="flex flex-col gap-3">
+          <label className="flex w-fit cursor-pointer items-center gap-2">
+            <input
+              type="checkbox"
+              checked={singleDay}
+              onChange={(ev) => {
+                const checked = ev.target.checked;
+                setSingleDay(checked);
+                if (checked) setEndDate(startDate);
+                else setPartialHours(false);
+              }}
+              className="h-4 w-4 accent-brand"
+            />
+            <span className="text-[12.5px] text-ink-soft">{dict.singleDay}</span>
+          </label>
+
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="flex flex-col gap-1">
+              <label className="text-[12px] font-semibold text-ink-soft">{singleDay ? dict.dayLabel : dict.startDate}</label>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(ev) => {
+                  setStartDate(ev.target.value);
+                  if (singleDay) setEndDate(ev.target.value);
+                }}
+                className={`${inputBase} w-[160px]`}
+              />
+            </div>
+            {!singleDay && (
+              <div className="flex flex-col gap-1">
+                <label className="text-[12px] font-semibold text-ink-soft">{dict.endDate}</label>
+                <input type="date" value={endDate} onChange={(ev) => setEndDate(ev.target.value)} className={`${inputBase} w-[160px]`} />
+              </div>
+            )}
+          </div>
+
+          {singleDay && (
             <label className="flex w-fit cursor-pointer items-center gap-2">
               <input
                 type="checkbox"
-                checked={singleDay}
-                onChange={(e) => {
-                  const checked = e.target.checked;
-                  setSingleDay(checked);
-                  if (checked) setEndDate(startDate);
-                  else setPartialHours(false);
-                }}
+                checked={partialHours}
+                onChange={(ev) => setPartialHours(ev.target.checked)}
+                disabled={!startDate}
                 className="h-4 w-4 accent-brand"
               />
-              <span className="text-[12.5px] text-ink-soft">{dict.singleDay}</span>
+              <span className="text-[12.5px] text-ink-soft">{dict.partialHours}</span>
             </label>
+          )}
 
+          {partialHours && (
             <div className="flex flex-wrap items-end gap-2">
               <div className="flex flex-col gap-1">
-                <label className="text-[11.5px] font-semibold text-ink-soft">
-                  {singleDay ? dict.dayLabel : dict.startDate}
-                </label>
-                <input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => {
-                    setStartDate(e.target.value);
-                    if (singleDay) setEndDate(e.target.value);
-                  }}
-                  className={`${inputBase} w-[150px]`}
-                />
+                <label className="text-[12px] font-semibold text-ink-soft">{dict.startTime}</label>
+                <input type="time" value={startTime} onChange={(ev) => setStartTime(ev.target.value)} className={`${inputBase} w-[120px]`} />
               </div>
-              {!singleDay && (
-                <div className="flex flex-col gap-1">
-                  <label className="text-[11.5px] font-semibold text-ink-soft">{dict.endDate}</label>
-                  <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className={`${inputBase} w-[150px]`} />
-                </div>
-              )}
-            </div>
-
-            {singleDay && (
-              <label className="flex w-fit cursor-pointer items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={partialHours}
-                  onChange={(e) => setPartialHours(e.target.checked)}
-                  disabled={!startDate}
-                  className="h-4 w-4 accent-brand"
-                />
-                <span className="text-[12.5px] text-ink-soft">{dict.partialHours}</span>
-              </label>
-            )}
-
-            {partialHours && (
-              <div className="flex flex-wrap items-end gap-2">
-                <div className="flex flex-col gap-1">
-                  <label className="text-[11.5px] font-semibold text-ink-soft">{dict.startTime}</label>
-                  <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className={`${inputBase} w-[110px]`} />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-[11.5px] font-semibold text-ink-soft">{dict.endTime}</label>
-                  <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className={`${inputBase} w-[110px]`} />
-                </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[12px] font-semibold text-ink-soft">{dict.endTime}</label>
+                <input type="time" value={endTime} onChange={(ev) => setEndTime(ev.target.value)} className={`${inputBase} w-[120px]`} />
               </div>
-            )}
+            </div>
+          )}
 
-            <div className="min-w-[140px] flex-1">
-              <label className="mb-1 block text-[11.5px] font-semibold text-ink-soft">{dict.nameLabel}</label>
-              <input
-                value={label}
-                onChange={(e) => setLabel(e.target.value)}
-                placeholder={dict.namePlaceholder}
-                maxLength={80}
-                className={inputBase}
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <Btn variant="outline" size="sm" onClick={() => handleAdd()} disabled={saving}>
-                {dict.save}
-              </Btn>
-              <button
-                onClick={() => setShowAddForm(false)}
-                disabled={saving}
-                className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-ink-soft hover:bg-surface-2"
-                aria-label={dict.cancelAdd}
-              >
-                <Icon name="x" size={15} />
-              </button>
-            </div>
+          <div>
+            <label className="mb-1 block text-[12px] font-semibold text-ink-soft">{dict.nameLabel}</label>
+            <input
+              value={label}
+              onChange={(ev) => setLabel(ev.target.value)}
+              placeholder={dict.namePlaceholder}
+              maxLength={80}
+              className={inputBase}
+            />
           </div>
-        ) : (
-          <Btn variant="outline" size="sm" onClick={() => setShowAddForm(true)}>
-            <Icon name="plus" size={14} /> {dict.add}
-          </Btn>
-        )}
+        </div>
+
+        <div className="mt-5 flex justify-end gap-2">
+          <button
+            onClick={close}
+            disabled={saving}
+            className="rounded-lg px-3.5 py-2 text-[13.5px] font-semibold text-ink-soft hover:bg-surface-2"
+          >
+            {dict.cancelAdd}
+          </button>
+          <button
+            onClick={() => handleSave()}
+            disabled={saving}
+            className="rounded-lg bg-brand px-4 py-2 text-[13.5px] font-semibold text-white hover:opacity-90 disabled:opacity-50"
+          >
+            {saving ? "…" : dict.save}
+          </button>
+        </div>
       </div>
 
-      {conflicts && pendingConfirm && (
+      {conflicts && (
         <ClosureConflictDialog
           conflicts={conflicts}
           intlLocale={intlLocale}
           dict={conflictDict}
           saving={saving}
-          onCancel={() => { setConflicts(null); setPendingConfirm(null); }}
-          onConfirm={() =>
-            pendingConfirm.kind === "add" ? handleAdd(true) : handleEditSave(pendingConfirm.id, true)
-          }
+          onCancel={() => setConflicts(null)}
+          onConfirm={() => handleSave(true)}
         />
       )}
     </div>
