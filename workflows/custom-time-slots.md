@@ -125,13 +125,31 @@ codebase's existing closure/outside-hours convention everywhere else
 - `kalendar_business_hours` (Horarios) and its existing UI: completely
   untouched — this is a parallel, optional layer, not a replacement.
   A provider/day with no matching custom rule works exactly as today.
-- Festivos and Vacaciones: untouched, not reused as the data model for
-  this (see above) — their own scoping (all-only / one-only) stays
-  exactly as is.
-- No change to how conflict-checking (`isTimeTaken`) or the closure
-  warning (`closureWarningLabel`) work — both operate on whatever date/
-  time ends up selected, regardless of whether it came from the generic
-  suggestion list or a custom-slot rule.
+- Festivos and Vacaciones: data model/scoping untouched (all-only /
+  one-only stays exactly as is) — but see below, their UI shell IS
+  changing as part of this same pass.
+
+## Festivos + Vacaciones — also moved to the side-panel pattern
+
+Arun: "also factor in side panel patterns for festivos and vacations."
+Verified both pages' current shell: `FestivosManager` and `TimeOffList`
+have NO popup/modal today — add and edit are both inline, expand-in-
+place forms on the page itself (`showAddForm`/`editingId` toggles).
+Converting that to the panel pattern:
+
+- Both pages' "Añadir" button and each row's "Editar" open the same
+  right-docked side panel shell (as above), with the same fields the
+  inline form has today — nothing about what's editable changes, only
+  the shell. Festivos: month/day (or date range) + label. Vacaciones:
+  provider + date range + label.
+- `ClosureConflictDialog` (the shared existing-bookings-conflict warning
+  both pages can trigger on save) STAYS a small centered modal, not a
+  side panel — same classification as Cobrar/past-cancel/discard-changes
+  elsewhere in this app: a quick preview-and-confirm dialog, not a form,
+  so the side-panel shell doesn't fit it. It currently layers on top of
+  the inline form; once that form is a side panel, this dialog simply
+  layers on top of the panel instead (same z-index relationship as
+  Cobrar-on-top-of-BookingDetailModal already established).
 
 ## Status
 
