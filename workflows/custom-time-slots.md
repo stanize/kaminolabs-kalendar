@@ -188,3 +188,27 @@ Vacaciones add/edit/delete + the conflict-dialog override flow all
 still work through the new panel shell), and run
 `schema_subset_034.sql` against the live DB (through the admin
 Run-migrations tool).
+
+## KNOWN GAP (important, pending) — not yet on the public booking page
+
+Confirmed by code review (2026-10-31): `getAvailableSlots`
+(`lib/actions/booking.ts`), the slot engine behind the patient-facing
+`/bookings/[slug]` wizard, does NOT read `kalendar_custom_time_slots` —
+it only uses `data.hoursByDay` + closures via its own
+`generateSlotsForDay`. Today's build only wired custom slots into the
+two clinic-panel components (`AppointmentModal` /
+`BookingDetailModal`'s Cita tab), via `resolveCustomSuggestedTimes` in
+`lib/booking/appointment-fields.ts` — that was never extended to
+`getAvailableSlots`, and the original design discussion never raised
+the public page at all (it only ever talked about "the appointment
+form's time suggestions," i.e. the clinic panel).
+
+Arun (2026-10-31): this is **not optional polish** — personalized/fixed
+slots are a core part of the concept and patients must see the same
+custom slots when booking themselves, not just staff. Flagged as an
+important pending item, to be designed and built in its own pass (the
+public engine's shape — range-based, taken-intervals-aware, team
+"Cualquiera" semantics — is different enough from the panel's simple
+suggestion-list functions that it needs real design, not a quick
+wire-through). Do not start coding this without going through a design
+discussion first, same as the rest of this feature.
