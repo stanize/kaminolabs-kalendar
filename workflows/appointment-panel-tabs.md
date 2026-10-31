@@ -225,6 +225,16 @@ IMPLEMENTED (2026-10-30):
   `updateBookingAsOwner`/Guardar cambios, matching that code's own
   existing "avoid a duplicate note on every edit/re-save" rationale —
   flagging this so it's an explicit, known scope line, not a gap.
+- **Medicación field (2026-10-31, Arun, from a reconciled review of an
+  uploaded Bea-feedback doc)**: explicitly does NOT replace bonos — Arun
+  rejected that part of the uploaded doc outright. Bonos stays exactly
+  as already built (flag-gated per the earlier commit). New
+  `kalendar_clients.medication text` (`schema_subset_033.sql`, not yet
+  run), free-text plain textarea (not rich text, not multi-entry like
+  Notas — a current-state field, not a log), its own explicit save,
+  shown below the note history in the Notas tab (both live and staged
+  modes) and on `/panel/clients/[id]` (`MedicationCard`, next to
+  `NotesCard`). Never gated by `bonosEnabled` — unrelated flag entirely.
 
 Still needs: live-test both panels (existing-booking tabs show the
 right client/history/notes; create-flow tabs switch from staged to live

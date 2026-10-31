@@ -228,6 +228,11 @@ export interface CalendarDictionary {
     savingNote: string;
     // Staged note while creating an appointment for a brand-new client.
     newClientNotePlaceholder: string;
+    // bea-feedback-medication-field: a free-text field, below the note
+    // history in the Notas tab — unrelated to bonos.
+    medicationLabel: string;
+    medicationPlaceholder: string;
+    saveMedicationButton: string;
   };
   widget: {
     title: string; // "Hoy"
@@ -417,6 +422,9 @@ const es: CalendarDictionary = {
     cancelEditButton: "Cancelar",
     savingNote: "Guardando…",
     newClientNotePlaceholder: "Nota sobre este cliente (opcional) — se guardará junto con la cita.",
+    medicationLabel: "Medicación",
+    medicationPlaceholder: "Medicación actual del paciente…",
+    saveMedicationButton: "Guardar medicación",
   },
   widget: {
     title: "Hoy",
@@ -605,6 +613,9 @@ const en: CalendarDictionary = {
     cancelEditButton: "Cancel",
     savingNote: "Saving…",
     newClientNotePlaceholder: "Note about this client (optional) — will be saved with the appointment.",
+    medicationLabel: "Medication",
+    medicationPlaceholder: "Patient's current medication…",
+    saveMedicationButton: "Save medication",
   },
   widget: {
     title: "Today",

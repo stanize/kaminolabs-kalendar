@@ -50,6 +50,10 @@ export interface ClientsDictionary {
     notesPlaceholder: string;
     addNote: string;
     saveNote: string;
+    // bea-feedback-medication-field — free-text, plain textarea, unrelated to bonos.
+    medicationTitle: string;
+    medicationPlaceholder: string;
+    saveMedication: string;
     editNote: string;
     deleteNote: string;
     confirmDeleteNote: string;
@@ -118,6 +122,9 @@ const es: ClientsDictionary = {
     saveNote: "Guardar nota",
     editNote: "Editar",
     deleteNote: "Eliminar",
+    medicationTitle: "Medicación",
+    medicationPlaceholder: "Medicación actual del paciente…",
+    saveMedication: "Guardar medicación",
     confirmDeleteNote: "¿Eliminar esta nota?",
     emptyNotes: "No hay notas todavía. Solo tú y tu equipo podéis verlas.",
     statusPending: "Pendiente",
@@ -184,6 +191,9 @@ const en: ClientsDictionary = {
     saveNote: "Save note",
     editNote: "Edit",
     deleteNote: "Delete",
+    medicationTitle: "Medication",
+    medicationPlaceholder: "Patient's current medication…",
+    saveMedication: "Save medication",
     confirmDeleteNote: "Delete this note?",
     emptyNotes: "No notes yet. Only you and your team can see these.",
     statusPending: "Pending",

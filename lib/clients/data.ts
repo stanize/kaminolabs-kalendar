@@ -78,6 +78,8 @@ export interface ClientDetail {
   address: string | null;
   // appointment-panel-tabs: Cliente tab's new field.
   dateOfBirth: string | null; // "YYYY-MM-DD"
+  // bea-feedback-medication-field: free-text, plain textarea.
+  medication: string | null;
   totalSessions: number;
   completedCount: number;
   noShowCount: number;
@@ -103,7 +105,7 @@ export async function getClientDetail(userId: string, clientId: string): Promise
 
   const { data: client } = await supabase
     .from("kalendar_clients")
-    .select("id, business_id, name, email, phone, dni, address, date_of_birth, total_sessions, completed_count, no_show_count, cancelled_count, first_visit_at, last_visit_at")
+    .select("id, business_id, name, email, phone, dni, address, date_of_birth, medication, total_sessions, completed_count, no_show_count, cancelled_count, first_visit_at, last_visit_at")
     .eq("id", clientId)
     .eq("business_id", business.id)
     .maybeSingle();
@@ -183,6 +185,7 @@ export async function getClientDetail(userId: string, clientId: string): Promise
     dni: client.dni,
     address: client.address,
     dateOfBirth: client.date_of_birth,
+    medication: client.medication,
     totalSessions: client.total_sessions,
     completedCount: client.completed_count,
     noShowCount: client.no_show_count,

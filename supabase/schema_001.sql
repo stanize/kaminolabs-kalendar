@@ -702,6 +702,9 @@ create table public.kalendar_clients (
   -- appointment-panel-tabs (schema_subset_032.sql): the Cliente tab's
   -- "Fecha de nacimiento" field.
   date_of_birth   date,
+  -- bea-feedback-medication-field (schema_subset_033.sql): free-text,
+  -- plain textarea, unrelated to bonos.
+  medication      text,
   total_sessions  integer     not null default 0,
   completed_count integer     not null default 0,
   no_show_count   integer     not null default 0,

@@ -8,6 +8,7 @@ import {
   addClientNote,
   updateClientNote,
   deleteClientNote,
+  updateClientMedication,
 } from "@/lib/actions/clients";
 import { reportClientError } from "@/lib/report-client-error";
 import type { ClientDetail, ClientNote, ClientBookingSummary } from "@/lib/clients/data";
@@ -81,6 +82,7 @@ export function ClientDetailView({
       />
 
       <NotesCard clientId={client.id} initialNotes={initialNotes} dict={dict} locale={locale} />
+      <MedicationCard clientId={client.id} initialMedication={client.medication} dict={dict} />
 
       {generatingBooking && (
         <InvoiceConfirmModal
@@ -498,6 +500,66 @@ function NotesCard({
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// bea-feedback-medication-field: a single free-text field, plain textarea,
+// explicit save — not a multi-entry history like NotesCard above (no need
+// for one; medication is a current-state field, not a log). Unrelated to
+// bonos — always shown, never gated by bonosEnabled.
+function MedicationCard({
+  clientId, initialMedication, dict,
+}: {
+  clientId: string;
+  initialMedication: string | null;
+  dict: ClientsDictionary;
+}) {
+  const d = dict.detail;
+  const [value, setValue] = useState(initialMedication ?? "");
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const isDirty = value !== (initialMedication ?? "");
+
+  async function handleSave() {
+    setSaving(true);
+    setError(null);
+    try {
+      const result = await updateClientMedication({ clientId, medication: value }, dict.errors);
+      setSaving(false);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (e) {
+      reportClientError("updateClientMedication", e);
+      setError(dict.errors.errSaveFailed);
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div>
+      <p className="mb-2 text-[12px] font-bold uppercase tracking-[.04em] text-ink-soft">{d.medicationTitle}</p>
+      <div className="rounded-xl border border-line bg-surface p-3">
+        <textarea
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder={d.medicationPlaceholder}
+          rows={5}
+          className="w-full resize-none rounded-lg border border-line bg-surface px-3 py-2 text-[14px] text-ink outline-none focus:border-brand"
+        />
+        {error && <p className="mt-2 text-[12.5px] text-error">{error}</p>}
+        <div className="mt-2 flex items-center gap-2">
+          <Btn size="sm" onClick={handleSave} disabled={!isDirty || saving}>
+            {saving ? d.saving : d.saveMedication}
+          </Btn>
+          {saved && <p className="text-[12.5px] text-brand-ink">{d.saved}</p>}
+        </div>
+      </div>
     </div>
   );
 }

@@ -8,6 +8,7 @@ import {
   addClientNote,
   updateClientNote,
   deleteClientNote,
+  updateClientMedication,
   type ClientPanelData,
 } from "@/lib/actions/clients";
 import { reportClientError } from "@/lib/report-client-error";
@@ -37,9 +38,13 @@ export interface StagedClientFields {
   address: string;
   dateOfBirth: string;
   note: string;
+  // bea-feedback-medication-field
+  medication: string;
 }
 
-export const EMPTY_STAGED_CLIENT_FIELDS: StagedClientFields = { dni: "", address: "", dateOfBirth: "", note: "" };
+export const EMPTY_STAGED_CLIENT_FIELDS: StagedClientFields = {
+  dni: "", address: "", dateOfBirth: "", note: "", medication: "",
+};
 
 function statusLabel(status: ClientBookingSummary["status"], d: CalendarDictionary["clientTabs"]): string {
   switch (status) {
@@ -138,14 +143,16 @@ export function ClientProfileTabs({
     );
   }
 
-  // Notas
+  // Notas (+ Medicación, below the note history — bea-feedback-medication-field)
   return clientId ? (
     <LiveNotasTab
       clientId={clientId}
       notes={data?.notes ?? []}
+      medication={data?.medication ?? null}
       loading={loading}
       dict={dict}
       onChanged={(notes) => setData((d) => (d ? { ...d, notes } : d))}
+      onMedicationChanged={(medication) => setData((d) => (d ? { ...d, medication } : d))}
     />
   ) : (
     <StagedNotasTab staged={staged} onStagedChange={onStagedChange} dict={dict} />
@@ -372,15 +379,19 @@ function HistorialRow({
 function LiveNotasTab({
   clientId,
   notes,
+  medication,
   loading,
   dict,
   onChanged,
+  onMedicationChanged,
 }: {
   clientId: string;
   notes: NonNullable<ClientPanelData>["notes"];
+  medication: string | null;
   loading: boolean;
   dict: CalendarDictionary["clientTabs"];
   onChanged: (notes: NonNullable<ClientPanelData>["notes"]) => void;
+  onMedicationChanged: (medication: string | null) => void;
 }) {
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState("");
@@ -509,6 +520,68 @@ function LiveNotasTab({
           ))}
         </div>
       )}
+
+      <div className="mt-2 border-t border-line pt-3">
+        <LiveMedicationSection clientId={clientId} medication={medication} dict={dict} onChanged={onMedicationChanged} />
+      </div>
+    </div>
+  );
+}
+
+function LiveMedicationSection({
+  clientId,
+  medication,
+  dict,
+  onChanged,
+}: {
+  clientId: string;
+  medication: string | null;
+  dict: CalendarDictionary["clientTabs"];
+  onChanged: (medication: string | null) => void;
+}) {
+  const [value, setValue] = useState(medication ?? "");
+  const [saving, setSaving] = useState(false);
+  const [savedFlash, setSavedFlash] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const isDirty = value !== (medication ?? "");
+
+  async function handleSave() {
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await updateClientMedication({ clientId, medication: value });
+      setSaving(false);
+      if (!res.ok) { setError(res.error); return; }
+      onChanged(value.trim() || null);
+      setSavedFlash(true);
+      setTimeout(() => setSavedFlash(false), 2000);
+    } catch (e) {
+      setSaving(false);
+      reportClientError("updateClientMedication", e);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="text-[12.5px] font-semibold text-ink-soft">{dict.medicationLabel}</p>
+      {savedFlash && <p className="text-[12.5px] font-semibold text-brand">{dict.saved}</p>}
+      {error && <p className="text-[12.5px] text-error">{error}</p>}
+      <textarea
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder={dict.medicationPlaceholder}
+        rows={5}
+        className="w-full resize-none rounded-lg border border-line bg-surface px-3 py-2 text-[14px] text-ink"
+      />
+      <Btn
+        variant={isDirty ? "primary" : "outline"}
+        size="sm"
+        onClick={handleSave}
+        disabled={!isDirty || saving}
+        className="self-end"
+      >
+        {saving ? dict.savingNote : dict.saveMedicationButton}
+      </Btn>
     </div>
   );
 }
@@ -523,15 +596,27 @@ function StagedNotasTab({
   dict: CalendarDictionary["clientTabs"];
 }) {
   return (
-    <div className="flex flex-col gap-2">
-      <p className="text-[12.5px] text-ink-soft">{dict.newClientNote}</p>
-      <textarea
-        value={staged.note}
-        onChange={(e) => onStagedChange({ ...staged, note: e.target.value })}
-        placeholder={dict.newClientNotePlaceholder}
-        rows={4}
-        className="w-full resize-none rounded-lg border border-line bg-surface px-3 py-2 text-[14px] text-ink"
-      />
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-2">
+        <p className="text-[12.5px] text-ink-soft">{dict.newClientNote}</p>
+        <textarea
+          value={staged.note}
+          onChange={(e) => onStagedChange({ ...staged, note: e.target.value })}
+          placeholder={dict.newClientNotePlaceholder}
+          rows={4}
+          className="w-full resize-none rounded-lg border border-line bg-surface px-3 py-2 text-[14px] text-ink"
+        />
+      </div>
+      <div className="flex flex-col gap-2 border-t border-line pt-3">
+        <p className="text-[12.5px] font-semibold text-ink-soft">{dict.medicationLabel}</p>
+        <textarea
+          value={staged.medication}
+          onChange={(e) => onStagedChange({ ...staged, medication: e.target.value })}
+          placeholder={dict.medicationPlaceholder}
+          rows={5}
+          className="w-full resize-none rounded-lg border border-line bg-surface px-3 py-2 text-[14px] text-ink"
+        />
+      </div>
     </div>
   );
 }

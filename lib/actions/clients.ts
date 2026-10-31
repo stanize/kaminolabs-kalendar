@@ -151,6 +151,45 @@ export const updateClientContactInfo = authedAction(
   }
 );
 
+/**
+ * bea-feedback-medication-field: saved independently from the contact-info
+ * fields above (its own explicit save button in the Notas tab, below the
+ * note history) — not folded into updateClientContactInfo since it's
+ * edited in a different place with different dirty-tracking.
+ */
+export const updateClientMedication = authedAction(
+  async (
+    session,
+    input: { clientId: string; medication: string },
+    dict?: Partial<ClientActionDict>
+  ): Promise<UpdateClientResult> => {
+    const t = { ...CLIENT_FALLBACK, ...dict };
+
+    const business = await getBusinessForUser(session.user.id);
+    if (!business) return { ok: false, error: t.errNoBusiness };
+
+    const supabase = await createClient();
+    const { data: existing } = await supabase
+      .from("kalendar_clients")
+      .select("id")
+      .eq("id", input.clientId)
+      .eq("business_id", business.id)
+      .maybeSingle();
+    if (!existing) return { ok: false, error: t.errNotFound };
+
+    const { error } = await supabase
+      .from("kalendar_clients")
+      .update({ medication: input.medication.trim() || null })
+      .eq("id", input.clientId)
+      .eq("business_id", business.id);
+
+    if (error) return { ok: false, error: t.errSaveFailed };
+
+    revalidatePath(`/panel/clients/${input.clientId}`);
+    return { ok: true };
+  }
+);
+
 export interface ClientIdentity {
   dni: string | null;
   address: string | null;
@@ -191,6 +230,9 @@ export interface ClientPanelProfile {
 export interface ClientPanelData {
   profile: ClientPanelProfile;
   notes: ClientNote[];
+  // bea-feedback-medication-field — shown below the note history in the
+  // Notas tab, its own explicit save, unrelated to bonos.
+  medication: string | null;
   // appointment-panel-tabs, Tab 3 — upcoming+history merged and re-sorted
   // most-recent-first for the panel's single reverse-chronological
   // Historial list, instead of getClientDetail's own upcoming(asc)/
@@ -228,6 +270,7 @@ export const getClientPanelData = authedAction(
         dateOfBirth: detail.dateOfBirth,
       },
       notes,
+      medication: detail.medication,
       history,
     };
   }

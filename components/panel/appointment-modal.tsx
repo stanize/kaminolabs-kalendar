@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import { createBookingAsOwner } from "@/lib/actions/booking-owner";
-import { searchClients, updateClientContactInfo, addClientNote, type ClientSearchResult } from "@/lib/actions/clients";
+import { searchClients, updateClientContactInfo, addClientNote, updateClientMedication, type ClientSearchResult } from "@/lib/actions/clients";
 import { reportClientError } from "@/lib/report-client-error";
 import { zonedTimeToUtc, dayIdInTz, tzDateParts } from "@/lib/calendar/client-date";
 import type { CalendarDictionary } from "@/lib/i18n/dictionaries/calendar";
@@ -322,6 +322,9 @@ export function AppointmentModal({
           }
           if (staged.note.trim()) {
             await addClientNote({ clientId: res.clinicClientId, body: staged.note.trim() });
+          }
+          if (staged.medication.trim()) {
+            await updateClientMedication({ clientId: res.clinicClientId, medication: staged.medication.trim() });
           }
         } catch (e) {
           reportClientError("applyStagedClientFields", e);
