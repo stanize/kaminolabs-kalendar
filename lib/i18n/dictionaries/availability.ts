@@ -18,6 +18,7 @@ export interface AvailabilityDictionary {
   };
   tabs: {
     hours: string;
+    customSlots: string;
     holidays: string;
     timeOff: string;
   };
@@ -81,6 +82,7 @@ const es: AvailabilityDictionary = {
   },
   tabs: {
     hours: "Horario",
+    customSlots: "Horarios personalizados",
     holidays: "Festivos",
     timeOff: "Vacaciones y ausencias",
   },
@@ -157,6 +159,7 @@ const en: AvailabilityDictionary = {
   },
   tabs: {
     hours: "Hours",
+    customSlots: "Custom time slots",
     holidays: "Holidays",
     timeOff: "Time off",
   },

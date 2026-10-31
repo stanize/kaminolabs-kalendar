@@ -7,6 +7,7 @@ import type { AvailabilityDictionary } from "@/lib/i18n/dictionaries/availabilit
 
 const TABS: { href: string; labelKey: keyof AvailabilityDictionary["tabs"] }[] = [
   { href: "/panel/availability", labelKey: "hours" },
+  { href: "/panel/availability/custom-slots", labelKey: "customSlots" },
   { href: "/panel/availability/holidays", labelKey: "holidays" },
   { href: "/panel/availability/time-off", labelKey: "timeOff" },
 ];
