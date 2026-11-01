@@ -13,6 +13,8 @@ export interface TimeOffDictionary {
   toggleShow: string; // "Vacaciones / ausencias"
   toggleHide: string;
   providerLabel: string; // provider select inside the add/edit panel
+  entriesCountTemplate: string; // "{n} entrada(s)" shown collapsed on a provider's row
+  noEntriesShort: string; // "Sin entradas" — shown on a provider's row when it has none
   startDate: string;
   endDate: string;
   dayLabel: string; // replaces startDate's label when singleDay is checked
@@ -49,6 +51,8 @@ const es: TimeOffDictionary = {
   toggleShow: "Vacaciones / ausencias",
   toggleHide: "Ocultar vacaciones / ausencias",
   providerLabel: "Profesional",
+  entriesCountTemplate: "{n} entrada(s)",
+  noEntriesShort: "Sin entradas",
   startDate: "Desde",
   endDate: "Hasta",
   dayLabel: "Día",
@@ -85,6 +89,8 @@ const en: TimeOffDictionary = {
   toggleShow: "Time off",
   toggleHide: "Hide time off",
   providerLabel: "Provider",
+  entriesCountTemplate: "{n} entry/entries",
+  noEntriesShort: "No entries",
   startDate: "From",
   endDate: "To",
   dayLabel: "Day",

@@ -59,9 +59,16 @@ export function TimeOffManager({
   const [panelEntry, setPanelEntry] = useState<BusinessClosure | "new" | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  function memberName(id: string | null): string {
-    return members.find((m) => m.id === id)?.name ?? "?";
+  // Grouped by provider (2026-11-01, per Arun) — every member shown even
+  // with zero entries, collapsed by default; the add button/panel stays
+  // the single shared one (header-action + provider picker), this only
+  // changes how existing entries are displayed.
+  const entriesByMember: Record<string, BusinessClosure[]> = {};
+  for (const e of entries) {
+    if (!e.team_member_id) continue;
+    (entriesByMember[e.team_member_id] ??= []).push(e);
   }
 
   async function handleDelete(id: string) {
@@ -102,49 +109,65 @@ export function TimeOffManager({
         </Btn>
       </AvailabilityHeaderAction>
 
-      <div className="rounded-xl border border-line bg-surface px-4 py-4 sm:px-6">
-        {entries.length > 0 ? (
-          <div className="flex flex-col gap-2">
-            {entries.map((e) => (
-              <div
-                key={e.id}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line px-3.5 py-3"
+      <div className="flex flex-col gap-2">
+        {members.map((member) => {
+          const memberEntries = entriesByMember[member.id] ?? [];
+          const isExpanded = expandedId === member.id;
+          return (
+            <div key={member.id} className="rounded-xl border border-line bg-surface">
+              <button
+                type="button"
+                onClick={() => setExpandedId(isExpanded ? null : member.id)}
+                className="flex w-full items-center gap-3 px-3.5 py-3 text-left"
               >
-                <div className="flex min-w-0 items-center gap-3">
-                  <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-brand-weak text-brand">
-                    <Icon name="user" size={16} />
-                  </div>
-                  <div className="flex min-w-0 flex-col">
-                    <span className="truncate text-[14px] font-semibold text-ink">{memberName(e.team_member_id)}</span>
-                    <span className="truncate text-[12.5px] text-ink-soft">
-                      {formatRange(e, intlLocale)}
-                      {e.label ? ` · ${e.label}` : ""}
-                    </span>
-                  </div>
+                <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-brand-weak text-brand">
+                  <Icon name="user" size={16} />
                 </div>
-                <div className="flex shrink-0 items-center gap-1">
-                  <button
-                    onClick={() => setPanelEntry(e)}
-                    className="grid h-8 w-8 place-items-center rounded-lg text-ink-soft hover:bg-brand-weak hover:text-brand"
-                    aria-label={dict.edit}
-                  >
-                    <Icon name="pencil" size={15} />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(e.id)}
-                    disabled={deletingId === e.id}
-                    className="grid h-8 w-8 place-items-center rounded-lg text-ink-soft hover:bg-error-weak hover:text-error"
-                    aria-label={dict.delete}
-                  >
-                    <Icon name="x" size={15} />
-                  </button>
+                <span className="min-w-0 flex-1 truncate text-[14px] font-semibold text-ink">{member.name}</span>
+                <span className="shrink-0 text-[12px] font-medium text-ink-soft">
+                  {memberEntries.length > 0 ? dict.entriesCountTemplate.replace("{n}", String(memberEntries.length)) : dict.noEntriesShort}
+                </span>
+                <Icon
+                  name="chevronDown"
+                  size={16}
+                  className={`shrink-0 text-ink-soft transition-transform ${isExpanded ? "rotate-180" : ""}`}
+                />
+              </button>
+              {isExpanded && memberEntries.length > 0 && (
+                <div className="flex flex-col gap-1.5 border-t border-line px-3.5 py-3">
+                  {memberEntries.map((e) => (
+                    <div
+                      key={e.id}
+                      className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-surface-2/50 px-3 py-2.5"
+                    >
+                      <span className="text-[13px] text-ink">
+                        {formatRange(e, intlLocale)}
+                        {e.label ? ` · ${e.label}` : ""}
+                      </span>
+                      <div className="flex shrink-0 items-center gap-1">
+                        <button
+                          onClick={() => setPanelEntry(e)}
+                          className="grid h-7 w-7 place-items-center rounded-lg text-ink-soft hover:bg-brand-weak hover:text-brand"
+                          aria-label={dict.edit}
+                        >
+                          <Icon name="pencil" size={14} />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(e.id)}
+                          disabled={deletingId === e.id}
+                          className="grid h-7 w-7 place-items-center rounded-lg text-ink-soft hover:bg-error-weak hover:text-error"
+                          aria-label={dict.delete}
+                        >
+                          <Icon name="x" size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="px-1 py-1 text-[12.5px] text-ink-soft">{dict.noEntries}</p>
-        )}
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {panelEntry && (

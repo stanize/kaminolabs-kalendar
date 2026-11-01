@@ -198,6 +198,18 @@ export function TeamManager({
     <div className="flex flex-col gap-6">
       <SaveOverlay state={overlay} savingLabel={m.saving} successLabel={m.flashSuccess} />
 
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="mb-1 text-[24px]">{dict.page.title}</h1>
+          <p className="text-[15px] text-ink-soft">{dict.page.subtitle}</p>
+        </div>
+        {isTeam && (
+          <Btn variant="primary" size="sm" onClick={addRow} className="mt-1 shrink-0">
+            <Icon name="plus" size={15} /> {m.addMember}
+          </Btn>
+        )}
+      </div>
+
       {error && (
         <div className="flex items-start gap-2 rounded-xl border border-error bg-error-weak px-4 py-3 text-[13.5px] text-error">
           <Icon name="x" size={16} className="mt-0.5 shrink-0" />
@@ -304,15 +316,6 @@ export function TeamManager({
           );
         })}
       </div>
-
-      {/* Add member (team mode only — appends a local row) */}
-      {isTeam && (
-        <div>
-          <Btn variant="outline" onClick={addRow}>
-            <Icon name="plus" size={15} /> {m.addMember}
-          </Btn>
-        </div>
-      )}
 
       {/* Single commit — saves the whole roster; in the setup flow it also
           returns to Inicio after saving. */}
