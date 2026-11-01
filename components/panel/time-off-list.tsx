@@ -60,6 +60,7 @@ export function TimeOffManager({
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
 
   // Grouped by provider (2026-11-01, per Arun) — every member shown even
   // with zero entries, collapsed by default; the add button/panel stays
@@ -72,7 +73,6 @@ export function TimeOffManager({
   }
 
   async function handleDelete(id: string) {
-    if (!window.confirm(dict.confirmDelete)) return;
     setError(null);
     setDeletingId(id);
     try {
@@ -80,15 +80,18 @@ export function TimeOffManager({
       if (!result.ok) {
         setError(result.error);
         setDeletingId(null);
+        setConfirmingId(null);
         return;
       }
       setEntries((prev) => prev.filter((e) => e.id !== id));
       setDeletingId(null);
+      setConfirmingId(null);
       router.refresh();
     } catch (e) {
       reportClientError("deleteClosure", e);
       setError(dict.errUnexpected);
       setDeletingId(null);
+      setConfirmingId(null);
     }
   }
 
@@ -144,23 +147,41 @@ export function TimeOffManager({
                         {formatRange(e, intlLocale)}
                         {e.label ? ` · ${e.label}` : ""}
                       </span>
-                      <div className="flex shrink-0 items-center gap-1">
-                        <button
-                          onClick={() => setPanelEntry(e)}
-                          className="grid h-7 w-7 place-items-center rounded-lg text-ink-soft hover:bg-brand-weak hover:text-brand"
-                          aria-label={dict.edit}
-                        >
-                          <Icon name="pencil" size={14} />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(e.id)}
-                          disabled={deletingId === e.id}
-                          className="grid h-7 w-7 place-items-center rounded-lg text-ink-soft hover:bg-error-weak hover:text-error"
-                          aria-label={dict.delete}
-                        >
-                          <Icon name="x" size={14} />
-                        </button>
-                      </div>
+                      {confirmingId === e.id ? (
+                        <div className="flex shrink-0 items-center gap-2">
+                          <span className="text-[12px] text-ink-soft">{dict.confirmDelete}</span>
+                          <button
+                            onClick={() => handleDelete(e.id)}
+                            disabled={deletingId === e.id}
+                            className="rounded-lg bg-error px-2.5 py-1 text-[12px] font-semibold text-white hover:opacity-90 disabled:opacity-50"
+                          >
+                            {deletingId === e.id ? "…" : dict.confirmDeleteYes}
+                          </button>
+                          <button
+                            onClick={() => setConfirmingId(null)}
+                            className="rounded-lg px-2.5 py-1 text-[12px] font-semibold text-ink-soft hover:bg-surface-2"
+                          >
+                            {dict.confirmDeleteNo}
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex shrink-0 items-center gap-1">
+                          <button
+                            onClick={() => setPanelEntry(e)}
+                            className="grid h-7 w-7 place-items-center rounded-lg text-ink-soft hover:bg-brand-weak hover:text-brand"
+                            aria-label={dict.edit}
+                          >
+                            <Icon name="pencil" size={14} />
+                          </button>
+                          <button
+                            onClick={() => setConfirmingId(e.id)}
+                            className="grid h-7 w-7 place-items-center rounded-lg text-ink-soft hover:bg-error-weak hover:text-error"
+                            aria-label={dict.delete}
+                          >
+                            <Icon name="x" size={14} />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
