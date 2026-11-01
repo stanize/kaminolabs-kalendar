@@ -1043,16 +1043,27 @@ export function BookingDetailModal({
                   {d.editPaymentButton}
                 </button>
               </div>
-            ) : (
-              <Btn variant="outline" size="sm" onClick={() => setCobrarModalOpen(true)} disabled={busy}>
-                {d.cobrarButton}
-              </Btn>
-            )}
+            ) : null}
 
-            <div className="flex flex-wrap justify-end gap-2">
-              <Btn variant="outline" onClick={handleCancel} disabled={busy}>
+            {/* caja-cancel-row-uniform (2026-11-02, per Arun): same row
+                layout/styling as the past-appointment actions below — a
+                solid Caja pill (when not yet paid) + plain-text secondary
+                actions, instead of Caja/Cancelar living in two visually
+                different rows/styles. */}
+            <div className="flex flex-wrap items-center gap-4">
+              {editingPayment || !paidSummaryText ? (
+                <Btn variant="primary" onClick={() => setCobrarModalOpen(true)} disabled={busy}>
+                  {d.cobrarButton}
+                </Btn>
+              ) : null}
+              <button
+                type="button"
+                onClick={handleCancel}
+                disabled={busy}
+                className="text-[14px] font-semibold text-ink-soft hover:text-ink disabled:opacity-50"
+              >
                 {busy ? d.cancelling : d.cancelButton}
-              </Btn>
+              </button>
               {isAwaitingConfirmation && (
                 <Btn onClick={handleConfirm} disabled={busy}>
                   {busy ? dict.manager.confirming : dict.manager.confirm}
@@ -1091,19 +1102,29 @@ export function BookingDetailModal({
                 </button>
               </div>
             ) : (
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-4">
                 <Btn variant="primary" onClick={() => setCobrarModalOpen(true)} disabled={busy}>
                   {d.cobrarButton}
                 </Btn>
-                <Btn variant="outline" size="sm" onClick={handleNoShow} disabled={busy}>
+                <button
+                  type="button"
+                  onClick={handleNoShow}
+                  disabled={busy}
+                  className="text-[14px] font-semibold text-ink-soft hover:text-ink disabled:opacity-50"
+                >
                   {d.resultNoShow}
-                </Btn>
+                </button>
                 {/* payment-cancellation-flow-expansion: a retroactive
                     cancel for an unresolved past booking — distinct from
                     No-show above, which is its own status/button. */}
-                <Btn variant="outline" size="sm" onClick={() => setPastCancelOpen(true)} disabled={busy}>
+                <button
+                  type="button"
+                  onClick={() => setPastCancelOpen(true)}
+                  disabled={busy}
+                  className="text-[14px] font-semibold text-ink-soft hover:text-ink disabled:opacity-50"
+                >
                   {d.pastCancelButton}
-                </Btn>
+                </button>
               </div>
             )}
 
