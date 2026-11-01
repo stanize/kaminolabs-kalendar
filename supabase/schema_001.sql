@@ -1045,18 +1045,13 @@ create index kalendar_bookings_cancellation_requested_idx on public.kalendar_boo
 -- a fresh database. The app layer enforces the reference integrity: it always
 -- resolves patient_id from kalendar_patients.user_id before inserting.
 
--- Slot-collision guard: at most one active (pending or confirmed) booking per
--- provider+start. A null team_member_id (solo / unassigned) collapses to a
--- single "business chair" via coalesce to the all-zero uuid, so a solo business
--- cannot double-book the same start time. Cancelled/completed rows are excluded
--- so a freed slot can be rebooked.
-create unique index kalendar_bookings_active_slot_idx
-  on public.kalendar_bookings (
-    business_id,
-    coalesce(team_member_id, '00000000-0000-0000-0000-000000000000'::uuid),
-    starts_at
-  )
-  where status in ('pending_confirmation', 'confirmed');
+-- force-insert-double-booking (schema_subset_036.sql): the DB-level
+-- slot-collision unique index that used to live here was dropped so the
+-- clinic can deliberately force-insert an appointment into an
+-- already-taken slot (Bea's feedback, via Arun). The app layer now owns
+-- this check (overlap query + confirm dialog in
+-- lib/actions/booking-owner.ts) — a soft warning, not a hard constraint,
+-- same pattern as the existing closures/time-off conflict-confirm flow.
 
 -- ----------------------------------------------------------------------------
 -- kalendar_invoices (schema_subset_023.sql, pdf-invoicing.md)

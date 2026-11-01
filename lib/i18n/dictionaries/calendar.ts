@@ -243,6 +243,19 @@ export interface CalendarDictionary {
   };
   // Intl.DateTimeFormat locale tag for day-heading formatting (e.g. "es-ES").
   intlLocale: string;
+  // force-insert-double-booking: shown via the shared ClosureConflictDialog
+  // (components/panel/closure-conflict-dialog.tsx) when creating/editing a
+  // manual appointment would overlap an existing one for the same
+  // provider — same shape as ClosureConflictDictionary, worded for a
+  // booking conflict instead of a closure.
+  bookingConflict: {
+    title: string; // contains "{count}"
+    description: string;
+    moreLabel: string; // contains "{n}"
+    cancel: string;
+    confirm: string;
+    saving: string;
+  };
 }
 
 const es: CalendarDictionary = {
@@ -434,6 +447,15 @@ const es: CalendarDictionary = {
     nextWeekTitle: "Próxima semana",
   },
   intlLocale: "es-ES",
+  bookingConflict: {
+    title: "⚠️ Horario ya ocupado",
+    description:
+      "Este profesional ya tiene una cita en este horario. Puedes reservar igualmente — ambas citas quedarán guardadas.",
+    moreLabel: "+{n} más",
+    cancel: "Cancelar",
+    confirm: "Reservar de todas formas",
+    saving: "Guardando...",
+  },
 };
 
 const en: CalendarDictionary = {
@@ -625,6 +647,15 @@ const en: CalendarDictionary = {
     nextWeekTitle: "Next week",
   },
   intlLocale: "en-GB",
+  bookingConflict: {
+    title: "⚠️ Time slot already taken",
+    description:
+      "This provider already has an appointment at this time. You can book anyway — both appointments will be kept.",
+    moreLabel: "+{n} more",
+    cancel: "Cancel",
+    confirm: "Book anyway",
+    saving: "Saving...",
+  },
 };
 
 const CALENDAR_DICTIONARIES: Record<Locale, CalendarDictionary> = { es, en };

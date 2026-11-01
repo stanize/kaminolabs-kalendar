@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import { createBookingAsOwner } from "@/lib/actions/booking-owner";
+import { ClosureConflictDialog } from "@/components/panel/closure-conflict-dialog";
+import type { ConflictSummary } from "@/lib/actions/closures";
 import { searchClients, updateClientContactInfo, addClientNote, updateClientMedication, type ClientSearchResult } from "@/lib/actions/clients";
 import { reportClientError } from "@/lib/report-client-error";
 import { zonedTimeToUtc, dayIdInTz, tzDateParts } from "@/lib/calendar/client-date";
@@ -109,6 +111,7 @@ export function AppointmentModal({
   const [sendWhatsapp, setSendWhatsapp] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [conflicts, setConflicts] = useState<ConflictSummary | null>(null);
   const [timeMenuOpen, setTimeMenuOpen] = useState(false);
 
   // side-panel-pattern (first rollout, 2026-10): slides in from the right
@@ -288,7 +291,7 @@ export function AppointmentModal({
     return null;
   }, [selectedDateParts, timeStr, timeValid, durationMin, teamMemberId, closures, md.closureGenericLabel]);
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (confirmed?: boolean) => {
     setError(null);
     if (!serviceId || !teamMemberId || !startDate || conflict) return;
     setSubmitting(true);
@@ -305,11 +308,17 @@ export function AppointmentModal({
           sendConfirmationEmail: sendEmail,
           sendConfirmationWhatsapp: whatsappEnabled && sendWhatsapp,
           clinicClientId: clinicClientId || undefined,
+          confirmed,
         },
         errorsDict
       );
       if (!res.ok) {
         setError(res.error);
+        setSubmitting(false);
+        return;
+      }
+      if ("needsConfirmation" in res) {
+        setConflicts(res.conflicts);
         setSubmitting(false);
         return;
       }
@@ -623,7 +632,7 @@ export function AppointmentModal({
             {md.cancel}
           </button>
           <button
-            onClick={handleSubmit}
+            onClick={() => handleSubmit()}
             disabled={submitting || !clientName.trim() || !serviceId || !teamMemberId || !dateValid || !timeValid || conflict}
             className="rounded-lg bg-brand px-4 py-2 text-[13.5px] font-semibold text-white hover:opacity-90 disabled:opacity-50"
           >
@@ -632,6 +641,17 @@ export function AppointmentModal({
         </div>
         </>}
       </div>
+
+      {conflicts && (
+        <ClosureConflictDialog
+          conflicts={conflicts}
+          intlLocale={dict.intlLocale}
+          dict={dict.bookingConflict}
+          saving={submitting}
+          onCancel={() => setConflicts(null)}
+          onConfirm={() => handleSubmit(true)}
+        />
+      )}
     </div>
   );
 }

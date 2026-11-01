@@ -174,7 +174,9 @@ Criteria:
 - Clicking an open slot in the week grid opens AppointmentModal
 - Owner-created bookings are confirmed immediately (no pending-confirmation window)
 - Client email is optional; confirmation email only sent if provided AND sendConfirmationEmail is true
-- Double-booking prevented at creation (errSlotTaken on conflict)
+- Double-booking flagged at creation (confirm dialog on conflict) but can
+  be force-inserted anyway once confirmed — see
+  `force-insert-double-booking.md` (no longer a hard block)
 - Service and provider selection validated server-side (errInvalidService / errInvalidProvider)
 
 ## Step: appointment-editing

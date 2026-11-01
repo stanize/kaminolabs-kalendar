@@ -24,6 +24,8 @@ import type { DayId } from "@/lib/onboarding/types";
 import { clientStatusLabel, clientStatusBadgeClass, needsClinicFollowUp, type WeekBookingVM } from "@/components/panel/calendar-grid-view";
 import { InvoiceConfirmModal, hasRealEmail } from "@/components/panel/invoice-confirm-modal";
 import type { ClosureRuleVM } from "@/components/panel/appointment-modal";
+import { ClosureConflictDialog } from "@/components/panel/closure-conflict-dialog";
+import type { ConflictSummary } from "@/lib/actions/closures";
 import {
   ClientProfileTabs,
   EMPTY_STAGED_CLIENT_FIELDS,
@@ -133,6 +135,7 @@ export function BookingDetailModal({
   void autoInvoiceEnabled;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [conflicts, setConflicts] = useState<ConflictSummary | null>(null);
 
   // side-panel-pattern (rollout, 2026-10) — same shell/transition as
   // AppointmentModal: slides in from the right over the main content,
@@ -298,7 +301,7 @@ export function BookingDetailModal({
     return null;
   }, [selectedDateParts, timeStr, timeValid, durationMin, teamMemberId, closures, md.closureGenericLabel]);
 
-  const handleSaveFields = async () => {
+  const handleSaveFields = async (confirmed?: boolean) => {
     if (!serviceId || !teamMemberId || !startDate || fieldsConflict) return;
     setSavingFields(true);
     setError(null);
@@ -314,11 +317,13 @@ export function BookingDetailModal({
         notes: fieldsNotes || undefined,
         sendConfirmationEmail: sendEmail,
         sendConfirmationWhatsapp: whatsappEnabled && sendWhatsapp,
+        confirmed,
       },
       dict.manualErrors
     );
     setSavingFields(false);
     if (!res.ok) { setError(res.error); return; }
+    if ("needsConfirmation" in res) { setConflicts(res.conflicts); return; }
     onUpdated();
     requestClose(onClose);
   };
@@ -955,7 +960,7 @@ export function BookingDetailModal({
           <div className="flex justify-end">
             <Btn
               variant={isDirty ? "primary" : "outline"}
-              onClick={handleSaveFields}
+              onClick={() => handleSaveFields()}
               disabled={
                 !isDirty || savingFields || !clientName.trim() || !serviceId || !teamMemberId || !dateValid || !timeValid || fieldsConflict
               }
@@ -1235,6 +1240,17 @@ export function BookingDetailModal({
             setInvoiceLoading(false);
             onUpdated();
           }}
+        />
+      )}
+
+      {conflicts && (
+        <ClosureConflictDialog
+          conflicts={conflicts}
+          intlLocale={dict.intlLocale}
+          dict={dict.bookingConflict}
+          saving={savingFields}
+          onCancel={() => setConflicts(null)}
+          onConfirm={() => handleSaveFields(true)}
         />
       )}
 

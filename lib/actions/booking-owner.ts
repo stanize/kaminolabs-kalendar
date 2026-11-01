@@ -19,6 +19,8 @@ import {
 import { sendPlainMessage, decryptConfigAuthToken, type WhatsappConfigRow } from "@/lib/whatsapp/twilio-client";
 import { logEvent } from "@/lib/server-error-log";
 import { ERROR_CODES } from "@/lib/error-codes";
+import type { ConflictSummary } from "@/lib/actions/closures";
+import { CONFLICT_LIST_CAP, type ConflictingBooking } from "@/lib/closures/conflicts";
 
 export type OwnerBookingResult = { ok: true } | { ok: false; error: string };
 
@@ -684,7 +686,43 @@ const MANUAL_FALLBACK: ManualBookingActionDict = {
 // tab edits for a brand-new client right after the booking is saved.
 export type CreateManualBookingResult =
   | { ok: true; clinicClientId: string | null }
+  // force-insert-double-booking (2026-11-01, per Bea's feedback via Arun):
+  // returned instead of saving when the slot overlaps an existing
+  // pending/confirmed booking for the same provider and the caller hasn't
+  // yet passed `confirmed: true`. The UI shows this summary (same
+  // ClosureConflictDialog used by Festivos/Vacaciones) and, if the clinic
+  // confirms anyway, re-calls with `confirmed: true` to force-insert.
+  | { ok: true; needsConfirmation: true; conflicts: ConflictSummary }
   | { ok: false; error: string };
+
+async function findOverlappingBookings(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  params: { businessId: string; teamMemberId: string; providerName: string | null; start: Date; end: Date; excludeBookingId?: string }
+): Promise<ConflictingBooking[]> {
+  let query = supabase
+    .from("kalendar_bookings")
+    .select("id, client_name, service_name, starts_at")
+    .eq("business_id", params.businessId)
+    .eq("team_member_id", params.teamMemberId)
+    .in("status", ["pending_confirmation", "confirmed"])
+    .lt("starts_at", params.end.toISOString())
+    .gt("ends_at", params.start.toISOString())
+    .order("starts_at", { ascending: true })
+    .limit(CONFLICT_LIST_CAP);
+  if (params.excludeBookingId) query = query.neq("id", params.excludeBookingId);
+
+  const { data } = await query;
+  return (
+    (data as { id: string; client_name: string; service_name: string; starts_at: string }[] | null) ?? []
+  ).map((b) => ({
+    id: b.id,
+    clientName: b.client_name,
+    serviceName: b.service_name,
+    startIso: b.starts_at,
+    teamMemberId: params.teamMemberId,
+    providerName: params.providerName,
+  }));
+}
 
 /**
  * Creates an appointment directly from the owner's week-grid (walk-in/phone
@@ -711,6 +749,11 @@ export const createBookingAsOwner = authedAction(
       // belong to the caller's own business — validated below, not just
       // trusted from the client.
       clinicClientId?: string | null;
+      // force-insert-double-booking: false (default) checks for an
+      // overlapping booking first and returns it instead of saving; the UI
+      // re-calls with true once the clinic confirms "Reservar de todas
+      // formas".
+      confirmed?: boolean;
     },
     dict?: Partial<ManualBookingActionDict>
   ): Promise<CreateManualBookingResult> => {
@@ -730,7 +773,7 @@ export const createBookingAsOwner = authedAction(
         .maybeSingle(),
       supabase
         .from("kalendar_team_members")
-        .select("id")
+        .select("id, name")
         .eq("id", input.teamMemberId)
         .eq("business_id", business.id)
         .maybeSingle(),
@@ -758,16 +801,22 @@ export const createBookingAsOwner = authedAction(
     // appointment at 12:00 doesn't share a starts_at with one at 12:30, but
     // they still overlap). Matters more now that the owner can pick any
     // free time, not just a fixed hourly grid.
-    const { data: overlapping } = await supabase
-      .from("kalendar_bookings")
-      .select("id")
-      .eq("business_id", business.id)
-      .eq("team_member_id", member.id)
-      .in("status", ["pending_confirmation", "confirmed"])
-      .lt("starts_at", end.toISOString())
-      .gt("ends_at", start.toISOString())
-      .limit(1);
-    if (overlapping && overlapping.length > 0) return { ok: false, error: t.errSlotTaken };
+    //
+    // force-insert-double-booking: skipped entirely once the clinic has
+    // confirmed — they've already seen the conflict and chosen to
+    // double-book anyway.
+    if (!input.confirmed) {
+      const overlapping = await findOverlappingBookings(supabase, {
+        businessId: business.id,
+        teamMemberId: member.id,
+        providerName: member.name,
+        start,
+        end,
+      });
+      if (overlapping.length > 0) {
+        return { ok: true, needsConfirmation: true, conflicts: { total: overlapping.length, sample: overlapping } };
+      }
+    }
 
     // client-linking-on-booking: use the picked existing client (validated
     // to belong to this business — never trust a raw id from the client
@@ -958,6 +1007,8 @@ export const updateBookingAsOwner = authedAction(
       notes?: string;
       sendConfirmationEmail: boolean;
       sendConfirmationWhatsapp: boolean;
+      // force-insert-double-booking: see createBookingAsOwner's doc comment.
+      confirmed?: boolean;
     },
     dict?: Partial<ManualBookingActionDict>
   ): Promise<CreateManualBookingResult> => {
@@ -977,7 +1028,7 @@ export const updateBookingAsOwner = authedAction(
         .maybeSingle(),
       supabase
         .from("kalendar_team_members")
-        .select("id")
+        .select("id, name")
         .eq("id", input.teamMemberId)
         .eq("business_id", business.id)
         .maybeSingle(),
@@ -1006,17 +1057,19 @@ export const updateBookingAsOwner = authedAction(
     if (Number.isNaN(start.getTime())) return { ok: false, error: t.errInvalidSlot };
     const end = new Date(start.getTime() + service.duration_min * 60_000);
 
-    const { data: overlapping } = await supabase
-      .from("kalendar_bookings")
-      .select("id")
-      .eq("business_id", business.id)
-      .eq("team_member_id", member.id)
-      .neq("id", input.bookingId)
-      .in("status", ["pending_confirmation", "confirmed"])
-      .lt("starts_at", end.toISOString())
-      .gt("ends_at", start.toISOString())
-      .limit(1);
-    if (overlapping && overlapping.length > 0) return { ok: false, error: t.errSlotTaken };
+    if (!input.confirmed) {
+      const overlapping = await findOverlappingBookings(supabase, {
+        businessId: business.id,
+        teamMemberId: member.id,
+        providerName: member.name,
+        start,
+        end,
+        excludeBookingId: input.bookingId,
+      });
+      if (overlapping.length > 0) {
+        return { ok: true, needsConfirmation: true, conflicts: { total: overlapping.length, sample: overlapping } };
+      }
+    }
 
     const { error } = await supabase
       .from("kalendar_bookings")
