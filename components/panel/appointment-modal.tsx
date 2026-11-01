@@ -524,11 +524,6 @@ export function AppointmentModal({
                   ))}
                 </select>
               </Field>
-              {nearestSlotFlash && (
-                <div className="absolute left-0 top-full z-10 mt-1 rounded-lg border border-brand-line bg-brand-weak px-2.5 py-1.5 text-[12px] font-medium text-brand-ink shadow-lg transition-opacity duration-300">
-                  {md.nearestSlotHint.replace("{time}", nearestSlotFlash)}
-                </div>
-              )}
             </div>
           )}
 
@@ -545,18 +540,25 @@ export function AppointmentModal({
             </div>
             <div className="relative flex-1">
               <Field label={md.timeLabel}>
-                <input
-                  type="text"
-                  value={timeStr}
-                  onChange={(e) => setTimeStr(e.target.value)}
-                  onFocus={() => setTimeMenuOpen(true)}
-                  onBlur={() => setTimeMenuOpen(false)}
-                  placeholder="HH:MM"
-                  autoComplete="off"
-                  className={`w-full rounded-lg border bg-surface px-3 py-2 text-[16px] text-ink ${
-                    conflict ? "border-error" : "border-line"
-                  }`}
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={timeStr}
+                    onChange={(e) => setTimeStr(e.target.value)}
+                    onFocus={() => setTimeMenuOpen(true)}
+                    onBlur={() => setTimeMenuOpen(false)}
+                    placeholder="HH:MM"
+                    autoComplete="off"
+                    className={`w-full rounded-lg border bg-surface px-3 py-2 text-[16px] text-ink ${
+                      conflict ? "border-error" : "border-line"
+                    }`}
+                  />
+                  {nearestSlotFlash && (
+                    <div className="pointer-events-none absolute inset-0 z-20 flex items-center rounded-lg border border-brand-line bg-brand-weak px-3 text-[16px] font-medium text-brand-ink shadow-lg transition-opacity duration-300">
+                      {md.nearestSlotHint.replace("{time}", nearestSlotFlash)}
+                    </div>
+                  )}
+                </div>
               </Field>
               {timeMenuOpen && suggestedTimes.length > 0 && (
                 <div className="absolute left-0 right-0 top-full z-10 mt-1 max-h-[220px] overflow-y-auto rounded-lg border border-line bg-surface py-1 shadow-lg">
