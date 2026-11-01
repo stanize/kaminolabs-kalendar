@@ -366,6 +366,26 @@ export function BookingDetailModal({
   // The Cobrar modal (Efectivo/Tarjeta/bono buttons), opened instead of the
   // old inline toggle+selector.
   const [cobrarModalOpen, setCobrarModalOpen] = useState(false);
+  // cobrar-side-panel (2026-11-02, per Arun): converted from a centered
+  // popup to the same right-docked side-panel pattern as every other
+  // add/edit surface — own visible/closing state so it can slide in/out
+  // independently of this (already-open) panel underneath it.
+  const [cobrarPanelVisible, setCobrarPanelVisible] = useState(false);
+  const cobrarClosingRef = useRef(false);
+  useEffect(() => {
+    if (!cobrarModalOpen) {
+      cobrarClosingRef.current = false;
+      return;
+    }
+    const id = requestAnimationFrame(() => setCobrarPanelVisible(true));
+    return () => cancelAnimationFrame(id);
+  }, [cobrarModalOpen]);
+  function closeCobrarPanel() {
+    if (cobrarClosingRef.current) return;
+    cobrarClosingRef.current = true;
+    setCobrarPanelVisible(false);
+    setTimeout(() => setCobrarModalOpen(false), 200);
+  }
   // "Editar" next to an already-resolved Pago state (paid or no-show) — lets
   // the clinic correct a mistake by re-showing the Cobrar/No-show buttons
   // instead of the read-only summary. Not offered for an already-cancelled
@@ -1135,15 +1155,28 @@ export function BookingDetailModal({
       </div>
 
       {cobrarModalOpen && (
-        <div
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 px-4"
-          onClick={() => !busy && setCobrarModalOpen(false)}
-        >
+        <div className="fixed inset-y-0 left-0 right-0 z-[70] md:left-[240px]">
           <div
-            className="w-full max-w-[340px] rounded-2xl bg-surface p-5 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
+            className={`absolute inset-0 bg-black/40 transition-opacity duration-200 ${cobrarPanelVisible ? "opacity-100" : "opacity-0"}`}
+            onClick={() => !busy && closeCobrarPanel()}
+            aria-hidden
+          />
+          <div
+            className={`absolute inset-y-0 right-0 flex h-full w-full flex-col overflow-y-auto bg-surface p-5 shadow-2xl transition-transform duration-200 ease-out sm:w-1/2 sm:min-w-[480px] sm:p-8 ${
+              cobrarPanelVisible ? "translate-x-0" : "translate-x-full"
+            }`}
           >
-            <h3 className="mb-4 text-[15px] font-bold text-ink">{d.cobrarModalTitle}</h3>
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-[17px] font-bold text-ink">{d.cobrarModalTitle}</h3>
+              <button
+                onClick={() => !busy && closeCobrarPanel()}
+                aria-label={d.cobrarCancel}
+                className="grid h-8 w-8 place-items-center rounded-lg text-ink-soft hover:bg-surface-2"
+              >
+                <Icon name="x" size={16} />
+              </button>
+            </div>
+
             {/* payment-cancellation-flow-expansion: expanded from
                 Efectivo/Tarjeta to the full PAYMENT_METHOD_CODES list — a
                 2-column grid, same button style as before. */}
@@ -1184,7 +1217,7 @@ export function BookingDetailModal({
               </div>
             )}
             <div className="mt-4 flex justify-end">
-              <Btn variant="ghost" onClick={() => setCobrarModalOpen(false)} disabled={busy}>
+              <Btn variant="ghost" onClick={() => closeCobrarPanel()} disabled={busy}>
                 {d.cobrarCancel}
               </Btn>
             </div>
