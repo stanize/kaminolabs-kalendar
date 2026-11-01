@@ -90,7 +90,24 @@ export function AppointmentModal({
   const [serviceId, setServiceId] = useState(services[0]?.id ?? "");
   const [teamMemberId, setTeamMemberId] = useState(slot.teamMemberId);
   const [dateStr, setDateStr] = useState(ymd(initialDateParts.year, initialDateParts.month, initialDateParts.day));
-  const [timeStr, setTimeStr] = useState(slot.initialTime);
+  // custom-time-slots (2026-11-01, per Arun): a calendar click straight
+  // into a specific provider's column (not the merged "Cualquiera" view)
+  // opens this modal with that provider already selected at `slot.
+  // initialTime` — snap it forward to that provider's nearest custom slot
+  // right in the initial state, same rule as handleProviderChange below,
+  // so there's no separate mount-effect needed (nothing to synchronize —
+  // this is derivable once, from props, at init).
+  const [{ time: initialSnappedTime, flash: initialSnapFlash }] = useState(() => {
+    if (!slot.teamMemberId) return { time: slot.initialTime, flash: null as string | null };
+    const dayId = dayIdInTz(zonedTimeToUtc(slot.dayYear, slot.dayMonth, slot.dayDay, 12, 0));
+    const custom = resolveCustomSuggestedTimes(customSlotRules, dayId, slot.teamMemberId);
+    if (!custom) return { time: slot.initialTime, flash: null as string | null };
+    const currentMin = toMinutes(slot.initialTime);
+    const next = custom.filter((t) => toMinutes(t) >= currentMin).sort((a, b) => toMinutes(a) - toMinutes(b))[0];
+    if (next && next !== slot.initialTime) return { time: next, flash: next };
+    return { time: slot.initialTime, flash: null as string | null };
+  });
+  const [timeStr, setTimeStr] = useState(initialSnappedTime);
   const [clientName, setClientName] = useState("");
   const [clientEmail, setClientEmail] = useState("");
   const [clientPhone, setClientPhone] = useState("");
@@ -239,25 +256,38 @@ export function AppointmentModal({
   // (day, provider). A brief flash near the provider field announces the
   // change, mirroring the pattern of every other non-blocking heads-up in
   // this form.
-  const [nearestSlotFlash, setNearestSlotFlash] = useState<string | null>(null);
+  const [nearestSlotFlash, setNearestSlotFlash] = useState<string | null>(initialSnapFlash);
   const flashTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => () => { if (flashTimeoutRef.current) clearTimeout(flashTimeoutRef.current); }, []);
+  useEffect(() => {
+    // Also covers the initial-snap case above (flash already set at init) —
+    // scheduling the auto-dismiss here, not where the flash is set, keeps
+    // every setTimeout-then-setState in one place.
+    if (nearestSlotFlash) {
+      flashTimeoutRef.current = setTimeout(() => setNearestSlotFlash(null), 3000);
+    }
+    return () => { if (flashTimeoutRef.current) clearTimeout(flashTimeoutRef.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  function handleProviderChange(newMemberId: string) {
-    setTeamMemberId(newMemberId);
-    if (!selectedDayId || !newMemberId || !timeValid) return;
-    const custom = resolveCustomSuggestedTimes(customSlotRules, selectedDayId, newMemberId);
+  function snapToNearestSlot(memberId: string, baseTime: string) {
+    if (!selectedDayId || !memberId) return;
+    const custom = resolveCustomSuggestedTimes(customSlotRules, selectedDayId, memberId);
     if (!custom) return;
-    const currentMin = toMinutes(timeStr);
+    const currentMin = toMinutes(baseTime);
     const next = custom
       .filter((t) => toMinutes(t) >= currentMin)
       .sort((a, b) => toMinutes(a) - toMinutes(b))[0];
-    if (next && next !== timeStr) {
+    if (next && next !== baseTime) {
       setTimeStr(next);
       setNearestSlotFlash(next);
       if (flashTimeoutRef.current) clearTimeout(flashTimeoutRef.current);
       flashTimeoutRef.current = setTimeout(() => setNearestSlotFlash(null), 3000);
     }
+  }
+
+  function handleProviderChange(newMemberId: string) {
+    setTeamMemberId(newMemberId);
+    if (timeValid) snapToNearestSlot(newMemberId, timeStr);
   }
 
   const startDate = useMemo(() => {
