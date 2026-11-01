@@ -527,7 +527,7 @@ export function AppointmentModal({
             </div>
           )}
 
-          <div className="flex flex-col gap-3 sm:flex-row">
+          <div className="relative flex flex-col gap-3 sm:flex-row">
             <div className="flex-1">
               <Field label={md.dateLabel}>
                 <input
@@ -540,25 +540,18 @@ export function AppointmentModal({
             </div>
             <div className="relative flex-1">
               <Field label={md.timeLabel}>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={timeStr}
-                    onChange={(e) => setTimeStr(e.target.value)}
-                    onFocus={() => setTimeMenuOpen(true)}
-                    onBlur={() => setTimeMenuOpen(false)}
-                    placeholder="HH:MM"
-                    autoComplete="off"
-                    className={`w-full rounded-lg border bg-surface px-3 py-2 text-[16px] text-ink ${
-                      conflict ? "border-error" : "border-line"
-                    }`}
-                  />
-                  {nearestSlotFlash && (
-                    <div className="pointer-events-none absolute inset-0 z-20 flex items-center rounded-lg border border-brand-line bg-brand-weak px-3 text-[16px] font-medium text-brand-ink shadow-lg transition-opacity duration-300">
-                      {md.nearestSlotHint.replace("{time}", nearestSlotFlash)}
-                    </div>
-                  )}
-                </div>
+                <input
+                  type="text"
+                  value={timeStr}
+                  onChange={(e) => setTimeStr(e.target.value)}
+                  onFocus={() => setTimeMenuOpen(true)}
+                  onBlur={() => setTimeMenuOpen(false)}
+                  placeholder="HH:MM"
+                  autoComplete="off"
+                  className={`w-full rounded-lg border bg-surface px-3 py-2 text-[16px] text-ink ${
+                    conflict ? "border-error" : "border-line"
+                  }`}
+                />
               </Field>
               {timeMenuOpen && suggestedTimes.length > 0 && (
                 <div className="absolute left-0 right-0 top-full z-10 mt-1 max-h-[220px] overflow-y-auto rounded-lg border border-line bg-surface py-1 shadow-lg">
@@ -587,6 +580,11 @@ export function AppointmentModal({
                 </div>
               )}
             </div>
+            {nearestSlotFlash && (
+              <div className="pointer-events-none absolute left-0 right-0 top-[26px] bottom-0 z-20 flex items-center rounded-lg border border-brand bg-brand/20 px-3 text-[16px] font-medium text-brand-ink shadow-lg transition-opacity duration-300">
+                {md.nearestSlotHint.replace("{time}", nearestSlotFlash)}
+              </div>
+            )}
           </div>
           {isOutsideHours && !conflict && (
             <span className="-mt-2 text-[12px] text-ink-soft">{md.outsideHoursNote}</span>
