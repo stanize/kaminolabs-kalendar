@@ -97,6 +97,10 @@ export interface CalendarDictionary {
     // provider — submitting still works, it just triggers the confirm
     // dialog (dict.bookingConflict) instead of silently saving.
     slotTakenHint: string;
+    // custom-time-slots: brief flash shown next to the provider field when
+    // picking a provider snaps the time forward to their nearest custom
+    // slot; "{time}" is replaced with it.
+    nearestSlotHint: string;
     clientNameLabel: string;
     clientNamePlaceholder: string;
     clientEmailLabel: string;
@@ -338,6 +342,7 @@ const es: CalendarDictionary = {
     closureWarningNote: "Este día/horario está marcado como no disponible ({label}). Puedes crear la cita igualmente.",
     closureGenericLabel: "festivo o ausencia",
     slotTakenHint: "Este profesional ya tiene una cita en este horario. Puedes continuar — se te pedirá confirmación.",
+    nearestSlotHint: "Horario más cercano: {time}",
     clientNameLabel: "Nombre del cliente",
     clientNamePlaceholder: "Nombre y apellidos",
     clientEmailLabel: "Email (opcional)",
@@ -539,6 +544,7 @@ const en: CalendarDictionary = {
     closureWarningNote: "This day/time is marked as unavailable ({label}). You can still create the appointment.",
     closureGenericLabel: "holiday or time off",
     slotTakenHint: "This provider already has an appointment at this time. You can continue — you'll be asked to confirm.",
+    nearestSlotHint: "Nearest time slot: {time}",
     clientNameLabel: "Client name",
     clientNamePlaceholder: "Full name",
     clientEmailLabel: "Email (optional)",
