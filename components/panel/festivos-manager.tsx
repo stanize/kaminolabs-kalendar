@@ -7,6 +7,7 @@ import { Btn } from "@/components/ui/button";
 import { createFestivo, updateFestivo, deleteClosure, type ConflictSummary } from "@/lib/actions/closures";
 import { reportClientError } from "@/lib/report-client-error";
 import { ClosureConflictDialog } from "@/components/panel/closure-conflict-dialog";
+import { AvailabilityHeaderAction } from "@/components/panel/availability-header-action";
 import type { BusinessClosure } from "@/lib/closures/data";
 import type { FestivosDictionary } from "@/lib/i18n/dictionaries/festivos";
 import type { ClosureConflictDictionary } from "@/lib/i18n/dictionaries/closure-conflict";
@@ -97,10 +98,13 @@ export function FestivosManager({
         </div>
       )}
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <AvailabilityHeaderAction>
         <Btn variant="primary" size="sm" onClick={() => setPanelFestivo("new")}>
           <Icon name="plus" size={15} /> {dict.add}
         </Btn>
+      </AvailabilityHeaderAction>
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="relative min-w-[220px] flex-1 sm:flex-none sm:w-[280px]">
           <Icon name="search" size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft" />
           <input

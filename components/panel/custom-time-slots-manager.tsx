@@ -10,6 +10,7 @@ import {
 } from "@/lib/actions/custom-slots";
 import { isOutsideBusinessHours, type TimeRangeVM } from "@/lib/booking/appointment-fields";
 import { reportClientError } from "@/lib/report-client-error";
+import { AvailabilityHeaderAction } from "@/components/panel/availability-header-action";
 import type { CustomTimeSlotRule } from "@/lib/custom-slots/data";
 import type { CustomSlotsDictionary } from "@/lib/i18n/dictionaries/custom-slots";
 import type { AvailabilityDictionary } from "@/lib/i18n/dictionaries/availability";
@@ -68,9 +69,11 @@ export function CustomTimeSlotsManager({
         <div className="rounded-lg border border-error bg-error-weak px-3 py-2 text-[13px] text-error">{error}</div>
       )}
 
-      <Btn variant="primary" size="sm" onClick={() => setPanelRule("new")} className="self-start">
-        <Icon name="plus" size={15} /> {dict.addButton}
-      </Btn>
+      <AvailabilityHeaderAction>
+        <Btn variant="primary" size="sm" onClick={() => setPanelRule("new")}>
+          <Icon name="plus" size={15} /> {dict.addButton}
+        </Btn>
+      </AvailabilityHeaderAction>
 
       {rules.length === 0 ? (
         <div className="rounded-xl border border-line bg-surface p-5 text-center">

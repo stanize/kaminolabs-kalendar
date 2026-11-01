@@ -7,6 +7,7 @@ import { Btn } from "@/components/ui/button";
 import { createTimeOff, updateTimeOff, deleteClosure, type ConflictSummary } from "@/lib/actions/closures";
 import { reportClientError } from "@/lib/report-client-error";
 import { ClosureConflictDialog } from "@/components/panel/closure-conflict-dialog";
+import { AvailabilityHeaderAction } from "@/components/panel/availability-header-action";
 import type { BusinessClosure } from "@/lib/closures/data";
 import type { TimeOffDictionary } from "@/lib/i18n/dictionaries/time-off";
 import type { ClosureConflictDictionary } from "@/lib/i18n/dictionaries/closure-conflict";
@@ -95,9 +96,11 @@ export function TimeOffManager({
         </div>
       )}
 
-      <Btn variant="primary" size="sm" onClick={() => setPanelEntry("new")} className="self-start">
-        <Icon name="plus" size={15} /> {dict.add}
-      </Btn>
+      <AvailabilityHeaderAction>
+        <Btn variant="primary" size="sm" onClick={() => setPanelEntry("new")}>
+          <Icon name="plus" size={15} /> {dict.add}
+        </Btn>
+      </AvailabilityHeaderAction>
 
       <div className="rounded-xl border border-line bg-surface px-4 py-4 sm:px-6">
         {entries.length > 0 ? (

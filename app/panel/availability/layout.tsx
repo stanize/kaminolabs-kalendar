@@ -5,6 +5,7 @@ import { getBusinessForUser } from "@/lib/business/data";
 import { getLocale } from "@/lib/i18n/server";
 import { getAvailabilityDictionary } from "@/lib/i18n/dictionaries/availability";
 import { AvailabilityTabs } from "@/components/panel/availability-tabs";
+import { AvailabilityHeaderSlot } from "@/components/panel/availability-header-action";
 
 export default async function AvailabilityLayout({ children }: { children: ReactNode }) {
   const session = await requireSession();
@@ -19,8 +20,9 @@ export default async function AvailabilityLayout({ children }: { children: React
 
   return (
     <div className="mx-auto max-w-[680px] px-4 py-6 sm:px-8 sm:py-8">
-      <div className="mb-6">
+      <div className="mb-6 flex items-center justify-between gap-3">
         <h1 className="text-[24px]">{dict.page.title}</h1>
+        <AvailabilityHeaderSlot />
       </div>
 
       <AvailabilityTabs dict={dict} />
