@@ -1015,7 +1015,7 @@ function DayMergedColumn({
                         className={`inline-block h-[6px] w-[6px] shrink-0 rounded-full ${providerColorClass(b.teamMemberId, allMembers)}`}
                       />
                     )}
-                    <span className="truncate font-medium">{providerName}</span>
+                    <span className="truncate font-medium">{b.clientName}</span>
                     {b.serviceName && <span className="truncate opacity-80">· {b.serviceName}</span>}
                   </div>
                 );
