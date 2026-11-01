@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import { Icon } from "@/components/ui/icon";
 import { Btn } from "@/components/ui/button";
 import {
@@ -188,9 +187,12 @@ export function BookingDetailModal({
   const [teamMemberId, setTeamMemberId] = useState(initialFields.teamMemberId);
   const [dateStr, setDateStr] = useState(initialFields.dateStr);
   const [timeStr, setTimeStr] = useState(initialFields.timeStr);
-  const [clientName, setClientName] = useState(initialFields.clientName);
-  const [clientEmail, setClientEmail] = useState(initialFields.clientEmail);
-  const [clientPhone, setClientPhone] = useState(initialFields.clientPhone);
+  // cita-tab-client-fields-removed: no longer editable from this tab (see
+  // below), so these stay at whatever they loaded as — plain consts, not
+  // state, now that nothing ever changes them.
+  const clientName = initialFields.clientName;
+  const clientEmail = initialFields.clientEmail;
+  const clientPhone = initialFields.clientPhone;
   const [fieldsNotes, setFieldsNotes] = useState(initialFields.notes);
   const [sendEmail, setSendEmail] = useState(false);
   const [sendWhatsapp, setSendWhatsapp] = useState(false);
@@ -203,9 +205,6 @@ export function BookingDetailModal({
     teamMemberId !== initialFields.teamMemberId ||
     dateStr !== initialFields.dateStr ||
     timeStr !== initialFields.timeStr ||
-    clientName !== initialFields.clientName ||
-    clientEmail !== initialFields.clientEmail ||
-    clientPhone !== initialFields.clientPhone ||
     fieldsNotes !== initialFields.notes;
 
   const dateValid = /^\d{4}-\d{2}-\d{2}$/.test(dateStr);
@@ -905,45 +904,15 @@ export function BookingDetailModal({
             </div>
           )}
 
-          <Field label={md.clientNameLabel}>
-            <input
-              value={clientName}
-              onChange={(e) => setClientName(e.target.value)}
-              placeholder={md.clientNamePlaceholder}
-              className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[16px] text-ink"
-            />
-          </Field>
-          {/* client-link-from-appointment (2026-10): a booking linked to a
-              clinic client still jumps to that client's profile — now a
-              small link under the name field since the name itself is an
-              editable input. Guest/unlinked bookings show nothing here. */}
-          {booking.clinicClientId && (
-            <Link
-              href={`/panel/clients/${booking.clinicClientId}`}
-              className="-mt-2 self-start text-[12.5px] font-semibold text-brand hover:underline"
-            >
-              Ver perfil del cliente
-            </Link>
-          )}
-
-          <Field label={md.clientEmailLabel}>
-            <input
-              value={clientEmail}
-              onChange={(e) => setClientEmail(e.target.value)}
-              placeholder={md.clientEmailPlaceholder}
-              type="email"
-              className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[16px] text-ink"
-            />
-          </Field>
-
-          <Field label={md.clientPhoneLabel}>
-            <input
-              value={clientPhone}
-              onChange={(e) => setClientPhone(e.target.value)}
-              placeholder={md.clientPhonePlaceholder}
-              className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[16px] text-ink"
-            />
-          </Field>
+          {/* cita-tab-client-fields-removed (2026-11-02, per Arun):
+              Nombre/Email/Teléfono + "Ver perfil del cliente" dropped from
+              the Cita tab — redundant now that the panel's own title is
+              the client name and the Cliente tab holds this same info
+              (live-editable there, via updateClientContactInfo). The
+              underlying clientName/clientEmail/clientPhone state is kept
+              as-is (still submitted with the booking save, unchanged from
+              whatever it loaded as) — only the inputs are removed, not the
+              save payload. */}
 
           <Field label={md.notesLabel}>
             <textarea
