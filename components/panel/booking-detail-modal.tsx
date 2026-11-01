@@ -187,6 +187,7 @@ export function BookingDetailModal({
   const [teamMemberId, setTeamMemberId] = useState(initialFields.teamMemberId);
   const [dateStr, setDateStr] = useState(initialFields.dateStr);
   const [timeStr, setTimeStr] = useState(initialFields.timeStr);
+  const timeInputRef = useRef<HTMLInputElement>(null);
   // cita-tab-client-fields-removed: no longer editable from this tab (see
   // below), so these stay at whatever they loaded as — plain consts, not
   // state, now that nothing ever changes them.
@@ -199,6 +200,13 @@ export function BookingDetailModal({
   const [timeMenuOpen, setTimeMenuOpen] = useState(false);
   const [savingFields, setSavingFields] = useState(false);
   const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false);
+  // cliente-tab-default-edit: the Cliente tab is now always in edit mode
+  // (no separate "Editar" click) and saves itself independently via
+  // updateClientContactInfo — but closing the whole panel with unsaved
+  // Cliente-tab edits still needs the same discard-confirm guardedClose
+  // already does for the Cita tab's own fields. Bubbled up from
+  // ClientProfileTabs's onDirtyChange.
+  const [clientTabDirty, setClientTabDirty] = useState(false);
 
   const isDirty =
     serviceId !== initialFields.serviceId ||
@@ -332,7 +340,7 @@ export function BookingDetailModal({
   // close path (actions below that already committed something server-
   // side) goes straight through requestClose, unaffected.
   function guardedClose() {
-    if (isDirty) { setDiscardConfirmOpen(true); return; }
+    if (isDirty || clientTabDirty) { setDiscardConfirmOpen(true); return; }
     closePanel();
   }
 
@@ -778,6 +786,7 @@ export function BookingDetailModal({
               currentBookingId={booking.id}
               staged={EMPTY_STAGED_CLIENT_FIELDS}
               onStagedChange={() => {}}
+              onClienteDirtyChange={setClientTabDirty}
               dict={ct}
             />
           ) : (
@@ -853,18 +862,35 @@ export function BookingDetailModal({
             </div>
             <div className="relative flex-1">
               <Field label={md.timeLabel}>
-                <input
-                  type="text"
-                  value={timeStr}
-                  onChange={(e) => setTimeStr(e.target.value)}
-                  onFocus={() => setTimeMenuOpen(true)}
-                  onBlur={() => setTimeMenuOpen(false)}
-                  placeholder="HH:MM"
-                  autoComplete="off"
-                  className={`w-full rounded-lg border bg-surface px-3 py-2 text-[16px] text-ink ${
-                    fieldsConflict ? "border-error" : "border-line"
-                  }`}
-                />
+                <div className="relative">
+                  <input
+                    ref={timeInputRef}
+                    type="text"
+                    value={timeStr}
+                    onChange={(e) => setTimeStr(e.target.value)}
+                    onFocus={() => setTimeMenuOpen(true)}
+                    onBlur={() => setTimeMenuOpen(false)}
+                    placeholder="HH:MM"
+                    autoComplete="off"
+                    className={`w-full rounded-lg border bg-surface px-3 py-2 pr-9 text-[16px] text-ink ${
+                      fieldsConflict ? "border-error" : "border-line"
+                    }`}
+                  />
+                  {/* Purely a visual affordance matching the date field's
+                      native calendar icon — the field is already editable
+                      (typed or picked from the suggestions dropdown below);
+                      clicking the icon just focuses it to open that list. */}
+                  <button
+                    type="button"
+                    tabIndex={-1}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => timeInputRef.current?.focus()}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-soft"
+                    aria-label={md.timeLabel}
+                  >
+                    <Icon name="clock" size={17} />
+                  </button>
+                </div>
               </Field>
               {timeMenuOpen && suggestedTimes.length > 0 && (
                 <div className="absolute left-0 right-0 top-full z-10 mt-1 max-h-[220px] overflow-y-auto rounded-lg border border-line bg-surface py-1 shadow-lg">

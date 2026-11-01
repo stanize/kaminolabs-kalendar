@@ -123,6 +123,7 @@ export function AppointmentModal({
   const [clientResults, setClientResults] = useState<ClientSearchResult[]>([]);
   const [showClientResults, setShowClientResults] = useState(false);
   const clientSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const timeInputRef = useRef<HTMLInputElement>(null);
   const [notes, setNotes] = useState("");
   const [sendEmail, setSendEmail] = useState(false);
   const [sendWhatsapp, setSendWhatsapp] = useState(false);
@@ -540,18 +541,35 @@ export function AppointmentModal({
             </div>
             <div className="relative flex-1">
               <Field label={md.timeLabel}>
-                <input
-                  type="text"
-                  value={timeStr}
-                  onChange={(e) => setTimeStr(e.target.value)}
-                  onFocus={() => setTimeMenuOpen(true)}
-                  onBlur={() => setTimeMenuOpen(false)}
-                  placeholder="HH:MM"
-                  autoComplete="off"
-                  className={`w-full rounded-lg border bg-surface px-3 py-2 text-[16px] text-ink ${
-                    conflict ? "border-error" : "border-line"
-                  }`}
-                />
+                <div className="relative">
+                  <input
+                    ref={timeInputRef}
+                    type="text"
+                    value={timeStr}
+                    onChange={(e) => setTimeStr(e.target.value)}
+                    onFocus={() => setTimeMenuOpen(true)}
+                    onBlur={() => setTimeMenuOpen(false)}
+                    placeholder="HH:MM"
+                    autoComplete="off"
+                    className={`w-full rounded-lg border bg-surface px-3 py-2 pr-9 text-[16px] text-ink ${
+                      conflict ? "border-error" : "border-line"
+                    }`}
+                  />
+                  {/* Purely a visual affordance matching the date field's
+                      native calendar icon — the field is already editable
+                      (typed or picked from the suggestions dropdown below);
+                      clicking the icon just focuses it to open that list. */}
+                  <button
+                    type="button"
+                    tabIndex={-1}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => timeInputRef.current?.focus()}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-soft"
+                    aria-label={md.timeLabel}
+                  >
+                    <Icon name="clock" size={17} />
+                  </button>
+                </div>
               </Field>
               {timeMenuOpen && suggestedTimes.length > 0 && (
                 <div className="absolute left-0 right-0 top-full z-10 mt-1 max-h-[220px] overflow-y-auto rounded-lg border border-line bg-surface py-1 shadow-lg">

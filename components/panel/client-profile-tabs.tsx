@@ -76,6 +76,7 @@ export function ClientProfileTabs({
   currentBookingId,
   staged,
   onStagedChange,
+  onClienteDirtyChange,
   dict,
 }: {
   activeTab: ClientProfileTab;
@@ -83,6 +84,12 @@ export function ClientProfileTabs({
   currentBookingId?: string;
   staged: StagedClientFields;
   onStagedChange: (next: StagedClientFields) => void;
+  // cliente-tab-default-edit: bubbles the live Cliente tab's unsaved-
+  // changes state up so the parent panel can guard its own close button
+  // with the same discard-confirm it already uses for its own fields.
+  // Only meaningful for the live (clientId set) case — the staged
+  // (brand-new client) case has no separate save step to warn about.
+  onClienteDirtyChange?: (dirty: boolean) => void;
   dict: CalendarDictionary["clientTabs"];
 }) {
   const [data, setData] = useState<ClientPanelData | null>(null);
@@ -121,6 +128,7 @@ export function ClientProfileTabs({
         loading={loading}
         dict={dict}
         onSaved={(profile) => setData((d) => (d ? { ...d, profile } : d))}
+        onDirtyChange={onClienteDirtyChange}
       />
     ) : (
       <StagedClienteTab staged={staged} onStagedChange={onStagedChange} dict={dict} />
@@ -180,47 +188,64 @@ function LiveClienteTab({
   loading,
   dict,
   onSaved,
+  onDirtyChange,
 }: {
   clientId: string;
   data: ClientPanelData | null;
   loading: boolean;
   dict: CalendarDictionary["clientTabs"];
   onSaved: (profile: NonNullable<ClientPanelData>["profile"]) => void;
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
-  const [editing, setEditing] = useState(false);
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
-  const [dni, setDni] = useState("");
-  const [address, setAddress] = useState("");
-  const [dateOfBirth, setDateOfBirth] = useState("");
+  if (loading || !data) return <ClienteSkeleton />;
+  // cliente-tab-default-edit (2026-11-02, per Arun): always in edit mode,
+  // no separate "Editar" click — ClienteEditForm only mounts once `data`
+  // is actually loaded, so its fields can be lazily initialized straight
+  // from `data.profile` without syncing a prop into state via an effect.
+  return <ClienteEditForm key={clientId} clientId={clientId} profile={data.profile} dict={dict} onSaved={onSaved} onDirtyChange={onDirtyChange} />;
+}
+
+function ClienteEditForm({
+  clientId,
+  profile,
+  dict,
+  onSaved,
+  onDirtyChange,
+}: {
+  clientId: string;
+  profile: NonNullable<ClientPanelData>["profile"];
+  dict: CalendarDictionary["clientTabs"];
+  onSaved: (profile: NonNullable<ClientPanelData>["profile"]) => void;
+  onDirtyChange?: (dirty: boolean) => void;
+}) {
+  const [name, setName] = useState(profile.name);
+  const [email, setEmail] = useState(profile.email ?? "");
+  const [phone, setPhone] = useState(profile.phone ?? "");
+  const [dni, setDni] = useState(profile.dni ?? "");
+  const [address, setAddress] = useState(profile.address ?? "");
+  const [dateOfBirth, setDateOfBirth] = useState(profile.dateOfBirth ?? "");
   const [saving, setSaving] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (loading || !data) return <ClienteSkeleton />;
-
-  // Fields are only initialized from `data` the moment edit mode starts
-  // (data is guaranteed loaded by then, per the guard above) — avoids
-  // syncing local state from a prop in an effect.
-  function startEditing() {
-    if (!data) return;
-    setName(data.profile.name);
-    setEmail(data.profile.email ?? "");
-    setPhone(data.profile.phone ?? "");
-    setDni(data.profile.dni ?? "");
-    setAddress(data.profile.address ?? "");
-    setDateOfBirth(data.profile.dateOfBirth ?? "");
-    setEditing(true);
-  }
-
   const isDirty =
-    name !== data.profile.name ||
-    email !== (data.profile.email ?? "") ||
-    phone !== (data.profile.phone ?? "") ||
-    dni !== (data.profile.dni ?? "") ||
-    address !== (data.profile.address ?? "") ||
-    dateOfBirth !== (data.profile.dateOfBirth ?? "");
+    name !== profile.name ||
+    email !== (profile.email ?? "") ||
+    phone !== (profile.phone ?? "") ||
+    dni !== (profile.dni ?? "") ||
+    address !== (profile.address ?? "") ||
+    dateOfBirth !== (profile.dateOfBirth ?? "");
+
+  // cliente-tab-default-edit: bubbles isDirty up to the parent panel (see
+  // onDirtyChange's doc comment on ClientProfileTabs) so its own close
+  // button can also guard on unsaved Cliente-tab edits, and clears it on
+  // unmount (e.g. switching tabs/closing the panel) so a stale "dirty"
+  // flag never outlives this component.
+  useEffect(() => {
+    onDirtyChange?.(isDirty);
+    return () => onDirtyChange?.(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDirty]);
 
   async function handleSave() {
     setSaving(true);
@@ -230,7 +255,6 @@ function LiveClienteTab({
       setSaving(false);
       if (!res.ok) { setError(res.error); return; }
       onSaved({ name: name.trim(), email: email.trim() || null, phone: phone.trim() || null, dni: dni.trim() || null, address: address.trim() || null, dateOfBirth: dateOfBirth.trim() || null });
-      setEditing(false);
       setSavedFlash(true);
       setTimeout(() => setSavedFlash(false), 2000);
     } catch (e) {
@@ -240,38 +264,23 @@ function LiveClienteTab({
     }
   }
 
-  if (!editing) {
-    return (
-      <div className="flex flex-col gap-3">
-        {savedFlash && <p className="text-[12.5px] font-semibold text-brand">{dict.saved}</p>}
-        <Row label={dict.nameLabel} value={data.profile.name} />
-        <Row label={dict.emailLabel} value={data.profile.email ?? "—"} />
-        <Row label={dict.phoneLabel} value={data.profile.phone ?? "—"} />
-        <Row label={dict.dniLabel} value={data.profile.dni ?? "—"} />
-        <Row label={dict.addressLabel} value={data.profile.address ?? "—"} />
-        <Row label={dict.dateOfBirthLabel} value={data.profile.dateOfBirth ?? "—"} />
-        <Btn variant="outline" size="sm" onClick={startEditing} className="self-start">
-          {dict.editButton}
-        </Btn>
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-col gap-3">
       {error && <p className="text-[12.5px] text-error">{error}</p>}
+      {savedFlash && <p className="text-[12.5px] font-semibold text-brand">{dict.saved}</p>}
       <Field label={dict.nameLabel}><input value={name} onChange={(e) => setName(e.target.value)} className={fieldClass()} /></Field>
       <Field label={dict.emailLabel}><input value={email} onChange={(e) => setEmail(e.target.value)} type="email" className={fieldClass()} /></Field>
       <Field label={dict.phoneLabel}><input value={phone} onChange={(e) => setPhone(e.target.value)} className={fieldClass()} /></Field>
       <Field label={dict.dniLabel}><input value={dni} onChange={(e) => setDni(e.target.value)} className={fieldClass()} /></Field>
       <Field label={dict.addressLabel}><input value={address} onChange={(e) => setAddress(e.target.value)} className={fieldClass()} /></Field>
       <Field label={dict.dateOfBirthLabel}><input type="date" value={dateOfBirth} onChange={(e) => setDateOfBirth(e.target.value)} className={fieldClass()} /></Field>
-      <div className="flex justify-end gap-2">
-        <Btn variant="ghost" size="sm" onClick={() => setEditing(false)} disabled={saving}>{dict.cancelEditButton}</Btn>
-        <Btn variant={isDirty ? "primary" : "outline"} size="sm" onClick={handleSave} disabled={!isDirty || saving}>
-          {saving ? dict.saving : dict.saveButton}
-        </Btn>
-      </div>
+      {isDirty && (
+        <div className="flex justify-end">
+          <Btn variant="primary" size="sm" onClick={handleSave} disabled={saving}>
+            {saving ? dict.saving : dict.saveButton}
+          </Btn>
+        </div>
+      )}
     </div>
   );
 }
@@ -297,15 +306,6 @@ function StagedClienteTab({
       <Field label={dict.dateOfBirthLabel}>
         <input type="date" value={staged.dateOfBirth} onChange={(e) => onStagedChange({ ...staged, dateOfBirth: e.target.value })} className={fieldClass()} />
       </Field>
-    </div>
-  );
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <p className="text-[12px] font-semibold text-ink-soft">{label}</p>
-      <p className="text-[14px] text-ink">{value}</p>
     </div>
   );
 }
