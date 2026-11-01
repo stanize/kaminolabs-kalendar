@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { Btn } from "@/components/ui/button";
@@ -68,33 +68,15 @@ export function TeamManager({
   const [rows, setRows] = useState<Row[]>(toRows(initialMembers));
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [panelKey, setPanelKey] = useState<string | "new" | null>(null);
   const { overlay, setOverlay, flashSuccessThen } = useSaveOverlay();
 
-  // ── Local roster edits ──────────────────────────────────────────────────────
-  function updateRow(
-    key: string,
-    patch: Partial<Pick<Row, "name" | "role" | "professionalDni" | "professionalCollegeNumber">>
-  ) {
-    setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch } : r)));
-  }
-
+  // ── Local roster edits (side-panel-pattern: a member's fields are edited
+  // in the MemberPanel below, which only touches local `rows` state — the
+  // whole roster still commits atomically via the bottom "Guardar cambios"
+  // button, same as before) ───────────────────────────────────────────────
   function removeRow(key: string) {
     setRows((rs) => rs.filter((r) => r.key !== key));
-  }
-
-  function addRow() {
-    setRows((rs) => [
-      ...rs,
-      {
-        key: crypto.randomUUID(),
-        id: null,
-        name: "",
-        role: "",
-        isOwner: false,
-        professionalDni: "",
-        professionalCollegeNumber: "",
-      },
-    ]);
   }
 
   function handleMode(next: TeamMode) {
@@ -191,8 +173,8 @@ export function TeamManager({
   const isTeam = mode === "team";
   const canDrag = isTeam && rows.length > 1;
 
-  const inputBase =
-    "w-full rounded-[10px] border border-line bg-surface px-3 py-2.5 text-[14px] text-ink outline-none transition-all focus:border-brand focus:shadow-[0_0_0_3px_var(--color-brand-weak)] placeholder:text-ink-soft/60";
+  const panelRow = panelKey === null ? null : panelKey === "new" ? null : rows.find((r) => r.key === panelKey) ?? null;
+  const panelOpen = panelKey !== null;
 
   return (
     <div className="flex flex-col gap-6">
@@ -204,7 +186,7 @@ export function TeamManager({
           <p className="text-[15px] text-ink-soft">{dict.page.subtitle}</p>
         </div>
         {isTeam && (
-          <Btn variant="primary" size="sm" onClick={addRow} className="mt-1 shrink-0">
+          <Btn variant="primary" size="sm" onClick={() => setPanelKey("new")} className="mt-1 shrink-0">
             <Icon name="plus" size={15} /> {m.addMember}
           </Btn>
         )}
@@ -238,9 +220,10 @@ export function TeamManager({
         </div>
       </div>
 
-      {/* Members — each a card with labeled fields (name/role up top,
-          invoicing fields below) */}
-      <div className="flex flex-col gap-3">
+      {/* Members — compact listing (name + role); Editar opens the side
+          panel with the full editable fields (side-panel-pattern, 2026-11-01
+          per Arun) instead of inline-editing every field on the page. */}
+      <div className="flex flex-col gap-2">
         {rows.map((r, index) => {
           return (
             <div
@@ -249,68 +232,44 @@ export function TeamManager({
               onDragStart={() => canDrag && setDragIndex(index)}
               onDragOver={(e) => canDrag && e.preventDefault()}
               onDrop={() => canDrag && handleDrop(index)}
-              className={`rounded-xl border border-line bg-surface p-4 transition-colors ${
+              className={`flex items-center gap-3 rounded-xl border border-line bg-surface px-3.5 py-3 transition-colors ${
                 dragIndex === index ? "opacity-50" : ""
               }`}
             >
-              <div className="mb-3 flex items-start justify-between gap-2 border-b border-line pb-3">
-                <div className="flex items-start gap-2">
-                  {canDrag && (
-                    <span className="mt-0.5 cursor-grab text-ink-soft active:cursor-grabbing" aria-hidden>
-                      <Icon name="list" size={16} />
-                    </span>
-                  )}
-                  <div>
-                    <h3 className="text-[14px] font-semibold text-ink">{m.professionalDataTitle}</h3>
-                    <p className="text-[12px] text-ink-soft">{m.professionalDataSubtitle}</p>
-                  </div>
-                </div>
-                {r.isOwner ? (
-                  <span className="shrink-0 rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-semibold text-ink-soft">
-                    {m.you}
-                  </span>
-                ) : (
+              {canDrag && (
+                <span className="shrink-0 cursor-grab text-ink-soft active:cursor-grabbing" aria-hidden>
+                  <Icon name="list" size={16} />
+                </span>
+              )}
+              <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-brand-weak text-brand">
+                <Icon name="user" size={16} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[14px] font-semibold text-ink">{r.name || m.namePlaceholder}</p>
+                <p className="truncate text-[12.5px] text-ink-soft">{r.role || m.noRole}</p>
+              </div>
+              {r.isOwner && (
+                <span className="shrink-0 rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-semibold text-ink-soft">
+                  {m.you}
+                </span>
+              )}
+              <div className="flex shrink-0 items-center gap-1">
+                <button
+                  onClick={() => setPanelKey(r.key)}
+                  className="grid h-8 w-8 place-items-center rounded-lg text-ink-soft hover:bg-brand-weak hover:text-brand"
+                  aria-label={m.edit}
+                >
+                  <Icon name="pencil" size={15} />
+                </button>
+                {!r.isOwner && (
                   <button
                     onClick={() => removeRow(r.key)}
-                    className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-ink-soft hover:bg-error-weak hover:text-error"
+                    className="grid h-8 w-8 place-items-center rounded-lg text-ink-soft hover:bg-error-weak hover:text-error"
                     aria-label={m.delete}
                   >
                     <Icon name="x" size={15} />
                   </button>
                 )}
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                <LabeledField
-                  label={m.nameLabel}
-                  value={r.name}
-                  onChange={(v) => updateRow(r.key, { name: v })}
-                  placeholder={m.namePlaceholder}
-                  maxLength={80}
-                  inputClassName={inputBase}
-                />
-                <LabeledField
-                  label={m.roleLabel}
-                  value={r.role}
-                  onChange={(v) => updateRow(r.key, { role: v })}
-                  placeholder={m.rolePlaceholder}
-                  maxLength={60}
-                  inputClassName={inputBase}
-                />
-                <LabeledField
-                  label={m.dniLabel}
-                  value={r.professionalDni}
-                  onChange={(v) => updateRow(r.key, { professionalDni: v })}
-                  placeholder={m.dniPlaceholder}
-                  inputClassName={inputBase}
-                />
-                <LabeledField
-                  label={m.collegeNumberLabel}
-                  value={r.professionalCollegeNumber}
-                  onChange={(v) => updateRow(r.key, { professionalCollegeNumber: v })}
-                  placeholder={m.collegeNumberPlaceholder}
-                  inputClassName={inputBase}
-                />
               </div>
             </div>
           );
@@ -323,6 +282,159 @@ export function TeamManager({
         <Btn onClick={handleSave} disabled={saving} size="lg">
           {saving ? m.saving : m.saveTeam}
         </Btn>
+      </div>
+
+      {panelOpen && (
+        <MemberPanel
+          row={panelRow}
+          dict={dict}
+          onClose={() => setPanelKey(null)}
+          onSaved={(saved) => {
+            setPanelKey(null);
+            setRows((rs) => {
+              const exists = rs.some((r) => r.key === saved.key);
+              return exists ? rs.map((r) => (r.key === saved.key ? saved : r)) : [...rs, saved];
+            });
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function MemberPanel({
+  row,
+  dict,
+  onClose,
+  onSaved,
+}: {
+  row: Row | null;
+  dict: TeamDictionary;
+  onClose: () => void;
+  onSaved: (row: Row) => void;
+}) {
+  const m = dict.manager;
+  const [name, setName] = useState(row?.name ?? "");
+  const [role, setRole] = useState(row?.role ?? "");
+  const [professionalDni, setProfessionalDni] = useState(row?.professionalDni ?? "");
+  const [professionalCollegeNumber, setProfessionalCollegeNumber] = useState(row?.professionalCollegeNumber ?? "");
+  const [error, setError] = useState<string | null>(null);
+
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setVisible(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
+  const closingRef = useRef(false);
+  function requestClose(after: () => void) {
+    if (closingRef.current) return;
+    closingRef.current = true;
+    setVisible(false);
+    setTimeout(after, 200);
+  }
+  const closePanel = () => requestClose(onClose);
+
+  function handleSave() {
+    setError(null);
+    if (name.trim().length < 2) {
+      setError(dict.errors.errNameRequired);
+      return;
+    }
+    requestClose(() =>
+      onSaved({
+        key: row?.key ?? crypto.randomUUID(),
+        id: row?.id ?? null,
+        name: name.trim(),
+        role: role.trim(),
+        isOwner: row?.isOwner ?? false,
+        professionalDni: professionalDni.trim(),
+        professionalCollegeNumber: professionalCollegeNumber.trim(),
+      })
+    );
+  }
+
+  const inputBase =
+    "w-full rounded-[10px] border border-line bg-surface px-3 py-2.5 text-[14px] text-ink outline-none transition-all focus:border-brand focus:shadow-[0_0_0_3px_var(--color-brand-weak)] placeholder:text-ink-soft/60";
+
+  return (
+    <div className="fixed inset-y-0 left-0 right-0 z-50 md:left-[240px]">
+      <div
+        className={`absolute inset-0 bg-black/40 transition-opacity duration-200 ${visible ? "opacity-100" : "opacity-0"}`}
+        onClick={closePanel}
+        aria-hidden
+      />
+      <div
+        className={`absolute inset-y-0 right-0 flex h-full w-full flex-col overflow-y-auto bg-surface p-5 shadow-2xl transition-transform duration-200 ease-out sm:w-1/2 sm:min-w-[480px] sm:p-8 ${
+          visible ? "translate-x-0" : "translate-x-full"
+        }`}
+      >
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-[17px] font-bold text-ink">{row ? m.panelTitleEdit : m.panelTitleNew}</h2>
+          <button
+            onClick={closePanel}
+            aria-label={m.panelClose}
+            className="grid h-8 w-8 place-items-center rounded-lg text-ink-soft hover:bg-surface-2"
+          >
+            <Icon name="x" size={16} />
+          </button>
+        </div>
+
+        {error && (
+          <div className="mb-3 rounded-lg border border-error bg-error-weak px-3 py-2 text-[12.5px] text-error">{error}</div>
+        )}
+
+        <div className="mb-4 rounded-lg border border-line bg-surface-2/50 px-3 py-2.5">
+          <p className="text-[12.5px] font-medium text-ink">{m.professionalDataTitle}</p>
+          <p className="text-[11.5px] text-ink-soft">{m.professionalDataSubtitle}</p>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <LabeledField
+            label={m.nameLabel}
+            value={name}
+            onChange={setName}
+            placeholder={m.namePlaceholder}
+            maxLength={80}
+            inputClassName={inputBase}
+          />
+          <LabeledField
+            label={m.roleLabel}
+            value={role}
+            onChange={setRole}
+            placeholder={m.rolePlaceholder}
+            maxLength={60}
+            inputClassName={inputBase}
+          />
+          <LabeledField
+            label={m.dniLabel}
+            value={professionalDni}
+            onChange={setProfessionalDni}
+            placeholder={m.dniPlaceholder}
+            inputClassName={inputBase}
+          />
+          <LabeledField
+            label={m.collegeNumberLabel}
+            value={professionalCollegeNumber}
+            onChange={setProfessionalCollegeNumber}
+            placeholder={m.collegeNumberPlaceholder}
+            inputClassName={inputBase}
+          />
+        </div>
+
+        <div className="mt-5 flex justify-end gap-2">
+          <button
+            onClick={closePanel}
+            className="rounded-lg px-3.5 py-2 text-[13.5px] font-semibold text-ink-soft hover:bg-surface-2"
+          >
+            {m.panelCancel}
+          </button>
+          <button
+            onClick={handleSave}
+            className="rounded-lg bg-brand px-4 py-2 text-[13.5px] font-semibold text-white hover:opacity-90"
+          >
+            {m.panelSave}
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -19,9 +19,16 @@ export interface TeamDictionary {
     teamTitle: string;
     teamSub: string;
     you: string;
+    edit: string; // aria-label on the edit-pencil button
     delete: string;
     addMember: string;
     saveTeam: string; // single commit button label
+    panelTitleNew: string;
+    panelTitleEdit: string;
+    panelClose: string; // aria-label
+    panelCancel: string;
+    panelSave: string;
+    noRole: string; // shown on the list row when a member has no role set
     nameLabel: string;
     namePlaceholder: string;
     roleLabel: string;
@@ -72,9 +79,16 @@ const es: TeamDictionary = {
     teamTitle: "Equipo",
     teamSub: "Varias personas atienden citas",
     you: "Tú",
+    edit: "Editar",
     delete: "Eliminar",
     addMember: "Añadir miembro",
     saveTeam: "Guardar cambios",
+    panelTitleNew: "Nuevo miembro",
+    panelTitleEdit: "Editar miembro",
+    panelClose: "Cerrar",
+    panelCancel: "Cancelar",
+    panelSave: "Guardar",
+    noRole: "Sin rol asignado",
     nameLabel: "Nombre",
     namePlaceholder: "Nombre y apellido",
     roleLabel: "Rol",
@@ -118,9 +132,16 @@ const en: TeamDictionary = {
     teamTitle: "Team",
     teamSub: "Several people handle appointments",
     you: "You",
+    edit: "Edit",
     delete: "Delete",
     addMember: "Add member",
     saveTeam: "Save changes",
+    panelTitleNew: "New member",
+    panelTitleEdit: "Edit member",
+    panelClose: "Close",
+    panelCancel: "Cancel",
+    panelSave: "Save",
+    noRole: "No role set",
     nameLabel: "Name",
     namePlaceholder: "First and last name",
     roleLabel: "Role",
