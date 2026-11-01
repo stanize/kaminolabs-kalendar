@@ -483,12 +483,6 @@ export function AppointmentModal({
           </div>
         )}
 
-        {!error && conflict && (
-          <div className="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-[12.5px] text-amber-700">
-            {md.slotTakenHint}
-          </div>
-        )}
-
         <div className="flex flex-col gap-3">
           <Field label={md.serviceLabel}>
             <select
@@ -611,6 +605,11 @@ export function AppointmentModal({
             <span className="-mt-2 text-[12px] text-amber-600">
               {md.closureWarningNote.replace("{label}", closureWarningLabel)}
             </span>
+          )}
+          {conflict && (
+            <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-[12.5px] text-amber-700">
+              {md.slotTakenHint}
+            </div>
           )}
 
           <Field label={md.clientNameLabel}>
