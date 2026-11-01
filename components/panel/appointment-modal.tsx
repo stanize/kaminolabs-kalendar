@@ -525,7 +525,7 @@ export function AppointmentModal({
                 </select>
               </Field>
               {nearestSlotFlash && (
-                <div className="absolute left-0 top-full z-10 mt-1 rounded-lg bg-ink px-2.5 py-1.5 text-[12px] font-medium text-white shadow-lg transition-opacity duration-300">
+                <div className="absolute left-0 top-full z-10 mt-1 rounded-lg border border-brand-line bg-brand-weak px-2.5 py-1.5 text-[12px] font-medium text-brand-ink shadow-lg transition-opacity duration-300">
                   {md.nearestSlotHint.replace("{time}", nearestSlotFlash)}
                 </div>
               )}
