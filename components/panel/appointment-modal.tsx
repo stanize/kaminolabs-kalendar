@@ -581,7 +581,7 @@ export function AppointmentModal({
               )}
             </div>
             {nearestSlotFlash && (
-              <div className="pointer-events-none absolute left-0 right-0 top-[26px] bottom-0 z-20 flex items-center rounded-lg border border-brand bg-brand/20 px-3 text-[16px] font-medium text-brand-ink shadow-lg transition-opacity duration-300">
+              <div className="pointer-events-none absolute left-0 right-0 top-[26px] bottom-0 z-20 flex items-center rounded-lg border border-brand bg-[color-mix(in_oklab,var(--color-brand)_25%,white)] px-3 text-[16px] font-medium text-brand-ink shadow-lg transition-opacity duration-300">
                 {md.nearestSlotHint.replace("{time}", nearestSlotFlash)}
               </div>
             )}
