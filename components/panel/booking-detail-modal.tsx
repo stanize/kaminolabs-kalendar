@@ -302,7 +302,7 @@ export function BookingDetailModal({
   }, [selectedDateParts, timeStr, timeValid, durationMin, teamMemberId, closures, md.closureGenericLabel]);
 
   const handleSaveFields = async (confirmed?: boolean) => {
-    if (!serviceId || !teamMemberId || !startDate || fieldsConflict) return;
+    if (!serviceId || !teamMemberId || !startDate) return;
     setSavingFields(true);
     setError(null);
     const res = await updateBookingAsOwner(
@@ -880,8 +880,8 @@ export function BookingDetailModal({
             </span>
           )}
           {fieldsConflict && (
-            <div className="rounded-lg border border-error bg-error-weak px-3 py-2 text-[12.5px] text-error">
-              {dict.manualErrors.errSlotTaken}
+            <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-[12.5px] text-amber-700">
+              {md.slotTakenHint}
             </div>
           )}
 
@@ -962,7 +962,7 @@ export function BookingDetailModal({
               variant={isDirty ? "primary" : "outline"}
               onClick={() => handleSaveFields()}
               disabled={
-                !isDirty || savingFields || !clientName.trim() || !serviceId || !teamMemberId || !dateValid || !timeValid || fieldsConflict
+                !isDirty || savingFields || !clientName.trim() || !serviceId || !teamMemberId || !dateValid || !timeValid
               }
             >
               {savingFields ? md.saving : md.saveButton}

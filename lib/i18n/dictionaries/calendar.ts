@@ -92,6 +92,11 @@ export interface CalendarDictionary {
     outsideHoursNote: string; // non-blocking note shown when the picked time falls outside business hours
     closureWarningNote: string; // non-blocking note shown when the picked date/time falls on a festivo or provider time off; "{label}" is replaced with the closure's name
     closureGenericLabel: string; // "{label}" fallback when the matched closure has no custom label
+    // force-insert-double-booking: non-blocking pre-submit heads-up shown
+    // when the picked time already overlaps another booking for this
+    // provider — submitting still works, it just triggers the confirm
+    // dialog (dict.bookingConflict) instead of silently saving.
+    slotTakenHint: string;
     clientNameLabel: string;
     clientNamePlaceholder: string;
     clientEmailLabel: string;
@@ -332,6 +337,7 @@ const es: CalendarDictionary = {
     outsideHoursNote: "Fuera de horario laboral",
     closureWarningNote: "Este día/horario está marcado como no disponible ({label}). Puedes crear la cita igualmente.",
     closureGenericLabel: "festivo o ausencia",
+    slotTakenHint: "Este profesional ya tiene una cita en este horario. Puedes continuar — se te pedirá confirmación.",
     clientNameLabel: "Nombre del cliente",
     clientNamePlaceholder: "Nombre y apellidos",
     clientEmailLabel: "Email (opcional)",
@@ -532,6 +538,7 @@ const en: CalendarDictionary = {
     outsideHoursNote: "Outside business hours",
     closureWarningNote: "This day/time is marked as unavailable ({label}). You can still create the appointment.",
     closureGenericLabel: "holiday or time off",
+    slotTakenHint: "This provider already has an appointment at this time. You can continue — you'll be asked to confirm.",
     clientNameLabel: "Client name",
     clientNamePlaceholder: "Full name",
     clientEmailLabel: "Email (optional)",

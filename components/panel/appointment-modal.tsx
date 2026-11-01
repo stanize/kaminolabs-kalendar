@@ -293,7 +293,7 @@ export function AppointmentModal({
 
   const handleSubmit = async (confirmed?: boolean) => {
     setError(null);
-    if (!serviceId || !teamMemberId || !startDate || conflict) return;
+    if (!serviceId || !teamMemberId || !startDate) return;
     setSubmitting(true);
     try {
       const res = await createBookingAsOwner(
@@ -424,8 +424,8 @@ export function AppointmentModal({
         )}
 
         {!error && conflict && (
-          <div className="mb-3 rounded-lg border border-error bg-error-weak px-3 py-2 text-[12.5px] text-error">
-            {errorsDict.errSlotTaken}
+          <div className="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-[12.5px] text-amber-700">
+            {md.slotTakenHint}
           </div>
         )}
 
@@ -633,7 +633,7 @@ export function AppointmentModal({
           </button>
           <button
             onClick={() => handleSubmit()}
-            disabled={submitting || !clientName.trim() || !serviceId || !teamMemberId || !dateValid || !timeValid || conflict}
+            disabled={submitting || !clientName.trim() || !serviceId || !teamMemberId || !dateValid || !timeValid}
             className="rounded-lg bg-brand px-4 py-2 text-[13.5px] font-semibold text-white hover:opacity-90 disabled:opacity-50"
           >
             {submitting ? md.submitting : md.submit}
