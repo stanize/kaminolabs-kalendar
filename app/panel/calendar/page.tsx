@@ -140,7 +140,7 @@ export default async function CalendarPage() {
           clientStatus: b.clientStatus,
           clinicReviewedAt: b.clinic_reviewed_at,
         }))}
-        weekMembers={(weekData?.members ?? []).map((m) => ({ id: m.id, name: m.name, isOwner: m.isOwner }))}
+        weekMembers={(weekData?.members ?? []).map((m) => ({ id: m.id, name: m.name, isOwner: m.isOwner, active: m.active }))}
         weekHoursByDay={weekData?.hoursByDay ?? {}}
         weekServices={(weekData?.services ?? []).map((s) => ({
           id: s.id, name: s.name, durationMin: s.durationMin, price: s.price,

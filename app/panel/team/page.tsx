@@ -43,6 +43,7 @@ export default async function TeamPage({
           is_owner: m.is_owner,
           professional_dni: m.professional_dni,
           professional_college_number: m.professional_college_number,
+          active: m.active,
         }))}
         returnToHome={returnToHome}
       />

@@ -28,6 +28,10 @@ export interface WeekMemberVM {
   id: string;
   name: string;
   isOwner: boolean;
+  // team-member-lifecycle: false once a member with bookings is
+  // deleted-as-disabled — the week column and this member's existing
+  // bookings still show, but they're excluded from new-booking pickers.
+  active: boolean;
 }
 
 // Client-relationship status labels/colors (lib/booking/client-status.ts) —
@@ -540,7 +544,11 @@ export function CalendarGridView({
           hoursByDay={hoursByDay}
           allBookings={bookings}
           services={services.map((s) => ({ id: s.id, name: s.name, durationMin: s.durationMin, price: s.price }))}
-          members={allMembers.map((m) => ({ id: m.id, name: m.name }))}
+          /* team-member-lifecycle: a new appointment can only be assigned
+             to an active provider — a disabled member (has bookings, can't
+             be hard-deleted) stays visible on existing bookings/columns but
+             drops out of this picker. */
+          members={allMembers.filter((m) => m.active).map((m) => ({ id: m.id, name: m.name }))}
           closures={closures}
           customSlotRules={customSlotRules}
           dict={dict}

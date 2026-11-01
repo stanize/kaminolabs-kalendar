@@ -12,10 +12,11 @@ export interface TeamMember {
   created_at: string;
   professional_dni: string | null;
   professional_college_number: string | null;
+  active: boolean;
 }
 
 const TEAM_COLUMNS =
-  "id, business_id, name, role, is_owner, sort_order, created_at, professional_dni, professional_college_number";
+  "id, business_id, name, role, is_owner, sort_order, created_at, professional_dni, professional_college_number, active";
 
 /**
  * All team members for the given user's business, ordered for display (owner

@@ -124,6 +124,10 @@ export interface WeekViewMember {
   id: string;
   name: string;
   isOwner: boolean;
+  // team-member-lifecycle: false once a member with bookings is
+  // deleted-as-disabled. The column still appears (existing bookings stay
+  // visible) but new-booking pickers exclude inactive members.
+  active: boolean;
 }
 
 export interface WeekViewBooking {
@@ -301,7 +305,7 @@ export async function getWeekCalendarData(
   }));
 
   return {
-    members: membersRows.map((m) => ({ id: m.id, name: m.name, isOwner: m.is_owner })),
+    members: membersRows.map((m) => ({ id: m.id, name: m.name, isOwner: m.is_owner, active: m.active })),
     hoursByDay,
     services: servicesRows.map((s) => ({ id: s.id, name: s.name, durationMin: s.duration_min, price: s.price })),
     bookings,

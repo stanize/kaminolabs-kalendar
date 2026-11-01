@@ -22,7 +22,12 @@ export interface TeamDictionary {
     edit: string; // aria-label on the edit-pencil button
     delete: string;
     addMember: string;
-    saveTeam: string; // single commit button label
+    saveTeam: string; // unused now that every action commits immediately; kept for a possible future bulk-edit mode
+    disabledBadge: string; // "Desactivado" — shown on a member with bookings that was deleted-as-disabled
+    reactivate: string;
+    confirmDelete: string; // inline confirm prompt shown on the member's own row
+    confirmDeleteYes: string;
+    confirmDeleteNo: string;
     panelTitleNew: string;
     panelTitleEdit: string;
     panelClose: string; // aria-label
@@ -83,6 +88,11 @@ const es: TeamDictionary = {
     delete: "Eliminar",
     addMember: "Añadir miembro",
     saveTeam: "Guardar cambios",
+    disabledBadge: "Desactivado",
+    reactivate: "Reactivar",
+    confirmDelete: "¿Eliminar?",
+    confirmDeleteYes: "Eliminar",
+    confirmDeleteNo: "Cancelar",
     panelTitleNew: "Nuevo miembro",
     panelTitleEdit: "Editar miembro",
     panelClose: "Cerrar",
@@ -136,6 +146,11 @@ const en: TeamDictionary = {
     delete: "Delete",
     addMember: "Add member",
     saveTeam: "Save changes",
+    disabledBadge: "Disabled",
+    reactivate: "Reactivate",
+    confirmDelete: "Delete?",
+    confirmDeleteYes: "Delete",
+    confirmDeleteNo: "Cancel",
     panelTitleNew: "New member",
     panelTitleEdit: "Edit member",
     panelClose: "Close",

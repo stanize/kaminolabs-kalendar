@@ -53,6 +53,10 @@ export async function getPublicBookingData(slug: string): Promise<PublicBookingD
       .from("kalendar_team_members")
       .select("id, name, role, is_owner, sort_order")
       .eq("business_id", business.id)
+      // team-member-lifecycle: the public page only ever creates NEW
+      // bookings, so a disabled provider (has bookings, can't be
+      // hard-deleted) is never offered here.
+      .eq("active", true)
       .order("sort_order", { ascending: true }),
   ]);
 

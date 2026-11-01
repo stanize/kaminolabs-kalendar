@@ -578,7 +578,12 @@ create table public.kalendar_team_members (
   -- each team member can have their own. This member's own `name` is used
   -- as the invoice's "Fdo:" signature line, so no separate name field here.
   professional_dni             text,
-  professional_college_number  text
+  professional_college_number  text,
+  -- team-member-lifecycle (schema_subset_035.sql): a member with any
+  -- bookings (past or future) can't be hard-deleted — disabled instead.
+  -- Disabled members are excluded from new-booking provider pickers (public
+  -- booking page + clinic calendar) but kept for historical display/lookup.
+  active                       boolean     not null default true
 );
 
 create index kalendar_team_members_business_id_idx on public.kalendar_team_members (business_id);

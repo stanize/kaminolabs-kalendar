@@ -4,8 +4,14 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { Btn } from "@/components/ui/button";
-import { SaveOverlay, useSaveOverlay } from "@/components/panel/save-overlay";
-import { saveTeam } from "@/lib/actions/team";
+import {
+  setTeamMode,
+  createTeamMember,
+  updateTeamMember,
+  deleteOrDisableTeamMember,
+  reactivateTeamMember,
+  reorderTeamMembers,
+} from "@/lib/actions/team";
 import { reportClientError } from "@/lib/report-client-error";
 import type { TeamDictionary } from "@/lib/i18n/dictionaries/team";
 
@@ -18,38 +24,45 @@ interface MemberItem {
   is_owner: boolean;
   professional_dni: string | null;
   professional_college_number: string | null;
+  active: boolean;
 }
 
-/** One locally edited roster row. id === null → new member, not yet saved. */
+/** One roster row, always backed by a saved member (id is never null here —
+ * add goes through the panel, which inserts server-side before it appears
+ * in this list). */
 interface Row {
-  key: string; // stable React key (real id for saved rows, random for new)
-  id: string | null;
+  id: string;
   name: string;
   role: string;
   isOwner: boolean;
   professionalDni: string;
   professionalCollegeNumber: string;
+  active: boolean;
 }
 
-function toRows(members: MemberItem[]): Row[] {
-  return members.map((m) => ({
-    key: m.id,
+function toRow(m: MemberItem): Row {
+  return {
     id: m.id,
     name: m.name,
     role: m.role,
     isOwner: m.is_owner,
     professionalDni: m.professional_dni ?? "",
     professionalCollegeNumber: m.professional_college_number ?? "",
-  }));
+    active: m.active,
+  };
 }
 
 /**
- * Equipo manager — fully local editing, single commit.
+ * Equipo manager — every action commits immediately (2026-11-01, per Arun:
+ * "no changes should happen in this page", replacing the old single
+ * "Guardar cambios" batch commit). Mode switch, add/edit (via the side
+ * panel), delete-or-disable, reactivate, and drag-reorder each fire their
+ * own server action on the spot.
  *
- * All roster edits (mode switch, rename, role, add, delete, drag-reorder)
- * happen in local state only. One button at the bottom saves the whole roster
- * atomically via saveTeam (mirrors Disponibilidad's whole-week save) and, in
- * the setup flow (?from=home), continues back to Inicio.
+ * team-member-lifecycle: a member with any booking (past or future) can't
+ * be hard-deleted — deleteOrDisableTeamMember disables them instead
+ * (active=false). Disabled members stay listed, grayed out, with a
+ * "Desactivado" badge and a Reactivar action instead of Editar/Eliminar.
  */
 export function TeamManager({
   teamMode,
@@ -65,35 +78,91 @@ export function TeamManager({
   const router = useRouter();
   const m = dict.manager;
   const [mode, setMode] = useState<TeamMode>(teamMode);
-  const [rows, setRows] = useState<Row[]>(toRows(initialMembers));
+  const [rows, setRows] = useState<Row[]>(initialMembers.map(toRow));
   const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [panelKey, setPanelKey] = useState<string | "new" | null>(null);
-  const { overlay, setOverlay, flashSuccessThen } = useSaveOverlay();
+  const [modeSaving, setModeSaving] = useState(false);
+  const [panelId, setPanelId] = useState<string | "new" | null>(null);
+  const [rowBusyId, setRowBusyId] = useState<string | null>(null);
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
 
-  // ── Local roster edits (side-panel-pattern: a member's fields are edited
-  // in the MemberPanel below, which only touches local `rows` state — the
-  // whole roster still commits atomically via the bottom "Guardar cambios"
-  // button, same as before) ───────────────────────────────────────────────
-  function removeRow(key: string) {
-    setRows((rs) => rs.filter((r) => r.key !== key));
-  }
-
-  function handleMode(next: TeamMode) {
-    if (next === mode) return;
+  async function handleMode(next: TeamMode) {
+    if (next === mode || modeSaving) return;
     setError(null);
     // Same rule the server enforces: solo = just the owner. Surface it
-    // immediately instead of at save time.
+    // immediately instead of waiting on the round trip.
     if (next === "solo" && rows.some((r) => !r.isOwner)) {
       setError(dict.errors.errCannotGoSolo);
       return;
     }
-    setMode(next);
+    setModeSaving(true);
+    try {
+      const result = await setTeamMode({ mode: next, dict: dict.errors });
+      if (!result.ok) {
+        setError(result.error);
+        setModeSaving(false);
+        return;
+      }
+      setMode(next);
+      setModeSaving(false);
+      if (returnToHome) router.push("/panel");
+      else router.refresh();
+    } catch (e) {
+      reportClientError("setTeamMode", e);
+      setError(m.errUnexpected);
+      setModeSaving(false);
+    }
   }
 
-  // ── Drag reorder (team mode; local only, persisted on save) ────────────────
+  async function handleDeleteOrDisable(id: string) {
+    setError(null);
+    setRowBusyId(id);
+    try {
+      const result = await deleteOrDisableTeamMember({ id, dict: dict.errors });
+      setConfirmingId(null);
+      if (!result.ok) {
+        setError(result.error);
+        setRowBusyId(null);
+        return;
+      }
+      if (result.outcome === "deleted") {
+        setRows((rs) => rs.filter((r) => r.id !== id));
+      } else {
+        setRows((rs) => rs.map((r) => (r.id === id ? toRow(result.member as MemberItem) : r)));
+      }
+      setRowBusyId(null);
+      router.refresh();
+    } catch (e) {
+      reportClientError("deleteOrDisableTeamMember", e);
+      setError(m.errUnexpected);
+      setRowBusyId(null);
+      setConfirmingId(null);
+    }
+  }
+
+  async function handleReactivate(id: string) {
+    setError(null);
+    setRowBusyId(id);
+    try {
+      const result = await reactivateTeamMember({ id, dict: dict.errors });
+      if (!result.ok) {
+        setError(result.error);
+        setRowBusyId(null);
+        return;
+      }
+      setRows((rs) => rs.map((r) => (r.id === id ? toRow(result.member as MemberItem) : r)));
+      setRowBusyId(null);
+      router.refresh();
+    } catch (e) {
+      reportClientError("reactivateTeamMember", e);
+      setError(m.errUnexpected);
+      setRowBusyId(null);
+    }
+  }
+
+  // ── Drag reorder — commits immediately on drop ──────────────────────────
   const [dragIndex, setDragIndex] = useState<number | null>(null);
-  function handleDrop(targetIndex: number) {
+  const [reordering, setReordering] = useState(false);
+  async function handleDrop(targetIndex: number) {
     if (dragIndex === null || dragIndex === targetIndex) {
       setDragIndex(null);
       return;
@@ -103,90 +172,35 @@ export function TeamManager({
     next.splice(targetIndex, 0, moved);
     setRows(next);
     setDragIndex(null);
-  }
 
-  // ── Single commit ───────────────────────────────────────────────────────────
-  async function handleSave() {
     setError(null);
-
-    // Client-side validation for immediate feedback (server re-validates).
-    for (const r of rows) {
-      if (r.name.trim().length < 2) {
-        setError(dict.errors.errNameRequired);
-        return;
-      }
-    }
-
-    setSaving(true);
-    setOverlay("saving");
+    setReordering(true);
     try {
-      const result = await saveTeam(
-        {
-          mode,
-          members: rows.map((r) => ({
-            id: r.id,
-            name: r.name.trim(),
-            role: r.role.trim(),
-            professionalDni: r.professionalDni.trim(),
-            professionalCollegeNumber: r.professionalCollegeNumber.trim(),
-          })),
-        },
-        dict.errors
-      );
-      if (!result.ok) {
-        setError(result.error);
-        setSaving(false);
-        setOverlay(null);
-        return;
-      }
-      flashSuccessThen(() => {
-        if (returnToHome) {
-          router.push("/panel");
-          return; // overlay stays up until navigation unmounts this page
-        }
-        // Remap local rows to their saved ids so a second save doesn't
-        // re-insert new members.
-        setRows(
-          toRows(
-            result.members.map((mem) => ({
-              id: mem.id,
-              name: mem.name,
-              role: mem.role ?? "",
-              is_owner: mem.is_owner,
-              professional_dni: mem.professional_dni,
-              professional_college_number: mem.professional_college_number,
-            }))
-          )
-        );
-        setSaving(false);
-        setOverlay(null);
-        router.refresh();
-      });
+      const result = await reorderTeamMembers({ orderedIds: next.map((r) => r.id), dict: dict.errors });
+      if (!result.ok) setError(result.error);
+      setReordering(false);
     } catch (e) {
-      reportClientError("saveTeam", e);
+      reportClientError("reorderTeamMembers", e);
       setError(m.errUnexpected);
-      setSaving(false);
-      setOverlay(null);
+      setReordering(false);
     }
   }
 
   const isTeam = mode === "team";
-  const canDrag = isTeam && rows.length > 1;
+  const canDrag = isTeam && rows.length > 1 && !reordering;
 
-  const panelRow = panelKey === null ? null : panelKey === "new" ? null : rows.find((r) => r.key === panelKey) ?? null;
-  const panelOpen = panelKey !== null;
+  const panelRow = panelId === null || panelId === "new" ? null : rows.find((r) => r.id === panelId) ?? null;
+  const panelOpen = panelId !== null;
 
   return (
     <div className="flex flex-col gap-6">
-      <SaveOverlay state={overlay} savingLabel={m.saving} successLabel={m.flashSuccess} />
-
       <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="mb-1 text-[24px]">{dict.page.title}</h1>
           <p className="text-[15px] text-ink-soft">{dict.page.subtitle}</p>
         </div>
         {isTeam && (
-          <Btn variant="primary" size="sm" onClick={() => setPanelKey("new")} className="mt-1 shrink-0">
+          <Btn variant="primary" size="sm" onClick={() => setPanelId("new")} className="mt-1 shrink-0">
             <Icon name="plus" size={15} /> {m.addMember}
           </Btn>
         )}
@@ -199,12 +213,13 @@ export function TeamManager({
         </div>
       )}
 
-      {/* Mode selector (local — committed on save) */}
+      {/* Mode selector — commits immediately */}
       <div className="flex flex-col gap-[9px]">
         <span className="text-[13px] font-semibold text-ink">{m.howDoYouWork}</span>
         <div className="grid grid-cols-2 gap-2">
           <ModeCard
             active={!isTeam}
+            disabled={modeSaving}
             onClick={() => handleMode("solo")}
             icon="user"
             title={m.soloTitle}
@@ -212,6 +227,7 @@ export function TeamManager({
           />
           <ModeCard
             active={isTeam}
+            disabled={modeSaving}
             onClick={() => handleMode("team")}
             icon="users"
             title={m.teamTitle}
@@ -221,20 +237,22 @@ export function TeamManager({
       </div>
 
       {/* Members — compact listing (name + role); Editar opens the side
-          panel with the full editable fields (side-panel-pattern, 2026-11-01
-          per Arun) instead of inline-editing every field on the page. */}
+          panel with the full editable fields (side-panel-pattern). A member
+          with bookings can't be hard-deleted — Eliminar disables them
+          instead (grayed row, "Desactivado" badge, Reactivar action). */}
       <div className="flex flex-col gap-2">
         {rows.map((r, index) => {
+          const busy = rowBusyId === r.id;
           return (
             <div
-              key={r.key}
+              key={r.id}
               draggable={canDrag}
               onDragStart={() => canDrag && setDragIndex(index)}
               onDragOver={(e) => canDrag && e.preventDefault()}
               onDrop={() => canDrag && handleDrop(index)}
               className={`flex items-center gap-3 rounded-xl border border-line bg-surface px-3.5 py-3 transition-colors ${
                 dragIndex === index ? "opacity-50" : ""
-              }`}
+              } ${!r.active ? "opacity-60" : ""}`}
             >
               {canDrag && (
                 <span className="shrink-0 cursor-grab text-ink-soft active:cursor-grabbing" aria-hidden>
@@ -253,48 +271,74 @@ export function TeamManager({
                   {m.you}
                 </span>
               )}
-              <div className="flex shrink-0 items-center gap-1">
+              {!r.active && (
+                <span className="shrink-0 rounded-full bg-error-weak px-2 py-0.5 text-[11px] font-semibold text-error">
+                  {m.disabledBadge}
+                </span>
+              )}
+
+              {!r.active ? (
                 <button
-                  onClick={() => setPanelKey(r.key)}
-                  className="grid h-8 w-8 place-items-center rounded-lg text-ink-soft hover:bg-brand-weak hover:text-brand"
-                  aria-label={m.edit}
+                  onClick={() => handleReactivate(r.id)}
+                  disabled={busy}
+                  className="shrink-0 rounded-lg px-2.5 py-1.5 text-[12.5px] font-semibold text-brand hover:bg-brand-weak disabled:opacity-50"
                 >
-                  <Icon name="pencil" size={15} />
+                  {busy ? "…" : m.reactivate}
                 </button>
-                {!r.isOwner && (
+              ) : confirmingId === r.id ? (
+                <div className="flex shrink-0 items-center gap-2">
+                  <span className="text-[12px] text-ink-soft">{m.confirmDelete}</span>
                   <button
-                    onClick={() => removeRow(r.key)}
-                    className="grid h-8 w-8 place-items-center rounded-lg text-ink-soft hover:bg-error-weak hover:text-error"
-                    aria-label={m.delete}
+                    onClick={() => handleDeleteOrDisable(r.id)}
+                    disabled={busy}
+                    className="rounded-lg bg-error px-2.5 py-1 text-[12px] font-semibold text-white hover:opacity-90 disabled:opacity-50"
                   >
-                    <Icon name="x" size={15} />
+                    {busy ? "…" : m.confirmDeleteYes}
                   </button>
-                )}
-              </div>
+                  <button
+                    onClick={() => setConfirmingId(null)}
+                    className="rounded-lg px-2.5 py-1 text-[12px] font-semibold text-ink-soft hover:bg-surface-2"
+                  >
+                    {m.confirmDeleteNo}
+                  </button>
+                </div>
+              ) : (
+                <div className="flex shrink-0 items-center gap-1">
+                  <button
+                    onClick={() => setPanelId(r.id)}
+                    className="grid h-8 w-8 place-items-center rounded-lg text-ink-soft hover:bg-brand-weak hover:text-brand"
+                    aria-label={m.edit}
+                  >
+                    <Icon name="pencil" size={15} />
+                  </button>
+                  {!r.isOwner && (
+                    <button
+                      onClick={() => setConfirmingId(r.id)}
+                      className="grid h-8 w-8 place-items-center rounded-lg text-ink-soft hover:bg-error-weak hover:text-error"
+                      aria-label={m.delete}
+                    >
+                      <Icon name="x" size={15} />
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           );
         })}
-      </div>
-
-      {/* Single commit — saves the whole roster; in the setup flow it also
-          returns to Inicio after saving. */}
-      <div className="pt-2">
-        <Btn onClick={handleSave} disabled={saving} size="lg">
-          {saving ? m.saving : m.saveTeam}
-        </Btn>
       </div>
 
       {panelOpen && (
         <MemberPanel
           row={panelRow}
           dict={dict}
-          onClose={() => setPanelKey(null)}
+          onClose={() => setPanelId(null)}
           onSaved={(saved) => {
-            setPanelKey(null);
+            setPanelId(null);
             setRows((rs) => {
-              const exists = rs.some((r) => r.key === saved.key);
-              return exists ? rs.map((r) => (r.key === saved.key ? saved : r)) : [...rs, saved];
+              const exists = rs.some((r) => r.id === saved.id);
+              return exists ? rs.map((r) => (r.id === saved.id ? saved : r)) : [...rs, saved];
             });
+            router.refresh();
           }}
         />
       )}
@@ -318,6 +362,7 @@ function MemberPanel({
   const [role, setRole] = useState(row?.role ?? "");
   const [professionalDni, setProfessionalDni] = useState(row?.professionalDni ?? "");
   const [professionalCollegeNumber, setProfessionalCollegeNumber] = useState(row?.professionalCollegeNumber ?? "");
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [visible, setVisible] = useState(false);
@@ -334,23 +379,42 @@ function MemberPanel({
   }
   const closePanel = () => requestClose(onClose);
 
-  function handleSave() {
+  async function handleSave() {
     setError(null);
-    if (name.trim().length < 2) {
-      setError(dict.errors.errNameRequired);
-      return;
-    }
-    requestClose(() =>
-      onSaved({
-        key: row?.key ?? crypto.randomUUID(),
-        id: row?.id ?? null,
+    setSaving(true);
+    try {
+      const payload = {
         name: name.trim(),
         role: role.trim(),
-        isOwner: row?.isOwner ?? false,
         professionalDni: professionalDni.trim(),
         professionalCollegeNumber: professionalCollegeNumber.trim(),
-      })
-    );
+        dict: dict.errors,
+      };
+      const result = row
+        ? await updateTeamMember({ id: row.id, ...payload })
+        : await createTeamMember(payload);
+      if (!result.ok) {
+        setError(result.error);
+        setSaving(false);
+        return;
+      }
+      setSaving(false);
+      requestClose(() =>
+        onSaved({
+          id: result.member.id,
+          name: result.member.name,
+          role: result.member.role ?? "",
+          isOwner: result.member.is_owner,
+          professionalDni: result.member.professional_dni ?? "",
+          professionalCollegeNumber: result.member.professional_college_number ?? "",
+          active: result.member.active,
+        })
+      );
+    } catch (e) {
+      reportClientError(row ? "updateTeamMember" : "createTeamMember", e);
+      setError(dict.manager.errUnexpected);
+      setSaving(false);
+    }
   }
 
   const inputBase =
@@ -424,15 +488,17 @@ function MemberPanel({
         <div className="mt-5 flex justify-end gap-2">
           <button
             onClick={closePanel}
+            disabled={saving}
             className="rounded-lg px-3.5 py-2 text-[13.5px] font-semibold text-ink-soft hover:bg-surface-2"
           >
             {m.panelCancel}
           </button>
           <button
             onClick={handleSave}
-            className="rounded-lg bg-brand px-4 py-2 text-[13.5px] font-semibold text-white hover:opacity-90"
+            disabled={saving}
+            className="rounded-lg bg-brand px-4 py-2 text-[13.5px] font-semibold text-white hover:opacity-90 disabled:opacity-50"
           >
-            {m.panelSave}
+            {saving ? "…" : m.panelSave}
           </button>
         </div>
       </div>
@@ -442,12 +508,14 @@ function MemberPanel({
 
 function ModeCard({
   active,
+  disabled,
   onClick,
   icon,
   title,
   sub,
 }: {
   active: boolean;
+  disabled: boolean;
   onClick: () => void;
   icon: string;
   title: string;
@@ -457,7 +525,8 @@ function ModeCard({
     <button
       type="button"
       onClick={onClick}
-      className={`flex flex-col items-start gap-1.5 rounded-xl border px-4 py-3.5 text-left transition-all ${
+      disabled={disabled}
+      className={`flex flex-col items-start gap-1.5 rounded-xl border px-4 py-3.5 text-left transition-all disabled:opacity-60 ${
         active
           ? "border-brand bg-brand-weak shadow-[0_0_0_3px_var(--color-brand-weak)]"
           : "border-line bg-surface hover:border-brand-line"
