@@ -123,6 +123,7 @@ export function AppointmentModal({
   const [clientResults, setClientResults] = useState<ClientSearchResult[]>([]);
   const [showClientResults, setShowClientResults] = useState(false);
   const clientSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const suppressNextSearchRef = useRef(false);
   const timeInputRef = useRef<HTMLInputElement>(null);
   const [notes, setNotes] = useState("");
   const [sendEmail, setSendEmail] = useState(false);
@@ -177,8 +178,19 @@ export function AppointmentModal({
   // Debounced to avoid a request per keystroke; the "clear results" case
   // is also inside the timeout (not called synchronously in the effect
   // body) to avoid the cascading-render setState-in-effect pattern.
+  //
+  // client-picker-reopens-after-select (fix): selectExistingClient also
+  // calls setClientName(c.name), which — since this effect depends on
+  // clientName — re-ran this same search right after picking someone,
+  // found that one client again, and popped the dropdown back open with
+  // just their name in it. suppressNextSearchRef skips exactly that one
+  // re-run; any further typing clears it and searches normally again.
   useEffect(() => {
     if (clientSearchDebounceRef.current) clearTimeout(clientSearchDebounceRef.current);
+    if (suppressNextSearchRef.current) {
+      suppressNextSearchRef.current = false;
+      return;
+    }
     const q = clientName.trim();
     clientSearchDebounceRef.current = setTimeout(async () => {
       if (q.length < 1) {
@@ -200,10 +212,12 @@ export function AppointmentModal({
   }, [clientName]);
 
   function selectExistingClient(c: ClientSearchResult) {
+    suppressNextSearchRef.current = true;
     setClientName(c.name);
     setClientEmail(c.email ?? "");
     setClientPhone(c.phone ?? "");
     setClinicClientId(c.id);
+    setClientResults([]);
     setShowClientResults(false);
   }
 
