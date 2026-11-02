@@ -75,10 +75,24 @@ interface AppointmentModalProps {
   whatsappEnabled: boolean;
   onClose: () => void;
   onSaved: () => void;
+  // nueva-cita-from-panel (2026-11-02): pre-fills Servicio/Cliente when
+  // opened from an existing appointment's "+ Nueva cita" button (BookingDetailModal),
+  // instead of always starting blank from a grid click. Provider pre-fill
+  // already exists via `slot.teamMemberId` — no new prop needed for that.
+  initialServiceId?: string;
+  initialClientId?: string | null;
+  initialClientName?: string;
+  initialClientEmail?: string;
+  initialClientPhone?: string;
+  // Rendered nested on top of BookingDetailModal (itself z-50) instead of
+  // standalone from the calendar grid — bumps the stacking context above
+  // it, same shape as the existing Cobrar/conflict-dialog layering.
+  nested?: boolean;
 }
 
 export function AppointmentModal({
   slot, hoursByDay, allBookings, services, members, closures, customSlotRules, dict, errorsDict, whatsappEnabled, onClose, onSaved,
+  initialServiceId, initialClientId, initialClientName, initialClientEmail, initialClientPhone, nested,
 }: AppointmentModalProps) {
   const md = dict.modal;
   const ct = dict.clientTabs;
@@ -87,7 +101,9 @@ export function AppointmentModal({
 
   const initialDateParts = { year: slot.dayYear, month: slot.dayMonth, day: slot.dayDay };
 
-  const [serviceId, setServiceId] = useState(services[0]?.id ?? "");
+  const [serviceId, setServiceId] = useState(
+    (initialServiceId && services.some((s) => s.id === initialServiceId)) ? initialServiceId : services[0]?.id ?? ""
+  );
   const [teamMemberId, setTeamMemberId] = useState(slot.teamMemberId);
   const [dateStr, setDateStr] = useState(ymd(initialDateParts.year, initialDateParts.month, initialDateParts.day));
   // custom-time-slots (2026-11-01, per Arun): a calendar click straight
@@ -108,9 +124,9 @@ export function AppointmentModal({
     return { time: slot.initialTime, flash: null as string | null };
   });
   const [timeStr, setTimeStr] = useState(initialSnappedTime);
-  const [clientName, setClientName] = useState("");
-  const [clientEmail, setClientEmail] = useState("");
-  const [clientPhone, setClientPhone] = useState("");
+  const [clientName, setClientName] = useState(initialClientName ?? "");
+  const [clientEmail, setClientEmail] = useState(initialClientEmail ?? "");
+  const [clientPhone, setClientPhone] = useState(initialClientPhone ?? "");
   // client-linking-on-booking: set when the owner picks an existing client
   // from the search results below; cleared the moment they type anything
   // afterward, since editing the fields after picking means they're now
@@ -119,7 +135,7 @@ export function AppointmentModal({
   // Also drives the Cliente/Historial/Notas tabs below: set = those tabs
   // show the real picked client live; null = a brand-new client, tabs
   // operate on `staged` instead (see client-profile-tabs.tsx).
-  const [clinicClientId, setClinicClientId] = useState<string | null>(null);
+  const [clinicClientId, setClinicClientId] = useState<string | null>(initialClientId ?? null);
   const [clientResults, setClientResults] = useState<ClientSearchResult[]>([]);
   const [showClientResults, setShowClientResults] = useState(false);
   const clientSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -440,7 +456,7 @@ export function AppointmentModal({
   const close = () => requestClose(onClose);
 
   return (
-    <div className="fixed inset-y-0 left-0 right-0 z-50 md:left-[240px]">
+    <div className={`fixed inset-y-0 left-0 right-0 md:left-[240px] ${nested ? "z-[65]" : "z-50"}`}>
       <div
         className={`absolute inset-0 bg-black/40 transition-opacity duration-200 ${visible ? "opacity-100" : "opacity-0"}`}
         onClick={close}

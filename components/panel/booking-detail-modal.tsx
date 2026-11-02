@@ -22,7 +22,7 @@ import type { InvoicingDictionary } from "@/lib/i18n/dictionaries/invoicing";
 import type { DayId } from "@/lib/onboarding/types";
 import { clientStatusLabel, clientStatusBadgeClass, needsClinicFollowUp, type WeekBookingVM } from "@/components/panel/calendar-grid-view";
 import { InvoiceConfirmModal, hasRealEmail } from "@/components/panel/invoice-confirm-modal";
-import type { ClosureRuleVM } from "@/components/panel/appointment-modal";
+import { AppointmentModal, type ClosureRuleVM, type SlotSelection } from "@/components/panel/appointment-modal";
 import { ClosureConflictDialog } from "@/components/panel/closure-conflict-dialog";
 import type { ConflictSummary } from "@/lib/actions/closures";
 import {
@@ -201,6 +201,11 @@ export function BookingDetailModal({
   const [timeMenuOpen, setTimeMenuOpen] = useState(false);
   const [savingFields, setSavingFields] = useState(false);
   const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false);
+  // nueva-cita-from-panel: a brand-new appointment for the same client,
+  // pre-filling Cliente/Servicio/Profesional from this one — nested
+  // AppointmentModal on top (see render below), date defaults to today,
+  // time starts blank so the clinic has to actively pick one.
+  const [newApptOpen, setNewApptOpen] = useState(false);
   // cliente-tab-default-edit: the Cliente tab is now always in edit mode
   // (no separate "Editar" click) and saves itself independently via
   // updateClientContactInfo — but closing the whole panel with unsaved
@@ -754,13 +759,22 @@ export function BookingDetailModal({
               {clientStatusLabel(booking.clientStatus, booking.clinicReviewedAt)}
             </span>
           </div>
-          <button
-            onClick={guardedClose}
-            aria-label={d.close}
-            className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-ink-soft hover:bg-surface-2"
-          >
-            <Icon name="x" size={16} />
-          </button>
+          <div className="flex shrink-0 items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setNewApptOpen(true)}
+              className="rounded-lg px-2.5 py-1.5 text-[12.5px] font-semibold text-brand hover:bg-brand-weak"
+            >
+              + {d.newApptButton}
+            </button>
+            <button
+              onClick={guardedClose}
+              aria-label={d.close}
+              className="grid h-8 w-8 place-items-center rounded-lg text-ink-soft hover:bg-surface-2"
+            >
+              <Icon name="x" size={16} />
+            </button>
+          </div>
         </div>
 
         {/* appointment-panel-tabs */}
@@ -1319,6 +1333,48 @@ export function BookingDetailModal({
           onConfirm={() => handleSaveFields(true)}
         />
       )}
+
+      {newApptOpen && (() => {
+        const today = tzDateParts(new Date());
+        const providerName = members.find((m) => m.id === booking.teamMemberId)?.name ?? "";
+        const newApptSlot: SlotSelection = {
+          dayYear: today.year,
+          dayMonth: today.month,
+          dayDay: today.day,
+          initialTime: "",
+          teamMemberId: booking.teamMemberId ?? "",
+          providerName,
+        };
+        return (
+          <AppointmentModal
+            nested
+            slot={newApptSlot}
+            hoursByDay={hoursByDay}
+            allBookings={allBookings}
+            services={services}
+            members={members}
+            closures={closures}
+            customSlotRules={customSlotRules}
+            dict={dict}
+            errorsDict={dict.manualErrors}
+            whatsappEnabled={whatsappEnabled}
+            initialServiceId={booking.serviceId ?? undefined}
+            initialClientId={booking.clinicClientId}
+            initialClientName={booking.clientName}
+            initialClientEmail={
+              booking.clientEmail && !booking.clientEmail.startsWith("sin-email+") && !isWhatsappSentinelEmail(booking.clientEmail)
+                ? booking.clientEmail
+                : ""
+            }
+            initialClientPhone={booking.clientPhone ?? ""}
+            onClose={() => setNewApptOpen(false)}
+            onSaved={() => {
+              setNewApptOpen(false);
+              onUpdated();
+            }}
+          />
+        );
+      })()}
 
       {discardConfirmOpen && (
         <div
