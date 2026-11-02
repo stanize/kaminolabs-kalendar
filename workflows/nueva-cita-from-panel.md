@@ -64,11 +64,4 @@ default `z-50` so it layers correctly on top of `BookingDetailModal`
 
 ## Status
 
-Status: in_progress — code implemented, typechecked/linted/built clean.
-Pending Arun's live testing.
-
-Still needs testing (from the spec's own checklist): button visible on
-both past and future appointments; client/service/provider pre-filled
-and still changeable; date/time genuinely blank/unpicked at open;
-creating the appointment works and shows up on the calendar; original
-panel stays open and unaffected afterward.
+Status: done (2026-11-02) — Arun confirmed live-tested and working.
