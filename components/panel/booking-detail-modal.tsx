@@ -45,6 +45,7 @@ import {
   buildSuggestedTimes,
   resolveCustomSuggestedTimes,
   isOutsideBusinessHours,
+  normalizeTimeInput,
 } from "@/lib/booking/appointment-fields";
 
 function invoicePdfHref(invoice: { id: string; access_token: string }): string {
@@ -869,7 +870,7 @@ export function BookingDetailModal({
                     value={timeStr}
                     onChange={(e) => setTimeStr(e.target.value)}
                     onFocus={() => setTimeMenuOpen(true)}
-                    onBlur={() => setTimeMenuOpen(false)}
+                    onBlur={() => { setTimeMenuOpen(false); setTimeStr((t) => normalizeTimeInput(t)); }}
                     placeholder="HH:MM"
                     autoComplete="off"
                     className={`w-full rounded-lg border bg-surface px-3 py-2 pr-9 text-[16px] text-ink ${

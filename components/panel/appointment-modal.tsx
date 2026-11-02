@@ -28,6 +28,7 @@ import {
   buildSuggestedTimes,
   resolveCustomSuggestedTimes,
   isOutsideBusinessHours,
+  normalizeTimeInput,
 } from "@/lib/booking/appointment-fields";
 
 // A client-safe projection of BusinessClosure (lib/closures/data.ts) — just
@@ -123,7 +124,6 @@ export function AppointmentModal({
   const [clientResults, setClientResults] = useState<ClientSearchResult[]>([]);
   const [showClientResults, setShowClientResults] = useState(false);
   const clientSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const suppressNextSearchRef = useRef(false);
   const timeInputRef = useRef<HTMLInputElement>(null);
   const [notes, setNotes] = useState("");
   const [sendEmail, setSendEmail] = useState(false);
@@ -179,18 +179,17 @@ export function AppointmentModal({
   // is also inside the timeout (not called synchronously in the effect
   // body) to avoid the cascading-render setState-in-effect pattern.
   //
-  // client-picker-reopens-after-select (fix): selectExistingClient also
-  // calls setClientName(c.name), which — since this effect depends on
-  // clientName — re-ran this same search right after picking someone,
-  // found that one client again, and popped the dropdown back open with
-  // just their name in it. suppressNextSearchRef skips exactly that one
-  // re-run; any further typing clears it and searches normally again.
+  // client-picker-reopens-after-select (fix): skip searching entirely
+  // whenever a client is already linked (clinicClientId set) — selecting
+  // one used to still re-trigger this effect (it depends on clientName,
+  // which selectExistingClient also sets) and search for that exact name
+  // again, popping the dropdown back open with just them in it. There's
+  // nothing to search for while a client is linked anyway: typing in the
+  // field immediately nulls clinicClientId (see the input's onChange
+  // below), which re-enables search right away.
   useEffect(() => {
     if (clientSearchDebounceRef.current) clearTimeout(clientSearchDebounceRef.current);
-    if (suppressNextSearchRef.current) {
-      suppressNextSearchRef.current = false;
-      return;
-    }
+    if (clinicClientId) return;
     const q = clientName.trim();
     clientSearchDebounceRef.current = setTimeout(async () => {
       if (q.length < 1) {
@@ -209,10 +208,9 @@ export function AppointmentModal({
     return () => {
       if (clientSearchDebounceRef.current) clearTimeout(clientSearchDebounceRef.current);
     };
-  }, [clientName]);
+  }, [clientName, clinicClientId]);
 
   function selectExistingClient(c: ClientSearchResult) {
-    suppressNextSearchRef.current = true;
     setClientName(c.name);
     setClientEmail(c.email ?? "");
     setClientPhone(c.phone ?? "");
@@ -556,7 +554,7 @@ export function AppointmentModal({
                     value={timeStr}
                     onChange={(e) => setTimeStr(e.target.value)}
                     onFocus={() => setTimeMenuOpen(true)}
-                    onBlur={() => setTimeMenuOpen(false)}
+                    onBlur={() => { setTimeMenuOpen(false); setTimeStr((t) => normalizeTimeInput(t)); }}
                     placeholder="HH:MM"
                     autoComplete="off"
                     className={`w-full rounded-lg border bg-surface px-3 py-2 pr-9 text-[16px] text-ink ${
