@@ -187,8 +187,9 @@ consolidation rather than building a third parallel structure.
 
 ## Status
 
-Status: in_progress — code implemented and typechecked/linted/built,
-pending Arun's live testing + running `schema_subset_032.sql`.
+Status: done (2026-11-02) — Arun confirmed live-tested and working
+overall (Cita/Cliente/Historial/Notas tabs, Cliente default-edit mode,
+Cobrar converted to a side panel, unified action-row styling).
 
 IMPLEMENTED (2026-10-30):
 - `date_of_birth` added to `kalendar_clients` (schema_subset_032.sql,

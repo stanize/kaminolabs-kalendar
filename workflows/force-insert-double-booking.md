@@ -75,13 +75,9 @@ closures).
 
 ## Status
 
-Status: in_progress — code implemented, typechecked/linted/built clean.
-Pending Arun's live testing + running `schema_subset_036.sql` against the
-live DB (via the admin Run-migrations tool).
-
-Still needs testing: creating a new appointment into an already-taken
-slot shows the conflict dialog with the existing booking's details, and
-confirming saves both; same for editing/rescheduling an existing
-appointment into another taken slot; confirming at the EXACT same start
-time (the case the dropped unique index used to block) succeeds cleanly
-with no DB error.
+Status: done (2026-11-02) — Arun confirmed live-tested and working:
+creating/rescheduling into an already-taken slot shows the conflict
+dialog with the existing booking's details, confirming saves both
+(including at the exact same start time, after
+`schema_subset_036.sql` was run). Overlap math also independently
+verified correct for partial (non-exact-start) overlaps.

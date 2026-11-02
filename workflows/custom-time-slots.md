@@ -153,8 +153,11 @@ Converting that to the panel pattern:
 
 ## Status
 
-Status: in_progress — code implemented and typechecked/linted/built
-clean, pending Arun's live testing + running `schema_subset_034.sql`.
+Status: done (2026-11-02) — Arun confirmed live-tested and working in
+the clinic panel (custom slots, side-panel shells for Festivos/
+Vacaciones/Horarios personalizados, out-of-hours flagging). The public
+booking page extension (see KNOWN GAP below) remains open separately,
+deprioritized — not urgent for now per Arun.
 
 IMPLEMENTED (2026-10-31):
 - `kalendar_custom_time_slots` (schema_subset_034.sql, not yet run) +
@@ -212,3 +215,6 @@ public engine's shape — range-based, taken-intervals-aware, team
 suggestion-list functions that it needs real design, not a quick
 wire-through). Do not start coding this without going through a design
 discussion first, same as the rest of this feature.
+
+Update (2026-11-02, Arun): deprioritized — not urgent right now. Still a
+real gap, just not next in line; revisit when Arun raises it again.
