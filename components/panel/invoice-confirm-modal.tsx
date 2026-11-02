@@ -18,6 +18,13 @@ export function hasRealEmail(email: string | null | undefined): boolean {
   return !!email && !email.startsWith("sin-email+") && !isWhatsappSentinelEmail(email);
 }
 
+// auto-open-invoice-pdf (2026-11-02, per Arun): same URL shape as the
+// "Descargar" link shown elsewhere (booking-detail-modal.tsx's
+// invoicePdfHref) — duplicated here rather than shared, same one-liner.
+function invoicePdfHref(invoice: { id: string; access_token: string }): string {
+  return `/api/invoices/${invoice.id}/pdf?token=${invoice.access_token}`;
+}
+
 /**
  * invoice-confirm-modal-extraction (2026-10): the Sí/No invoice-generation
  * modal, factored out of booking-detail-modal.tsx so the three entry
@@ -142,6 +149,10 @@ export function InvoiceConfirmModal({
       setError(res.error);
       return;
     }
+    // auto-open-invoice-pdf: the generated PDF opens in a new tab right
+    // away, same as if the clinic had clicked "Descargar" themselves,
+    // instead of only landing back on the appointment panel.
+    window.open(invoicePdfHref(res.invoice), "_blank", "noopener,noreferrer");
     requestClose(onDone);
   }
 
