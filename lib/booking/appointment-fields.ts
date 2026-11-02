@@ -26,21 +26,6 @@ export function toMinutes(t: string): number {
   return h * 60 + m;
 }
 
-// time-field-loose-input: the Hora field accepts free typing ("9", "9:00",
-// "9:5") but every downstream check (timeValid, overlap detection, the
-// suggested-times list) requires the strict "HH:MM" shape — without this,
-// typing "9:00" (no leading zero) silently skipped the conflict warning
-// entirely, since timeValid was false. Called on blur, not on every
-// keystroke, so the field doesn't fight the user mid-type.
-export function normalizeTimeInput(raw: string): string {
-  const s = raw.trim();
-  const m = /^(\d{1,2})(?::(\d{1,2}))?$/.exec(s);
-  if (!m) return s;
-  const hh = m[1].padStart(2, "0");
-  const mm = (m[2] ?? "00").padStart(2, "0");
-  return `${hh}:${mm}`;
-}
-
 export function ymd(year: number, month: number, day: number): string {
   return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }

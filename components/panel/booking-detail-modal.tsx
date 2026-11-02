@@ -45,7 +45,6 @@ import {
   buildSuggestedTimes,
   resolveCustomSuggestedTimes,
   isOutsideBusinessHours,
-  normalizeTimeInput,
 } from "@/lib/booking/appointment-fields";
 
 function invoicePdfHref(invoice: { id: string; access_token: string }): string {
@@ -189,6 +188,7 @@ export function BookingDetailModal({
   const [dateStr, setDateStr] = useState(initialFields.dateStr);
   const [timeStr, setTimeStr] = useState(initialFields.timeStr);
   const timeInputRef = useRef<HTMLInputElement>(null);
+  const nativeTimePickerRef = useRef<HTMLInputElement>(null);
   // cita-tab-client-fields-removed: no longer editable from this tab (see
   // below), so these stay at whatever they loaded as — plain consts, not
   // state, now that nothing ever changes them.
@@ -864,28 +864,44 @@ export function BookingDetailModal({
             <div className="relative flex-1">
               <Field label={md.timeLabel}>
                 <div className="relative">
+                  {/* time-field-two-pickers (2026-11-02, per Arun): no more
+                      free typing — the text box (readOnly) opens the
+                      suggested-times dropdown below, while the clock icon
+                      opens a separate native time picker (hidden input,
+                      triggered via showPicker()). Both write the same
+                      timeStr, already a valid "HH:MM" either way. */}
                   <input
                     ref={timeInputRef}
                     type="text"
                     value={timeStr}
-                    onChange={(e) => setTimeStr(e.target.value)}
+                    readOnly
                     onFocus={() => setTimeMenuOpen(true)}
-                    onBlur={() => { setTimeMenuOpen(false); setTimeStr((t) => normalizeTimeInput(t)); }}
+                    onBlur={() => setTimeMenuOpen(false)}
                     placeholder="HH:MM"
                     autoComplete="off"
-                    className={`w-full rounded-lg border bg-surface px-3 py-2 pr-9 text-[16px] text-ink ${
+                    className={`w-full cursor-pointer rounded-lg border bg-surface px-3 py-2 pr-9 text-[16px] text-ink ${
                       fieldsConflict ? "border-error" : "border-line"
                     }`}
                   />
-                  {/* Purely a visual affordance matching the date field's
-                      native calendar icon — the field is already editable
-                      (typed or picked from the suggestions dropdown below);
-                      clicking the icon just focuses it to open that list. */}
+                  <input
+                    ref={nativeTimePickerRef}
+                    type="time"
+                    value={timeStr}
+                    onChange={(e) => { if (e.target.value) setTimeStr(e.target.value); }}
+                    className="pointer-events-none absolute inset-0 opacity-0"
+                    tabIndex={-1}
+                    aria-hidden
+                  />
                   <button
                     type="button"
                     tabIndex={-1}
                     onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => timeInputRef.current?.focus()}
+                    onClick={() => {
+                      const el = nativeTimePickerRef.current;
+                      if (!el) return;
+                      if (typeof el.showPicker === "function") el.showPicker();
+                      else el.focus();
+                    }}
                     className="absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-soft"
                     aria-label={md.timeLabel}
                   >
