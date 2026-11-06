@@ -683,7 +683,7 @@ function DayProviderColumn({
         className="relative overflow-hidden cursor-pointer bg-surface-2/50 hover:bg-surface-2/70"
         style={{
           height: gridHeight,
-          ...(ranges.length === 0
+          ...(ranges.length === 0 && !day.isFestivo
             ? {
                 backgroundImage:
                   "repeating-linear-gradient(135deg, rgba(15,23,42,0.08) 0px, rgba(15,23,42,0.08) 6px, transparent 6px, transparent 14px)",
@@ -698,7 +698,9 @@ function DayProviderColumn({
             slots) is visible and free time reads as clearly clickable. Days
             with zero ranges (clinic closed all day) get a diagonal-stripe
             base above instead, so a closed day reads differently from a
-            working day's off-hours time. */}
+            working day's off-hours time. A festivo day always gets its own
+            (bolder) stripe treatment below regardless of ranges, so it's
+            never excluded here. */}
         {ranges.map((r, i) => {
           const [sh, sm] = r.start.split(":").map(Number);
           const [eh, em] = r.end.split(":").map(Number);
@@ -722,12 +724,22 @@ function DayProviderColumn({
             below the gridlines/booking chips so those stay unaffected. */}
         {day.isPast && <div className="pointer-events-none absolute inset-0 bg-ink/5" />}
 
-        {/* Festivo wash — same layering technique as the past-day wash above
-            (uniform, non-interactive overlay across the whole column, so
-            clicking to add a walk-in booking still works), reusing the same
-            amber tone chipClasses already uses for a "needs clinic
-            follow-up" booking, so the two amber cues read consistently. */}
-        {day.isFestivo && <div className="pointer-events-none absolute inset-0 bg-amber-50/60" />}
+        {/* Festivo wash — bold diagonal hatch + amber tint, independent of
+            ranges.length (so a holiday always reads this way even if working
+            hours weren't separately cleared for that date — Bea/Arun
+            feedback 2026-11-06: the old faint stripe only showed up
+            incidentally and wasn't obvious enough as a "don't book here"
+            cue). pointer-events-none so clicking to add a walk-in booking
+            still works underneath. */}
+        {day.isFestivo && (
+          <div
+            className="pointer-events-none absolute inset-0 bg-amber-100/50"
+            style={{
+              backgroundImage:
+                "repeating-linear-gradient(45deg, rgba(180,83,9,0.35) 0px, rgba(180,83,9,0.35) 7px, transparent 7px, transparent 16px)",
+            }}
+          />
+        )}
 
         {/* Hour gridlines */}
         {Array.from({ length: Math.floor((gridEndMin - gridStartMin) / 60) + 1 }).map((_, i) => (
@@ -861,7 +873,7 @@ function DayMergedColumn({
         className="relative overflow-hidden cursor-pointer bg-surface-2/50 hover:bg-surface-2/70"
         style={{
           height: gridHeight,
-          ...(ranges.length === 0
+          ...(ranges.length === 0 && !day.isFestivo
             ? {
                 backgroundImage:
                   "repeating-linear-gradient(135deg, rgba(15,23,42,0.08) 0px, rgba(15,23,42,0.08) 6px, transparent 6px, transparent 14px)",
@@ -886,7 +898,15 @@ function DayMergedColumn({
         })}
 
         {day.isPast && <div className="pointer-events-none absolute inset-0 bg-ink/5" />}
-        {day.isFestivo && <div className="pointer-events-none absolute inset-0 bg-amber-50/60" />}
+        {day.isFestivo && (
+          <div
+            className="pointer-events-none absolute inset-0 bg-amber-100/50"
+            style={{
+              backgroundImage:
+                "repeating-linear-gradient(45deg, rgba(180,83,9,0.35) 0px, rgba(180,83,9,0.35) 7px, transparent 7px, transparent 16px)",
+            }}
+          />
+        )}
 
         {Array.from({ length: Math.floor((gridEndMin - gridStartMin) / 60) + 1 }).map((_, i) => (
           <div
