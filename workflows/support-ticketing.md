@@ -192,6 +192,42 @@ as `INTERNAL_SCHEMA_API_SECRET`.
 
 ## Status
 
-Status: not_started — design only, written up per Arun's request before
-any tickets are raised or code is built. Waiting for Arun to share the
-actual tickets he wants raised for Bea before starting implementation.
+Status: in_progress (2026-11-06) — code implemented in both repos,
+typechecked/linted/built clean. Pending Arun's live testing + running
+`schema_subset_037.sql` against the live DB (via the admin
+Run-migrations tool).
+
+IMPLEMENTED:
+- **Schema** (`schema_subset_037.sql`): `reported_via`/
+  `created_by_admin_email` added to `kalendar_support_tickets`,
+  `admin_notes` dropped, new `kalendar_support_ticket_comments` table +
+  `support_ticket_source`/`support_comment_author_type` enums.
+- **Main repo** (`lib/actions/support.ts`): `submitSupportTicket`
+  unchanged behavior (now `reported_via: 'panel'`), new
+  `getMyTickets`/`getTicketWithComments`/`addTicketComment`, all
+  ownership-scoped to the caller's session.
+- **Panel** (`/panel/support`, `components/panel/support-manager.tsx`):
+  submit form is now a side panel (was a full-page form); new ticket
+  list + detail/reply side panel. New
+  `lib/i18n/dictionaries/support.ts` (es/en) — all copy moved off
+  hardcoded strings.
+- **Internal read API** (`app/api/internal/support-tickets/route.ts` +
+  `.../[id]/route.ts`), gated by new `INTERNAL_SUPPORT_API_SECRET` —
+  for a Claude session's cross-session ticket access, not used by the
+  admin portal itself (it has its own direct Supabase client, same as
+  `error-log.ts`).
+- **Admin portal** (`kaminolabs-kalendar-admin`, new `/admin/support`):
+  `lib/admin/support.ts` (list/get/addComment/setStatus/
+  createTicketOnBehalf/listBusinessOptions), list page with status/
+  category/subject filters, expandable row → detail + comment thread +
+  status dropdown + reply box, "+ Raise ticket on behalf" form
+  (business picker, reported_via, category, subject, description).
+  Sidebar link added. The business dashboard's "Open support tickets"
+  count is now a real link into this list (filtered to that business),
+  not a dead number.
+
+Still needs: `schema_subset_037.sql` run against the live DB; live-test
+submit → appears in admin list → admin replies/changes status →
+clinic sees the update and can reply back → thread stays in sync both
+ways; "raise on behalf" creates a ticket that shows up correctly in
+the clinic's own panel with the "logged by..." note.
