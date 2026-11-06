@@ -369,6 +369,7 @@ function TicketDetailPanel({
 }) {
   const [detail, setDetail] = useState<SupportTicketDetail | null>(null);
   const [reply, setReply] = useState("");
+  const [pastedFiles, setPastedFiles] = useState<File[]>([]);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -392,18 +393,29 @@ function TicketDetailPanel({
   }
   const closePanel = () => requestClose(onClose);
 
+  function handlePaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
+    const items = Array.from(e.clipboardData.items);
+    const images = items.filter((i) => i.type.startsWith("image/")).map((i) => i.getAsFile()).filter((f): f is File => !!f);
+    if (images.length === 0) return;
+    setPastedFiles((prev) => [...prev, ...images].slice(0, MAX_FILES));
+  }
+
   async function handleReply() {
     if (!reply.trim()) return;
     setSending(true);
     setError(null);
     try {
-      const res = await addTicketComment({ ticketId, body: reply.trim() });
+      const formData = new FormData();
+      formData.set("ticketId", ticketId);
+      formData.set("body", reply.trim());
+      pastedFiles.forEach((f) => formData.append("attachments", f));
+
+      const res = await addTicketComment(formData);
       setSending(false);
       if (!res.ok) { setError(res.error); return; }
-      setDetail((d) => d ? { ...d, comments: [...d.comments, {
-        id: crypto.randomUUID(), authorType: "clinic", authorName: null, authorEmail: "", body: reply.trim(), createdAt: new Date().toISOString(),
-      }] } : d);
+      setDetail((d) => (d ? { ...d, comments: [...d.comments, res.comment] } : d));
       setReply("");
+      setPastedFiles([]);
       onCommentAdded();
     } catch (e) {
       setSending(false);
@@ -472,6 +484,15 @@ function TicketDetailPanel({
                         {c.authorType === "admin" ? "Kalendar" : (c.authorName || c.authorEmail)} · {formatWhen(c.createdAt, "es-ES")}
                       </p>
                       <p className="whitespace-pre-wrap text-ink">{c.body}</p>
+                      {c.attachments.length > 0 && (
+                        <div className="mt-1.5 flex flex-wrap gap-1.5">
+                          {c.attachments.map((url) => (
+                            <a key={url} href={url} target="_blank" rel="noopener noreferrer">
+                              <img src={url} alt="" className="h-14 w-14 rounded-md border border-line object-cover" />
+                            </a>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -480,10 +501,25 @@ function TicketDetailPanel({
 
             {error && <div className="mb-2 rounded-lg border border-error bg-error-weak px-3 py-2 text-[12.5px] text-error">{error}</div>}
 
+            {pastedFiles.length > 0 && (
+              <div className="mb-2 flex flex-wrap gap-1.5">
+                {pastedFiles.map((f, i) => (
+                  <div key={i} className="flex items-center gap-1 rounded-md border border-line bg-surface-2 px-1.5 py-1 text-[11px] text-ink-soft">
+                    <Icon name="paperclip" size={11} />
+                    <span className="max-w-[90px] truncate">{f.name || "imagen.png"}</span>
+                    <button onClick={() => setPastedFiles((fs) => fs.filter((_, idx) => idx !== i))} className="hover:text-ink">
+                      <Icon name="x" size={11} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <div className="flex gap-2">
               <textarea
                 value={reply}
                 onChange={(e) => setReply(e.target.value)}
+                onPaste={handlePaste}
                 placeholder={dict.replyPlaceholder}
                 rows={2}
                 className="flex-1 resize-none rounded-lg border border-line bg-surface px-3 py-2 text-[13px] text-ink focus:border-brand focus:outline-none"

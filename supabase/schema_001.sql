@@ -1264,6 +1264,9 @@ create table public.kalendar_support_ticket_comments (
   author_name  text,
   author_email text        not null,
   body         text        not null,
+  -- schema_subset_038.sql: pasted image screenshots on a reply, same
+  -- support-attachments bucket as a ticket's own initial attachments.
+  attachments  text[]      not null default '{}',
   created_at   timestamptz not null default now()
 );
 

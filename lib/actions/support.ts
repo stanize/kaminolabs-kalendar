@@ -16,6 +16,37 @@ export type SupportCommentAuthorType = "clinic" | "admin";
 
 const VALID_CATEGORIES: SupportTicketCategory[] = ["billing", "technical", "feature_request", "account", "other"];
 
+/** Shared upload helper for ticket/comment image attachments — same
+ *  support-attachments bucket, same 5MB/image-only validation, used by
+ *  both submitSupportTicket and addTicketComment. */
+async function uploadSupportAttachments(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  files: File[]
+): Promise<{ ok: true; urls: string[] } | { ok: false; error: string }> {
+  const urls: string[] = [];
+  const validFiles = files.filter((f) => f && f.size > 0 && f.type.startsWith("image/") && f.size <= 5 * 1024 * 1024);
+
+  for (const file of validFiles) {
+    const ext = file.name.split(".").pop() ?? "png";
+    const fileName = `${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = new Uint8Array(arrayBuffer);
+
+    const { error: uploadError } = await supabase.storage
+      .from("support-attachments")
+      .upload(fileName, buffer, { contentType: file.type, upsert: false });
+
+    if (uploadError) return { ok: false, error: `Error al subir imagen: ${uploadError.message}` };
+
+    const { data: publicUrlData } = supabase.storage.from("support-attachments").getPublicUrl(fileName);
+    urls.push(publicUrlData.publicUrl);
+  }
+
+  return { ok: true, urls };
+}
+
 export interface SupportTicketSummary {
   id: string;
   subject: string;
@@ -33,6 +64,7 @@ export interface SupportTicketComment {
   authorName: string | null;
   authorEmail: string;
   body: string;
+  attachments: string[];
   createdAt: string;
 }
 
@@ -78,35 +110,8 @@ export async function submitSupportTicket(formData: FormData): Promise<SubmitTic
 
   const supabase = await createClient();
 
-  // ── Handle screenshot uploads ──────────────────────────────────────────
-  const attachmentUrls: string[] = [];
-  const files = formData.getAll("attachments") as File[];
-  const validFiles = files.filter((f) => f && f.size > 0 && f.type.startsWith("image/") && f.size <= 5 * 1024 * 1024);
-
-  for (const file of validFiles) {
-    const ext = file.name.split(".").pop() ?? "png";
-    const fileName = `${session.user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = new Uint8Array(arrayBuffer);
-
-    const { error: uploadError } = await supabase.storage
-      .from("support-attachments")
-      .upload(fileName, buffer, {
-        contentType: file.type,
-        upsert: false,
-      });
-
-    if (uploadError) {
-      return { ok: false, error: `Error al subir imagen: ${uploadError.message}` };
-    }
-
-    const { data: publicUrlData } = supabase.storage
-      .from("support-attachments")
-      .getPublicUrl(fileName);
-
-    attachmentUrls.push(publicUrlData.publicUrl);
-  }
+  const uploadResult = await uploadSupportAttachments(supabase, session.user.id, formData.getAll("attachments") as File[]);
+  if (!uploadResult.ok) return uploadResult;
 
   // ── Insert ticket ──────────────────────────────────────────────────────
   const { data: ticket, error } = await supabase
@@ -117,7 +122,7 @@ export async function submitSupportTicket(formData: FormData): Promise<SubmitTic
       subject,
       description,
       category,
-      attachments: attachmentUrls,
+      attachments: uploadResult.urls,
       reported_via: "panel",
     })
     .select("id")
@@ -189,7 +194,7 @@ export async function getTicketWithComments(ticketId: string): Promise<SupportTi
 
   const { data: comments } = await supabase
     .from("kalendar_support_ticket_comments")
-    .select("id, author_type, author_name, author_email, body, created_at")
+    .select("id, author_type, author_name, author_email, body, attachments, created_at")
     .eq("ticket_id", ticketId)
     .order("created_at", { ascending: true });
 
@@ -209,54 +214,79 @@ export async function getTicketWithComments(ticketId: string): Promise<SupportTi
     createdByAdminEmail: t.created_by_admin_email,
     createdAt: t.created_at,
     comments: ((comments ?? []) as {
-      id: string; author_type: SupportCommentAuthorType; author_name: string | null; author_email: string; body: string; created_at: string;
+      id: string; author_type: SupportCommentAuthorType; author_name: string | null; author_email: string; body: string; attachments: string[]; created_at: string;
     }[]).map((c) => ({
       id: c.id,
       authorType: c.author_type,
       authorName: c.author_name,
       authorEmail: c.author_email,
       body: c.body,
+      attachments: c.attachments ?? [],
       createdAt: c.created_at,
     })),
   };
 }
 
-export type AddCommentResult = { ok: true } | { ok: false; error: string };
+export type AddCommentResult = { ok: true; comment: SupportTicketComment } | { ok: false; error: string };
 
 /** support-ticketing-v1: clinic reply on their own ticket — ownership
- *  re-checked here too, not just trusted from the UI having shown it. */
-export async function addTicketComment(input: { ticketId: string; body: string }): Promise<AddCommentResult> {
+ *  re-checked here too, not just trusted from the UI having shown it.
+ *  Takes FormData (not a plain object) so pasted-image attachments can
+ *  ride alongside the text body, same upload path as a ticket's own
+ *  initial attachments. */
+export async function addTicketComment(formData: FormData): Promise<AddCommentResult> {
   const session = await getSession();
   if (!session?.user?.id) {
     return { ok: false, error: "Sesión no encontrada. Por favor inicia sesión de nuevo." };
   }
-  const body = input.body.trim();
+  const ticketId = formData.get("ticketId") as string | null;
+  const body = ((formData.get("body") as string | null) ?? "").trim();
+  if (!ticketId) return { ok: false, error: "Ticket no encontrado." };
   if (!body) return { ok: false, error: "Escribe un mensaje." };
 
   const supabase = await createClient();
   const { data: ticket } = await supabase
     .from("kalendar_support_tickets")
     .select("id")
-    .eq("id", input.ticketId)
+    .eq("id", ticketId)
     .eq("user_id", session.user.id)
     .maybeSingle();
   if (!ticket) return { ok: false, error: "Ticket no encontrado." };
 
-  const { error } = await supabase.from("kalendar_support_ticket_comments").insert({
-    ticket_id: input.ticketId,
-    author_type: "clinic",
-    author_name: session.user.name ?? null,
-    author_email: session.user.email,
-    body,
-  });
-  if (error) return { ok: false, error: `No se pudo enviar: ${error.message}` };
+  const uploadResult = await uploadSupportAttachments(supabase, session.user.id, formData.getAll("attachments") as File[]);
+  if (!uploadResult.ok) return uploadResult;
+
+  const { data: comment, error } = await supabase
+    .from("kalendar_support_ticket_comments")
+    .insert({
+      ticket_id: ticketId,
+      author_type: "clinic",
+      author_name: session.user.name ?? null,
+      author_email: session.user.email,
+      body,
+      attachments: uploadResult.urls,
+    })
+    .select("id, author_type, author_name, author_email, body, attachments, created_at")
+    .single();
+  if (error || !comment) return { ok: false, error: `No se pudo enviar: ${error?.message ?? "desconocido"}` };
 
   // Bumps updated_at so the ticket surfaces as recently active in both
   // the clinic's own list and the admin list.
   await supabase
     .from("kalendar_support_tickets")
     .update({ updated_at: new Date().toISOString() })
-    .eq("id", input.ticketId);
+    .eq("id", ticketId);
 
-  return { ok: true };
+  return {
+    ok: true,
+    comment: {
+      id: comment.id,
+      authorType: comment.author_type,
+      authorName: comment.author_name,
+      authorEmail: comment.author_email,
+      body: comment.body,
+      attachments: comment.attachments ?? [],
+      createdAt: comment.created_at,
+    },
+  };
 }
