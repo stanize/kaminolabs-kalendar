@@ -515,5 +515,85 @@ Criteria:
   same shape as this file's other admin-portal steps, tracked here per
   this repo's centralized-workflow-tracking convention.
 
+## Step: clinic-config-readonly-view
+Status: in_progress
+Criteria:
+- CODE IMPLEMENTED 2026-11-06 (admin repo only, typechecked/linted/built
+  clean), PENDING MANUAL TESTING — not yet verified working live. Built:
+  `lib/admin/clinic-config.ts` (8 new businessId-scoped read functions),
+  `components/admin/clinic-config-tabs.tsx` (tabbed read-only UI), wired
+  into `/admin/customers/business/[businessId]/page.tsx` below the
+  existing dashboard. Client-detail is lazy-loaded per click via a new
+  `adminLoadClientDetail` server action in that route's `actions.ts`. No
+  schema changes — every table/column already existed.
+- DESIGN SETTLED (2026-11-06, Arun) — on the existing
+  `/admin/customers/business/[businessId]` dashboard (see `customer-dashboard`
+  step above), add a tabbed, read-only mirror of every page in the clinic's
+  own `/panel/*` **except the calendar page** — so support staff can see
+  exactly how a clinic has configured their account (services, team,
+  horarios, bonos, invoicing, clients, etc.) without the clinic needing to
+  screen-share. All tabs ship in one pass, not incrementally. Client/patient
+  data (PII, medication notes, private clinic notes) IS included — Arun
+  confirmed support staff already handle this data via WhatsApp/tickets, so
+  showing it read-only in admin is consistent with existing access.
+- **Tabs (one admin-repo page, client-side tab switcher, data fetched
+  server-side up front)**:
+  1. **Business** — profile/contact/address fields, team_mode,
+     booking_window_months, bonos_enabled flag, invoicing flags
+     (`kalendar_businesses`, mirrors `/panel/business`).
+  2. **Services** — name/duration/price/sort_order (`kalendar_services`,
+     mirrors `/panel/services`).
+  3. **Team** — name/role/is_owner/active/professional_dni/
+     professional_college_number (`kalendar_team_members`, mirrors
+     `/panel/team`). Does NOT call `ensureOwnerSeeded` (a write embedded in
+     the panel page) — admin mirror is read-only, must never write.
+  4. **Availability** — weekly business hours
+     (`kalendar_business_hours`), custom time slots
+     (`kalendar_custom_time_slots`), holidays/recurring closures and
+     team-member time-off (`kalendar_business_closures`, both
+     recurring and one-off rows) — mirrors `/panel/availability` +
+     `/custom-slots` + `/holidays` + `/time-off` as sub-sections of one tab
+     rather than 4 separate tabs.
+  5. **Bonos** — bono types (active + inactive) and sold bonos
+     (client/sessions-used/price), shows `bonos_enabled` state rather than
+     hiding the tab when disabled (`kalendar_bono_types`,
+     `kalendar_bono_purchases`, mirrors `/panel/bonos`).
+  6. **Invoices** — invoice list + pending-invoice bookings
+     (`kalendar_invoices`, `kalendar_bookings`), plus invoicing settings
+     (template id, auto-invoice, next number, invoice concepts) folded in
+     as a sub-section rather than a separate tab (mirrors `/panel/invoices`
+     + `/panel/settings/invoicing`).
+  7. **Clients** — list (name/email/phone/session counts/last visit) +
+     detail-on-click (dni/address/dob/medication/booking history/notes/
+     bonos) — mirrors `/panel/clients` + `/panel/clients/[id]`.
+  8. **Settings** — cancellation_window_hours (bookings policy);
+     WhatsApp config (enabled/sandbox/number/which template sids are set —
+     never the auth token, same masking as the panel's `hasAuthToken`
+     boolean); subscription/billing fields read from
+     `kalendar_businesses` columns only (stripe_customer_id presence,
+     subscription_status, current_period_end, plan_type, discount info) —
+     explicitly NOT calling the Stripe API live (cost/latency/payment-method
+     exposure not worth it for a read-only support view; if Arun wants live
+     Stripe data in this tab later that's a separate follow-up decision).
+- **Explicitly excluded**: Calendar page (per Arun's explicit "except the
+  calendar page"); `/panel/payments` (main-repo page is itself an
+  unbuilt placeholder — nothing to mirror yet); `/panel/settings/language`
+  and `/panel/settings/notifications` (static placeholder copy, no
+  data); `/panel/settings/security` (static placeholder today — if this
+  page later grows real password/2FA content, that content should still be
+  excluded from the admin mirror, re-check at that time, don't carry this
+  decision forward blindly).
+- **Implementation shape**: admin repo gets its own read query layer
+  (`lib/admin/clinic-config.ts`), directly querying the tables above by
+  `businessId` via this repo's own Supabase service-role client — NOT a
+  call into the main repo's `lib/*/data.ts` functions, since those live in
+  a separate deployed repo and most are `userId`-scoped/session-coupled
+  rather than `businessId`-scoped (confirmed via cross-repo inventory,
+  2026-11-06). All functions here are genuinely new code in the admin
+  repo, written fresh against the known table/column shapes, read-only
+  (service-role key already bypasses RLS in this repo same as every other
+  admin feature — no mutation paths added by this step).
+- No new schema/migration needed — every table/column already exists.
+
 ## Notes / Deviations
 - All admin portal pages are worth spot-checking for the same mobile-table pattern as schema-reset-tool, since this may not be an isolated instance (e.g. customer-overview and orphaned-bookings likely also render tabular data) — flagging for a future pass rather than assuming it's fixed by fixing schema-reset alone.
