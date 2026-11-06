@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import type { CalendarDictionary } from "@/lib/i18n/dictionaries/calendar";
@@ -407,23 +407,52 @@ export function CalendarGridView({
   const [modalSlot, setModalSlot] = useState<SlotSelection | null>(null);
 
   // drag-to-reschedule (workflows/calendar-management-upcoming.md): custom
-  // pointer-events drag, no library. `drag` drives the drop-preview overlay
-  // in whichever day column the pointer is currently over; the booking's
-  // own teamMemberId never changes regardless of view (single-provider or
-  // merged) — only starts_at moves. `suppressNextClickRef` swallows the
-  // click that a pointerup after an actual drag would otherwise fire (a
-  // plain tap with no movement still opens the detail modal as before).
+  // pointer-events drag, no library. `drag` drives the snapped drop-preview
+  // overlay in whichever day column the pointer is currently over;
+  // `floatingChip` is a separate, unsnapped element that tracks the raw
+  // cursor position every move event so the drag visually feels like it's
+  // moving with the mouse (the snapped ghost alone looked "erratic" since
+  // it only jumps between 15-min marks). The booking's own teamMemberId
+  // never changes regardless of view (single-provider or merged) — only
+  // starts_at moves. `suppressNextClickRef` swallows the click that a
+  // pointerup after an actual drag would otherwise fire (a plain tap with
+  // no movement still opens the detail modal as before).
   const [drag, setDrag] = useState<{ booking: WeekBookingVM; target: DragTarget | null } | null>(null);
+  const [floatingChip, setFloatingChip] = useState<{ left: number; top: number; width: number; height: number; label: string } | null>(null);
+  // Optimistic override: as soon as a drop resolves to a real target (no
+  // conflict, or conflict confirmed), show the booking at its NEW time
+  // immediately rather than waiting for the server round-trip + the
+  // parent's refetch to land — that gap was the "takes a while to appear
+  // in the new slot, stays in the old one" complaint. Cleared once the
+  // `bookings` prop itself changes (the refetch triggered by
+  // onBookingCreated() landed and now reflects the real new time), or
+  // immediately on a failed/cancelled move (revert to the old position).
+  const [pendingMove, setPendingMove] = useState<{ bookingId: string; startIso: string } | null>(null);
   const [conflictPrompt, setConflictPrompt] = useState<{ booking: WeekBookingVM; target: DragTarget; conflicts: ConflictSummary } | null>(null);
   const [moving, setMoving] = useState(false);
   const [moveError, setMoveError] = useState<string | null>(null);
   const suppressNextClickRef = useRef(false);
+  const firstBookingsEffectRef = useRef(true);
+
+  const displayBookings = useMemo(() => {
+    if (!pendingMove) return bookings;
+    return bookings.map((b) => (b.id === pendingMove.bookingId ? { ...b, startIso: pendingMove.startIso } : b));
+  }, [bookings, pendingMove]);
+
+  // Only clears the optimistic override once the underlying `bookings` prop
+  // itself changes (the real refetch landed) — not on every render, and not
+  // on the initial mount (nothing pending then anyway).
+  useEffect(() => {
+    if (firstBookingsEffectRef.current) { firstBookingsEffectRef.current = false; return; }
+    setPendingMove(null);
+  }, [bookings]);
 
   async function finalizeMove(booking: WeekBookingVM, target: DragTarget, confirmed?: boolean) {
     if (!booking.teamMemberId || !booking.serviceId) return;
     const hh = Math.floor(target.startMin / 60);
     const mm = target.startMin % 60;
     const startIso = zonedTimeToUtc(target.year, target.month, target.day, hh, mm).toISOString();
+    setPendingMove({ bookingId: booking.id, startIso }); // show the move instantly, before the server even responds
     setMoving(true);
     setMoveError(null);
     try {
@@ -443,7 +472,7 @@ export function CalendarGridView({
         },
         dict.manualErrors
       );
-      if (!res.ok) { setMoveError(res.error); return; }
+      if (!res.ok) { setMoveError(res.error); setPendingMove(null); return; }
       if ("needsConfirmation" in res) { setConflictPrompt({ booking, target, conflicts: res.conflicts }); return; }
       setConflictPrompt(null);
       onBookingCreated();
@@ -459,6 +488,9 @@ export function CalendarGridView({
     e.stopPropagation();
     const startX = e.clientX;
     const startY = e.clientY;
+    const chipRect = e.currentTarget.getBoundingClientRect();
+    const grabOffsetX = e.clientX - chipRect.left;
+    const grabOffsetY = e.clientY - chipRect.top;
     let dragging = false;
     let target: DragTarget | null = null;
 
@@ -467,6 +499,17 @@ export function CalendarGridView({
         if (Math.hypot(ev.clientX - startX, ev.clientY - startY) < 6) return;
         dragging = true;
       }
+      // Tracks the raw cursor every event, independent of the 15-min snap
+      // below — this is what makes the drag feel like it's actually
+      // following the mouse instead of only jumping between snap marks.
+      setFloatingChip({
+        left: ev.clientX - grabOffsetX,
+        top: ev.clientY - grabOffsetY,
+        width: chipRect.width,
+        height: chipRect.height,
+        label: `${timeLabel(booking.startIso)} · ${booking.clientName}`,
+      });
+
       const el = document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null;
       const col = el?.closest<HTMLElement>("[data-grid-day]");
       if (!col?.dataset.gridDay) return;
@@ -484,6 +527,7 @@ export function CalendarGridView({
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onCancel);
+      setFloatingChip(null);
       if (dragging && target) {
         suppressNextClickRef.current = true;
         void finalizeMove(booking, target);
@@ -494,6 +538,7 @@ export function CalendarGridView({
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onCancel);
+      setFloatingChip(null);
       setDrag(null);
     }
 
@@ -662,7 +707,7 @@ export function CalendarGridView({
                     members={members}
                     allMembers={allMembers}
                     ranges={ranges}
-                    bookings={bookings}
+                    bookings={displayBookings}
                     gridStartMin={gridStartMin}
                     gridEndMin={gridEndMin}
                     gridHeight={gridHeight}
@@ -689,7 +734,7 @@ export function CalendarGridView({
                     member={member}
                     members={members}
                     ranges={ranges}
-                    bookings={bookings}
+                    bookings={displayBookings}
                     closures={closures}
                     gridStartMin={gridStartMin}
                     gridEndMin={gridEndMin}
@@ -734,7 +779,7 @@ export function CalendarGridView({
           intlLocale={dict.intlLocale}
           dict={dict.bookingConflict}
           saving={moving}
-          onCancel={() => setConflictPrompt(null)}
+          onCancel={() => { setConflictPrompt(null); setPendingMove(null); }}
           onConfirm={() => finalizeMove(conflictPrompt.booking, conflictPrompt.target, true)}
         />
       )}
@@ -745,6 +790,18 @@ export function CalendarGridView({
           className="fixed bottom-4 right-4 z-50 max-w-sm cursor-pointer rounded-lg border border-error bg-error-weak px-4 py-2.5 text-[13px] text-error shadow-lg"
         >
           {moveError}
+        </div>
+      )}
+
+      {/* Floating drag clone — tracks the raw cursor pixel-for-pixel
+          (see startChipDrag), separate from the snapped drop-preview
+          rendered inside the target day column. */}
+      {floatingChip && (
+        <div
+          className="pointer-events-none fixed z-50 overflow-hidden rounded-md bg-brand px-1.5 py-[3px] text-[10.5px] font-medium leading-[1.2] text-white shadow-lg"
+          style={{ left: floatingChip.left, top: floatingChip.top, width: floatingChip.width, height: floatingChip.height }}
+        >
+          {floatingChip.label}
         </div>
       )}
     </div>
