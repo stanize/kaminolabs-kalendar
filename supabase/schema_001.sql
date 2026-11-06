@@ -34,6 +34,7 @@ drop table if exists public.kalendar_discount_schedule_phases    cascade;
 drop table if exists public.kalendar_discount_schedule_templates cascade;
 drop table if exists public.kalendar_plan_prices                 cascade;
 drop table if exists public.kalendar_presales_codes   cascade;
+drop table if exists public.kalendar_support_ticket_comments cascade;
 drop table if exists public.kalendar_support_tickets  cascade;
 drop table if exists public.kalendar_user_preferences cascade;
 drop table if exists public.kalendar_whatsapp_sessions cascade;
@@ -51,8 +52,10 @@ drop table if exists public.kalendar_business_hours  cascade;
 drop table if exists public.kalendar_services        cascade;
 drop table if exists public.kalendar_businesses      cascade;
 
-drop type if exists public.support_ticket_status   cascade;
-drop type if exists public.support_ticket_category cascade;
+drop type if exists public.support_ticket_status      cascade;
+drop type if exists public.support_ticket_category    cascade;
+drop type if exists public.support_ticket_source      cascade;
+drop type if exists public.support_comment_author_type cascade;
 drop type if exists public.booking_status          cascade;
 
 -- ----------------------------------------------------------------------------
@@ -1201,12 +1204,19 @@ create policy "Bookings: write"
   on public.kalendar_bookings for all using (true) with check (true);
 
 -- ----------------------------------------------------------------------------
--- kalendar_support_tickets
--- Support requests submitted by authenticated users via the panel.
--- The help portal reads and updates this table (status, admin_notes).
+-- kalendar_support_tickets / kalendar_support_ticket_comments
+-- Kalendar Support Framework v1 (workflows/support-ticketing.md). A clinic
+-- raises a ticket from /panel/support (or an admin raises one on their
+-- behalf, e.g. from a WhatsApp conversation — reported_via/
+-- created_by_admin_email below); both sides exchange comments on the same
+-- thread, and status changes are logged as comments too so the thread is
+-- a full history. The admin portal (kaminolabs-kalendar-admin) reads and
+-- updates this table and the comments table.
 -- ----------------------------------------------------------------------------
-create type public.support_ticket_status   as enum ('open', 'in_progress', 'resolved', 'closed');
-create type public.support_ticket_category as enum ('billing', 'technical', 'feature_request', 'account', 'other');
+create type public.support_ticket_status      as enum ('open', 'in_progress', 'resolved', 'closed');
+create type public.support_ticket_category    as enum ('billing', 'technical', 'feature_request', 'account', 'other');
+create type public.support_ticket_source      as enum ('panel', 'whatsapp', 'email', 'phone', 'other');
+create type public.support_comment_author_type as enum ('clinic', 'admin');
 
 create table public.kalendar_support_tickets (
   id          uuid                           primary key default gen_random_uuid(),
@@ -1218,7 +1228,12 @@ create table public.kalendar_support_tickets (
   category    public.support_ticket_category not null default 'other',
   status      public.support_ticket_status   not null default 'open',
   attachments text[]                         not null default '{}',
-  admin_notes text,
+  -- support-ticketing-v1: how the feedback actually reached Arun — most
+  -- tickets are self-raised via the panel, but one raised on the clinic's
+  -- behalf (e.g. from a WhatsApp conversation) records that here, plus
+  -- which admin logged it. Both null/'panel' for a self-raised ticket.
+  reported_via           public.support_ticket_source not null default 'panel',
+  created_by_admin_email text,
   created_at  timestamptz                    not null default now(),
   updated_at  timestamptz                    not null default now()
 );
@@ -1236,6 +1251,31 @@ create policy "Support: read"
   on public.kalendar_support_tickets for select using (true);
 create policy "Support: insert"
   on public.kalendar_support_tickets for insert with check (true);
+
+-- support-ticketing-v1: two-way comment thread, replacing the old
+-- single admin_notes free-text field — both the clinic and admin post to
+-- the same thread, and a status change is also logged here as a comment
+-- (author_type 'admin', body prefixed e.g. "Estado cambiado a: ...") so
+-- the thread is a complete chronological record.
+create table public.kalendar_support_ticket_comments (
+  id           uuid        primary key default gen_random_uuid(),
+  ticket_id    uuid        not null references public.kalendar_support_tickets (id) on delete cascade,
+  author_type  public.support_comment_author_type not null,
+  author_name  text,
+  author_email text        not null,
+  body         text        not null,
+  created_at   timestamptz not null default now()
+);
+
+create index kalendar_support_ticket_comments_ticket_id_idx
+  on public.kalendar_support_ticket_comments (ticket_id);
+
+alter table public.kalendar_support_ticket_comments enable row level security;
+
+create policy "Support comments: read"
+  on public.kalendar_support_ticket_comments for select using (true);
+create policy "Support comments: insert"
+  on public.kalendar_support_ticket_comments for insert with check (true);
 
 -- ============================================================================
 -- support-attachments storage bucket
