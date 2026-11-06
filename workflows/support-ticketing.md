@@ -231,3 +231,29 @@ submit → appears in admin list → admin replies/changes status →
 clinic sees the update and can reply back → thread stays in sync both
 ways; "raise on behalf" creates a ticket that shows up correctly in
 the clinic's own panel with the "logged by..." note.
+
+ADDED 2026-11-06 (CODE IMPLEMENTED, typechecked/linted/built clean,
+PENDING TESTING):
+- **Admin ticket detail → side panel**: both `/admin/support` and the
+  new clinic Configuration > Support tab (admin repo's
+  `clinic-config-readonly-view` step, workflows/admin-portal-tools.md)
+  now open ticket detail in a slide-in side panel
+  (`components/admin/side-panel.tsx` + `support-ticket-panel.tsx`)
+  instead of an expandable table row — same visual pattern as the main
+  repo's panel convention. One shared `SupportTicketPanel` component
+  backs both call sites.
+- **Pasted image attachments on replies**: new
+  `kalendar_support_ticket_comments.attachments text[]` column
+  (`schema_subset_038.sql`, also NOT YET RUN against the live DB).
+  `addTicketComment` (main repo) now takes `FormData` instead of a
+  plain object; both the clinic reply box and the admin reply box
+  handle `onPaste`, upload any pasted image to the `support-attachments`
+  bucket (same validation as a ticket's own initial attachments), and
+  render thumbnails on existing comments.
+
+Still needs (in addition to the above): `schema_subset_038.sql` run
+against the live DB (comment replies with a pasted image will error on
+the missing column until then); live-test paste-an-image-into-reply on
+both the clinic panel and the admin side panel; confirm the new side
+panel behaves correctly on mobile widths (admin repo's sidebar is
+`md:w-56`, side panel uses `md:left-56` to match).
