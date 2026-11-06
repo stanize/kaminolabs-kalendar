@@ -217,6 +217,49 @@ export interface GridDayFestivo {
   label: string | null;
 }
 
+function pad2(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+function isoDateKey(year: number, month: number, day: number): string {
+  return `${year}-${pad2(month)}-${pad2(day)}`;
+}
+
+function parseHM(t: string): number {
+  const [h, m] = t.split(":").map(Number);
+  return h * 60 + m;
+}
+
+export interface MemberTimeOff {
+  fullDay: boolean;
+  startMin: number | null; // null when fullDay
+  endMin: number | null; // null when fullDay
+  label: string | null;
+}
+
+/** One-off (non-recurring) time off affecting this provider on this date —
+ *  clinic-wide (teamMemberId null) or scoped to this member. holidays-and-
+ *  time-off: unlike a recurring festivo (clinic-wide, grid-level), this is
+ *  per-provider and per-date-range, so it's computed per (day, member) at
+ *  render time from the full closures list rather than pre-reduced in
+ *  buildGridDays. */
+function memberTimeOffForDay(
+  closures: ClosureRuleVM[],
+  year: number, month: number, day: number,
+  memberId: string
+): MemberTimeOff[] {
+  const dateStr = isoDateKey(year, month, day);
+  return closures
+    .filter((c) => !c.recurring && (c.teamMemberId === null || c.teamMemberId === memberId))
+    .filter((c) => c.startDate && c.endDate && c.startDate <= dateStr && dateStr <= c.endDate)
+    .map((c) => ({
+      fullDay: !c.startTime || !c.endTime,
+      startMin: c.startTime ? parseHM(c.startTime) : null,
+      endMin: c.endTime ? parseHM(c.endTime) : null,
+      label: c.label,
+    }));
+}
+
 function timeLabel(iso: string): string {
   return new Intl.DateTimeFormat("en-GB", {
     timeZone: TZ, hour: "2-digit", minute: "2-digit", hour12: false,
@@ -524,6 +567,7 @@ export function CalendarGridView({
                     members={members}
                     ranges={ranges}
                     bookings={bookings}
+                    closures={closures}
                     gridStartMin={gridStartMin}
                     gridEndMin={gridEndMin}
                     gridHeight={gridHeight}
@@ -631,6 +675,7 @@ function DayProviderColumn({
   members,
   ranges,
   bookings,
+  closures,
   gridStartMin,
   gridEndMin,
   gridHeight,
@@ -643,6 +688,7 @@ function DayProviderColumn({
   members: WeekMemberVM[];
   ranges: TimeRangeVM[];
   bookings: WeekBookingVM[];
+  closures: ClosureRuleVM[];
   gridStartMin: number;
   gridEndMin: number;
   gridHeight: number;
@@ -655,6 +701,8 @@ function DayProviderColumn({
     const parts = tzDateParts(new Date(b.startIso));
     return parts.year === day.year && parts.month === day.month && parts.day === day.day;
   });
+
+  const timeOff = day.isFestivo ? [] : memberTimeOffForDay(closures, day.year, day.month, day.day, member.id);
 
   const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -740,6 +788,44 @@ function DayProviderColumn({
             }}
           />
         )}
+
+        {/* One-off provider time off — same bold diagonal-hatch treatment as
+            festivo, in slate instead of amber so the two read as distinct
+            ("clinic holiday" vs. "this provider is off"). Full-day spans the
+            whole column; a same-day partial window is clamped to the grid's
+            visible time range. */}
+        {timeOff.map((t, i) => {
+          if (t.fullDay) {
+            return (
+              <div
+                key={i}
+                className="pointer-events-none absolute inset-0 bg-slate-200/50"
+                title={t.label ?? dict.week.festivoFallbackLabel}
+                style={{
+                  backgroundImage:
+                    "repeating-linear-gradient(45deg, rgba(71,85,105,0.35) 0px, rgba(71,85,105,0.35) 7px, transparent 7px, transparent 16px)",
+                }}
+              />
+            );
+          }
+          const start = Math.max(t.startMin!, gridStartMin);
+          const end = Math.min(t.endMin!, gridEndMin);
+          if (end <= start) return null;
+          const top = (start - gridStartMin) * PX_PER_MIN;
+          const height = (end - start) * PX_PER_MIN;
+          return (
+            <div
+              key={i}
+              className="pointer-events-none absolute left-0 right-0 bg-slate-200/50"
+              title={t.label ?? dict.week.festivoFallbackLabel}
+              style={{
+                top, height,
+                backgroundImage:
+                  "repeating-linear-gradient(45deg, rgba(71,85,105,0.35) 0px, rgba(71,85,105,0.35) 7px, transparent 7px, transparent 16px)",
+              }}
+            />
+          );
+        })}
 
         {/* Hour gridlines */}
         {Array.from({ length: Math.floor((gridEndMin - gridStartMin) / 60) + 1 }).map((_, i) => (

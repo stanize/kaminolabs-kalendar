@@ -582,6 +582,8 @@ export function CalendarBookings({
               gridStart={range.start}
               currentMonth={tzDateParts(focusDate).month}
               bookings={providerFilteredBookings}
+              festivos={festivos}
+              closures={closures}
               dict={dict}
               onSelectDay={handleSelectDay}
             />
