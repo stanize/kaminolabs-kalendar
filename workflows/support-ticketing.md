@@ -257,3 +257,47 @@ the missing column until then); live-test paste-an-image-into-reply on
 both the clinic panel and the admin side panel; confirm the new side
 panel behaves correctly on mobile widths (admin repo's sidebar is
 `md:w-56`, side panel uses `md:left-56` to match).
+
+ADDED 2026-11-06 (CODE IMPLEMENTED, typechecked/linted/built clean,
+PENDING TESTING) — bug fix + follow-up requests found while testing
+the batch above:
+- **BUG FOUND + FIXED**: the admin repo's attachment-upload path built
+  its storage object key as `admin/${encodeURIComponent(adminEmail)}/...`
+  — `encodeURIComponent` leaves a literal `%40` (etc.) in the key
+  string itself, and Supabase Storage rejects `%` in object keys. The
+  `.upload()` call silently succeeded writing bytes under that bad
+  key, but `getPublicUrl()`'s URL then permanently 400s
+  (`InvalidKey`) on every subsequent fetch — an admin's pasted
+  screenshot showed as a broken image forever. Fixed by sanitizing the
+  email to a safe charset (`[^a-zA-Z0-9._-]` → `_`) instead of
+  percent-encoding it. The main repo's own upload helper was never
+  affected (it keys by `userId`, a UUID, not an email).
+- **Image-only comments**: both repos now accept a reply with no text
+  as long as at least one attachment is present (previously body text
+  was always required, forcing workarounds like typing "image.png").
+- **Edit/delete own comments**: new `updateTicketComment`/
+  `deleteTicketComment` (main repo, clinic-scoped) and `updateComment`/
+  `deleteComment` (admin repo, admin-scoped) — strictly own-comment-only
+  in both directions (a clinic can never touch an admin's comment or
+  vice versa, and never another clinic's/admin's own comment).
+  Attachments aren't editable, only the text body; delete removes the
+  row outright (storage objects are left orphaned, same no-cleanup
+  convention as everywhere else attachments are used in this app).
+- **Lightbox**: every attachment thumbnail (ticket-level and
+  comment-level, both repos) now opens a full-size image overlay on
+  click instead of only linking out to the raw storage URL.
+- **Reassign a ticket to a different business** (admin repo only,
+  requested after Arun found tickets logged on behalf of the wrong
+  clinic): a new "Change business" control on the admin ticket panel
+  lets staff pick the correct business from the same picker the
+  "Raise ticket on behalf" form uses, updates the ticket's
+  `user_id`/`user_email`, and logs a system comment ("Ticket
+  reasignado a: {business}") so the reassignment is visible in the
+  thread — same pattern as the existing status-change system comment.
+
+Still needs (in addition to the above): run `schema_subset_038.sql`
+against the live DB (blocks pasted-image replies entirely until then);
+live-test every item above; the one pre-existing broken comment on the
+Test Ticket (from before the InvalidKey fix) is left in the DB
+deliberately, as a live test case for the new delete-comment feature
+rather than cleaned up directly.
