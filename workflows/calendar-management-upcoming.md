@@ -211,5 +211,88 @@ Criteria:
 - Failure detail (error text) shown in the booking detail modal
 - No retry action exists from this view (visibility-only, by design — see appointment-reminders workflow)
 
+## Step: drag-to-reschedule
+Status: not_started
+Criteria:
+- DESIGN SETTLED (2026-11-06, Arun) — requested via support ticket
+  (subject "Mover citas arrastrando en el calendario (drag & drop)",
+  logged from WhatsApp by demo4@kaminolabs.dev / Bea, category
+  technical, ticket id `f80c5a04-cfcd-4f42-92e7-965cb5ac7215`). Lets
+  the clinic click-and-drag a booking chip in the week/day grid to a
+  new time slot — including the merged multi-provider week view — and
+  drop it to reschedule, instead of opening the edit form.
+- **Technique: custom pointer-events, no new dependency.** Hand-rolled
+  `onPointerDown`/`onPointerMove`/`onPointerUp` on the chip (not HTML5
+  `draggable`, which has weak/inconsistent touch support — a concern
+  here since clinics may use tablets — and not `@dnd-kit`, which would
+  be this app's first drag dependency for a single feature). The
+  existing in-house drag precedent (`team-manager.tsx`/
+  `services-manager.tsx`'s native-`draggable` list reordering) is a
+  different interaction shape (1D list reorder, not 2D pixel-accurate
+  time-grid dropping) and isn't reused here.
+- **Scope: week/day grid only, single-provider AND merged
+  multi-provider columns.** Month view is out of scope (no time
+  granularity to drop onto).
+- **Provider never changes on drag, in either view** — this was an
+  explicit correction from the AskUserQuestion default: dragging a
+  chip only ever changes the booking's `starts_at` (day + time), never
+  its `team_member_id`. In the single-provider (filtered) view each
+  column is already one provider, so this falls out naturally; in the
+  merged view (`DayMergedColumn`, one column per day holding every
+  provider's bookings) the chip's vertical position within its day
+  changes the time and horizontal movement changes the day, but the
+  booking's own provider stays fixed regardless of where in that
+  column it lands — the drop handler must NOT attempt to infer a new
+  provider from drop position in the merged view, just reuse the
+  booking's existing `teamMemberId`.
+- **Snapping**: drop position snaps to a fixed grid increment (15 min
+  — TO CONFIRM AT BUILD TIME, not explicitly settled with Arun; 15 is
+  the working assumption since it matches typical slot granularity
+  elsewhere in the app, revisit if that feels off once it's built and
+  testable).
+- **Backend: reuses `updateBookingAsOwner`** (`lib/actions/
+  booking-owner.ts`), calling it with just `startIso` changed (same
+  `serviceId`/`teamMemberId`/client fields as the booking already
+  has) — no new server action needed for the move itself. Conflict
+  detection reuses the same `findOverlappingBookings` helper that
+  function already calls internally (with `excludeBookingId` = the
+  dragged booking's own id) — on drop, if the target slot conflicts,
+  show the same confirm-override flow `updateBookingAsOwner` already
+  returns (`needsConfirmation`/`conflicts`) rather than building a new
+  conflict UI.
+- **Notify patient**: `sendConfirmationEmail` defaults to **true** on
+  a drag-reschedule — a deliberate difference from the manual
+  "Modificar" edit form, where it defaults unchecked. Rationale (per
+  Arun): a dragged move is still a real time change from the patient's
+  perspective and should default to telling them, unlike the edit
+  form's broader "any field could be changing including just a typo
+  fix" ambiguity. Still a single email reusing the existing
+  `bookingConfirmEmailHtml` "Cita actualizada" template — no new
+  template. Whether the drag interaction itself exposes a way to
+  override this default (e.g. holding a modifier key, or a brief
+  post-drop confirm toast with an uncheck option) is a build-time UX
+  detail, not settled here — at minimum the clinic should have SOME
+  way to suppress it per-move, not just a global setting.
+- **Editability**: a cancelled or no_show booking's chip is not
+  draggable at all (no pointer handlers attached / `cursor-default`
+  instead of grab cursor). A past booking IS draggable, consistent
+  with this file's existing "always revisable" design intent
+  (calendar-grid-view.tsx's doc comment on chip clickability) — no
+  special-casing for past dates beyond what already exists.
+- **Conflict with existing click-to-open / click-to-create**: the chip
+  currently has `onClick` → opens `BookingDetailModal`
+  (`stopPropagation`'d against the day column's own slot-click-to-
+  create handler). The drag implementation needs a small-movement
+  threshold (e.g. a few px of pointer movement before treating it as a
+  drag rather than a click) so a plain click still opens the detail
+  modal as today — a drag must not swallow ordinary single-clicks, and
+  a click must not accidentally fire a reschedule.
+- Not scoped for v1: dragging to resize a booking's duration (only
+  moving start time, not stretching/shrinking the chip); dragging
+  between the week grid and month view; any mobile-specific gesture
+  beyond basic pointer-event touch support (no haptic feedback, no
+  long-press-to-drag affordance — a direct touch-drag is assumed
+  sufficient, revisit if testing shows otherwise).
+
 ## Notes / Deviations
 (freeform — anything found in code that doesn't map to a defined step)
