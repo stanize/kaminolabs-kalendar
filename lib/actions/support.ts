@@ -241,8 +241,9 @@ export async function addTicketComment(formData: FormData): Promise<AddCommentRe
   }
   const ticketId = formData.get("ticketId") as string | null;
   const body = ((formData.get("body") as string | null) ?? "").trim();
+  const files = (formData.getAll("attachments") as File[]).filter((f) => f && f.size > 0);
   if (!ticketId) return { ok: false, error: "Ticket no encontrado." };
-  if (!body) return { ok: false, error: "Escribe un mensaje." };
+  if (!body && files.length === 0) return { ok: false, error: "Escribe un mensaje o adjunta una imagen." };
 
   const supabase = await createClient();
   const { data: ticket } = await supabase
@@ -253,7 +254,7 @@ export async function addTicketComment(formData: FormData): Promise<AddCommentRe
     .maybeSingle();
   if (!ticket) return { ok: false, error: "Ticket no encontrado." };
 
-  const uploadResult = await uploadSupportAttachments(supabase, session.user.id, formData.getAll("attachments") as File[]);
+  const uploadResult = await uploadSupportAttachments(supabase, session.user.id, files);
   if (!uploadResult.ok) return uploadResult;
 
   const { data: comment, error } = await supabase
@@ -289,4 +290,54 @@ export async function addTicketComment(formData: FormData): Promise<AddCommentRe
       createdAt: comment.created_at,
     },
   };
+}
+
+export type EditCommentResult = { ok: true } | { ok: false; error: string };
+
+/** The clinic can edit/delete only its OWN comments (author_email match),
+ *  on a ticket it owns — never an admin's comment, and never another
+ *  clinic's. Text-only edit (attachments stay as originally sent); delete
+ *  removes the row outright (storage objects are left in place — same
+ *  no-cleanup-on-delete choice as everywhere else attachments are used in
+ *  this app, acceptable since the bucket isn't user-facing/browsable). */
+export async function updateTicketComment(input: { commentId: string; body: string }): Promise<EditCommentResult> {
+  const session = await getSession();
+  if (!session?.user?.id) return { ok: false, error: "Sesión no encontrada. Por favor inicia sesión de nuevo." };
+  const body = input.body.trim();
+  if (!body) return { ok: false, error: "Escribe un mensaje." };
+
+  const supabase = await createClient();
+  const { data: comment } = await supabase
+    .from("kalendar_support_ticket_comments")
+    .select("id, ticket_id, author_email, kalendar_support_tickets!inner(user_id)")
+    .eq("id", input.commentId)
+    .maybeSingle();
+  const ownerUserId = (comment?.kalendar_support_tickets as unknown as { user_id: string } | null)?.user_id;
+  if (!comment || comment.author_email !== session.user.email || ownerUserId !== session.user.id) {
+    return { ok: false, error: "Comentario no encontrado." };
+  }
+
+  const { error } = await supabase.from("kalendar_support_ticket_comments").update({ body }).eq("id", input.commentId);
+  if (error) return { ok: false, error: `No se pudo actualizar: ${error.message}` };
+  return { ok: true };
+}
+
+export async function deleteTicketComment(commentId: string): Promise<EditCommentResult> {
+  const session = await getSession();
+  if (!session?.user?.id) return { ok: false, error: "Sesión no encontrada. Por favor inicia sesión de nuevo." };
+
+  const supabase = await createClient();
+  const { data: comment } = await supabase
+    .from("kalendar_support_ticket_comments")
+    .select("id, author_email, kalendar_support_tickets!inner(user_id)")
+    .eq("id", commentId)
+    .maybeSingle();
+  const ownerUserId = (comment?.kalendar_support_tickets as unknown as { user_id: string } | null)?.user_id;
+  if (!comment || comment.author_email !== session.user.email || ownerUserId !== session.user.id) {
+    return { ok: false, error: "Comentario no encontrado." };
+  }
+
+  const { error } = await supabase.from("kalendar_support_ticket_comments").delete().eq("id", commentId);
+  if (error) return { ok: false, error: `No se pudo eliminar: ${error.message}` };
+  return { ok: true };
 }

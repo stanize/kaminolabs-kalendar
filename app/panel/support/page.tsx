@@ -3,6 +3,7 @@ import { getMyTickets } from "@/lib/actions/support";
 import { getLocale } from "@/lib/i18n/server";
 import { getSupportDictionary } from "@/lib/i18n/dictionaries/support";
 import { SupportManager } from "@/components/panel/support-manager";
+import { requireSession } from "@/lib/auth-session";
 
 // support-ticketing-v1 (workflows/support-ticketing.md): the submit-only
 // form is now paired with the clinic's own ticket history/detail/reply
@@ -10,6 +11,7 @@ import { SupportManager } from "@/components/panel/support-manager";
 // every other add/edit surface in this app) — this page just fetches the
 // initial list + dictionary server-side.
 export default async function SoportePage() {
+  const session = await requireSession();
   const [tickets, locale] = await Promise.all([getMyTickets(), getLocale()]);
   const dict = getSupportDictionary(locale);
 
@@ -25,7 +27,7 @@ export default async function SoportePage() {
         </div>
       </div>
 
-      <SupportManager initialTickets={tickets} dict={dict} />
+      <SupportManager initialTickets={tickets} dict={dict} myEmail={session.user.email} />
     </div>
   );
 }

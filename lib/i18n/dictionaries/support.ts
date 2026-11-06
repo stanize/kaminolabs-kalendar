@@ -70,6 +70,13 @@ export interface SupportDictionary {
   replyButton: string;
   replySending: string;
   errReplyFailed: string;
+  errEmptyReply: string;
+  commentEdit: string;
+  commentDelete: string;
+  commentDeleteConfirm: string;
+  commentSave: string;
+  commentCancel: string;
+  lightboxClose: string;
 }
 
 const es: SupportDictionary = {
@@ -133,6 +140,13 @@ const es: SupportDictionary = {
   replyButton: "Enviar",
   replySending: "Enviando…",
   errReplyFailed: "No se pudo enviar el comentario.",
+  errEmptyReply: "Escribe un mensaje o adjunta una imagen.",
+  commentEdit: "Editar",
+  commentDelete: "Eliminar",
+  commentDeleteConfirm: "¿Eliminar este comentario?",
+  commentSave: "Guardar",
+  commentCancel: "Cancelar",
+  lightboxClose: "Cerrar",
 };
 
 const en: SupportDictionary = {
@@ -196,6 +210,13 @@ const en: SupportDictionary = {
   replyButton: "Send",
   replySending: "Sending…",
   errReplyFailed: "Couldn't send the comment.",
+  errEmptyReply: "Write a message or attach an image.",
+  commentEdit: "Edit",
+  commentDelete: "Delete",
+  commentDeleteConfirm: "Delete this comment?",
+  commentSave: "Save",
+  commentCancel: "Cancel",
+  lightboxClose: "Close",
 };
 
 const SUPPORT_DICTIONARIES: Record<Locale, SupportDictionary> = { es, en };

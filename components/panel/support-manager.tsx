@@ -7,10 +7,13 @@ import {
   submitSupportTicket,
   getTicketWithComments,
   addTicketComment,
+  updateTicketComment,
+  deleteTicketComment,
   type SupportTicketCategory,
   type SupportTicketStatus,
   type SupportTicketSummary,
   type SupportTicketDetail,
+  type SupportTicketComment,
 } from "@/lib/actions/support";
 import { reportClientError } from "@/lib/report-client-error";
 import type { SupportDictionary } from "@/lib/i18n/dictionaries/support";
@@ -43,9 +46,11 @@ function formatWhen(iso: string, intlLocale: string): string {
 export function SupportManager({
   initialTickets,
   dict,
+  myEmail,
 }: {
   initialTickets: SupportTicketSummary[];
   dict: SupportDictionary;
+  myEmail: string;
 }) {
   const [tickets, setTickets] = useState(initialTickets);
   const [newPanelOpen, setNewPanelOpen] = useState(false);
@@ -143,6 +148,7 @@ export function SupportManager({
         <TicketDetailPanel
           ticketId={openTicketId}
           dict={dict}
+          myEmail={myEmail}
           onClose={() => setOpenTicketId(null)}
           onCommentAdded={() => {
             setTickets((ts) =>
@@ -359,11 +365,13 @@ function NewTicketPanel({
 function TicketDetailPanel({
   ticketId,
   dict,
+  myEmail,
   onClose,
   onCommentAdded,
 }: {
   ticketId: string;
   dict: SupportDictionary;
+  myEmail: string;
   onClose: () => void;
   onCommentAdded: () => void;
 }) {
@@ -372,6 +380,7 @@ function TicketDetailPanel({
   const [pastedFiles, setPastedFiles] = useState<File[]>([]);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -401,7 +410,7 @@ function TicketDetailPanel({
   }
 
   async function handleReply() {
-    if (!reply.trim()) return;
+    if (!reply.trim() && pastedFiles.length === 0) return;
     setSending(true);
     setError(null);
     try {
@@ -461,9 +470,9 @@ function TicketDetailPanel({
                 <p className="mb-1.5 text-[12.5px] font-semibold text-ink-soft">{dict.attachmentsSection}</p>
                 <div className="flex flex-wrap gap-2">
                   {detail.attachments.map((url) => (
-                    <a key={url} href={url} target="_blank" rel="noopener noreferrer">
+                    <button key={url} type="button" onClick={() => setLightboxUrl(url)}>
                       <img src={url} alt="" className="h-20 w-20 rounded-lg border border-line object-cover" />
-                    </a>
+                    </button>
                   ))}
                 </div>
               </div>
@@ -476,24 +485,15 @@ function TicketDetailPanel({
               ) : (
                 <div className="flex flex-col gap-2">
                   {detail.comments.map((c) => (
-                    <div
+                    <CommentItem
                       key={c.id}
-                      className={`rounded-lg border px-3 py-2 text-[13px] ${c.authorType === "admin" ? "border-brand-line bg-brand-weak" : "border-line bg-surface-2/50"}`}
-                    >
-                      <p className="mb-0.5 text-[11.5px] font-semibold text-ink-soft">
-                        {c.authorType === "admin" ? "Kalendar" : (c.authorName || c.authorEmail)} · {formatWhen(c.createdAt, "es-ES")}
-                      </p>
-                      <p className="whitespace-pre-wrap text-ink">{c.body}</p>
-                      {c.attachments.length > 0 && (
-                        <div className="mt-1.5 flex flex-wrap gap-1.5">
-                          {c.attachments.map((url) => (
-                            <a key={url} href={url} target="_blank" rel="noopener noreferrer">
-                              <img src={url} alt="" className="h-14 w-14 rounded-md border border-line object-cover" />
-                            </a>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+                      comment={c}
+                      dict={dict}
+                      isMine={c.authorType === "clinic" && c.authorEmail === myEmail}
+                      onOpenImage={setLightboxUrl}
+                      onUpdated={(updated) => setDetail((d) => (d ? { ...d, comments: d.comments.map((x) => (x.id === updated.id ? updated : x)) } : d))}
+                      onDeleted={(id) => setDetail((d) => (d ? { ...d, comments: d.comments.filter((x) => x.id !== id) } : d))}
+                    />
                   ))}
                 </div>
               )}
@@ -526,7 +526,7 @@ function TicketDetailPanel({
               />
               <button
                 onClick={handleReply}
-                disabled={sending || !reply.trim()}
+                disabled={sending || (!reply.trim() && pastedFiles.length === 0)}
                 className="shrink-0 self-end rounded-lg bg-brand px-4 py-2 text-[13px] font-semibold text-white hover:opacity-90 disabled:opacity-50"
               >
                 {sending ? dict.replySending : dict.replyButton}
@@ -535,6 +535,136 @@ function TicketDetailPanel({
           </>
         )}
       </div>
+
+      {lightboxUrl && <Lightbox url={lightboxUrl} label={dict.lightboxClose} onClose={() => setLightboxUrl(null)} />}
+    </div>
+  );
+}
+
+function Lightbox({ url, label, onClose }: { url: string; label: string; onClose: () => void }) {
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-6"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+    >
+      <button onClick={onClose} aria-label={label} className="absolute right-5 top-5 grid h-9 w-9 place-items-center rounded-full bg-white/10 text-white hover:bg-white/20">
+        <Icon name="x" size={18} />
+      </button>
+      <img src={url} alt="" className="max-h-full max-w-full rounded-lg object-contain" onClick={(e) => e.stopPropagation()} />
+    </div>
+  );
+}
+
+function CommentItem({
+  comment: c,
+  dict,
+  isMine,
+  onOpenImage,
+  onUpdated,
+  onDeleted,
+}: {
+  comment: SupportTicketComment;
+  dict: SupportDictionary;
+  isMine: boolean;
+  onOpenImage: (url: string) => void;
+  onUpdated: (comment: SupportTicketComment) => void;
+  onDeleted: (id: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [editText, setEditText] = useState(c.body);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  async function handleSave() {
+    if (!editText.trim()) return;
+    setBusy(true);
+    try {
+      const res = await updateTicketComment({ commentId: c.id, body: editText.trim() });
+      setBusy(false);
+      if (res.ok) {
+        onUpdated({ ...c, body: editText.trim() });
+        setEditing(false);
+      }
+    } catch (e) {
+      setBusy(false);
+      reportClientError("updateTicketComment", e);
+    }
+  }
+
+  async function handleDelete() {
+    setBusy(true);
+    try {
+      const res = await deleteTicketComment(c.id);
+      setBusy(false);
+      if (res.ok) onDeleted(c.id);
+    } catch (e) {
+      setBusy(false);
+      reportClientError("deleteTicketComment", e);
+    }
+  }
+
+  return (
+    <div className={`rounded-lg border px-3 py-2 text-[13px] ${c.authorType === "admin" ? "border-brand-line bg-brand-weak" : "border-line bg-surface-2/50"}`}>
+      <div className="mb-0.5 flex items-center justify-between gap-2">
+        <p className="text-[11.5px] font-semibold text-ink-soft">
+          {c.authorType === "admin" ? "Kalendar" : (c.authorName || c.authorEmail)} · {formatWhen(c.createdAt, "es-ES")}
+        </p>
+        {isMine && !editing && (
+          <div className="flex shrink-0 items-center gap-2 text-[11px]">
+            <button onClick={() => { setEditText(c.body); setEditing(true); }} className="font-medium text-ink-soft hover:text-ink">
+              {dict.commentEdit}
+            </button>
+            {confirmingDelete ? (
+              <>
+                <span className="text-ink-soft">{dict.commentDeleteConfirm}</span>
+                <button onClick={handleDelete} disabled={busy} className="font-semibold text-error hover:underline disabled:opacity-50">
+                  {dict.commentDelete}
+                </button>
+                <button onClick={() => setConfirmingDelete(false)} className="text-ink-soft hover:text-ink">
+                  {dict.commentCancel}
+                </button>
+              </>
+            ) : (
+              <button onClick={() => setConfirmingDelete(true)} className="font-medium text-error hover:underline">
+                {dict.commentDelete}
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {editing ? (
+        <div className="flex flex-col gap-1.5">
+          <textarea
+            value={editText}
+            onChange={(e) => setEditText(e.target.value)}
+            rows={2}
+            className="resize-none rounded-md border border-line bg-surface px-2 py-1.5 text-[13px] text-ink focus:border-brand focus:outline-none"
+          />
+          <div className="flex gap-2">
+            <button onClick={handleSave} disabled={busy || !editText.trim()} className="rounded-md bg-brand px-2.5 py-1 text-[11.5px] font-semibold text-white hover:opacity-90 disabled:opacity-50">
+              {dict.commentSave}
+            </button>
+            <button onClick={() => setEditing(false)} className="text-[11.5px] font-medium text-ink-soft hover:text-ink">
+              {dict.commentCancel}
+            </button>
+          </div>
+        </div>
+      ) : (
+        c.body && <p className="whitespace-pre-wrap text-ink">{c.body}</p>
+      )}
+
+      {c.attachments.length > 0 && (
+        <div className="mt-1.5 flex flex-wrap gap-1.5">
+          {c.attachments.map((url) => (
+            <button key={url} type="button" onClick={() => onOpenImage(url)}>
+              <img src={url} alt="" className="h-14 w-14 rounded-md border border-line object-cover" />
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
