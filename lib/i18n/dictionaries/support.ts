@@ -56,6 +56,8 @@ export interface SupportDictionary {
   // Ticket list
   listTitle: string;
   listEmpty: string;
+  listEmptyFiltered: string;
+  filterAll: string;
   loggedByAdminNote: string; // shown on a ticket reported_via !== "panel"; contains "{channel}"
   commentCountTemplate: string; // "{n} comentario(s)"
 
@@ -118,6 +120,8 @@ const es: SupportDictionary = {
 
   listTitle: "Tus consultas",
   listEmpty: "Aún no has enviado ninguna consulta.",
+  listEmptyFiltered: "No tienes consultas con este estado.",
+  filterAll: "Todos",
   loggedByAdminNote: "Registrado por el equipo de Kalendar desde {channel}.",
   commentCountTemplate: "{n} comentario(s)",
 
@@ -179,6 +183,8 @@ const en: SupportDictionary = {
 
   listTitle: "Your queries",
   listEmpty: "You haven't sent any queries yet.",
+  listEmptyFiltered: "You have no queries with this status.",
+  filterAll: "All",
   loggedByAdminNote: "Logged by the Kalendar team from {channel}.",
   commentCountTemplate: "{n} comment(s)",
 

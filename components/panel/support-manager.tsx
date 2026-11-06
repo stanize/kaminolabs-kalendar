@@ -18,6 +18,8 @@ import type { SupportDictionary } from "@/lib/i18n/dictionaries/support";
 const CATEGORY_ORDER: SupportTicketCategory[] = ["technical", "billing", "feature_request", "account", "other"];
 const MAX_FILES = 5;
 const MAX_FILE_SIZE_MB = 5;
+const STATUS_FILTER_ORDER: SupportTicketStatus[] = ["open", "in_progress", "resolved", "closed"];
+type StatusFilter = "all" | SupportTicketStatus;
 
 function statusBadgeClass(status: SupportTicketStatus): string {
   switch (status) {
@@ -48,6 +50,9 @@ export function SupportManager({
   const [tickets, setTickets] = useState(initialTickets);
   const [newPanelOpen, setNewPanelOpen] = useState(false);
   const [openTicketId, setOpenTicketId] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+
+  const filteredTickets = statusFilter === "all" ? tickets : tickets.filter((t) => t.status === statusFilter);
 
   return (
     <div className="flex flex-col gap-4">
@@ -56,14 +61,39 @@ export function SupportManager({
       </Btn>
 
       <div>
-        <h2 className="mb-2 text-[13px] font-semibold text-ink-soft">{dict.listTitle}</h2>
-        {tickets.length === 0 ? (
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-[13px] font-semibold text-ink-soft">{dict.listTitle}</h2>
+          <div className="flex flex-wrap gap-1.5">
+            <button
+              type="button"
+              onClick={() => setStatusFilter("all")}
+              className={`rounded-full border px-2.5 py-1 text-[11.5px] font-semibold transition-colors ${
+                statusFilter === "all" ? "border-brand-line bg-brand-weak text-brand-ink" : "border-line bg-surface text-ink-soft hover:border-brand-line"
+              }`}
+            >
+              {dict.filterAll}
+            </button>
+            {STATUS_FILTER_ORDER.map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => setStatusFilter(s)}
+                className={`rounded-full border px-2.5 py-1 text-[11.5px] font-semibold transition-colors ${
+                  statusFilter === s ? "border-brand-line bg-brand-weak text-brand-ink" : "border-line bg-surface text-ink-soft hover:border-brand-line"
+                }`}
+              >
+                {dict.statuses[s]}
+              </button>
+            ))}
+          </div>
+        </div>
+        {filteredTickets.length === 0 ? (
           <p className="rounded-xl border border-line bg-surface px-4 py-6 text-center text-[13px] text-ink-soft">
-            {dict.listEmpty}
+            {tickets.length === 0 ? dict.listEmpty : dict.listEmptyFiltered}
           </p>
         ) : (
           <div className="flex flex-col gap-2">
-            {tickets.map((t) => (
+            {filteredTickets.map((t) => (
               <button
                 key={t.id}
                 type="button"
