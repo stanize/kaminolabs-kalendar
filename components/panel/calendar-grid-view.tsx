@@ -1,12 +1,15 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import type { CalendarDictionary } from "@/lib/i18n/dictionaries/calendar";
 import type { DayId } from "@/lib/onboarding/types";
 import { AppointmentModal, type SlotSelection, type ClosureRuleVM } from "@/components/panel/appointment-modal";
 import type { CustomTimeSlotRuleVM } from "@/lib/booking/appointment-fields";
+import { ClosureConflictDialog } from "@/components/panel/closure-conflict-dialog";
+import type { ConflictSummary } from "@/lib/actions/closures";
+import { updateBookingAsOwner } from "@/lib/actions/booking-owner";
 import {
   TZ,
   tzDateParts,
@@ -14,6 +17,15 @@ import {
   zonedTimeToUtc,
   minutesInTz,
 } from "@/lib/calendar/client-date";
+
+/** Where a dragged chip currently hovers — used both to render the drop
+ *  preview and, on release, to compute the new startIso. */
+export interface DragTarget {
+  year: number;
+  month: number;
+  day: number;
+  startMin: number;
+}
 
 const PX_PER_MIN = 1.1; // grid vertical scale
 const DEFAULT_START_MIN = 8 * 60; // 08:00 fallback when no hours are set
@@ -394,6 +406,107 @@ export function CalendarGridView({
   const w = dict.week;
   const [modalSlot, setModalSlot] = useState<SlotSelection | null>(null);
 
+  // drag-to-reschedule (workflows/calendar-management-upcoming.md): custom
+  // pointer-events drag, no library. `drag` drives the drop-preview overlay
+  // in whichever day column the pointer is currently over; the booking's
+  // own teamMemberId never changes regardless of view (single-provider or
+  // merged) — only starts_at moves. `suppressNextClickRef` swallows the
+  // click that a pointerup after an actual drag would otherwise fire (a
+  // plain tap with no movement still opens the detail modal as before).
+  const [drag, setDrag] = useState<{ booking: WeekBookingVM; target: DragTarget | null } | null>(null);
+  const [conflictPrompt, setConflictPrompt] = useState<{ booking: WeekBookingVM; target: DragTarget; conflicts: ConflictSummary } | null>(null);
+  const [moving, setMoving] = useState(false);
+  const [moveError, setMoveError] = useState<string | null>(null);
+  const suppressNextClickRef = useRef(false);
+
+  async function finalizeMove(booking: WeekBookingVM, target: DragTarget, confirmed?: boolean) {
+    if (!booking.teamMemberId || !booking.serviceId) return;
+    const hh = Math.floor(target.startMin / 60);
+    const mm = target.startMin % 60;
+    const startIso = zonedTimeToUtc(target.year, target.month, target.day, hh, mm).toISOString();
+    setMoving(true);
+    setMoveError(null);
+    try {
+      const res = await updateBookingAsOwner(
+        {
+          bookingId: booking.id,
+          serviceId: booking.serviceId,
+          teamMemberId: booking.teamMemberId,
+          startIso,
+          clientName: booking.clientName,
+          clientEmail: booking.clientEmail || undefined,
+          clientPhone: booking.clientPhone || undefined,
+          notes: booking.notes || undefined,
+          sendConfirmationEmail: true,
+          sendConfirmationWhatsapp: false,
+          confirmed,
+        },
+        dict.manualErrors
+      );
+      if (!res.ok) { setMoveError(res.error); return; }
+      if ("needsConfirmation" in res) { setConflictPrompt({ booking, target, conflicts: res.conflicts }); return; }
+      setConflictPrompt(null);
+      onBookingCreated();
+      router.refresh();
+    } finally {
+      setMoving(false);
+    }
+  }
+
+  function startChipDrag(booking: WeekBookingVM, e: React.PointerEvent<HTMLDivElement>) {
+    if (booking.status === "cancelled" || booking.status === "no_show") return;
+    if (!booking.teamMemberId || !booking.serviceId) return;
+    e.stopPropagation();
+    const startX = e.clientX;
+    const startY = e.clientY;
+    let dragging = false;
+    let target: DragTarget | null = null;
+
+    function onMove(ev: PointerEvent) {
+      if (!dragging) {
+        if (Math.hypot(ev.clientX - startX, ev.clientY - startY) < 6) return;
+        dragging = true;
+      }
+      const el = document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null;
+      const col = el?.closest<HTMLElement>("[data-grid-day]");
+      if (!col?.dataset.gridDay) return;
+      const [y, m, d] = col.dataset.gridDay.split("-").map(Number);
+      const rect = col.getBoundingClientRect();
+      const offsetY = ev.clientY - rect.top;
+      let minute = gridStartMin + offsetY / PX_PER_MIN;
+      minute = Math.round(minute / 15) * 15;
+      minute = Math.max(gridStartMin, Math.min(gridEndMin - booking.durationMin, minute));
+      target = { year: y, month: m, day: d, startMin: minute };
+      setDrag({ booking, target });
+    }
+
+    function onUp() {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onCancel);
+      if (dragging && target) {
+        suppressNextClickRef.current = true;
+        void finalizeMove(booking, target);
+      }
+      setDrag(null);
+    }
+    function onCancel() {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onCancel);
+      setDrag(null);
+    }
+
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onCancel);
+  }
+
+  function handleChipClick(booking: WeekBookingVM) {
+    if (suppressNextClickRef.current) { suppressNextClickRef.current = false; return; }
+    onBookingClick(booking);
+  }
+
   // Grid vertical span: uniform across Day/Week views and day navigation —
   // based on the business's full week of hours (not just the day currently
   // shown), padded by 1h on each side, plus widened further to cover any
@@ -539,7 +652,11 @@ export function CalendarGridView({
             const ranges = hoursByDay[day.dayId] ?? [];
             if (merged) {
               return (
-                <div key={`${day.year}-${day.month}-${day.day}`} className="flex flex-1 border-r border-line last:border-r-0">
+                <div
+                  key={`${day.year}-${day.month}-${day.day}`}
+                  data-grid-day={`${day.year}-${day.month}-${day.day}`}
+                  className="flex flex-1 border-r border-line last:border-r-0"
+                >
                   <DayMergedColumn
                     day={day}
                     members={members}
@@ -550,15 +667,21 @@ export function CalendarGridView({
                     gridEndMin={gridEndMin}
                     gridHeight={gridHeight}
                     dict={dict}
+                    drag={drag}
                     onSlotClick={(d, clickMinute, r) => handleSlotClick(d, null, clickMinute, r)}
-                    onBookingClick={onBookingClick}
+                    onBookingClick={handleChipClick}
                     onAddAtBooking={(d, booking, r) => handleSlotClick(d, null, minutesInTz(new Date(booking.startIso)), r)}
+                    onChipPointerDown={startChipDrag}
                   />
                 </div>
               );
             }
             return (
-              <div key={`${day.year}-${day.month}-${day.day}`} className="flex flex-1 border-r border-line last:border-r-0">
+              <div
+                key={`${day.year}-${day.month}-${day.day}`}
+                data-grid-day={`${day.year}-${day.month}-${day.day}`}
+                className="flex flex-1 border-r border-line last:border-r-0"
+              >
                 {members.map((member) => (
                   <DayProviderColumn
                     key={`${day.dayId}-${member.id}`}
@@ -572,8 +695,10 @@ export function CalendarGridView({
                     gridEndMin={gridEndMin}
                     gridHeight={gridHeight}
                     dict={dict}
+                    drag={drag}
                     onSlotClick={handleSlotClick}
-                    onBookingClick={onBookingClick}
+                    onBookingClick={handleChipClick}
+                    onChipPointerDown={startChipDrag}
                   />
                 ))}
               </div>
@@ -601,6 +726,26 @@ export function CalendarGridView({
           onClose={() => setModalSlot(null)}
           onSaved={handleCreated}
         />
+      )}
+
+      {conflictPrompt && (
+        <ClosureConflictDialog
+          conflicts={conflictPrompt.conflicts}
+          intlLocale={dict.intlLocale}
+          dict={dict.bookingConflict}
+          saving={moving}
+          onCancel={() => setConflictPrompt(null)}
+          onConfirm={() => finalizeMove(conflictPrompt.booking, conflictPrompt.target, true)}
+        />
+      )}
+
+      {moveError && (
+        <div
+          onClick={() => setMoveError(null)}
+          className="fixed bottom-4 right-4 z-50 max-w-sm cursor-pointer rounded-lg border border-error bg-error-weak px-4 py-2.5 text-[13px] text-error shadow-lg"
+        >
+          {moveError}
+        </div>
       )}
     </div>
   );
@@ -680,8 +825,10 @@ function DayProviderColumn({
   gridEndMin,
   gridHeight,
   dict,
+  drag,
   onSlotClick,
   onBookingClick,
+  onChipPointerDown,
 }: {
   day: GridDay;
   member: WeekMemberVM;
@@ -693,8 +840,10 @@ function DayProviderColumn({
   gridEndMin: number;
   gridHeight: number;
   dict: CalendarDictionary;
+  drag: { booking: WeekBookingVM; target: DragTarget | null } | null;
   onSlotClick: (day: GridDay, member: WeekMemberVM, clickMinute: number, ranges: TimeRangeVM[]) => void;
   onBookingClick: (booking: WeekBookingVM) => void;
+  onChipPointerDown: (booking: WeekBookingVM, e: React.PointerEvent<HTMLDivElement>) => void;
 }) {
   const dayBookings = bookings.filter((b) => {
     if (b.teamMemberId !== member.id) return false;
@@ -703,6 +852,15 @@ function DayProviderColumn({
   });
 
   const timeOff = day.isFestivo ? [] : memberTimeOffForDay(closures, day.year, day.month, day.day, member.id);
+
+  // drag-to-reschedule: this column is the live drop target only when the
+  // dragged booking's own provider matches this column's provider (the
+  // provider never changes on drag) and the pointer is currently over this
+  // day.
+  const dropTarget =
+    drag?.target && drag.booking.teamMemberId === member.id && drag.target.year === day.year && drag.target.month === day.month && drag.target.day === day.day
+      ? drag.target
+      : null;
 
   const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -838,17 +996,23 @@ function DayProviderColumn({
 
         {/* Bookings — click opens the detail modal (manage/cancel if
             upcoming, mark result + payment if in the past) instead of
-            falling through to the empty-slot "new appointment" handler. */}
+            falling through to the empty-slot "new appointment" handler.
+            Also draggable (drag-to-reschedule) via onPointerDown — a
+            cancelled/no_show chip's pointerdown is a no-op (startChipDrag
+            bails early), so only its cursor/opacity differ, not clickability. */}
         {dayBookings.map((b) => {
           const startMin = minutesInTz(new Date(b.startIso));
           const top = (startMin - gridStartMin) * PX_PER_MIN;
           const height = Math.max(b.durationMin * PX_PER_MIN, 30);
           const isPast = new Date(b.startIso) < new Date();
+          const draggable = b.status !== "cancelled" && b.status !== "no_show";
+          const isDragSource = drag?.booking.id === b.id;
           return (
             <div
               key={b.id}
               onClick={(e) => { e.stopPropagation(); onBookingClick(b); }}
-              className={`absolute left-0.5 right-0.5 cursor-pointer overflow-hidden rounded-md px-1.5 py-[3px] text-[10.5px] leading-[1.2] ${chipClasses(b.status, isPast, b.clientStatus, b.clinicReviewedAt)}`}
+              onPointerDown={(e) => onChipPointerDown(b, e)}
+              className={`absolute left-0.5 right-0.5 overflow-hidden rounded-md px-1.5 py-[3px] text-[10.5px] leading-[1.2] ${draggable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"} ${isDragSource ? "opacity-30" : ""} ${chipClasses(b.status, isPast, b.clientStatus, b.clinicReviewedAt)}`}
               style={{ top, height }}
             >
               <div className="truncate">
@@ -881,6 +1045,18 @@ function DayProviderColumn({
             </div>
           );
         })}
+
+        {/* Drag drop-preview — a dashed ghost at the snapped target time,
+            shown only in the dragged booking's own provider column (see
+            dropTarget above: provider never changes on drag). */}
+        {dropTarget && (
+          <div
+            className="pointer-events-none absolute left-0.5 right-0.5 rounded-md border-2 border-dashed border-brand bg-brand/10 px-1.5 py-[3px] text-[10.5px] font-semibold text-brand"
+            style={{ top: (dropTarget.startMin - gridStartMin) * PX_PER_MIN, height: Math.max(drag!.booking.durationMin * PX_PER_MIN, 30) }}
+          >
+            {String(Math.floor(dropTarget.startMin / 60)).padStart(2, "0")}:{String(dropTarget.startMin % 60).padStart(2, "0")}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -905,9 +1081,11 @@ function DayMergedColumn({
   gridEndMin,
   gridHeight,
   dict,
+  drag,
   onSlotClick,
   onBookingClick,
   onAddAtBooking,
+  onChipPointerDown,
 }: {
   day: GridDay;
   members: WeekMemberVM[];
@@ -918,6 +1096,7 @@ function DayMergedColumn({
   gridEndMin: number;
   gridHeight: number;
   dict: CalendarDictionary;
+  drag: { booking: WeekBookingVM; target: DragTarget | null } | null;
   onSlotClick: (day: GridDay, clickMinute: number, ranges: TimeRangeVM[]) => void;
   onBookingClick: (booking: WeekBookingVM) => void;
   // open-slot-plus-badge (2026-10): a small "+" on top of an existing
@@ -926,6 +1105,7 @@ function DayMergedColumn({
   // no-default create flow as an empty-slot click, pinned to that
   // booking's own start time instead of a raw click offset.
   onAddAtBooking: (day: GridDay, booking: WeekBookingVM, ranges: TimeRangeVM[]) => void;
+  onChipPointerDown: (booking: WeekBookingVM, e: React.PointerEvent<HTMLDivElement>) => void;
 }) {
   const memberIds = new Set(members.map((m) => m.id));
   const dayBookings = bookings.filter((b) => {
@@ -934,6 +1114,13 @@ function DayMergedColumn({
     return parts.year === day.year && parts.month === day.month && parts.day === day.day;
   });
   const clusters = clusterDayBookings(dayBookings);
+
+  // drag-to-reschedule: unlike DayProviderColumn, the merged view has one
+  // column per day (not per provider), so a drop target here only needs
+  // the day to match — the dragged booking's own provider never changes,
+  // so there's no provider ambiguity to resolve from drop position.
+  const dropTarget =
+    drag?.target && drag.target.year === day.year && drag.target.month === day.month && drag.target.day === day.day ? drag.target : null;
 
   const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -1015,10 +1202,12 @@ function DayMergedColumn({
           if (cluster.bookings.length === 1) {
             const b = cluster.bookings[0];
             const isPast = new Date(b.startIso) < new Date();
+            const draggable = b.status !== "cancelled" && b.status !== "no_show";
+            const isDragSource = drag?.booking.id === b.id;
             return (
               <div
                 key={clusterKey}
-                className="absolute left-0.5 right-0.5 flex flex-col overflow-hidden rounded-md"
+                className={`absolute left-0.5 right-0.5 flex flex-col overflow-hidden rounded-md ${isDragSource ? "opacity-30" : ""}`}
                 style={{ top, height: naturalHeight }}
               >
                 {hasFreeProvider && (
@@ -1033,7 +1222,8 @@ function DayMergedColumn({
                 )}
                 <div
                   onClick={(e) => { e.stopPropagation(); onBookingClick(b); }}
-                  className={`min-h-0 flex-1 cursor-pointer overflow-hidden px-1.5 py-[3px] text-[10.5px] leading-[1.2] ${chipClasses(b.status, isPast, b.clientStatus, b.clinicReviewedAt)}`}
+                  onPointerDown={(e) => onChipPointerDown(b, e)}
+                  className={`min-h-0 flex-1 overflow-hidden px-1.5 py-[3px] text-[10.5px] leading-[1.2] ${draggable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"} ${chipClasses(b.status, isPast, b.clientStatus, b.clinicReviewedAt)}`}
                 >
                   <div className="flex items-center gap-1 truncate">
                     {b.teamMemberId && (
@@ -1129,6 +1319,15 @@ function DayMergedColumn({
             </div>
           );
         })}
+
+        {dropTarget && drag && (
+          <div
+            className="pointer-events-none absolute left-0.5 right-0.5 rounded-md border-2 border-dashed border-brand bg-brand/10 px-1.5 py-[3px] text-[10.5px] font-semibold text-brand"
+            style={{ top: (dropTarget.startMin - gridStartMin) * PX_PER_MIN, height: Math.max(drag.booking.durationMin * PX_PER_MIN, 30) }}
+          >
+            {String(Math.floor(dropTarget.startMin / 60)).padStart(2, "0")}:{String(dropTarget.startMin % 60).padStart(2, "0")}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -212,8 +212,39 @@ Criteria:
 - No retry action exists from this view (visibility-only, by design — see appointment-reminders workflow)
 
 ## Step: drag-to-reschedule
-Status: not_started
+Status: in_progress
 Criteria:
+- CODE IMPLEMENTED 2026-11-06 (typechecked/linted/built clean), PENDING
+  MANUAL TESTING. Built in `components/panel/calendar-grid-view.tsx`:
+  custom `onPointerDown`/window-level `pointermove`/`pointerup` drag (no
+  new dependency), a 6px movement threshold before a pointerdown counts
+  as a drag (so a plain click still opens the detail modal — enforced
+  via `suppressNextClickRef`, which swallows the click event a real
+  drag's pointerup would otherwise also fire), hit-testing via
+  `document.elementFromPoint` + a `data-grid-day` attribute on each
+  day-column wrapper, snapping to 15-minute increments. Works in both
+  `DayProviderColumn` (single-provider) and `DayMergedColumn` (merged
+  multi-provider week view, single-booking clusters only — see note
+  below) — provider never changes in either case, only `starts_at`.
+  Reuses `updateBookingAsOwner` + its existing `findOverlappingBookings`
+  conflict check unchanged; a conflict reuses the same
+  `ClosureConflictDialog` the Festivos/Vacaciones flows already use,
+  via the shared `ConflictSummary` type. `sendConfirmationEmail: true`
+  on every drag-move (per the settled default) — no per-move override
+  UI was built (the design doc flagged this as "at minimum some way to
+  suppress it," but Arun didn't specify one when confirming the design,
+  so it's deferred rather than guessed at; revisit if this turns out to
+  be unwanted in practice). Drop-preview shown as a dashed ghost box at
+  the snapped target time + the source chip dimmed to 30% opacity while
+  dragging. A move error (e.g. network failure) surfaces as a dismissable
+  toast, bottom-right.
+- NOT BUILT: dragging from the merged view's compact multi-row cluster
+  (2+ overlapping bookings stacked in one box) — only the single-
+  booking-per-slot case is draggable there; a clustered row still opens
+  the detail modal on click as before, just isn't a drag source. Scope
+  cut for v1 given how rare/cramped that case is; flag if it turns out
+  to matter.
+- Snap granularity: 15 minutes, as the design doc's working assumption.
 - DESIGN SETTLED (2026-11-06, Arun) — requested via support ticket
   (subject "Mover citas arrastrando en el calendario (drag & drop)",
   logged from WhatsApp by demo4@kaminolabs.dev / Bea, category
