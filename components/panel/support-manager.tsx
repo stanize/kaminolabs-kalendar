@@ -609,7 +609,7 @@ function CommentItem({
     <div className={`rounded-lg border px-3 py-2 text-[13px] ${c.authorType === "admin" ? "border-brand-line bg-brand-weak" : "border-line bg-surface-2/50"}`}>
       <div className="mb-0.5 flex items-center justify-between gap-2">
         <p className="text-[11.5px] font-semibold text-ink-soft">
-          {c.authorType === "admin" ? "Kalendar" : (c.authorName || c.authorEmail)} · {formatWhen(c.createdAt, "es-ES")}
+          {c.authorType === "admin" ? "Kalendar Support Team" : (c.authorName || c.authorEmail)} · {formatWhen(c.createdAt, "es-ES")}
         </p>
         {isMine && !editing && (
           <div className="flex shrink-0 items-center gap-2 text-[11px]">
