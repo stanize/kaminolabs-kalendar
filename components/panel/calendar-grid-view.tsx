@@ -495,6 +495,13 @@ export function CalendarGridView({
     e.stopPropagation();
     const startX = e.clientX;
     const startY = e.clientY;
+    // How far (in minutes) below the chip's own top edge the pointer grabbed
+    // it — without this, the drop-preview's top edge snaps to wherever the
+    // cursor currently is, regardless of where inside the chip the drag
+    // started, which reads as "pulling" the box around rather than
+    // genuinely dragging it (Arun feedback, 2026-11-09).
+    const chipRect = e.currentTarget.getBoundingClientRect();
+    const grabOffsetMin = (e.clientY - chipRect.top) / PX_PER_MIN;
     let dragging = false;
     let target: DragTarget | null = null;
 
@@ -509,7 +516,7 @@ export function CalendarGridView({
       const [y, m, d] = col.dataset.gridDay.split("-").map(Number);
       const rect = col.getBoundingClientRect();
       const offsetY = ev.clientY - rect.top;
-      let minute = gridStartMin + offsetY / PX_PER_MIN;
+      let minute = gridStartMin + offsetY / PX_PER_MIN - grabOffsetMin;
       minute = Math.round(minute / 15) * 15;
       minute = Math.max(gridStartMin, Math.min(gridEndMin - booking.durationMin, minute));
       target = { year: y, month: m, day: d, startMin: minute };
