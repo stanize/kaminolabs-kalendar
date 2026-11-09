@@ -269,6 +269,19 @@ export interface CalendarDictionary {
     confirm: string;
     saving: string;
   };
+  // drag-to-reschedule: confirm dialog shown after dropping a dragged
+  // booking on a new slot, before anything is actually saved — Arun
+  // feedback (2026-11-09): a drag shouldn't silently commit, and the
+  // "notify patient" choice should be visible/editable per-move instead
+  // of a fixed always-on default.
+  dragConfirm: {
+    title: string; // "¿Mover esta cita?"
+    fromToTemplate: string; // "De {from} a {to}", {from}/{to} pre-formatted date+time strings
+    sendEmailLabel: string; // checkbox: "Enviar notificación por email al paciente" — checked by default
+    cancel: string;
+    confirm: string;
+    confirming: string; // "Moviendo…" — confirm button's busy label
+  };
 }
 
 const es: CalendarDictionary = {
@@ -472,6 +485,14 @@ const es: CalendarDictionary = {
     confirm: "Reservar de todas formas",
     saving: "Guardando...",
   },
+  dragConfirm: {
+    title: "¿Mover esta cita?",
+    fromToTemplate: "De {from} a {to}",
+    sendEmailLabel: "Enviar notificación por email al paciente",
+    cancel: "Cancelar",
+    confirm: "Mover cita",
+    confirming: "Moviendo…",
+  },
 };
 
 const en: CalendarDictionary = {
@@ -674,6 +695,14 @@ const en: CalendarDictionary = {
     cancel: "Cancel",
     confirm: "Book anyway",
     saving: "Saving...",
+  },
+  dragConfirm: {
+    title: "Move this appointment?",
+    fromToTemplate: "From {from} to {to}",
+    sendEmailLabel: "Send an email notification to the patient",
+    cancel: "Cancel",
+    confirm: "Move appointment",
+    confirming: "Moving…",
   },
 };
 

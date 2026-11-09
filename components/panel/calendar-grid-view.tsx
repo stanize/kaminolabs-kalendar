@@ -407,28 +407,33 @@ export function CalendarGridView({
   const [modalSlot, setModalSlot] = useState<SlotSelection | null>(null);
 
   // drag-to-reschedule (workflows/calendar-management-upcoming.md): custom
-  // pointer-events drag, no library. `drag` drives the snapped drop-preview
-  // overlay in whichever day column the pointer is currently over;
-  // `floatingChip` is a separate, unsnapped element that tracks the raw
-  // cursor position every move event so the drag visually feels like it's
-  // moving with the mouse (the snapped ghost alone looked "erratic" since
-  // it only jumps between 15-min marks). The booking's own teamMemberId
-  // never changes regardless of view (single-provider or merged) — only
-  // starts_at moves. `suppressNextClickRef` swallows the click that a
-  // pointerup after an actual drag would otherwise fire (a plain tap with
-  // no movement still opens the detail modal as before).
+  // pointer-events drag, no library. `drag` drives the single snapped
+  // drop-preview (dashed box) in whichever day column the pointer is over
+  // — Arun feedback (2026-11-09): an earlier version also rendered a
+  // second, unsnapped floating clone following the raw cursor, which read
+  // as two competing/fighting boxes rather than one clear indicator; that
+  // clone is gone, the dashed snapped box is the only drag visual now.
+  // Dropping no longer saves immediately either — it opens `moveConfirm`
+  // (a "move this appointment?" dialog with a send-email checkbox,
+  // default checked) and nothing is written until the clinic confirms;
+  // `drag` stays frozen at the dropped target while that dialog is open so
+  // the dashed box keeps showing where it will land. The booking's own
+  // teamMemberId never changes regardless of view (single-provider or
+  // merged) — only starts_at moves. `suppressNextClickRef` swallows the
+  // click that a pointerup after an actual drag would otherwise fire (a
+  // plain tap with no movement still opens the detail modal as before).
   const [drag, setDrag] = useState<{ booking: WeekBookingVM; target: DragTarget | null } | null>(null);
-  const [floatingChip, setFloatingChip] = useState<{ left: number; top: number; width: number; height: number; label: string } | null>(null);
-  // Optimistic override: as soon as a drop resolves to a real target (no
-  // conflict, or conflict confirmed), show the booking at its NEW time
+  const [moveConfirm, setMoveConfirm] = useState<{ booking: WeekBookingVM; target: DragTarget; sendEmail: boolean } | null>(null);
+  // Optimistic override: once the clinic confirms the move (no conflict,
+  // or conflict then confirmed), show the booking at its NEW time
   // immediately rather than waiting for the server round-trip + the
   // parent's refetch to land — that gap was the "takes a while to appear
   // in the new slot, stays in the old one" complaint. Cleared once the
   // `bookings` prop itself changes (the refetch triggered by
   // onBookingCreated() landed and now reflects the real new time), or
-  // immediately on a failed/cancelled move (revert to the old position).
+  // immediately on a failed move (revert to the old position).
   const [pendingMove, setPendingMove] = useState<{ bookingId: string; startIso: string } | null>(null);
-  const [conflictPrompt, setConflictPrompt] = useState<{ booking: WeekBookingVM; target: DragTarget; conflicts: ConflictSummary } | null>(null);
+  const [conflictPrompt, setConflictPrompt] = useState<{ booking: WeekBookingVM; target: DragTarget; sendEmail: boolean; conflicts: ConflictSummary } | null>(null);
   const [moving, setMoving] = useState(false);
   const [moveError, setMoveError] = useState<string | null>(null);
   const suppressNextClickRef = useRef(false);
@@ -447,7 +452,7 @@ export function CalendarGridView({
     setPendingMove(null);
   }, [bookings]);
 
-  async function finalizeMove(booking: WeekBookingVM, target: DragTarget, confirmed?: boolean) {
+  async function finalizeMove(booking: WeekBookingVM, target: DragTarget, sendEmail: boolean, confirmed?: boolean) {
     if (!booking.teamMemberId || !booking.serviceId) return;
     const hh = Math.floor(target.startMin / 60);
     const mm = target.startMin % 60;
@@ -466,15 +471,17 @@ export function CalendarGridView({
           clientEmail: booking.clientEmail || undefined,
           clientPhone: booking.clientPhone || undefined,
           notes: booking.notes || undefined,
-          sendConfirmationEmail: true,
+          sendConfirmationEmail: sendEmail,
           sendConfirmationWhatsapp: false,
           confirmed,
         },
         dict.manualErrors
       );
-      if (!res.ok) { setMoveError(res.error); setPendingMove(null); return; }
-      if ("needsConfirmation" in res) { setConflictPrompt({ booking, target, conflicts: res.conflicts }); return; }
+      if (!res.ok) { setMoveError(res.error); setPendingMove(null); setMoveConfirm(null); setConflictPrompt(null); setDrag(null); return; }
+      if ("needsConfirmation" in res) { setConflictPrompt({ booking, target, sendEmail, conflicts: res.conflicts }); setPendingMove(null); setMoveConfirm(null); return; }
       setConflictPrompt(null);
+      setMoveConfirm(null);
+      setDrag(null);
       onBookingCreated();
       router.refresh();
     } finally {
@@ -488,9 +495,6 @@ export function CalendarGridView({
     e.stopPropagation();
     const startX = e.clientX;
     const startY = e.clientY;
-    const chipRect = e.currentTarget.getBoundingClientRect();
-    const grabOffsetX = e.clientX - chipRect.left;
-    const grabOffsetY = e.clientY - chipRect.top;
     let dragging = false;
     let target: DragTarget | null = null;
 
@@ -499,17 +503,6 @@ export function CalendarGridView({
         if (Math.hypot(ev.clientX - startX, ev.clientY - startY) < 6) return;
         dragging = true;
       }
-      // Tracks the raw cursor every event, independent of the 15-min snap
-      // below — this is what makes the drag feel like it's actually
-      // following the mouse instead of only jumping between snap marks.
-      setFloatingChip({
-        left: ev.clientX - grabOffsetX,
-        top: ev.clientY - grabOffsetY,
-        width: chipRect.width,
-        height: chipRect.height,
-        label: `${timeLabel(booking.startIso)} · ${booking.clientName}`,
-      });
-
       const el = document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null;
       const col = el?.closest<HTMLElement>("[data-grid-day]");
       if (!col?.dataset.gridDay) return;
@@ -527,18 +520,20 @@ export function CalendarGridView({
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onCancel);
-      setFloatingChip(null);
       if (dragging && target) {
         suppressNextClickRef.current = true;
-        void finalizeMove(booking, target);
+        // Freeze `drag` at the dropped target (don't clear it) so the
+        // dashed preview keeps showing where it'll land while the confirm
+        // dialog is open.
+        setMoveConfirm({ booking, target, sendEmail: true });
+      } else {
+        setDrag(null);
       }
-      setDrag(null);
     }
     function onCancel() {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onCancel);
-      setFloatingChip(null);
       setDrag(null);
     }
 
@@ -773,14 +768,28 @@ export function CalendarGridView({
         />
       )}
 
+      {moveConfirm && (
+        <MoveConfirmDialog
+          booking={moveConfirm.booking}
+          target={moveConfirm.target}
+          sendEmail={moveConfirm.sendEmail}
+          intlLocale={dict.intlLocale}
+          dict={dict.dragConfirm}
+          saving={moving}
+          onToggleSendEmail={(v) => setMoveConfirm((m) => (m ? { ...m, sendEmail: v } : m))}
+          onCancel={() => { setMoveConfirm(null); setDrag(null); }}
+          onConfirm={() => finalizeMove(moveConfirm.booking, moveConfirm.target, moveConfirm.sendEmail)}
+        />
+      )}
+
       {conflictPrompt && (
         <ClosureConflictDialog
           conflicts={conflictPrompt.conflicts}
           intlLocale={dict.intlLocale}
           dict={dict.bookingConflict}
           saving={moving}
-          onCancel={() => { setConflictPrompt(null); setPendingMove(null); }}
-          onConfirm={() => finalizeMove(conflictPrompt.booking, conflictPrompt.target, true)}
+          onCancel={() => { setConflictPrompt(null); setPendingMove(null); setMoveConfirm(null); setDrag(null); }}
+          onConfirm={() => finalizeMove(conflictPrompt.booking, conflictPrompt.target, conflictPrompt.sendEmail, true)}
         />
       )}
 
@@ -792,18 +801,68 @@ export function CalendarGridView({
           {moveError}
         </div>
       )}
+    </div>
+  );
+}
 
-      {/* Floating drag clone — tracks the raw cursor pixel-for-pixel
-          (see startChipDrag), separate from the snapped drop-preview
-          rendered inside the target day column. */}
-      {floatingChip && (
-        <div
-          className="pointer-events-none fixed z-50 overflow-hidden rounded-md bg-brand px-1.5 py-[3px] text-[10.5px] font-medium leading-[1.2] text-white shadow-lg"
-          style={{ left: floatingChip.left, top: floatingChip.top, width: floatingChip.width, height: floatingChip.height }}
-        >
-          {floatingChip.label}
+function MoveConfirmDialog({
+  booking,
+  target,
+  sendEmail,
+  intlLocale,
+  dict,
+  saving,
+  onToggleSendEmail,
+  onCancel,
+  onConfirm,
+}: {
+  booking: WeekBookingVM;
+  target: DragTarget;
+  sendEmail: boolean;
+  intlLocale: string;
+  dict: CalendarDictionary["dragConfirm"];
+  saving: boolean;
+  onToggleSendEmail: (v: boolean) => void;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const fromLabel = new Intl.DateTimeFormat(intlLocale, {
+    timeZone: TZ, weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false,
+  }).format(new Date(booking.startIso));
+  const toDate = zonedTimeToUtc(target.year, target.month, target.day, Math.floor(target.startMin / 60), target.startMin % 60);
+  const toLabel = new Intl.DateTimeFormat(intlLocale, {
+    timeZone: TZ, weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false,
+  }).format(toDate);
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 px-4" onClick={onCancel}>
+      <div className="w-full max-w-[420px] rounded-2xl border border-line bg-surface p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <h2 className="text-[16px] font-semibold text-ink">{dict.title}</h2>
+        <p className="mt-1.5 text-[13.5px] text-ink">
+          <span className="font-medium">{booking.clientName}</span>
+        </p>
+        <p className="mt-1 text-[13px] text-ink-soft">
+          {dict.fromToTemplate.replace("{from}", fromLabel).replace("{to}", toLabel)}
+        </p>
+
+        <label className="mt-4 flex items-center gap-2 text-[13px] text-ink">
+          <input type="checkbox" checked={sendEmail} onChange={(e) => onToggleSendEmail(e.target.checked)} className="h-4 w-4 rounded border-line accent-brand" />
+          {dict.sendEmailLabel}
+        </label>
+
+        <div className="mt-5 flex justify-end gap-2">
+          <button onClick={onCancel} disabled={saving} className="rounded-lg px-3.5 py-2 text-[13.5px] font-semibold text-ink-soft hover:bg-surface-2 disabled:opacity-50">
+            {dict.cancel}
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={saving}
+            className="rounded-lg bg-brand px-4 py-2 text-[13.5px] font-semibold text-white hover:opacity-90 disabled:opacity-50"
+          >
+            {saving ? dict.confirming : dict.confirm}
+          </button>
         </div>
-      )}
+      </div>
     </div>
   );
 }
