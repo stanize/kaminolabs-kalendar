@@ -9,6 +9,11 @@ import { AppointmentModal, type SlotSelection, type ClosureRuleVM } from "@/comp
 import type { CustomTimeSlotRuleVM } from "@/lib/booking/appointment-fields";
 import type { ConflictSummary } from "@/lib/actions/closures";
 import { updateBookingAsOwner } from "@/lib/actions/booking-owner";
+
+// Mirrors lib/closures/conflicts.ts's CONFLICT_LIST_CAP — not imported
+// directly since that module pulls in server-only code (Supabase client)
+// transitively, which can't be bundled into this "use client" component.
+const CONFLICT_LIST_CAP = 8;
 import {
   TZ,
   tzDateParts,
@@ -380,6 +385,46 @@ function clusterDayBookings(dayBookings: WeekBookingVM[]): DayBookingCluster[] {
   return clusters;
 }
 
+/**
+ * Client-side mirror of the server's findOverlappingBookings (lib/actions/
+ * booking-owner.ts) — used to decide, AT DROP TIME, whether a drag's target
+ * slot conflicts, so the confirm dialog can render in its final shape (plain
+ * vs. conflict-warning) from the very first paint instead of opening plain
+ * and then morphing once the server responds (Arun feedback, 2026-11-09:
+ * that transition still read as "two modals"). `bookings` is already the
+ * full set loaded for the visible range, so this needs no server round
+ * trip — the real server-side check in updateBookingAsOwner still runs on
+ * submit as the authoritative source, this is purely a same-tick UI
+ * decision.
+ */
+function findLocalConflicts(
+  bookings: WeekBookingVM[],
+  allMembers: WeekMemberVM[],
+  excludeBookingId: string,
+  teamMemberId: string,
+  startIso: string,
+  durationMin: number
+): ConflictSummary | null {
+  const start = new Date(startIso).getTime();
+  const end = start + durationMin * 60_000;
+  const matches = bookings.filter((b) => {
+    if (b.id === excludeBookingId) return false;
+    if (b.teamMemberId !== teamMemberId) return false;
+    if (b.status !== "pending_confirmation" && b.status !== "confirmed") return false;
+    const bStart = new Date(b.startIso).getTime();
+    const bEnd = new Date(b.endIso).getTime();
+    return bStart < end && bEnd > start;
+  });
+  if (matches.length === 0) return null;
+  const providerName = allMembers.find((m) => m.id === teamMemberId)?.name ?? null;
+  return {
+    total: matches.length,
+    sample: matches.slice(0, CONFLICT_LIST_CAP).map((b) => ({
+      id: b.id, clientName: b.clientName, serviceName: b.serviceName, startIso: b.startIso, teamMemberId: b.teamMemberId, providerName,
+    })),
+  };
+}
+
 export function CalendarGridView({
   view,
   days,
@@ -562,10 +607,20 @@ export function CalendarGridView({
           setDrag(null);
           return;
         }
+        // Checked up front (same tick) so the dialog renders in its final
+        // shape immediately — no plain-dialog-then-morphs-into-warning
+        // transition, which still read as "two modals" even merged into
+        // one component (Arun feedback, 2026-11-09).
+        const hh = Math.floor(target.startMin / 60);
+        const mm = target.startMin % 60;
+        const targetStartIso = zonedTimeToUtc(target.year, target.month, target.day, hh, mm).toISOString();
+        const localConflict = booking.teamMemberId
+          ? findLocalConflicts(bookings, allMembers, booking.id, booking.teamMemberId, targetStartIso, booking.durationMin)
+          : null;
         // Freeze `drag` at the dropped target (don't clear it) so the
         // dashed preview keeps showing where it'll land while the confirm
         // dialog is open.
-        setMoveConfirm({ booking, target, sendEmail: true, conflict: null });
+        setMoveConfirm({ booking, target, sendEmail: true, conflict: localConflict });
       } else {
         setDrag(null);
       }
