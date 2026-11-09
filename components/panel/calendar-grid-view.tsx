@@ -529,6 +529,17 @@ export function CalendarGridView({
       window.removeEventListener("pointercancel", onCancel);
       if (dragging && target) {
         suppressNextClickRef.current = true;
+        // Dropped back on the exact same day+time it started at — nothing
+        // actually changed, so just cancel silently instead of opening the
+        // confirm dialog (Arun feedback, 2026-11-09).
+        const originalParts = tzDateParts(new Date(booking.startIso));
+        const originalMin = minutesInTz(new Date(booking.startIso));
+        const isNoOp =
+          target.year === originalParts.year && target.month === originalParts.month && target.day === originalParts.day && target.startMin === originalMin;
+        if (isNoOp) {
+          setDrag(null);
+          return;
+        }
         // Freeze `drag` at the dropped target (don't clear it) so the
         // dashed preview keeps showing where it'll land while the confirm
         // dialog is open.
@@ -628,6 +639,12 @@ export function CalendarGridView({
   // provider to default to there, so the modal opens with the provider
   // field blank/required instead of silently picking one.
   const handleSlotClick = (day: GridDay, member: WeekMemberVM | null, clickMinute: number, ranges: TimeRangeVM[]) => {
+    // A drag-release fires a synthetic click on the nearest common ancestor
+    // of where the gesture started (the chip) and ended (the day column's
+    // own background, since the chip never visually moves) — that ancestor
+    // is this very slot-click handler's owner, so a completed drag must
+    // swallow it too, not just the chip's own click (handleChipClick).
+    if (suppressNextClickRef.current) { suppressNextClickRef.current = false; return; }
     const rounded = snapToSlotGrid(clickMinute, ranges);
     const hh = Math.floor(rounded / 60);
     const mm = rounded % 60;
