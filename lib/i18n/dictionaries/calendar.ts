@@ -276,7 +276,8 @@ export interface CalendarDictionary {
   // of a fixed always-on default.
   dragConfirm: {
     title: string; // "¿Mover esta cita?"
-    fromToTemplate: string; // "De {from} a {to}", {from}/{to} pre-formatted date+time strings
+    beforeLabel: string; // small label above the "before" time card — "ANTES"
+    afterLabel: string; // small label above the highlighted "after" time card — "AHORA"
     sendEmailLabel: string; // checkbox: "Enviar notificación por email al paciente" — checked by default
     cancel: string;
     confirm: string;
@@ -487,7 +488,8 @@ const es: CalendarDictionary = {
   },
   dragConfirm: {
     title: "¿Mover esta cita?",
-    fromToTemplate: "De {from} a {to}",
+    beforeLabel: "ANTES",
+    afterLabel: "AHORA",
     sendEmailLabel: "Enviar notificación por email al paciente",
     cancel: "Cancelar",
     confirm: "Mover cita",
@@ -698,7 +700,8 @@ const en: CalendarDictionary = {
   },
   dragConfirm: {
     title: "Move this appointment?",
-    fromToTemplate: "From {from} to {to}",
+    beforeLabel: "BEFORE",
+    afterLabel: "NOW",
     sendEmailLabel: "Send an email notification to the patient",
     cancel: "Cancel",
     confirm: "Move appointment",

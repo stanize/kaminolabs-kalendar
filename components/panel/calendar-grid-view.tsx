@@ -826,24 +826,29 @@ function MoveConfirmDialog({
   onCancel: () => void;
   onConfirm: () => void;
 }) {
-  const fromLabel = new Intl.DateTimeFormat(intlLocale, {
-    timeZone: TZ, weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false,
-  }).format(new Date(booking.startIso));
+  const fromDate = new Date(booking.startIso);
   const toDate = zonedTimeToUtc(target.year, target.month, target.day, Math.floor(target.startMin / 60), target.startMin % 60);
-  const toLabel = new Intl.DateTimeFormat(intlLocale, {
-    timeZone: TZ, weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false,
-  }).format(toDate);
+  const timeFmt = new Intl.DateTimeFormat(intlLocale, { timeZone: TZ, hour: "2-digit", minute: "2-digit", hour12: false });
+  const dateFmt = new Intl.DateTimeFormat(intlLocale, { timeZone: TZ, weekday: "short", day: "numeric", month: "short" });
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 px-4" onClick={onCancel}>
       <div className="w-full max-w-[420px] rounded-2xl border border-line bg-surface p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
         <h2 className="text-[16px] font-semibold text-ink">{dict.title}</h2>
-        <p className="mt-1.5 text-[13.5px] text-ink">
-          <span className="font-medium">{booking.clientName}</span>
-        </p>
-        <p className="mt-1 text-[13px] text-ink-soft">
-          {dict.fromToTemplate.replace("{from}", fromLabel).replace("{to}", toLabel)}
-        </p>
+        <p className="mt-1.5 text-[13.5px] font-medium text-ink">{booking.clientName}</p>
+
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <div className="rounded-xl border border-line bg-surface-2/50 px-3 py-2.5 text-center">
+            <p className="text-[10.5px] font-semibold uppercase tracking-wide text-ink-soft">{dict.beforeLabel}</p>
+            <p className="mt-0.5 text-[18px] font-bold text-ink-soft line-through decoration-ink-soft/50">{timeFmt.format(fromDate)}</p>
+            <p className="text-[11.5px] text-ink-soft">{dateFmt.format(fromDate)}</p>
+          </div>
+          <div className="rounded-xl border-2 border-brand bg-brand-weak px-3 py-2.5 text-center">
+            <p className="text-[10.5px] font-semibold uppercase tracking-wide text-brand">{dict.afterLabel}</p>
+            <p className="mt-0.5 text-[18px] font-bold text-brand-ink">{timeFmt.format(toDate)}</p>
+            <p className="text-[11.5px] text-brand-ink/80">{dateFmt.format(toDate)}</p>
+          </div>
+        </div>
 
         <label className="mt-4 flex items-center gap-2 text-[13px] text-ink">
           <input type="checkbox" checked={sendEmail} onChange={(e) => onToggleSendEmail(e.target.checked)} className="h-4 w-4 rounded border-line accent-brand" />
