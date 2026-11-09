@@ -20,7 +20,7 @@ import { zonedTimeToUtc, dayIdInTz, tzDateParts } from "@/lib/calendar/client-da
 import type { CalendarDictionary } from "@/lib/i18n/dictionaries/calendar";
 import type { InvoicingDictionary } from "@/lib/i18n/dictionaries/invoicing";
 import type { DayId } from "@/lib/onboarding/types";
-import { clientStatusLabel, clientStatusBadgeClass, needsClinicFollowUp, type WeekBookingVM } from "@/components/panel/calendar-grid-view";
+import { clientStatusLabel, clientStatusBadgeClass, needsClinicFollowUp, type WeekBookingVM, type OptimisticBookingChange } from "@/components/panel/calendar-grid-view";
 import { InvoiceConfirmModal, hasRealEmail } from "@/components/panel/invoice-confirm-modal";
 import { AppointmentModal, type ClosureRuleVM, type SlotSelection } from "@/components/panel/appointment-modal";
 import { ClosureConflictDialog } from "@/components/panel/closure-conflict-dialog";
@@ -114,7 +114,12 @@ export function BookingDetailModal({
   customSlotRules: CustomTimeSlotRuleVM[];
   whatsappEnabled: boolean;
   onClose: () => void;
-  onUpdated: () => void;
+  // Arg is only passed by the one call site that can build a precise
+  // optimistic patch/create client-side (handleSaveFields below, and the
+  // nested "new appointment, same client" AppointmentModal) — every other
+  // call site (cancel/confirm/no-show/payment/invoice) still calls this
+  // with no argument, falling back to the plain refetch-only behavior.
+  onUpdated: (optimistic?: OptimisticBookingChange) => void;
   // Fired specifically after a successful approve/deny — distinct from
   // onUpdated (which just refetches the grid) because the caller may also
   // be showing this booking in a separate flat list (e.g. the calendar
@@ -337,7 +342,25 @@ export function BookingDetailModal({
     setSavingFields(false);
     if (!res.ok) { setError(res.error); return; }
     if ("needsConfirmation" in res) { setConflicts(res.conflicts); return; }
-    onUpdated();
+    // Optimistic UI (2026-11-09): every changed field is already known
+    // client-side from the form itself — patch it in immediately instead
+    // of waiting for onUpdated's background refetch to land.
+    onUpdated({
+      kind: "patch",
+      id: booking.id,
+      patch: {
+        serviceId,
+        serviceName: selectedService?.name ?? booking.serviceName,
+        durationMin,
+        startIso: startDate.toISOString(),
+        endIso: new Date(startDate.getTime() + durationMin * 60_000).toISOString(),
+        teamMemberId,
+        clientName,
+        clientEmail,
+        clientPhone: clientPhone || null,
+        notes: fieldsNotes || null,
+      },
+    });
     requestClose(onClose);
   };
 
@@ -1368,9 +1391,9 @@ export function BookingDetailModal({
             }
             initialClientPhone={booking.clientPhone ?? ""}
             onClose={() => setNewApptOpen(false)}
-            onSaved={() => {
+            onSaved={(optimistic) => {
               setNewApptOpen(false);
-              onUpdated();
+              onUpdated(optimistic ? { kind: "create", booking: optimistic } : undefined);
             }}
           />
         );

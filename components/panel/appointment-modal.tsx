@@ -74,7 +74,11 @@ interface AppointmentModalProps {
   errorsDict: CalendarDictionary["manualErrors"];
   whatsappEnabled: boolean;
   onClose: () => void;
-  onSaved: () => void;
+  // Arg is the just-created booking, best-effort reconstructed client-side
+  // for the caller's optimistic UI (see handleSubmit) — undefined only if
+  // somehow called before its required fields are all set, which shouldn't
+  // happen on the success path.
+  onSaved: (optimistic?: WeekBookingVM) => void;
   // nueva-cita-from-panel (2026-11-02): pre-fills Servicio/Cliente when
   // opened from an existing appointment's "+ Nueva cita" button (BookingDetailModal),
   // instead of always starting blank from a grid click. Provider pre-fill
@@ -445,7 +449,43 @@ export function AppointmentModal({
         }
       }
 
-      requestClose(onSaved);
+      // Optimistic UI (2026-11-09): the server doesn't return the new
+      // booking's real id/full row, so build a temp client-side one from
+      // the form's own already-known fields — it's shown immediately and
+      // simply disappears once the background refetch (triggered by
+      // onSaved below) lands with the real row in its place.
+      const selectedService = services.find((s) => s.id === serviceId);
+      const optimisticBooking: WeekBookingVM | undefined =
+        selectedService && teamMemberId && startDate
+          ? {
+              id: `temp-${Date.now()}`,
+              serviceId,
+              serviceName: selectedService.name,
+              startIso: startDate.toISOString(),
+              endIso: new Date(startDate.getTime() + selectedService.durationMin * 60_000).toISOString(),
+              durationMin: selectedService.durationMin,
+              status: "confirmed",
+              paymentStatus: "unpaid",
+              paymentMethod: null,
+              bonoPurchaseId: null,
+              paidAt: null,
+              clinicClientId: res.clinicClientId ?? clinicClientId ?? null,
+              clientName,
+              clientEmail,
+              clientPhone: clientPhone || null,
+              notes: notes || null,
+              teamMemberId,
+              pendingExpiryAt: null,
+              guestLocale: null,
+              reminderSendFailed: false,
+              lastReminderError: null,
+              cancellationRequestedAt: null,
+              clientStatus: clinicClientId ? "returning" : "first_time",
+              clinicReviewedAt: new Date().toISOString(),
+            }
+          : undefined;
+
+      requestClose(() => onSaved(optimisticBooking));
     } catch (e) {
       reportClientError("createBookingAsOwner", e);
       setError(errorsDict.errCreateFailed);

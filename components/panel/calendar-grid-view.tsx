@@ -7,7 +7,6 @@ import type { CalendarDictionary } from "@/lib/i18n/dictionaries/calendar";
 import type { DayId } from "@/lib/onboarding/types";
 import { AppointmentModal, type SlotSelection, type ClosureRuleVM } from "@/components/panel/appointment-modal";
 import type { CustomTimeSlotRuleVM } from "@/lib/booking/appointment-fields";
-import { ClosureConflictDialog } from "@/components/panel/closure-conflict-dialog";
 import type { ConflictSummary } from "@/lib/actions/closures";
 import { updateBookingAsOwner } from "@/lib/actions/booking-owner";
 import {
@@ -196,6 +195,21 @@ export interface WeekBookingVM {
   // whole lifetime).
   clinicReviewedAt: string | null;
 }
+
+/**
+ * Optimistic-UI payload threaded up from a create/edit action (AppointmentModal
+ * `onSaved`, BookingDetailModal `onUpdated`) to calendar-bookings.tsx, which
+ * applies it to the displayed list immediately instead of waiting for the
+ * server round-trip + refetch to land — same technique drag-to-reschedule
+ * already uses for its own move (Arun feedback, 2026-11-09: creates/edits
+ * should feel just as instant). `create` needs the full booking (no real id
+ * exists client-side yet, so a temp one is used — replaced once the real
+ * refetch lands); `patch` only needs the changed fields against an existing
+ * booking's real id.
+ */
+export type OptimisticBookingChange =
+  | { kind: "create"; booking: WeekBookingVM }
+  | { kind: "patch"; id: string; patch: Partial<WeekBookingVM> };
 
 export interface WeekServiceVM {
   id: string;
@@ -399,7 +413,7 @@ export function CalendarGridView({
   customSlotRules: CustomTimeSlotRuleVM[];
   dict: CalendarDictionary;
   whatsappEnabled: boolean;
-  onBookingCreated: () => void;
+  onBookingCreated: (optimistic?: OptimisticBookingChange) => void;
   onBookingClick: (booking: WeekBookingVM) => void;
 }) {
   const router = useRouter();
@@ -423,7 +437,12 @@ export function CalendarGridView({
   // click that a pointerup after an actual drag would otherwise fire (a
   // plain tap with no movement still opens the detail modal as before).
   const [drag, setDrag] = useState<{ booking: WeekBookingVM; target: DragTarget | null } | null>(null);
-  const [moveConfirm, setMoveConfirm] = useState<{ booking: WeekBookingVM; target: DragTarget; sendEmail: boolean } | null>(null);
+  // `conflict` starts null; if the clinic's first "Mover cita" click finds
+  // the slot taken, the SAME dialog morphs in place to show the warning and
+  // relabels its button to "Reservar de todas formas" instead of popping a
+  // second, separate dialog (Arun feedback, 2026-11-09: one combined
+  // confirmation, not two sequential ones).
+  const [moveConfirm, setMoveConfirm] = useState<{ booking: WeekBookingVM; target: DragTarget; sendEmail: boolean; conflict: ConflictSummary | null } | null>(null);
   // Optimistic override: once the clinic confirms the move (no conflict,
   // or conflict then confirmed), show the booking at its NEW time
   // immediately rather than waiting for the server round-trip + the
@@ -433,7 +452,6 @@ export function CalendarGridView({
   // onBookingCreated() landed and now reflects the real new time), or
   // immediately on a failed move (revert to the old position).
   const [pendingMove, setPendingMove] = useState<{ bookingId: string; startIso: string } | null>(null);
-  const [conflictPrompt, setConflictPrompt] = useState<{ booking: WeekBookingVM; target: DragTarget; sendEmail: boolean; conflicts: ConflictSummary } | null>(null);
   const [moving, setMoving] = useState(false);
   const [moveError, setMoveError] = useState<string | null>(null);
   const suppressNextClickRef = useRef(false);
@@ -477,9 +495,12 @@ export function CalendarGridView({
         },
         dict.manualErrors
       );
-      if (!res.ok) { setMoveError(res.error); setPendingMove(null); setMoveConfirm(null); setConflictPrompt(null); setDrag(null); return; }
-      if ("needsConfirmation" in res) { setConflictPrompt({ booking, target, sendEmail, conflicts: res.conflicts }); setPendingMove(null); setMoveConfirm(null); return; }
-      setConflictPrompt(null);
+      if (!res.ok) { setMoveError(res.error); setPendingMove(null); setMoveConfirm(null); setDrag(null); return; }
+      if ("needsConfirmation" in res) {
+        setPendingMove(null);
+        setMoveConfirm({ booking, target, sendEmail, conflict: res.conflicts });
+        return;
+      }
       setMoveConfirm(null);
       setDrag(null);
       onBookingCreated();
@@ -495,13 +516,14 @@ export function CalendarGridView({
     e.stopPropagation();
     const startX = e.clientX;
     const startY = e.clientY;
-    // How far (in minutes) below the chip's own top edge the pointer grabbed
-    // it — without this, the drop-preview's top edge snaps to wherever the
-    // cursor currently is, regardless of where inside the chip the drag
-    // started, which reads as "pulling" the box around rather than
-    // genuinely dragging it (Arun feedback, 2026-11-09).
+    // Keeps the drop-preview box vertically CENTERED on the cursor the
+    // whole drag, regardless of where inside the chip the pointer actually
+    // grabbed — matches how dragging is supposed to feel (the box is
+    // "attached" to the cursor) rather than preserving the exact grab point
+    // (Arun feedback, 2026-11-09: wants the cursor in the middle of the box
+    // being moved).
     const chipRect = e.currentTarget.getBoundingClientRect();
-    const grabOffsetMin = (e.clientY - chipRect.top) / PX_PER_MIN;
+    const grabOffsetMin = chipRect.height / 2 / PX_PER_MIN;
     let dragging = false;
     let target: DragTarget | null = null;
 
@@ -543,7 +565,7 @@ export function CalendarGridView({
         // Freeze `drag` at the dropped target (don't clear it) so the
         // dashed preview keeps showing where it'll land while the confirm
         // dialog is open.
-        setMoveConfirm({ booking, target, sendEmail: true });
+        setMoveConfirm({ booking, target, sendEmail: true, conflict: null });
       } else {
         setDrag(null);
       }
@@ -658,9 +680,9 @@ export function CalendarGridView({
     });
   };
 
-  const handleCreated = () => {
+  const handleCreated = (optimistic?: WeekBookingVM) => {
     setModalSlot(null);
-    onBookingCreated();
+    onBookingCreated(optimistic ? { kind: "create", booking: optimistic } : undefined);
     router.refresh();
   };
 
@@ -797,23 +819,14 @@ export function CalendarGridView({
           booking={moveConfirm.booking}
           target={moveConfirm.target}
           sendEmail={moveConfirm.sendEmail}
+          conflict={moveConfirm.conflict}
           intlLocale={dict.intlLocale}
           dict={dict.dragConfirm}
+          conflictDict={dict.bookingConflict}
           saving={moving}
           onToggleSendEmail={(v) => setMoveConfirm((m) => (m ? { ...m, sendEmail: v } : m))}
           onCancel={() => { setMoveConfirm(null); setDrag(null); }}
-          onConfirm={() => finalizeMove(moveConfirm.booking, moveConfirm.target, moveConfirm.sendEmail)}
-        />
-      )}
-
-      {conflictPrompt && (
-        <ClosureConflictDialog
-          conflicts={conflictPrompt.conflicts}
-          intlLocale={dict.intlLocale}
-          dict={dict.bookingConflict}
-          saving={moving}
-          onCancel={() => { setConflictPrompt(null); setPendingMove(null); setMoveConfirm(null); setDrag(null); }}
-          onConfirm={() => finalizeMove(conflictPrompt.booking, conflictPrompt.target, conflictPrompt.sendEmail, true)}
+          onConfirm={() => finalizeMove(moveConfirm.booking, moveConfirm.target, moveConfirm.sendEmail, !!moveConfirm.conflict)}
         />
       )}
 
@@ -833,8 +846,10 @@ function MoveConfirmDialog({
   booking,
   target,
   sendEmail,
+  conflict,
   intlLocale,
   dict,
+  conflictDict,
   saving,
   onToggleSendEmail,
   onCancel,
@@ -843,8 +858,14 @@ function MoveConfirmDialog({
   booking: WeekBookingVM;
   target: DragTarget;
   sendEmail: boolean;
+  // Populated only after a first confirm attempt finds the target slot
+  // taken — the dialog then shows this warning in place and relabels its
+  // own confirm button, rather than a second separate dialog (see
+  // `moveConfirm` state's comment above).
+  conflict: ConflictSummary | null;
   intlLocale: string;
   dict: CalendarDictionary["dragConfirm"];
+  conflictDict: CalendarDictionary["bookingConflict"];
   saving: boolean;
   onToggleSendEmail: (v: boolean) => void;
   onCancel: () => void;
@@ -854,6 +875,10 @@ function MoveConfirmDialog({
   const toDate = zonedTimeToUtc(target.year, target.month, target.day, Math.floor(target.startMin / 60), target.startMin % 60);
   const timeFmt = new Intl.DateTimeFormat(intlLocale, { timeZone: TZ, hour: "2-digit", minute: "2-digit", hour12: false });
   const dateFmt = new Intl.DateTimeFormat(intlLocale, { timeZone: TZ, weekday: "short", day: "numeric", month: "short" });
+  const whenFmt = new Intl.DateTimeFormat(intlLocale, {
+    timeZone: TZ, weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false,
+  });
+  const extra = conflict ? conflict.total - conflict.sample.length : 0;
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 px-4" onClick={onCancel}>
@@ -879,6 +904,22 @@ function MoveConfirmDialog({
           {dict.sendEmailLabel}
         </label>
 
+        {conflict && (
+          <div className="mt-4 rounded-lg border border-orange-300 bg-orange-50 px-3 py-2.5">
+            <p className="text-[13px] font-semibold text-orange-900">{conflictDict.title.replace("{count}", String(conflict.total))}</p>
+            <p className="mt-1 text-[12px] text-orange-800">{conflictDict.description}</p>
+            <div className="mt-2 flex max-h-[160px] flex-col gap-1 overflow-y-auto">
+              {conflict.sample.map((b) => (
+                <div key={b.id} className="flex items-center justify-between gap-2 rounded-md bg-white/70 px-2 py-1.5 text-[11.5px]">
+                  <span className="truncate font-medium text-ink">{b.clientName}</span>
+                  <span className="shrink-0 text-ink-soft">{whenFmt.format(new Date(b.startIso))}</span>
+                </div>
+              ))}
+              {extra > 0 && <p className="px-1 text-[11.5px] text-orange-800">{conflictDict.moreLabel.replace("{n}", String(extra))}</p>}
+            </div>
+          </div>
+        )}
+
         <div className="mt-5 flex justify-end gap-2">
           <button onClick={onCancel} disabled={saving} className="rounded-lg px-3.5 py-2 text-[13.5px] font-semibold text-ink-soft hover:bg-surface-2 disabled:opacity-50">
             {dict.cancel}
@@ -886,9 +927,11 @@ function MoveConfirmDialog({
           <button
             onClick={onConfirm}
             disabled={saving}
-            className="rounded-lg bg-brand px-4 py-2 text-[13.5px] font-semibold text-white hover:opacity-90 disabled:opacity-50"
+            className={`rounded-lg px-4 py-2 text-[13.5px] font-semibold disabled:opacity-50 ${
+              conflict ? "border border-error text-error hover:bg-error-weak" : "bg-brand text-white hover:opacity-90"
+            }`}
           >
-            {saving ? dict.confirming : dict.confirm}
+            {conflict ? (saving ? conflictDict.saving : conflictDict.confirm) : saving ? dict.confirming : dict.confirm}
           </button>
         </div>
       </div>

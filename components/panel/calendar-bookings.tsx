@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { Btn } from "@/components/ui/button";
@@ -18,6 +18,7 @@ import {
   type TimeRangeVM,
   type ClientStatusValue,
   type GridDayFestivo,
+  type OptimisticBookingChange,
   CLIENT_STATUS_LABEL,
   clientStatusLabel,
   clientStatusBadgeClass,
@@ -251,6 +252,18 @@ export function CalendarBookings({
   const [focusDate, setFocusDate] = useState<Date>(() => new Date(weekStartIso));
   const [fetchedBookings, setFetchedBookings] = useState<WeekBookingVM[] | null>(null);
   const [gridLoading, setGridLoading] = useState(false);
+  // Optimistic UI for create/edit (same technique as drag-to-reschedule's
+  // own pendingMove in calendar-grid-view.tsx) — Arun feedback (2026-11-09):
+  // a new/edited appointment should appear instantly instead of waiting on
+  // the server round-trip + refetch that handleGridBookingCreated below
+  // triggers. `create` has no real id yet (server doesn't return one), so a
+  // temp client-side id is used and simply disappears once the refetch
+  // lands with the real row in its place; `patch` targets an existing id
+  // directly. Cleared whenever `gridBookings` itself changes (the refetch
+  // landed), skipping the very first mount.
+  const [optimisticCreate, setOptimisticCreate] = useState<WeekBookingVM | null>(null);
+  const [optimisticPatch, setOptimisticPatch] = useState<{ id: string; patch: Partial<WeekBookingVM> } | null>(null);
+  const firstGridBookingsEffectRef = useRef(true);
   const [selectedBooking, setSelectedBooking] = useState<WeekBookingVM | null>(null);
 
   // multi-provider-calendar-display: `selectedProviderIds` is the VIEW
@@ -286,7 +299,35 @@ export function CalendarBookings({
   const isInitialWeek =
     view === "week" && range.start.toISOString() === new Date(weekStartIso).toISOString();
 
-  const gridBookings = fetchedBookings ?? (isInitialWeek ? weekInitialBookings : []);
+  // Stable identity across renders when nothing actually changed — without
+  // this useMemo, the `?? []` fallback mints a brand-new array every
+  // render, which would make the optimistic-clearing effect below think a
+  // real refetch landed on every re-render and wipe the optimistic state
+  // immediately after setting it.
+  const rawGridBookings = useMemo(
+    () => fetchedBookings ?? (isInitialWeek ? weekInitialBookings : []),
+    [fetchedBookings, isInitialWeek, weekInitialBookings]
+  );
+  const gridBookings = useMemo(() => {
+    let list = rawGridBookings;
+    if (optimisticPatch) {
+      list = list.map((b) => (b.id === optimisticPatch.id ? { ...b, ...optimisticPatch.patch } : b));
+    }
+    if (optimisticCreate && !list.some((b) => b.id === optimisticCreate.id)) {
+      list = [...list, optimisticCreate];
+    }
+    return list;
+  }, [rawGridBookings, optimisticPatch, optimisticCreate]);
+
+  // Only clears once the underlying fetched/initial bookings actually
+  // change (a real refetch landed) — not on every render, and not on the
+  // initial mount (nothing pending then anyway).
+  useEffect(() => {
+    if (firstGridBookingsEffectRef.current) { firstGridBookingsEffectRef.current = false; return; }
+    setOptimisticCreate(null);
+    setOptimisticPatch(null);
+  }, [rawGridBookings]);
+
   // multi-provider-calendar-display: bounds both the Day/Week grid and the
   // Month overview to the active provider selection — not just which
   // columns render, which bookings show at all. Plain derivation (not
@@ -368,7 +409,11 @@ export function CalendarBookings({
     }
   }, []);
 
-  const handleGridBookingCreated = useCallback(() => {
+  const handleGridBookingCreated = useCallback((optimistic?: OptimisticBookingChange) => {
+    if (optimistic) {
+      if (optimistic.kind === "create") setOptimisticCreate(optimistic.booking);
+      else setOptimisticPatch({ id: optimistic.id, patch: optimistic.patch });
+    }
     navigateTo(view, focusDate); // force a refetch of the current range
     // A newly-created/modified booking can create OR resolve a conflict —
     // keep the Conflictos tab's derived list in sync regardless of which

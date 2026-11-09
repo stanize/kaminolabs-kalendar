@@ -214,6 +214,54 @@ Criteria:
 ## Step: drag-to-reschedule
 Status: in_progress
 Criteria:
+- ADDED 2026-11-09 (CODE IMPLEMENTED, typechecked/linted/built clean,
+  PENDING TESTING) — four rounds of live-testing feedback from Arun,
+  folded in:
+  1. **Single drop indicator**: an earlier "two boxes" version (a
+     cursor-following floating clone + the snapped drop-preview) is
+     gone — the snapped dashed box is the only drag visual.
+  2. **Merged conflict confirmation**: dropping on a taken slot no
+     longer opens a SEPARATE ClosureConflictDialog after the first
+     "move this appointment?" dialog — the same dialog morphs in
+     place (warning block + conflicting-bookings list appended,
+     confirm button relabeled "Reservar de todas formas" in the
+     danger/outline style) instead of two sequential modals. `
+     ClosureConflictDialog` is no longer used by this flow (still used
+     elsewhere, e.g. the manual create/edit forms' own conflict check
+     — untouched).
+  3. **Grab-point fixes**: first fixed so the drop-preview tracks the
+     actual pointer-down grab point instead of always snapping its
+     top edge to the cursor (felt like "pulling" rather than
+     dragging); then changed AGAIN per explicit follow-up feedback to
+     always center the box on the cursor regardless of where it was
+     grabbed, for a more natural felt-sense of dragging the box itself.
+  4. **No-op drop**: dropping back on the exact same day+time now
+     cancels silently (no dialog) instead of opening the confirm
+     dialog for a change that isn't one.
+  5. **A second same-root bug found alongside #4**: a completed drag
+     was also opening the "Nueva cita" panel underneath — the browser
+     fires a synthetic click on the nearest common ancestor of the
+     drag's pointerdown target (the chip) and its pointerup target
+     (the day column's own background, since the chip never visually
+     moves during drag); that ancestor is the day column itself,
+     whose own click handler is "create a new appointment here". The
+     existing `suppressNextClickRef` swallow only covered the chip's
+     own click handler, not the day column's — added the same guard
+     there.
+  6. **Optimistic UI generalized beyond drag**: a new booking
+     (AppointmentModal) or an edited one (BookingDetailModal's
+     "Modificar" inline-fields save) now appears/updates instantly on
+     the grid too, not just a drag-move — same technique, lifted up
+     to calendar-bookings.tsx as a shared `OptimisticBookingChange`
+     overlay (`{kind:"create", booking}` or
+     `{kind:"patch", id, patch}`) applied to `gridBookings` before
+     passing down to the grid/month views, cleared once the
+     background refetch actually lands. Scope: only these two flows
+     were made optimistic — the other `BookingDetailModal` actions
+     that call `onUpdated()` (cancel, confirm, mark no-show, Cobrar/
+     payment, generate invoice) still call it with no argument and
+     stay refetch-only for now; each would need its own optimistic
+     patch shape and wasn't explicitly asked for in this pass.
 - CODE IMPLEMENTED 2026-11-06 (typechecked/linted/built clean), PENDING
   MANUAL TESTING. Built in `components/panel/calendar-grid-view.tsx`:
   custom `onPointerDown`/window-level `pointermove`/`pointerup` drag (no
