@@ -133,46 +133,18 @@ Cloud sessions start with only the main repo. If the task touches admin:
 >
 > Not touching this session: _(optional)_
 
-## 10. Snapshot of pending work (volatile, as of 2026-11-09)
+## 10. Pending work: regenerate, don't store
 
-Regenerate rather than trust: list non-done steps with
+Don't keep a status list in this file: it goes stale. Pull it live when needed.
+
+- Non-done workflow steps:
 ```bash
 cd workflows && for f in *.md; do awk -v f="$f" '/^#+ +Step/ {h=$0} /^\**Status:?\**/ {s=$0; gsub(/\*/,"",s); if (s !~ /done/ && s !~ /superseded/) print f" | "substr(h,1,90)" | "substr(s,1,110)}' "$f"; done
 ```
-
-**Overdue trackers:** REVIEW.md last run 2026-10-01; RESYNC.md last run 2026-09-20.
-
-**Coded, awaiting Arun's testing (`in_progress`):** pdf-invoicing (13 steps),
-holidays-and-time-off (6), ui-side-panels (3), calendar-management-upcoming
-(drag-to-reschedule, multi-provider display), public-booking
-(progress indicator, summary recap, abuse protection), whatsapp-booking
-(conversation flow, manual-booking confirmation), legal-compliance (privacy +
-terms pages), admin-portal-tools (5 steps), plus single steps in
-support-ticketing, team-member-lifecycle, error-monitoring
-(structured-event-log), patient-portal, calendar-management-past,
-clinic-clients-page, clinic-onboarding.
-
-**Designed, not started:** calendar-import (5), admin-account-cleanup (4),
-presales-demo-onboarding (4 of 5), error-monitoring (Sentry, owner-facing
-failure surface, backup story), public-booking rescheduling + repeat
-appointment, verifactu-compliance (3), signup-rate-limiting (clinic + patient),
-security-performance-audit (`run-audit`, due before first real clinic),
-post-mvp menu pages, several admin tools.
-
-**Parked:** whatsapp-reminders (blocked), auto-invoice-setting (on hold),
-subscription-billing (5 steps deferred out of MVP).
-
-**Backlog (unscoped, see `workflows/backlog.md`):** merge WhatsApp guest client
-into portal account (admin tool); natural-language WhatsApp parser (deferred;
-paid-tier-only if ever built); Cobrar-time service/price override; multi-line
-invoices; country-driven config (replace hardcoded payment methods); per-clinic
-invoice-QR toggle. `ideas.md` is empty.
-
-**Open support tickets (2026-11-09, all from demo4, via WhatsApp):** calendar
-drag & drop; invoice professional title + licence number (overlaps
-pdf-invoicing `professional-id-fields`); rename/shorten two services
-(data change, not code); insert appointments in occupied slots (overlaps
-`force-insert-double-booking`, done). Re-query live, don't trust this list.
+- Unscoped ideas: `workflows/backlog.md`, `ideas.md`, `notes.md`.
+- Review cadence: `workflows/review_tracker.json`, `workflows/resync_tracker.json`.
+- Open support tickets: query `kalendar_support_tickets where status = 'open'`
+  (section 8). Match them to existing workflow steps before creating new ones.
 
 ## 11. Attribution
 
