@@ -48,6 +48,10 @@ export interface TeamDictionary {
     dniPlaceholder: string;
     collegeNumberLabel: string;
     collegeNumberPlaceholder: string;
+    // professional-title-on-invoice: printed above the DNI/Nº colegiada
+    // line on the invoice, e.g. "Podóloga" — nullable, no fallback text.
+    titleLabel: string;
+    titlePlaceholder: string;
     saving: string;
     flashSuccess: string; // success flash shown in the save overlay
     errUnexpected: string;
@@ -109,6 +113,8 @@ const es: TeamDictionary = {
     dniPlaceholder: "12345678A",
     collegeNumberLabel: "Nº de colegiada/o",
     collegeNumberPlaceholder: "838282838",
+    titleLabel: "Título profesional",
+    titlePlaceholder: "Podóloga",
     saving: "Guardando…",
     flashSuccess: "¡Guardado correctamente!",
     errUnexpected: "Ocurrió un error inesperado. Inténtalo de nuevo.",
@@ -167,6 +173,8 @@ const en: TeamDictionary = {
     dniPlaceholder: "12345678A",
     collegeNumberLabel: "Professional college number",
     collegeNumberPlaceholder: "838282838",
+    titleLabel: "Professional title",
+    titlePlaceholder: "Podiatrist",
     saving: "Saving…",
     flashSuccess: "Saved successfully!",
     errUnexpected: "An unexpected error occurred. Please try again.",

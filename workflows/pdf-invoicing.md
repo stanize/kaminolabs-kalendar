@@ -297,6 +297,57 @@ same session, PENDING MANUAL/LIVE TESTING):
   column existed (the legacy-row fallback path). Flip to `done` once
   confirmed.
 
+## Step: professional-title-on-invoice
+Status: in_progress
+Criteria:
+- CODE IMPLEMENTED 2026-11-12 (typechecked/linted/built clean), PENDING
+  MANUAL TESTING AND `schema_subset_039.sql` run against the live DB.
+  Built exactly the touch-point chain below: new column +
+  `components/panel/team-manager.tsx` field (+ `lib/actions/team.ts`,
+  `lib/team/data.ts`) + `lib/invoices/data.ts`/`types.ts`/`render.ts` +
+  `lib/invoices/templates/vat-exempt.tsx` (both solo and multi-provider
+  branches) + `lib/i18n/dictionaries/team.ts` (es/en).
+- DESIGN SETTLED (2026-11-12) — support ticket (subject "Factura:
+  añadir título profesional y número de colegiado", ticket id
+  `347a65a5-4f72-40ac-88a6-c42412275822`, logged from WhatsApp by
+  demo4@kaminolabs.dev). The invoice already prints a per-provider
+  "Nºcolegiada" (`kalendar_team_members.professional_college_number`,
+  added in provider-invoicing-fields/schema_subset_027.sql) but has no
+  professional TITLE field (e.g. "Podiatra", "Psicóloga") anywhere —
+  confirmed via a fresh grep, genuinely new, not an existing-field bug.
+- **New column**: `kalendar_team_members.professional_title text`
+  (nullable — a member who hasn't set one just shows no title line, no
+  fallback text), same per-member scope as the existing DNI/college-
+  number fields (follows the same provider-invoicing-fields pattern;
+  NOT a business-level field — the deprecated `kalendar_businesses.
+  professional_*` trio stays untouched/still dead).
+- **Full touch-point chain** (verified against current code, not
+  guessed): `supabase/schema_subset_039.sql` (next available number)
+  + folded into `schema_001.sql` → `components/panel/team-manager.tsx`
+  (new "Título profesional" field in the existing "Datos
+  profesionales" section, alongside DNI/Nº colegiado) +
+  `lib/actions/team.ts` (save path) + `lib/team/data.ts`
+  (`TeamMemberRow` type) → `lib/invoices/data.ts` (`buildBusinessSnapshot`'s
+  provider select + resolution) → `lib/invoices/types.ts`
+  (`InvoiceBusinessSnapshot.professionalTitle: string | null`, frozen
+  at invoice-creation time like its siblings — never read live at
+  render time) → `lib/invoices/render.ts` (forward the field into the
+  template props) → `lib/invoices/templates/types.ts` (template's own
+  business-prop type) → `lib/invoices/templates/vat-exempt.tsx` (the
+  solo AND multi-provider render branches both need it).
+- **Rendering**: title prints as its own line directly under the
+  provider/business name (both the solo-business and multi-provider
+  branches of the invoice template), above the existing DNI/Nº
+  colegiada line — e.g. "Podiatra" on its own line, then "DNI: ... ·
+  Nºcolegiada: ...". Not folded into the existing DNI/college-number
+  line, since title is conceptually a different kind of fact (what
+  they are, not an ID number).
+- i18n note: "Título profesional" is the new field's own label (not
+  reusing `role`, the team member's existing free-text field, which
+  isn't wired into invoicing today and serves a different purpose —
+  this ticket's own example makes clear "Título" means the printed
+  professional title, not the internal team-list role label).
+
 ## Notes / Deviations
 - FUTURE DEPENDENCY (2026-09-27): `workflows/verifactu-compliance.md` (Spain's
   anti-fraud invoicing regulation — hash-chained records, QR codes,

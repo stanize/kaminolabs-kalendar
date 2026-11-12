@@ -24,6 +24,7 @@ interface MemberItem {
   is_owner: boolean;
   professional_dni: string | null;
   professional_college_number: string | null;
+  professional_title: string | null;
   active: boolean;
 }
 
@@ -37,6 +38,7 @@ interface Row {
   isOwner: boolean;
   professionalDni: string;
   professionalCollegeNumber: string;
+  professionalTitle: string;
   active: boolean;
 }
 
@@ -48,6 +50,7 @@ function toRow(m: MemberItem): Row {
     isOwner: m.is_owner,
     professionalDni: m.professional_dni ?? "",
     professionalCollegeNumber: m.professional_college_number ?? "",
+    professionalTitle: m.professional_title ?? "",
     active: m.active,
   };
 }
@@ -362,6 +365,7 @@ function MemberPanel({
   const [role, setRole] = useState(row?.role ?? "");
   const [professionalDni, setProfessionalDni] = useState(row?.professionalDni ?? "");
   const [professionalCollegeNumber, setProfessionalCollegeNumber] = useState(row?.professionalCollegeNumber ?? "");
+  const [professionalTitle, setProfessionalTitle] = useState(row?.professionalTitle ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -388,6 +392,7 @@ function MemberPanel({
         role: role.trim(),
         professionalDni: professionalDni.trim(),
         professionalCollegeNumber: professionalCollegeNumber.trim(),
+        professionalTitle: professionalTitle.trim(),
         dict: dict.errors,
       };
       const result = row
@@ -407,6 +412,7 @@ function MemberPanel({
           isOwner: result.member.is_owner,
           professionalDni: result.member.professional_dni ?? "",
           professionalCollegeNumber: result.member.professional_college_number ?? "",
+          professionalTitle: result.member.professional_title ?? "",
           active: result.member.active,
         })
       );
@@ -467,6 +473,13 @@ function MemberPanel({
             onChange={setRole}
             placeholder={m.rolePlaceholder}
             maxLength={60}
+            inputClassName={inputBase}
+          />
+          <LabeledField
+            label={m.titleLabel}
+            value={professionalTitle}
+            onChange={setProfessionalTitle}
+            placeholder={m.titlePlaceholder}
             inputClassName={inputBase}
           />
           <LabeledField

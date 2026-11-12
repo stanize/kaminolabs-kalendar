@@ -26,6 +26,9 @@ export interface InvoiceBusinessSnapshot {
   phoneNumber: string;
   professionalDni: string | null;
   professionalCollegeNumber: string | null;
+  // professional-title-on-invoice (schema_subset_039.sql): e.g. "Podiatra" —
+  // printed above the DNI/colegiada line. Nullable, no fallback text.
+  professionalTitle: string | null;
   professionalName: string | null;
   signatureUrl: string | null;
   templateId: string;

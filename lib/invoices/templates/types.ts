@@ -17,6 +17,7 @@ export interface InvoiceTemplateProps {
     phoneNumber: string;
     professionalDni: string | null;
     professionalCollegeNumber: string | null;
+    professionalTitle: string | null;
     professionalName: string | null;
     signatureUrl: string | null;
     brandColor: string;

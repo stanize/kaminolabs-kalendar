@@ -24,7 +24,7 @@ const INVOICE_COLUMNS =
  */
 function buildBusinessSnapshot(
   business: Business,
-  provider: { name: string; professional_dni: string | null; professional_college_number: string | null } | null
+  provider: { name: string; professional_dni: string | null; professional_college_number: string | null; professional_title: string | null } | null
 ): InvoiceBusinessSnapshot {
   return {
     name: business.name,
@@ -41,6 +41,7 @@ function buildBusinessSnapshot(
     phoneNumber: business.phone_number,
     professionalDni: provider?.professional_dni ?? null,
     professionalCollegeNumber: provider?.professional_college_number ?? null,
+    professionalTitle: provider?.professional_title ?? null,
     professionalName: provider?.name ?? business.name,
     signatureUrl: business.signature_url,
     templateId: business.invoice_template_id,
@@ -216,11 +217,11 @@ export async function createInvoiceForBooking(input: CreateInvoiceInput): Promis
 
   if (!booking) return { ok: false, error: "no_booking" };
 
-  let provider: { name: string; professional_dni: string | null; professional_college_number: string | null } | null = null;
+  let provider: { name: string; professional_dni: string | null; professional_college_number: string | null; professional_title: string | null } | null = null;
   if (booking.team_member_id) {
     const { data: member } = await supabase
       .from("kalendar_team_members")
-      .select("name, professional_dni, professional_college_number")
+      .select("name, professional_dni, professional_college_number, professional_title")
       .eq("id", booking.team_member_id)
       .eq("business_id", businessId)
       .maybeSingle();

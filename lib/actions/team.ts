@@ -99,6 +99,7 @@ export const createTeamMember = authedAction(
       role: string;
       professionalDni: string;
       professionalCollegeNumber: string;
+      professionalTitle: string;
       dict?: Partial<TeamActionDict>;
     }
   ): Promise<TeamActionResult> => {
@@ -128,6 +129,7 @@ export const createTeamMember = authedAction(
         sort_order: count ?? 0,
         professional_dni: payload.professionalDni.trim() || null,
         professional_college_number: payload.professionalCollegeNumber.trim() || null,
+        professional_title: payload.professionalTitle.trim() || null,
       })
       .select()
       .single();
@@ -147,6 +149,7 @@ export const updateTeamMember = authedAction(
       role: string;
       professionalDni: string;
       professionalCollegeNumber: string;
+      professionalTitle: string;
       dict?: Partial<TeamActionDict>;
     }
   ): Promise<TeamActionResult> => {
@@ -167,6 +170,7 @@ export const updateTeamMember = authedAction(
         role: role || null,
         professional_dni: payload.professionalDni.trim() || null,
         professional_college_number: payload.professionalCollegeNumber.trim() || null,
+        professional_title: payload.professionalTitle.trim() || null,
       })
       .eq("id", payload.id)
       .eq("business_id", business.id)

@@ -118,6 +118,7 @@ export function VatExemptInvoice(props: InvoiceTemplateProps) {
               // is deferred for later.
               <>
                 <Text style={styles.businessName}>{business.professionalName || business.name}</Text>
+                {business.professionalTitle && <Text style={styles.businessSub}>{business.professionalTitle}</Text>}
                 {(business.professionalDni || business.professionalCollegeNumber) && (
                   <Text style={styles.businessSub}>
                     {business.professionalDni ? `DNI: ${business.professionalDni}` : ""}
@@ -131,6 +132,7 @@ export function VatExemptInvoice(props: InvoiceTemplateProps) {
                 <Text style={styles.businessName}>{business.name}</Text>
                 <Text style={styles.businessSub}>{fullAddressLine(business)}</Text>
                 {business.legalId && <Text style={styles.businessSub}>NIF: {business.legalId}</Text>}
+                {business.professionalTitle && <Text style={styles.businessSub}>{business.professionalTitle}</Text>}
                 {(business.professionalDni || business.professionalCollegeNumber) && (
                   <Text style={styles.businessSub}>
                     {business.professionalDni ? `DNI: ${business.professionalDni}` : ""}

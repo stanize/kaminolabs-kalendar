@@ -582,6 +582,10 @@ create table public.kalendar_team_members (
   -- as the invoice's "Fdo:" signature line, so no separate name field here.
   professional_dni             text,
   professional_college_number  text,
+  -- professional-title-on-invoice (schema_subset_039.sql): printed on the
+  -- invoice above the DNI/Nº colegiada line, e.g. "Podiatra". Nullable —
+  -- no fallback text when unset.
+  professional_title           text,
   -- team-member-lifecycle (schema_subset_035.sql): a member with any
   -- bookings (past or future) can't be hard-deleted — disabled instead.
   -- Disabled members are excluded from new-booking provider pickers (public

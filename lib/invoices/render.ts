@@ -47,6 +47,7 @@ export async function renderInvoicePdf(invoice: InvoiceRow, paid: boolean): Prom
       phoneNumber: snapshot.phoneNumber,
       professionalDni: snapshot.professionalDni,
       professionalCollegeNumber: snapshot.professionalCollegeNumber,
+      professionalTitle: snapshot.professionalTitle,
       professionalName: snapshot.professionalName,
       signatureUrl: snapshot.signatureUrl,
       brandColor: snapshot.brandColor,
