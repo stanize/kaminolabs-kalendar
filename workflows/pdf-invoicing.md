@@ -335,13 +335,28 @@ Criteria:
   template props) → `lib/invoices/templates/types.ts` (template's own
   business-prop type) → `lib/invoices/templates/vat-exempt.tsx` (the
   solo AND multi-provider render branches both need it).
-- **Rendering**: title prints as its own line directly under the
-  provider/business name (both the solo-business and multi-provider
-  branches of the invoice template), above the existing DNI/Nº
-  colegiada line — e.g. "Podiatra" on its own line, then "DNI: ... ·
-  Nºcolegiada: ...". Not folded into the existing DNI/college-number
-  line, since title is conceptually a different kind of fact (what
-  they are, not an ID number).
+- **Rendering — REVISED 2026-11-12** (Arun reviewed the actual generated
+  PDF and asked for a different placement): the professional-identity
+  block (Título profesional / DNI / Nºcolegiada) no longer prints in
+  the page header. It now prints below the "Fdo: {name}" signature
+  line at the bottom of the page, inside `signatureBlock`, with each
+  of the three pieces of info on its OWN separate line (title, then
+  "DNI: ...", then "Nºcolegiada: ..." — no longer combined with " · ").
+  Each line renders only when that field is set (same nullable-no-
+  fallback behavior as before). The header (`headerLeft`, both solo
+  and multi-provider branches) now shows only the name (+ address/NIF
+  for the multi-provider branch) — none of the professional-identity
+  fields. Same underlying data/types/chain as above, this only moved
+  WHERE in the template it renders.
+- **QR section — also revised 2026-11-12**: removed the verification
+  URL text (`verificationUrl`) from the rendered PDF entirely (the prop
+  is no longer destructured/used in `vat-exempt.tsx`; `lib/invoices/
+  render.ts` still computes and passes it, since the QR image itself
+  still encodes it — only the visible URL text line was removed). The
+  "Verificar factura" caption now sits directly ABOVE the QR image
+  (`qrTopRow` changed from a horizontal row to a column layout)
+  instead of beside it. The now-unused `qrCaptionBlock`/`qrUrl` styles
+  were removed.
 - i18n note: "Título profesional" is the new field's own label (not
   reusing `role`, the team member's existing free-text field, which
   isn't wired into invoicing today and serves a different purpose —

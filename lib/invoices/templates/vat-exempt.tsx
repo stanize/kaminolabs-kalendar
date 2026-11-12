@@ -91,11 +91,9 @@ const styles = StyleSheet.create({
   // Kalendar's own page); that text would be a false compliance claim
   // until the feature is actually built. Quiet zone handled by
   // generateQrDataUri's own margin, not by extra space here.
-  qrTopRow: { flexDirection: "row", alignItems: "flex-start", marginBottom: 16 },
-  qrImage: { width: 99, height: 99, marginRight: 10 },
-  qrCaptionBlock: { justifyContent: "center" },
-  qrCaption: { fontSize: 7, fontWeight: 700, color: "#475569" },
-  qrUrl: { fontSize: 6, color: "#94a3b8", marginTop: 2 },
+  qrTopRow: { flexDirection: "column", alignItems: "flex-start", marginBottom: 16 },
+  qrImage: { width: 99, height: 99 },
+  qrCaption: { fontSize: 7, fontWeight: 700, color: "#475569", marginBottom: 4 },
 });
 
 function fullAddressLine(b: InvoiceTemplateProps["business"]): string {
@@ -104,7 +102,7 @@ function fullAddressLine(b: InvoiceTemplateProps["business"]): string {
 }
 
 export function VatExemptInvoice(props: InvoiceTemplateProps) {
-  const { business, client, invoiceNumberFormatted, issueDate, serviceName, amount, paid, verificationUrl, qrDataUri } = props;
+  const { business, client, invoiceNumberFormatted, issueDate, serviceName, amount, paid, qrDataUri } = props;
   const amountFormatted = amount.toFixed(2).replace(".", ",");
 
   return (
@@ -116,30 +114,12 @@ export function VatExemptInvoice(props: InvoiceTemplateProps) {
               // solo-provider-header: just the provider + DNI/colegiada —
               // no clinic name/address/NIF. Multi-provider header handling
               // is deferred for later.
-              <>
-                <Text style={styles.businessName}>{business.professionalName || business.name}</Text>
-                {business.professionalTitle && <Text style={styles.businessSub}>{business.professionalTitle}</Text>}
-                {(business.professionalDni || business.professionalCollegeNumber) && (
-                  <Text style={styles.businessSub}>
-                    {business.professionalDni ? `DNI: ${business.professionalDni}` : ""}
-                    {business.professionalDni && business.professionalCollegeNumber ? " · " : ""}
-                    {business.professionalCollegeNumber ? `Nºcolegiada: ${business.professionalCollegeNumber}` : ""}
-                  </Text>
-                )}
-              </>
+              <Text style={styles.businessName}>{business.professionalName || business.name}</Text>
             ) : (
               <>
                 <Text style={styles.businessName}>{business.name}</Text>
                 <Text style={styles.businessSub}>{fullAddressLine(business)}</Text>
                 {business.legalId && <Text style={styles.businessSub}>NIF: {business.legalId}</Text>}
-                {business.professionalTitle && <Text style={styles.businessSub}>{business.professionalTitle}</Text>}
-                {(business.professionalDni || business.professionalCollegeNumber) && (
-                  <Text style={styles.businessSub}>
-                    {business.professionalDni ? `DNI: ${business.professionalDni}` : ""}
-                    {business.professionalDni && business.professionalCollegeNumber ? " · " : ""}
-                    {business.professionalCollegeNumber ? `Nºcolegiada: ${business.professionalCollegeNumber}` : ""}
-                  </Text>
-                )}
               </>
             )}
           </View>
@@ -151,12 +131,9 @@ export function VatExemptInvoice(props: InvoiceTemplateProps) {
         </View>
 
         <View style={styles.qrTopRow}>
+          <Text style={styles.qrCaption}>Verificar factura</Text>
           {/* eslint-disable-next-line jsx-a11y/alt-text -- react-pdf's Image has no alt prop (not a DOM element) */}
           <Image style={styles.qrImage} src={qrDataUri} />
-          <View style={styles.qrCaptionBlock}>
-            <Text style={styles.qrCaption}>Verificar factura</Text>
-            <Text style={styles.qrUrl}>{verificationUrl}</Text>
-          </View>
         </View>
 
         <View style={styles.clientBox}>
@@ -211,6 +188,11 @@ export function VatExemptInvoice(props: InvoiceTemplateProps) {
             {/* eslint-disable-next-line jsx-a11y/alt-text -- react-pdf's Image has no alt prop (not a DOM element) */}
             {business.signatureUrl && <Image style={styles.signatureImage} src={business.signatureUrl} />}
             <Text style={styles.signatureName}>Fdo: {business.professionalName || business.name}</Text>
+            {business.professionalTitle && <Text style={styles.businessSub}>{business.professionalTitle}</Text>}
+            {business.professionalDni && <Text style={styles.businessSub}>DNI: {business.professionalDni}</Text>}
+            {business.professionalCollegeNumber && (
+              <Text style={styles.businessSub}>Nºcolegiada: {business.professionalCollegeNumber}</Text>
+            )}
           </View>
         </View>
       </Page>
