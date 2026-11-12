@@ -69,7 +69,7 @@ steps in order:
 
 9. Once approved, apply only the approved points to `CLAUDE.md` and/or
    `MODULES.md`. Update the `_Last resynced: <date>_` line at the bottom of
-   `MODULES.md` to today's date. Push both changed files via `gitpush.py` in
+   `MODULES.md` to today's date. Push both changed files directly to `main` (`git push origin HEAD:main`) in
    a single commit with message `chore: resync CLAUDE.md and MODULES.md`.
 
 ## What NOT to do during a resync

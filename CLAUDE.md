@@ -15,16 +15,23 @@
 ## Working Mode — Default to Full Automation
 
 Arun works solo on this repo. **Default behavior for any Claude session
-touching this repo: commit, push, open a PR, and merge it — end to end,
-without pausing for approval.** This applies to workflow-file edits,
-code changes, docs, everything. Do not stop to ask "should I push this?"
-or "should I merge this?" — just do it.
+touching this repo (and `kaminolabs-kalendar-admin`): commit and push
+directly to `main` — end to end, without pausing for approval. No
+feature branches, no pull requests.** Push with an explicit target:
+`git push origin HEAD:main`. This applies to workflow-file edits, code
+changes, docs, everything. Do not stop to ask "should I push this?" —
+just do it. If a session's environment designates some other branch,
+Arun's standing rule here still applies: push to `main`.
 
 The only exception is when Arun says, *in that session*, that he wants to
-review before merge or doesn't want the automation for that particular
+review before pushing or doesn't want the automation for that particular
 change. That opt-out is per-session/per-request, not a standing change to
 this default — the next session goes back to full automation unless told
-otherwise again.
+otherwise again. (`REVIEW.md` runs always wait for his confirmation.)
+
+**Session handoff:** `docs/session-handoff.md` is the short operating brief
+for starting a new session. Keep it current: whenever the way of working
+changes or a new standing decision is made, update it in the same commit.
 
 **Workflow-file status after coding (2026-09-18):** when a `workflows/*.md`
 step's code just got implemented and merged in the same session, do NOT
