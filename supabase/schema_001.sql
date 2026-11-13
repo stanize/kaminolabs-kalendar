@@ -1095,8 +1095,11 @@ create table public.kalendar_invoices (
   service_name    text        not null,
   -- Snapshot of the booking's payment method at invoice-creation time —
   -- invoice-on-payment-trigger only ever fires right after a successful
-  -- Cobrar, so this is simply the method just selected there.
-  payment_method  text        check (payment_method in ('cash', 'card', 'bono')),
+  -- Cobrar, so this is simply the method just selected there. Must allow
+  -- the same full set as kalendar_bookings.payment_method above
+  -- (schema_subset_041.sql fixed a gap where this was narrower and any
+  -- invoice for e.g. a bank_transfer-paid booking failed to insert).
+  payment_method  text        check (payment_method in ('cash', 'card', 'bono', 'bank_transfer', 'bizum', 'direct_debit', 'paypal', 'other')),
   amount          numeric(10, 2) not null default 0 check (amount >= 0),
   access_token    text        not null unique,
   sent_at         timestamptz,
