@@ -76,7 +76,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 22,
     alignSelf: "flex-start",
   },
-  signatureBlock: { alignItems: "flex-end" },
+  signatureBlock: { alignItems: "flex-start" },
   signatureImage: { width: 130, height: 50, objectFit: "contain", marginBottom: 4 },
   signatureName: { fontSize: 9.5, fontWeight: 700, color: "#111827" },
 
