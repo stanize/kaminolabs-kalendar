@@ -19,6 +19,7 @@ const styles = StyleSheet.create({
   headerLeft: { maxWidth: "60%" },
   businessName: { fontSize: 13, fontWeight: 700, color: "#111827", marginBottom: 2 },
   businessSub: { fontSize: 9, color: "#6b7280", marginBottom: 1 },
+  businessSubBold: { fontWeight: 700, color: "#111827" },
 
   headerRight: { alignItems: "flex-end" },
   badge: {
@@ -190,7 +191,9 @@ export function VatExemptInvoice(props: InvoiceTemplateProps) {
             <Text style={styles.signatureName}>Fdo: {business.professionalName || business.name}</Text>
             {business.professionalTitle && <Text style={styles.businessSub}>{business.professionalTitle}</Text>}
             {business.professionalCollegeNumber && (
-              <Text style={styles.businessSub}>Nºcolegiada: {business.professionalCollegeNumber}</Text>
+              <Text style={styles.businessSub}>
+                Nºcolegiada: <Text style={styles.businessSubBold}>{business.professionalCollegeNumber}</Text>
+              </Text>
             )}
           </View>
         </View>
