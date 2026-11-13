@@ -44,6 +44,7 @@ export default async function TeamPage({
           professional_dni: m.professional_dni,
           professional_college_number: m.professional_college_number,
           professional_title: m.professional_title,
+          signature_url: m.signature_url,
           active: m.active,
         }))}
         returnToHome={returnToHome}

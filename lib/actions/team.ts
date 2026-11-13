@@ -271,6 +271,112 @@ export const reactivateTeamMember = authedAction(
   }
 );
 
+const SIGNATURE_MAX_BYTES = 2 * 1024 * 1024;
+const SIGNATURE_ALLOWED_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
+
+export type UploadTeamSignatureResult = { ok: true; signatureUrl: string } | { ok: false; error: string };
+
+/**
+ * per-member-invoice-signature: each team member's own signature, stored in
+ * the same "invoice-signatures" bucket as the old business-level one
+ * (lib/actions/invoices.ts), just keyed by member id instead of business id.
+ */
+export const uploadTeamMemberSignature = authedAction(
+  async (
+    session,
+    formData: FormData,
+    dict?: { errNoBusiness: string; errInvalidFile: string; errSaveFailed: string }
+  ): Promise<UploadTeamSignatureResult> => {
+    const t = {
+      errNoBusiness: dict?.errNoBusiness ?? FALLBACK.errNoBusiness,
+      errInvalidFile: dict?.errInvalidFile ?? "Sube una imagen PNG, JPG o WEBP de hasta 2MB.",
+      errSaveFailed: dict?.errSaveFailed ?? FALLBACK.errSaveFailed,
+    };
+
+    const business = await getBusinessForUser(session.user.id);
+    if (!business) return { ok: false, error: t.errNoBusiness };
+
+    const memberId = formData.get("memberId");
+    if (typeof memberId !== "string" || !memberId) return { ok: false, error: t.errNoBusiness };
+
+    const file = formData.get("signature");
+    if (!(file instanceof File) || file.size > SIGNATURE_MAX_BYTES || !SIGNATURE_ALLOWED_TYPES.has(file.type)) {
+      return { ok: false, error: t.errInvalidFile };
+    }
+
+    const supabase = await createClient();
+    const { data: existing } = await supabase
+      .from("kalendar_team_members")
+      .select("id, signature_url")
+      .eq("id", memberId)
+      .eq("business_id", business.id)
+      .maybeSingle();
+    if (!existing) return { ok: false, error: t.errNoBusiness };
+
+    const ext = file.name.split(".").pop() ?? "png";
+    const fileName = `${business.id}/member-${memberId}-signature-${Date.now()}.${ext}`;
+    const { error: uploadError } = await supabase.storage
+      .from("invoice-signatures")
+      .upload(fileName, file, { contentType: file.type, upsert: true });
+    if (uploadError) return { ok: false, error: t.errSaveFailed };
+
+    const { data: publicUrlData } = supabase.storage.from("invoice-signatures").getPublicUrl(fileName);
+    const signatureUrl = publicUrlData.publicUrl;
+
+    const { error } = await supabase
+      .from("kalendar_team_members")
+      .update({ signature_url: signatureUrl })
+      .eq("id", memberId)
+      .eq("business_id", business.id);
+    if (error) return { ok: false, error: t.errSaveFailed };
+
+    const prevUrl = (existing as { signature_url: string | null }).signature_url;
+    if (prevUrl) {
+      const prevPath = prevUrl.split("/invoice-signatures/")[1];
+      if (prevPath) await supabase.storage.from("invoice-signatures").remove([prevPath]);
+    }
+
+    revalidatePath("/panel/team");
+    return { ok: true, signatureUrl };
+  }
+);
+
+export const removeTeamMemberSignature = authedAction(
+  async (session, payload: { id: string; dict?: { errNoBusiness: string; errSaveFailed: string } }): Promise<{ ok: true } | { ok: false; error: string }> => {
+    const t = {
+      errNoBusiness: payload.dict?.errNoBusiness ?? FALLBACK.errNoBusiness,
+      errSaveFailed: payload.dict?.errSaveFailed ?? FALLBACK.errSaveFailed,
+    };
+    const business = await getBusinessForUser(session.user.id);
+    if (!business) return { ok: false, error: t.errNoBusiness };
+
+    const supabase = await createClient();
+    const { data: existing } = await supabase
+      .from("kalendar_team_members")
+      .select("id, signature_url")
+      .eq("id", payload.id)
+      .eq("business_id", business.id)
+      .maybeSingle();
+    if (!existing) return { ok: false, error: t.errNoBusiness };
+
+    const { error } = await supabase
+      .from("kalendar_team_members")
+      .update({ signature_url: null })
+      .eq("id", payload.id)
+      .eq("business_id", business.id);
+    if (error) return { ok: false, error: t.errSaveFailed };
+
+    const prevUrl = (existing as { signature_url: string | null }).signature_url;
+    if (prevUrl) {
+      const prevPath = prevUrl.split("/invoice-signatures/")[1];
+      if (prevPath) await supabase.storage.from("invoice-signatures").remove([prevPath]);
+    }
+
+    revalidatePath("/panel/team");
+    return { ok: true };
+  }
+);
+
 export const reorderTeamMembers = authedAction(
   async (session, payload: { orderedIds: string[]; dict?: Partial<TeamActionDict> }) => {
     const d = { ...FALLBACK, ...payload.dict };

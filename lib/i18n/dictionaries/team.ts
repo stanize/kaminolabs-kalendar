@@ -52,6 +52,24 @@ export interface TeamDictionary {
     // line on the invoice, e.g. "Podóloga" — nullable, no fallback text.
     titleLabel: string;
     titlePlaceholder: string;
+    // per-member-invoice-signature (schema_subset_040.sql, 2026-11): each
+    // member's own signature, printed on invoices for bookings assigned to
+    // them. Moved here from the old single business-level Settings field —
+    // same upload/draw UI, just scoped per member now. Only shown when
+    // editing an existing member (a brand-new one has no id to attach it
+    // to yet).
+    signatureSectionTitle: string;
+    signatureSectionSubtitle: string;
+    signatureUpload: string;
+    signatureChange: string;
+    signatureRemove: string;
+    signatureUploading: string;
+    signatureDrawButton: string;
+    signatureDrawHint: string;
+    signatureDrawClear: string;
+    signatureDrawSave: string;
+    signatureDrawCancel: string;
+    errSignatureEmpty: string;
     saving: string;
     flashSuccess: string; // success flash shown in the save overlay
     errUnexpected: string;
@@ -70,6 +88,7 @@ export interface TeamDictionary {
     errCannotDeleteOwner: string;
     errDeleteFailed: string; // prefix; server detail appended
     errReorderFailed: string; // prefix; server detail appended
+    errInvalidFile: string; // signature upload
   };
   // Fallback display name for the owner when their account has no name set
   // (lib/team/data.ts ensureOwnerSeeded).
@@ -115,6 +134,18 @@ const es: TeamDictionary = {
     collegeNumberPlaceholder: "838282838",
     titleLabel: "Título profesional",
     titlePlaceholder: "Podóloga",
+    signatureSectionTitle: "Firma",
+    signatureSectionSubtitle: "Se muestra en las facturas de sus citas. Si no subes ninguna, esa zona queda en blanco.",
+    signatureUpload: "Subir firma",
+    signatureChange: "Cambiar firma",
+    signatureRemove: "Quitar",
+    signatureUploading: "Subiendo…",
+    signatureDrawButton: "Dibujar firma",
+    signatureDrawHint: "Firma con el ratón, el dedo o un lápiz óptico.",
+    signatureDrawClear: "Borrar",
+    signatureDrawSave: "Guardar firma",
+    signatureDrawCancel: "Cancelar",
+    errSignatureEmpty: "Dibuja tu firma antes de guardar.",
     saving: "Guardando…",
     flashSuccess: "¡Guardado correctamente!",
     errUnexpected: "Ocurrió un error inesperado. Inténtalo de nuevo.",
@@ -132,6 +163,7 @@ const es: TeamDictionary = {
     errCannotDeleteOwner: "No puedes eliminar al propietario.",
     errDeleteFailed: "No se pudo eliminar:",
     errReorderFailed: "No se pudo reordenar:",
+    errInvalidFile: "Sube una imagen PNG, JPG o WEBP de hasta 2MB.",
   },
   ownerFallbackName: "Yo",
 };
@@ -175,6 +207,18 @@ const en: TeamDictionary = {
     collegeNumberPlaceholder: "838282838",
     titleLabel: "Professional title",
     titlePlaceholder: "Podiatrist",
+    signatureSectionTitle: "Signature",
+    signatureSectionSubtitle: "Shown on invoices for their appointments. If none is uploaded, that area stays blank.",
+    signatureUpload: "Upload signature",
+    signatureChange: "Change signature",
+    signatureRemove: "Remove",
+    signatureUploading: "Uploading…",
+    signatureDrawButton: "Draw signature",
+    signatureDrawHint: "Sign with your mouse, finger, or a stylus.",
+    signatureDrawClear: "Clear",
+    signatureDrawSave: "Save signature",
+    signatureDrawCancel: "Cancel",
+    errSignatureEmpty: "Draw your signature before saving.",
     saving: "Saving…",
     flashSuccess: "Saved successfully!",
     errUnexpected: "An unexpected error occurred. Please try again.",
@@ -192,6 +236,7 @@ const en: TeamDictionary = {
     errCannotDeleteOwner: "You can't delete the owner.",
     errDeleteFailed: "Couldn't delete:",
     errReorderFailed: "Couldn't reorder:",
+    errInvalidFile: "Upload a PNG, JPG, or WEBP image up to 2MB.",
   },
   ownerFallbackName: "Me",
 };

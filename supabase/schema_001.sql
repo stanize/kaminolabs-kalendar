@@ -341,9 +341,11 @@ create table public.kalendar_businesses (
   professional_dni             text,
   professional_college_number  text,
   professional_name            text,
-  -- Uploaded signature image (invoice-signatures storage bucket, same
-  -- upload/remove pattern as logo_url). Shown on the invoice when set,
-  -- omitted otherwise — no placeholder/fallback graphic.
+  -- DEPRECATED (schema_subset_040.sql, per-member-invoice-signature): no
+  -- longer read by the app — replaced by kalendar_team_members.signature_url
+  -- (per-member, above), same reasoning as the professional_* trio above.
+  -- Column kept rather than dropped since it may still hold a real value
+  -- from before the move.
   signature_url           text,
   -- When true, Cobrar generates+sends the invoice automatically with no
   -- confirm modal. Off by default.
@@ -586,6 +588,12 @@ create table public.kalendar_team_members (
   -- invoice above the DNI/Nº colegiada line, e.g. "Podiatra". Nullable —
   -- no fallback text when unset.
   professional_title           text,
+  -- per-member-invoice-signature (schema_subset_040.sql): each member's own
+  -- signature image, printed on invoices for bookings assigned to them —
+  -- replaces the old single business-level kalendar_businesses.signature_url
+  -- (now deprecated/unread) for the same reason as the fields above: a
+  -- multi-provider clinic needs a different signature per person.
+  signature_url                text,
   -- team-member-lifecycle (schema_subset_035.sql): a member with any
   -- bookings (past or future) can't be hard-deleted — disabled instead.
   -- Disabled members are excluded from new-booking provider pickers (public

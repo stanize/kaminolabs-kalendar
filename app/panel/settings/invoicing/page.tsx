@@ -24,7 +24,6 @@ export default async function InvoicingSettingsPage() {
     <InvoicingSettings
       initialTemplateId={business.invoice_template_id}
       initialAutoInvoice={business.auto_invoice_enabled}
-      initialSignatureUrl={business.signature_url}
       initialNextNumberOverride={business.invoice_next_number}
       nextNumberPreview={nextNumberPreview}
       initialConcepts={concepts}

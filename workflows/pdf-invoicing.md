@@ -363,6 +363,56 @@ Criteria:
   this ticket's own example makes clear "Título" means the printed
   professional title, not the internal team-list role label).
 
+## Step: per-member-invoice-signature
+Status: in_progress
+Criteria:
+- CODE IMPLEMENTED 2026-11-13 (typechecked/linted/built clean), PENDING
+  MANUAL TESTING AND `schema_subset_040.sql` run against the live DB.
+- DESIGN SETTLED (2026-11-13, Arun): noticed the invoice's "Firma" was a
+  single business-level setting (Settings → Facturación) while the DNI/
+  colegiada/título fields right next to the signature on the printed PDF
+  already resolve PER the booking's assigned team member
+  (`lib/invoices/data.ts`'s `provider` resolution) — a multi-provider
+  clinic would show every provider's invoice signed with the SAME
+  signature image regardless of who actually treated the patient. This
+  step closes that last gap, same pattern as professional-title-on-invoice.
+- **New column**: `kalendar_team_members.signature_url text` (nullable),
+  same per-member scope and storage bucket (`invoice-signatures`) as the
+  old business-level field, just keyed by member id instead of business
+  id (file path `${businessId}/member-${memberId}-signature-${ts}.${ext}`).
+- **Two explicit decisions Arun made** (asked via AskUserQuestion since
+  only he could call these):
+  1. No business-level fallback — if a member hasn't uploaded their own
+     signature, that invoice's signature area is simply blank (matches
+     the existing "si no subes ninguna, esa zona queda en blanco" copy).
+     `kalendar_businesses.signature_url` is now DEPRECATED (kept, unread
+     — same treatment as the other deprecated business-level
+     professional_* trio) and the business-level "Firma" Settings card
+     (Settings → Facturación) was REMOVED entirely, along with
+     `uploadInvoiceSignature`/`removeInvoiceSignature`
+     (`lib/actions/invoices.ts`) and the signature-related keys in
+     `lib/i18n/dictionaries/invoicing.ts`.
+  2. Managed only in the Team member edit panel
+     (`components/panel/team-manager.tsx`'s `MemberPanel`) — new
+     "Firma" section (upload file or draw via the existing
+     `components/panel/signature-pad.tsx`, reused as-is), shown only
+     when editing an existing member (a brand-new unsaved member has no
+     id to attach an upload to yet).
+- **Full touch-point chain**: `supabase/schema_subset_040.sql` + folded
+  into `schema_001.sql` → `lib/team/data.ts` (`TeamMember.signature_url`,
+  `TEAM_COLUMNS`) → `lib/actions/team.ts` (new
+  `uploadTeamMemberSignature`/`removeTeamMemberSignature` actions,
+  mirroring the old business-level ones but scoped by member id) →
+  `components/panel/team-manager.tsx` (new Firma section + state/handlers
+  in `MemberPanel`) → `app/panel/team/page.tsx` (pass `signature_url`
+  through) → `lib/i18n/dictionaries/team.ts` (new `signature*` keys,
+  es/en) → `lib/invoices/data.ts` (`buildBusinessSnapshot`'s `provider`
+  select + resolution query gained `signature_url`; `signatureUrl:
+  provider?.signature_url ?? null`, no more `business.signature_url`
+  read at all) → `lib/invoices/types.ts` (comment update only, same
+  field/type). No template change needed — `vat-exempt.tsx` already
+  reads `business.signatureUrl` generically.
+
 ## Notes / Deviations
 - FUTURE DEPENDENCY (2026-09-27): `workflows/verifactu-compliance.md` (Spain's
   anti-fraud invoicing regulation — hash-chained records, QR codes,

@@ -13,11 +13,15 @@ export interface TeamMember {
   professional_dni: string | null;
   professional_college_number: string | null;
   professional_title: string | null;
+  // per-member-invoice-signature (schema_subset_040.sql): each team member's
+  // own signature image, printed on invoices for bookings assigned to them.
+  // Replaces the old single business-level signature_url.
+  signature_url: string | null;
   active: boolean;
 }
 
 const TEAM_COLUMNS =
-  "id, business_id, name, role, is_owner, sort_order, created_at, professional_dni, professional_college_number, professional_title, active";
+  "id, business_id, name, role, is_owner, sort_order, created_at, professional_dni, professional_college_number, professional_title, signature_url, active";
 
 /**
  * All team members for the given user's business, ordered for display (owner

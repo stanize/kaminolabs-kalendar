@@ -34,6 +34,10 @@ export interface Business {
   slug_active: boolean;
   bonos_enabled: boolean;
   invoice_template_id: string;
+  // DEPRECATED (per-member-invoice-signature, 2026-11): invoices now use
+  // each assigned team member's own kalendar_team_members.signature_url
+  // (lib/invoices/data.ts), no business-level fallback. Column/field kept
+  // around (not read anywhere) rather than dropped against live data.
   signature_url: string | null;
   auto_invoice_enabled: boolean;
   invoice_next_number: number | null;

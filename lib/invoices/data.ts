@@ -24,7 +24,13 @@ const INVOICE_COLUMNS =
  */
 function buildBusinessSnapshot(
   business: Business,
-  provider: { name: string; professional_dni: string | null; professional_college_number: string | null; professional_title: string | null } | null
+  provider: {
+    name: string;
+    professional_dni: string | null;
+    professional_college_number: string | null;
+    professional_title: string | null;
+    signature_url: string | null;
+  } | null
 ): InvoiceBusinessSnapshot {
   return {
     name: business.name,
@@ -43,7 +49,10 @@ function buildBusinessSnapshot(
     professionalCollegeNumber: provider?.professional_college_number ?? null,
     professionalTitle: provider?.professional_title ?? null,
     professionalName: provider?.name ?? business.name,
-    signatureUrl: business.signature_url,
+    // per-member-invoice-signature (schema_subset_040.sql, 2026-11):
+    // per-member only now, no business-level fallback — blank if this
+    // provider hasn't uploaded their own signature yet (per Arun's call).
+    signatureUrl: provider?.signature_url ?? null,
     templateId: business.invoice_template_id,
     brandColor: business.brand_color,
     isSolo: business.team_mode === "solo",
@@ -217,11 +226,17 @@ export async function createInvoiceForBooking(input: CreateInvoiceInput): Promis
 
   if (!booking) return { ok: false, error: "no_booking" };
 
-  let provider: { name: string; professional_dni: string | null; professional_college_number: string | null; professional_title: string | null } | null = null;
+  let provider: {
+    name: string;
+    professional_dni: string | null;
+    professional_college_number: string | null;
+    professional_title: string | null;
+    signature_url: string | null;
+  } | null = null;
   if (booking.team_member_id) {
     const { data: member } = await supabase
       .from("kalendar_team_members")
-      .select("name, professional_dni, professional_college_number, professional_title")
+      .select("name, professional_dni, professional_college_number, professional_title, signature_url")
       .eq("id", booking.team_member_id)
       .eq("business_id", businessId)
       .maybeSingle();

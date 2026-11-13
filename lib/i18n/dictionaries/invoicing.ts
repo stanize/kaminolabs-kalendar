@@ -13,20 +13,6 @@ export interface InvoicingDictionary {
     autoInvoiceLabel: string;
     autoInvoiceHint: string;
     autoInvoiceSaving: string;
-    signatureSectionTitle: string;
-    signatureSectionSubtitle: string;
-    signatureUpload: string;
-    signatureChange: string;
-    signatureRemove: string;
-    signatureUploading: string;
-    // draw-signature — alternative to uploading an image file: sign with
-    // mouse/touch/stylus directly in the browser.
-    signatureDrawButton: string;
-    signatureDrawHint: string;
-    signatureDrawClear: string;
-    signatureDrawSave: string;
-    signatureDrawCancel: string;
-    errSignatureEmpty: string;
     numberingSectionTitle: string;
     numberingSectionSubtitle: string;
     numberingNextLabel: string;
@@ -36,7 +22,6 @@ export interface InvoicingDictionary {
     numberingSaving: string;
     numberingClear: string;
     errNoBusiness: string;
-    errInvalidFile: string;
     errInvalidNumber: string;
     errSaveFailed: string;
     // invoice-concepts-list: Settings > Facturación's add/rename/delete
@@ -139,18 +124,6 @@ const es: InvoicingDictionary = {
     autoInvoiceHint:
       "Genera y envía la factura automáticamente al marcar una cita como pagada, sin preguntar cada vez.",
     autoInvoiceSaving: "Guardando…",
-    signatureSectionTitle: "Firma",
-    signatureSectionSubtitle: "Se muestra en tus facturas cuando la subes. Si no subes ninguna, esa zona queda en blanco.",
-    signatureUpload: "Subir firma",
-    signatureChange: "Cambiar firma",
-    signatureRemove: "Quitar",
-    signatureUploading: "Subiendo…",
-    signatureDrawButton: "Dibujar firma",
-    signatureDrawHint: "Firma con el ratón, el dedo o un lápiz óptico.",
-    signatureDrawClear: "Borrar",
-    signatureDrawSave: "Guardar firma",
-    signatureDrawCancel: "Cancelar",
-    errSignatureEmpty: "Dibuja tu firma antes de guardar.",
     numberingSectionTitle: "Numeración de facturas",
     numberingSectionSubtitle:
       "El siguiente número se calcula automáticamente. Si vienes de otro sistema a mitad de año, indica aquí el número con el que debe continuar tu próxima factura.",
@@ -161,7 +134,6 @@ const es: InvoicingDictionary = {
     numberingSaving: "Guardando…",
     numberingClear: "Quitar",
     errNoBusiness: "No se encontró tu negocio.",
-    errInvalidFile: "Sube una imagen PNG, JPG o WEBP de hasta 2MB.",
     errInvalidNumber: "Indica un número de factura válido.",
     errSaveFailed: "No se pudo guardar el cambio.",
     conceptsSectionTitle: "Conceptos de factura",
@@ -246,18 +218,6 @@ const en: InvoicingDictionary = {
     autoInvoiceLabel: "Auto-invoice",
     autoInvoiceHint: "Generate and send the invoice automatically when an appointment is marked as paid, with no prompt.",
     autoInvoiceSaving: "Saving…",
-    signatureSectionTitle: "Signature",
-    signatureSectionSubtitle: "Shown on your invoices once uploaded. If none is uploaded, that area stays blank.",
-    signatureUpload: "Upload signature",
-    signatureChange: "Change signature",
-    signatureRemove: "Remove",
-    signatureUploading: "Uploading…",
-    signatureDrawButton: "Draw signature",
-    signatureDrawHint: "Sign with your mouse, finger, or a stylus.",
-    signatureDrawClear: "Clear",
-    signatureDrawSave: "Save signature",
-    signatureDrawCancel: "Cancel",
-    errSignatureEmpty: "Draw your signature before saving.",
     numberingSectionTitle: "Invoice numbering",
     numberingSectionSubtitle:
       "The next number is calculated automatically. If you're switching from another system mid-year, set the number your next invoice should continue from.",
@@ -268,7 +228,6 @@ const en: InvoicingDictionary = {
     numberingSaving: "Saving…",
     numberingClear: "Clear",
     errNoBusiness: "Business not found.",
-    errInvalidFile: "Upload a PNG, JPG, or WEBP image up to 2MB.",
     errInvalidNumber: "Enter a valid invoice number.",
     errSaveFailed: "Couldn't save the change.",
     conceptsSectionTitle: "Invoice concepts",

@@ -11,9 +11,12 @@ import {
   deleteOrDisableTeamMember,
   reactivateTeamMember,
   reorderTeamMembers,
+  uploadTeamMemberSignature,
+  removeTeamMemberSignature,
 } from "@/lib/actions/team";
 import { reportClientError } from "@/lib/report-client-error";
 import type { TeamDictionary } from "@/lib/i18n/dictionaries/team";
+import { SignaturePad } from "@/components/panel/signature-pad";
 
 type TeamMode = "solo" | "team";
 
@@ -25,6 +28,7 @@ interface MemberItem {
   professional_dni: string | null;
   professional_college_number: string | null;
   professional_title: string | null;
+  signature_url: string | null;
   active: boolean;
 }
 
@@ -39,6 +43,7 @@ interface Row {
   professionalDni: string;
   professionalCollegeNumber: string;
   professionalTitle: string;
+  signatureUrl: string | null;
   active: boolean;
 }
 
@@ -51,6 +56,7 @@ function toRow(m: MemberItem): Row {
     professionalDni: m.professional_dni ?? "",
     professionalCollegeNumber: m.professional_college_number ?? "",
     professionalTitle: m.professional_title ?? "",
+    signatureUrl: m.signature_url,
     active: m.active,
   };
 }
@@ -366,8 +372,12 @@ function MemberPanel({
   const [professionalDni, setProfessionalDni] = useState(row?.professionalDni ?? "");
   const [professionalCollegeNumber, setProfessionalCollegeNumber] = useState(row?.professionalCollegeNumber ?? "");
   const [professionalTitle, setProfessionalTitle] = useState(row?.professionalTitle ?? "");
+  const [signatureUrl, setSignatureUrl] = useState(row?.signatureUrl ?? null);
+  const [signatureUploading, setSignatureUploading] = useState(false);
+  const [drawingSignature, setDrawingSignature] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const signatureFileInputRef = useRef<HTMLInputElement>(null);
 
   const [visible, setVisible] = useState(false);
   useEffect(() => {
@@ -413,6 +423,7 @@ function MemberPanel({
           professionalDni: result.member.professional_dni ?? "",
           professionalCollegeNumber: result.member.professional_college_number ?? "",
           professionalTitle: result.member.professional_title ?? "",
+          signatureUrl,
           active: result.member.active,
         })
       );
@@ -420,6 +431,66 @@ function MemberPanel({
       reportClientError(row ? "updateTeamMember" : "createTeamMember", e);
       setError(dict.manager.errUnexpected);
       setSaving(false);
+    }
+  }
+
+  // Shared by both signature sources (file upload + drawn pad). Only
+  // callable once the member is saved (needs an id) — see the panel's
+  // signature section below, shown only when editing an existing member.
+  async function uploadSignatureFile(file: File) {
+    if (!row) return;
+    setError(null);
+    setSignatureUploading(true);
+    const formData = new FormData();
+    formData.set("memberId", row.id);
+    formData.set("signature", file);
+    try {
+      const result = await uploadTeamMemberSignature(formData, {
+        errNoBusiness: dict.errors.errNoBusiness,
+        errInvalidFile: dict.errors.errInvalidFile,
+        errSaveFailed: dict.errors.errSaveFailed,
+      });
+      if (!result.ok) {
+        setError(result.error);
+      } else {
+        setSignatureUrl(result.signatureUrl);
+        setDrawingSignature(false);
+      }
+    } catch (e) {
+      reportClientError("uploadTeamMemberSignature", e);
+      setError(dict.manager.errUnexpected);
+    } finally {
+      setSignatureUploading(false);
+    }
+  }
+
+  async function handleSignatureFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024 || !["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+      setError(dict.errors.errInvalidFile);
+      return;
+    }
+    await uploadSignatureFile(file);
+  }
+
+  async function handleRemoveSignature() {
+    if (!row) return;
+    setError(null);
+    setSignatureUploading(true);
+    try {
+      const result = await removeTeamMemberSignature({ id: row.id, dict: { errNoBusiness: dict.errors.errNoBusiness, errSaveFailed: dict.errors.errSaveFailed } });
+      if (!result.ok) {
+        setError(result.error);
+      } else {
+        setSignatureUrl(null);
+      }
+    } catch (e) {
+      reportClientError("removeTeamMemberSignature", e);
+      setError(dict.manager.errUnexpected);
+    } finally {
+      setSignatureUploading(false);
     }
   }
 
@@ -497,6 +568,66 @@ function MemberPanel({
             inputClassName={inputBase}
           />
         </div>
+
+        {row && (
+          <div className="mt-5 rounded-lg border border-line bg-surface-2/50 p-3.5">
+            <p className="text-[12.5px] font-medium text-ink">{m.signatureSectionTitle}</p>
+            <p className="text-[11.5px] text-ink-soft">{m.signatureSectionSubtitle}</p>
+
+            {drawingSignature ? (
+              <div className="mt-3">
+                <SignaturePad
+                  onSave={uploadSignatureFile}
+                  onCancel={() => setDrawingSignature(false)}
+                  saving={signatureUploading}
+                  dict={{
+                    hint: m.signatureDrawHint,
+                    clear: m.signatureDrawClear,
+                    save: signatureUploading ? m.signatureUploading : m.signatureDrawSave,
+                    cancel: m.signatureDrawCancel,
+                    errEmpty: m.errSignatureEmpty,
+                  }}
+                />
+              </div>
+            ) : (
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <div className="flex h-14 min-w-[120px] max-w-[200px] items-center justify-center rounded-xl border border-line bg-surface px-3">
+                  {signatureUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- external Supabase Storage URL, not a local/optimizable asset
+                    <img src={signatureUrl} alt="Firma" className="max-h-10 max-w-full object-contain" />
+                  ) : (
+                    <Icon name="fileText" size={20} className="text-ink-soft" />
+                  )}
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Btn variant="outline" size="sm" type="button" onClick={() => signatureFileInputRef.current?.click()} disabled={signatureUploading}>
+                    {signatureUploading ? m.signatureUploading : signatureUrl ? m.signatureChange : m.signatureUpload}
+                  </Btn>
+                  <Btn variant="outline" size="sm" type="button" onClick={() => setDrawingSignature(true)} disabled={signatureUploading}>
+                    {m.signatureDrawButton}
+                  </Btn>
+                  {signatureUrl && (
+                    <button
+                      type="button"
+                      onClick={handleRemoveSignature}
+                      disabled={signatureUploading}
+                      className="text-[12.5px] font-medium text-ink-soft hover:text-error disabled:opacity-50"
+                    >
+                      {m.signatureRemove}
+                    </button>
+                  )}
+                </div>
+                <input
+                  ref={signatureFileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  onChange={handleSignatureFileChange}
+                  className="hidden"
+                />
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="mt-5 flex justify-end gap-2">
           <button

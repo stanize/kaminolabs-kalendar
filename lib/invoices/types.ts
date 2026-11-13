@@ -30,6 +30,10 @@ export interface InvoiceBusinessSnapshot {
   // printed above the DNI/colegiada line. Nullable, no fallback text.
   professionalTitle: string | null;
   professionalName: string | null;
+  // per-member-invoice-signature (schema_subset_040.sql): the assigned
+  // team member's own signature, frozen at invoice-creation time like its
+  // siblings. No business-level fallback — null/blank if that member
+  // hasn't uploaded one.
   signatureUrl: string | null;
   templateId: string;
   brandColor: string;
