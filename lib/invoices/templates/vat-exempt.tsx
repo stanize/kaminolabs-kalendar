@@ -189,7 +189,6 @@ export function VatExemptInvoice(props: InvoiceTemplateProps) {
             {business.signatureUrl && <Image style={styles.signatureImage} src={business.signatureUrl} />}
             <Text style={styles.signatureName}>Fdo: {business.professionalName || business.name}</Text>
             {business.professionalTitle && <Text style={styles.businessSub}>{business.professionalTitle}</Text>}
-            {business.professionalDni && <Text style={styles.businessSub}>DNI: {business.professionalDni}</Text>}
             {business.professionalCollegeNumber && (
               <Text style={styles.businessSub}>Nºcolegiada: {business.professionalCollegeNumber}</Text>
             )}
