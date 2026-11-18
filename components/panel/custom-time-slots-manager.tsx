@@ -173,7 +173,7 @@ function RulePanel({
   const [days, setDays] = useState<DayId[]>(rule?.days ?? []);
   const [allProviders, setAllProviders] = useState((rule?.teamMemberIds.length ?? 0) === 0);
   const [teamMemberIds, setTeamMemberIds] = useState<string[]>(rule?.teamMemberIds ?? []);
-  const [slotType, setSlotType] = useState<SlotType>(rule?.slotType ?? "custom");
+  const [slotType, setSlotType] = useState<SlotType>(rule?.slotType ?? "frequency");
   const [times, setTimes] = useState<string[]>(
     rule?.slotType !== "frequency" && rule?.times.length ? rule.times : [""]
   );
