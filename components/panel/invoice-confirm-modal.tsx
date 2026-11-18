@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import { Btn } from "@/components/ui/button";
 import { createAndSendInvoice, getInvoiceBookingDefaults, listInvoiceConcepts } from "@/lib/actions/invoices";
@@ -36,7 +36,10 @@ function formatAmount(n: number): string {
   return n.toFixed(2).replace(".", ",");
 }
 
-const PREVIEW_DEBOUNCE_MS = 700;
+// How long to wait after the last keystroke before refreshing the preview.
+const PREVIEW_DEBOUNCE_MS = 300;
+// If the freshly rendered PDF hasn't reported "loaded" by then, show it anyway.
+const PREVIEW_SWAP_FALLBACK_MS = 2500;
 
 /**
  * invoice-confirm-modal-extraction (2026-10): the invoice-generation panel,
@@ -98,7 +101,10 @@ export function InvoiceConfirmModal({
   const [error, setError] = useState<string | null>(null);
 
   // Live preview (a blob URL of the draft PDF).
+  // The PDF being shown, and the next one loading in a hidden second viewer
+  // (swapped in when ready, so the preview never blanks while it updates).
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [pendingUrl, setPendingUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewFailed, setPreviewFailed] = useState(false);
 
@@ -147,8 +153,21 @@ export function InvoiceConfirmModal({
   const amountValue = parseAmount(amountInput);
   const amountModified = servicePrice !== null && !Number.isNaN(amountValue) && Math.abs(amountValue - servicePrice) >= 0.005;
 
-  // Live preview: debounced, cancels a stale request when something changes.
-  const previewUrlRef = useRef<string | null>(null);
+  // Live preview: refreshes ~300ms after the last keystroke, cancelling a
+  // stale request when something changes. The new PDF loads in a hidden
+  // second viewer and replaces the visible one only once it is ready.
+  const shownRef = useRef<string | null>(null);
+  const pendingRef = useRef<string | null>(null);
+
+  const promote = useCallback((url: string) => {
+    if (pendingRef.current !== url) return; // superseded by a newer one
+    if (shownRef.current) URL.revokeObjectURL(shownRef.current);
+    shownRef.current = url;
+    pendingRef.current = null;
+    setPreviewUrl(url);
+    setPendingUrl(null);
+  }, []);
+
   useEffect(() => {
     if (loadingDefaults || Number.isNaN(amountValue)) return;
     const controller = new AbortController();
@@ -172,9 +191,14 @@ export function InvoiceConfirmModal({
         });
         if (!res.ok) throw new Error(String(res.status));
         const url = URL.createObjectURL(await res.blob());
-        if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
-        previewUrlRef.current = url;
-        setPreviewUrl(url);
+        // A newer PDF replaces one that never finished loading.
+        if (pendingRef.current) URL.revokeObjectURL(pendingRef.current);
+        pendingRef.current = url;
+        if (!shownRef.current) {
+          promote(url); // the first one: nothing to keep visible, show it now
+        } else {
+          setPendingUrl(url);
+        }
       } catch (e) {
         if ((e as Error).name !== "AbortError") setPreviewFailed(true);
       } finally {
@@ -185,11 +209,19 @@ export function InvoiceConfirmModal({
       clearTimeout(timer);
       controller.abort();
     };
-  }, [loadingDefaults, bookingId, nameInput, dniInput, addressInput, extraConceptInput, noteInput, amountValue]);
+  }, [loadingDefaults, bookingId, nameInput, dniInput, addressInput, extraConceptInput, noteInput, amountValue, promote]);
+
+  // Safety net: some browsers never fire the viewer's load event.
+  useEffect(() => {
+    if (!pendingUrl) return;
+    const t = setTimeout(() => promote(pendingUrl), PREVIEW_SWAP_FALLBACK_MS);
+    return () => clearTimeout(t);
+  }, [pendingUrl, promote]);
 
   useEffect(
     () => () => {
-      if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+      if (shownRef.current) URL.revokeObjectURL(shownRef.current);
+      if (pendingRef.current) URL.revokeObjectURL(pendingRef.current);
     },
     []
   );
@@ -424,11 +456,23 @@ export function InvoiceConfirmModal({
             {previewUrl && (
               <>
                 {/* Inline PDF viewers are unreliable on phones/tablets: there, a link opens it in a tab instead. */}
-                <iframe
-                  src={`${previewUrl}#navpanes=0&zoom=100`}
-                  title={dict.previewTitle}
-                  className="hidden min-h-0 w-full flex-1 rounded-lg border border-line bg-surface-2 lg:block"
-                />
+                <div className="relative hidden min-h-0 w-full flex-1 lg:block">
+                  {/* Keyed by URL: when the pending PDF is promoted, its viewer is kept
+                      (no reload) and the old one is removed, so nothing flashes. */}
+                  {[previewUrl, pendingUrl].filter((u): u is string => !!u).map((url) => (
+                    <iframe
+                      key={url}
+                      src={`${url}#navpanes=0&zoom=100`}
+                      title={url === previewUrl ? dict.previewTitle : ""}
+                      aria-hidden={url !== previewUrl}
+                      tabIndex={url === previewUrl ? 0 : -1}
+                      onLoad={url === pendingUrl ? () => promote(url) : undefined}
+                      className={`absolute inset-0 h-full w-full rounded-lg border border-line bg-surface-2 ${
+                        url === previewUrl ? "" : "pointer-events-none opacity-0"
+                      }`}
+                    />
+                  ))}
+                </div>
                 <a
                   href={previewUrl}
                   target="_blank"

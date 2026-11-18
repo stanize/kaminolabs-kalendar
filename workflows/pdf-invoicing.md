@@ -476,7 +476,10 @@ Criteria:
     (an "OBSERVACIONES" box), and the **amount**. The email options stay as
     today (send checkbox, missing-email field, one-off alternate address).
   - A live PDF preview next to the form (below it on narrow screens),
-    refreshed shortly after edits.
+    refreshed about 0.3 s after the last keystroke, no manual refresh. The
+    new PDF loads in a hidden second viewer and replaces the visible one
+    when ready (no blank flash). The viewer reloads, so its scroll position
+    returns to the top on each update.
   - Edits apply to THIS invoice only (name, concept, note, amount). DNI and
     address keep today's behavior of also updating the client's profile.
     The appointment's own price is never changed, and neither is the
