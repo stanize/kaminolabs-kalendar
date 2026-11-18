@@ -9,7 +9,7 @@ import type { Locale } from "../config";
 export interface CustomSlotsDictionary {
   title: string;
   subtitle: string;
-  addButton: string; // "+ Añadir horario personalizado"
+  addButton: string; // "Añadir horario personalizado" (the + comes from the button icon)
   emptyTitle: string;
   emptySubtitle: string;
 
@@ -76,7 +76,7 @@ export interface CustomSlotsDictionary {
 const es: CustomSlotsDictionary = {
   title: "Horarios personalizados",
   subtitle: "Define horas de cita exactas para días y profesionales concretos, en vez de la sugerencia horaria genérica.",
-  addButton: "+ Añadir horario personalizado",
+  addButton: "Añadir horario personalizado",
   emptyTitle: "No tienes horarios personalizados",
   emptySubtitle: "Sin ninguno, las citas siguen usando la sugerencia horaria genérica basada en tu Horario.",
 
@@ -139,7 +139,7 @@ const es: CustomSlotsDictionary = {
 const en: CustomSlotsDictionary = {
   title: "Custom time slots",
   subtitle: "Define exact appointment times for specific days and providers, instead of the generic hourly suggestion.",
-  addButton: "+ Add custom time slot",
+  addButton: "Add custom time slot",
   emptyTitle: "No custom time slots yet",
   emptySubtitle: "Without any, appointments keep using the generic hourly suggestion based on your Hours.",
 
