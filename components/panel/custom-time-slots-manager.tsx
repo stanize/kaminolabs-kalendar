@@ -12,6 +12,11 @@ import { isOutsideBusinessHours, type TimeRangeVM } from "@/lib/booking/appointm
 import { reportClientError } from "@/lib/report-client-error";
 import { AvailabilityHeaderAction } from "@/components/panel/availability-header-action";
 import type { CustomTimeSlotRule } from "@/lib/custom-slots/data";
+import {
+  FREQUENCY_OPTIONS,
+  generateFrequencyTimes,
+  type SlotType,
+} from "@/lib/custom-slots/frequency";
 import type { CustomSlotsDictionary } from "@/lib/i18n/dictionaries/custom-slots";
 import type { AvailabilityDictionary } from "@/lib/i18n/dictionaries/availability";
 import type { DayId } from "@/lib/onboarding/types";
@@ -93,7 +98,12 @@ export function CustomTimeSlotsManager({
                   {" · "}
                   {r.teamMemberIds.length === 0 ? dict.allProvidersSummary : r.teamMemberIds.map(memberName).join(", ")}
                   {" · "}
-                  {dict.timesCountTemplate.replace("{n}", String(r.times.length))}
+                  {r.slotType === "frequency" && r.rangeStart && r.rangeEnd && r.frequencyMin
+                    ? dict.frequencySummaryTemplate
+                        .replace("{start}", r.rangeStart)
+                        .replace("{end}", r.rangeEnd)
+                        .replace("{n}", String(r.frequencyMin))
+                    : dict.timesCountTemplate.replace("{n}", String(r.times.length))}
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-1">
@@ -123,6 +133,11 @@ export function CustomTimeSlotsManager({
       {panelRule && (
         <RulePanel
           rule={panelRule === "new" ? null : panelRule}
+          // One type per clinic: any OTHER existing rule fixes the type; the
+          // only rule a clinic has can still be switched to the other type.
+          lockedType={
+            rules.filter((r) => r.id !== (panelRule === "new" ? null : panelRule.id))[0]?.slotType ?? null
+          }
           members={members}
           hoursByDay={hoursByDay}
           dict={dict}
@@ -143,6 +158,7 @@ export function CustomTimeSlotsManager({
 
 function RulePanel({
   rule,
+  lockedType,
   members,
   hoursByDay,
   dict,
@@ -151,6 +167,7 @@ function RulePanel({
   onSaved,
 }: {
   rule: CustomTimeSlotRule | null;
+  lockedType: SlotType | null;
   members: MemberOption[];
   hoursByDay: Partial<Record<DayId, TimeRangeVM[]>>;
   dict: CustomSlotsDictionary;
@@ -163,7 +180,13 @@ function RulePanel({
   const [days, setDays] = useState<DayId[]>(rule?.days ?? []);
   const [allProviders, setAllProviders] = useState((rule?.teamMemberIds.length ?? 0) === 0);
   const [teamMemberIds, setTeamMemberIds] = useState<string[]>(rule?.teamMemberIds ?? []);
-  const [times, setTimes] = useState<string[]>(rule?.times.length ? rule.times : [""]);
+  const [slotType, setSlotType] = useState<SlotType>(rule?.slotType ?? lockedType ?? "custom");
+  const [times, setTimes] = useState<string[]>(
+    rule?.slotType !== "frequency" && rule?.times.length ? rule.times : [""]
+  );
+  const [rangeStart, setRangeStart] = useState(rule?.rangeStart ?? "");
+  const [rangeEnd, setRangeEnd] = useState(rule?.rangeEnd ?? "");
+  const [frequencyMin, setFrequencyMin] = useState<number>(rule?.frequencyMin ?? 30);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -210,6 +233,15 @@ function RulePanel({
     setTimes((ts) => ts.map((x, idx) => (idx === i ? value : x)));
   }
 
+  const typeLabelFor = (t: SlotType) => (t === "frequency" ? dict.typeFrequency : dict.typeCustom);
+
+  // Frequency type: the exact list that will be saved (same helper the
+  // server uses), shown live so the clinic sees what they're creating.
+  const frequencyTimes =
+    slotType === "frequency"
+      ? generateFrequencyTimes(normalizeTime(rangeStart), normalizeTime(rangeEnd), frequencyMin)
+      : null;
+
   function handleTimeBlur(i: number) {
     setTimes((ts) => ts.map((x, idx) => (idx === i ? normalizeTime(x) : x)));
   }
@@ -238,7 +270,11 @@ function RulePanel({
       label,
       days: allDays ? [] : days,
       teamMemberIds: allProviders ? [] : teamMemberIds,
+      slotType,
       times,
+      rangeStart: normalizeTime(rangeStart),
+      rangeEnd: normalizeTime(rangeEnd),
+      frequencyMin,
       dict: dict.errors,
     };
     try {
@@ -255,7 +291,12 @@ function RulePanel({
     }
   }
 
-  const canSave = times.some((t) => t.trim().length > 0) && (allProviders || teamMemberIds.length > 0) && (allDays || days.length > 0);
+  const hasTimes =
+    slotType === "frequency"
+      ? (frequencyTimes?.length ?? 0) > 0
+      : times.some((t) => t.trim().length > 0);
+  const canSave = hasTimes && (allProviders || teamMemberIds.length > 0) && (allDays || days.length > 0);
+  const frequencyOutside = (frequencyTimes ?? []).some((t) => isTimeOutsideHours(t));
 
   return (
     <div className="fixed inset-y-0 left-0 right-0 z-50 md:left-[240px]">
@@ -293,6 +334,24 @@ function RulePanel({
               placeholder={dict.labelPlaceholder}
               className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[15px] text-ink"
             />
+          </label>
+
+          <label className="flex flex-col gap-1">
+            <span className="text-[12.5px] font-semibold text-ink-soft">{dict.typeLabel}</span>
+            <select
+              value={slotType}
+              onChange={(e) => setSlotType(e.target.value as SlotType)}
+              disabled={lockedType !== null}
+              className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[15px] text-ink disabled:opacity-60"
+            >
+              <option value="frequency">{dict.typeFrequency}</option>
+              <option value="custom">{dict.typeCustom}</option>
+            </select>
+            {lockedType !== null && (
+              <span className="text-[12px] text-ink-soft">
+                {dict.typeLockedNote.replace("{type}", typeLabelFor(lockedType))}
+              </span>
+            )}
           </label>
 
           <div>
@@ -333,6 +392,67 @@ function RulePanel({
             )}
           </div>
 
+          {slotType === "frequency" ? (
+            <div className="flex flex-col gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <label className="flex flex-col gap-1">
+                  <span className="text-[12.5px] font-semibold text-ink-soft">{dict.startLabel}</span>
+                  <input
+                    type="text"
+                    value={rangeStart}
+                    onChange={(e) => setRangeStart(e.target.value)}
+                    onBlur={() => setRangeStart((v) => normalizeTime(v))}
+                    placeholder={dict.timePlaceholder}
+                    className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[14px] text-ink"
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-[12.5px] font-semibold text-ink-soft">{dict.endLabel}</span>
+                  <input
+                    type="text"
+                    value={rangeEnd}
+                    onChange={(e) => setRangeEnd(e.target.value)}
+                    onBlur={() => setRangeEnd((v) => normalizeTime(v))}
+                    placeholder={dict.timePlaceholder}
+                    className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[14px] text-ink"
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-[12.5px] font-semibold text-ink-soft">{dict.frequencyLabel}</span>
+                  <select
+                    value={frequencyMin}
+                    onChange={(e) => setFrequencyMin(Number(e.target.value))}
+                    className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[14px] text-ink"
+                  >
+                    {FREQUENCY_OPTIONS.map((n) => (
+                      <option key={n} value={n}>
+                        {dict.frequencyOptionTemplate.replace("{n}", String(n))}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <p className="text-[12px] text-ink-soft">{dict.frequencyHint}</p>
+              {rangeStart.trim() && rangeEnd.trim() && frequencyTimes === null && (
+                <p className="text-[12px] text-error">{dict.previewInvalid}</p>
+              )}
+              {frequencyTimes && frequencyTimes.length > 0 && (
+                <p className="text-[12.5px] text-ink">
+                  {dict.previewTemplate
+                    .replace("{n}", String(frequencyTimes.length))
+                    .replace(
+                      "{list}",
+                      frequencyTimes.length > 8
+                        ? `${frequencyTimes.slice(0, 6).join(", ")} … ${frequencyTimes[frequencyTimes.length - 1]}`
+                        : frequencyTimes.join(", ")
+                    )}
+                </p>
+              )}
+              {frequencyOutside && (
+                <p className="text-[11.5px] text-amber-600">⚠ {dict.outsideHoursNote}</p>
+              )}
+            </div>
+          ) : (
           <div>
             <p className="mb-1.5 text-[12.5px] font-semibold text-ink-soft">{dict.timesLabel}</p>
             <p className="mb-2 text-[12px] text-ink-soft">{dict.timesHint}</p>
@@ -368,6 +488,7 @@ function RulePanel({
               </Btn>
             </div>
           </div>
+          )}
         </div>
 
         <div className="mt-5 flex justify-end gap-2">

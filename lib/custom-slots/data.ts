@@ -2,6 +2,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { getBusinessForUser } from "@/lib/business/data";
 import type { DayId } from "@/lib/onboarding/types";
+import type { SlotType } from "@/lib/custom-slots/frequency";
 
 export interface CustomTimeSlotRule {
   id: string;
@@ -9,7 +10,15 @@ export interface CustomTimeSlotRule {
   label: string | null;
   days: DayId[]; // empty = every open day
   teamMemberIds: string[]; // empty = all providers
-  times: string[]; // "HH:MM", clinic-entered order
+  // For a "custom" rule: the clinic-entered list. For a "frequency" rule:
+  // generated from rangeStart/rangeEnd/frequencyMin on every save, so every
+  // consumer (booking form suggestions, future public page) reads `times`
+  // the same way regardless of type.
+  times: string[]; // "HH:MM"
+  slotType: SlotType;
+  rangeStart: string | null; // "HH:MM", frequency rules only
+  rangeEnd: string | null; // "HH:MM", frequency rules only
+  frequencyMin: number | null; // frequency rules only
   sortOrder: number;
   createdAt: string;
 }
@@ -29,7 +38,11 @@ export async function getCustomTimeSlotsForUser(userId: string): Promise<CustomT
   const supabase = await createClient();
   const { data } = await supabase
     .from("kalendar_custom_time_slots")
-    .select("id, business_id, label, days, team_member_ids, times, sort_order, created_at")
+    // "*" rather than a column list: tolerates the slot_type/range/frequency
+    // columns (schema_subset_042.sql) not existing yet during the window
+    // between deploy and the live migration — they just read as undefined
+    // and fall back to the "custom" defaults below.
+    .select("*")
     .eq("business_id", business.id)
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: true });
@@ -41,6 +54,10 @@ export async function getCustomTimeSlotsForUser(userId: string): Promise<CustomT
     days: string[] | null;
     team_member_ids: string[] | null;
     times: string[] | null;
+    slot_type?: string | null;
+    range_start?: string | null;
+    range_end?: string | null;
+    frequency_min?: number | null;
     sort_order: number;
     created_at: string;
   }[] | null) ?? []).map((r) => ({
@@ -50,6 +67,10 @@ export async function getCustomTimeSlotsForUser(userId: string): Promise<CustomT
     days: (r.days ?? []) as DayId[],
     teamMemberIds: r.team_member_ids ?? [],
     times: r.times ?? [],
+    slotType: r.slot_type === "frequency" ? "frequency" : "custom",
+    rangeStart: r.range_start ?? null,
+    rangeEnd: r.range_end ?? null,
+    frequencyMin: r.frequency_min ?? null,
     sortOrder: r.sort_order,
     createdAt: r.created_at,
   }));

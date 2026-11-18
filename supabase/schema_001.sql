@@ -550,8 +550,20 @@ create table public.kalendar_custom_time_slots (
   team_member_ids uuid[]      not null default '{}',
   -- "HH:MM" strings, clinic-entered order preserved.
   times           text[]      not null default '{}',
+  -- schema_subset_042.sql: 'custom' = the typed list in `times`; 'frequency' =
+  -- range_start..range_end (end exclusive) every frequency_min minutes, with
+  -- `times` generated from it on every save so readers never care which.
+  slot_type       text        not null default 'custom'
+                              check (slot_type in ('custom', 'frequency')),
+  range_start     text,
+  range_end       text,
+  frequency_min   integer,
   sort_order      integer     not null default 0,
-  created_at      timestamptz not null default now()
+  created_at      timestamptz not null default now(),
+  constraint kalendar_custom_time_slots_frequency_check check (
+    slot_type = 'custom'
+    or (range_start is not null and range_end is not null and frequency_min between 1 and 720)
+  )
 );
 
 create index kalendar_custom_time_slots_business_id_idx on public.kalendar_custom_time_slots (business_id);

@@ -13,6 +13,21 @@ export interface CustomSlotsDictionary {
   emptyTitle: string;
   emptySubtitle: string;
 
+  // Type selector + "Frecuencia" fields (workflows/custom-time-slots.md,
+  // slot-type-frequency)
+  typeLabel: string;
+  typeCustom: string;
+  typeFrequency: string;
+  typeLockedNote: string; // "{type}" — why the selector is disabled
+  startLabel: string;
+  endLabel: string;
+  frequencyLabel: string;
+  frequencyOptionTemplate: string; // "{n}" minutes
+  frequencyHint: string;
+  previewTemplate: string; // "{n}" count, "{list}" first times
+  previewInvalid: string;
+  frequencySummaryTemplate: string; // "{start}", "{end}", "{n}"
+
   // Panel (create/edit)
   panelTitleNew: string;
   panelTitleEdit: string;
@@ -53,6 +68,10 @@ export interface CustomSlotsDictionary {
     errInvalidDay: string;
     errInvalidProvider: string;
     errLabelTooLong: string; // "{max}"
+    errMixedTypes: string; // "{type}"
+    errInvalidRange: string;
+    errInvalidFrequency: string;
+    errInvalidType: string;
   };
 }
 
@@ -62,6 +81,19 @@ const es: CustomSlotsDictionary = {
   addButton: "+ Añadir horario personalizado",
   emptyTitle: "No tienes horarios personalizados",
   emptySubtitle: "Sin ninguno, las citas siguen usando la sugerencia horaria genérica basada en tu Horario.",
+
+  typeLabel: "Tipo",
+  typeCustom: "Personalizado",
+  typeFrequency: "Frecuencia",
+  typeLockedNote: "Ya usas horarios de tipo «{type}». Para cambiar de tipo, elimina los existentes.",
+  startLabel: "Hora de inicio",
+  endLabel: "Hora de fin",
+  frequencyLabel: "Frecuencia",
+  frequencyOptionTemplate: "Cada {n} min",
+  frequencyHint: "La hora de fin no se incluye como hora de cita.",
+  previewTemplate: "Se crearán {n} horarios: {list}",
+  previewInvalid: "La hora de fin debe ser posterior a la de inicio.",
+  frequencySummaryTemplate: "{start}–{end} · cada {n} min",
 
   panelTitleNew: "Nuevo horario personalizado",
   panelTitleEdit: "Editar horario personalizado",
@@ -101,6 +133,10 @@ const es: CustomSlotsDictionary = {
     errInvalidDay: "Día no válido.",
     errInvalidProvider: "Uno de los profesionales elegidos no existe.",
     errLabelTooLong: "El nombre no puede superar los {max} caracteres.",
+    errMixedTypes: "Solo puedes usar un tipo de horario a la vez. Ya tienes horarios de tipo «{type}»; elimínalos para usar otro tipo.",
+    errInvalidRange: "La hora de fin debe ser posterior a la de inicio.",
+    errInvalidFrequency: "Frecuencia no válida.",
+    errInvalidType: "Tipo de horario no válido.",
   },
 };
 
@@ -110,6 +146,19 @@ const en: CustomSlotsDictionary = {
   addButton: "+ Add custom time slot",
   emptyTitle: "No custom time slots yet",
   emptySubtitle: "Without any, appointments keep using the generic hourly suggestion based on your Hours.",
+
+  typeLabel: "Type",
+  typeCustom: "Custom",
+  typeFrequency: "Frequency",
+  typeLockedNote: "You already use \"{type}\" slots. To switch type, delete the existing ones.",
+  startLabel: "Start time",
+  endLabel: "End time",
+  frequencyLabel: "Frequency",
+  frequencyOptionTemplate: "Every {n} min",
+  frequencyHint: "The end time itself is not offered as an appointment time.",
+  previewTemplate: "{n} times will be created: {list}",
+  previewInvalid: "The end time must be after the start time.",
+  frequencySummaryTemplate: "{start}–{end} · every {n} min",
 
   panelTitleNew: "New custom time slot",
   panelTitleEdit: "Edit custom time slot",
@@ -149,6 +198,10 @@ const en: CustomSlotsDictionary = {
     errInvalidDay: "Invalid day.",
     errInvalidProvider: "One of the chosen providers doesn't exist.",
     errLabelTooLong: "The name can't be longer than {max} characters.",
+    errMixedTypes: "You can only use one slot type at a time. You already have \"{type}\" slots; delete them to use another type.",
+    errInvalidRange: "The end time must be after the start time.",
+    errInvalidFrequency: "Invalid frequency.",
+    errInvalidType: "Invalid slot type.",
   },
 };
 

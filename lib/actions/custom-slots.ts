@@ -6,6 +6,11 @@ import { createClient } from "@/lib/supabase/server";
 import { getBusinessForUser } from "@/lib/business/data";
 import type { CustomTimeSlotRule } from "@/lib/custom-slots/data";
 import type { DayId } from "@/lib/onboarding/types";
+import {
+  FREQUENCY_OPTIONS,
+  generateFrequencyTimes,
+  type SlotType,
+} from "@/lib/custom-slots/frequency";
 
 export type CustomTimeSlotResult =
   | { ok: true; rule: CustomTimeSlotRule }
@@ -22,6 +27,10 @@ export interface CustomTimeSlotActionDict {
   errInvalidDay: string;
   errInvalidProvider: string;
   errLabelTooLong: string; // contains "{max}"
+  errMixedTypes: string; // contains "{type}" — the type the clinic already uses
+  errInvalidRange: string; // frequency: end must be after start, both HH:MM
+  errInvalidFrequency: string; // frequency: not one of FREQUENCY_OPTIONS
+  errInvalidType: string;
 }
 
 const FALLBACK: CustomTimeSlotActionDict = {
@@ -33,6 +42,10 @@ const FALLBACK: CustomTimeSlotActionDict = {
   errInvalidDay: "Día no válido.",
   errInvalidProvider: "Uno de los profesionales elegidos no existe.",
   errLabelTooLong: "El nombre no puede superar los {max} caracteres.",
+  errMixedTypes: "Solo puedes usar un tipo de horario a la vez. Ya tienes horarios de tipo \"{type}\"; elimínalos para usar otro tipo.",
+  errInvalidRange: "La hora de fin debe ser posterior a la de inicio.",
+  errInvalidFrequency: "Frecuencia no válida.",
+  errInvalidType: "Tipo de horario no válido.",
 };
 
 const LABEL_MAX = 80;
@@ -47,25 +60,95 @@ interface RulePayload {
   label: string;
   days: DayId[]; // empty = all
   teamMemberIds: string[]; // empty = all
+  slotType: SlotType;
+  // slotType "custom": the clinic-entered list.
   times: string[];
+  // slotType "frequency": `times` is ignored and generated from these.
+  rangeStart?: string;
+  rangeEnd?: string;
+  frequencyMin?: number;
   dict?: Partial<CustomTimeSlotActionDict>;
 }
+
+type Normalized = {
+  ok: true;
+  days: string[];
+  teamMemberIds: string[];
+  times: string[];
+  label: string | null;
+  slotType: SlotType;
+  rangeStart: string | null;
+  rangeEnd: string | null;
+  frequencyMin: number | null;
+};
 
 async function validateAndNormalize(
   businessId: string,
   payload: RulePayload,
-  d: CustomTimeSlotActionDict
-): Promise<{ ok: true; days: string[]; teamMemberIds: string[]; times: string[]; label: string | null } | { ok: false; error: string }> {
+  d: CustomTimeSlotActionDict,
+  // The rule being edited (excluded from the one-type-per-clinic check, so
+  // the only rule a clinic has can be switched to the other type).
+  ruleId?: string
+): Promise<Normalized | { ok: false; error: string }> {
   if (payload.label.length > LABEL_MAX) {
     return { ok: false, error: tmpl(d.errLabelTooLong, { max: String(LABEL_MAX) }) };
   }
   for (const day of payload.days) {
     if (!VALID_DAYS.includes(day)) return { ok: false, error: d.errInvalidDay };
   }
-  const times = payload.times.map((t) => t.trim()).filter(Boolean);
-  if (times.length === 0) return { ok: false, error: d.errTimesRequired };
-  for (const t of times) {
-    if (!TIME_RE.test(t)) return { ok: false, error: tmpl(d.errInvalidTime, { time: t }) };
+  if (payload.slotType !== "custom" && payload.slotType !== "frequency") {
+    return { ok: false, error: d.errInvalidType };
+  }
+
+  let times: string[];
+  let rangeStart: string | null = null;
+  let rangeEnd: string | null = null;
+  let frequencyMin: number | null = null;
+  if (payload.slotType === "frequency") {
+    const start = (payload.rangeStart ?? "").trim();
+    const end = (payload.rangeEnd ?? "").trim();
+    for (const t of [start, end]) {
+      if (!TIME_RE.test(t)) return { ok: false, error: tmpl(d.errInvalidTime, { time: t }) };
+    }
+    const freq = payload.frequencyMin;
+    if (typeof freq !== "number" || !(FREQUENCY_OPTIONS as readonly number[]).includes(freq)) {
+      return { ok: false, error: d.errInvalidFrequency };
+    }
+    const generated = generateFrequencyTimes(start, end, freq);
+    if (!generated || generated.length === 0) return { ok: false, error: d.errInvalidRange };
+    times = generated;
+    rangeStart = start;
+    rangeEnd = end;
+    frequencyMin = freq;
+  } else {
+    times = payload.times.map((t) => t.trim()).filter(Boolean);
+    if (times.length === 0) return { ok: false, error: d.errTimesRequired };
+    for (const t of times) {
+      if (!TIME_RE.test(t)) return { ok: false, error: tmpl(d.errInvalidTime, { time: t }) };
+    }
+  }
+
+  // One type per clinic: if the business already has rules (other than the
+  // one being edited), the new/edited rule must be the same type.
+  {
+    const supabase = await createClient();
+    const { data: existing } = await supabase
+      .from("kalendar_custom_time_slots")
+      // "*" — tolerates slot_type not existing yet before schema_subset_042.
+      .select("*")
+      .eq("business_id", businessId);
+    const others = ((existing as { id: string; slot_type?: string | null }[] | null) ?? []).filter(
+      (r) => r.id !== ruleId
+    );
+    if (others.length > 0) {
+      const existingType: SlotType = others[0].slot_type === "frequency" ? "frequency" : "custom";
+      if (existingType !== payload.slotType) {
+        return {
+          ok: false,
+          error: tmpl(d.errMixedTypes, { type: existingType === "frequency" ? "Frecuencia" : "Personalizado" }),
+        };
+      }
+    }
   }
 
   if (payload.teamMemberIds.length > 0) {
@@ -87,6 +170,10 @@ async function validateAndNormalize(
     teamMemberIds: [...new Set(payload.teamMemberIds)],
     times,
     label: payload.label.trim() || null,
+    slotType: payload.slotType,
+    rangeStart,
+    rangeEnd,
+    frequencyMin,
   };
 }
 
@@ -97,6 +184,10 @@ function toRule(row: {
   days: string[] | null;
   team_member_ids: string[] | null;
   times: string[] | null;
+  slot_type?: string | null;
+  range_start?: string | null;
+  range_end?: string | null;
+  frequency_min?: number | null;
   sort_order: number;
   created_at: string;
 }): CustomTimeSlotRule {
@@ -107,12 +198,16 @@ function toRule(row: {
     days: (row.days ?? []) as DayId[],
     teamMemberIds: row.team_member_ids ?? [],
     times: row.times ?? [],
+    slotType: row.slot_type === "frequency" ? "frequency" : "custom",
+    rangeStart: row.range_start ?? null,
+    rangeEnd: row.range_end ?? null,
+    frequencyMin: row.frequency_min ?? null,
     sortOrder: row.sort_order,
     createdAt: row.created_at,
   };
 }
 
-const RULE_COLUMNS = "id, business_id, label, days, team_member_ids, times, sort_order, created_at";
+const RULE_COLUMNS = "*";
 
 export const createCustomTimeSlotRule = authedAction(
   async (session, payload: RulePayload): Promise<CustomTimeSlotResult> => {
@@ -132,6 +227,10 @@ export const createCustomTimeSlotRule = authedAction(
         days: validated.days,
         team_member_ids: validated.teamMemberIds,
         times: validated.times,
+        slot_type: validated.slotType,
+        range_start: validated.rangeStart,
+        range_end: validated.rangeEnd,
+        frequency_min: validated.frequencyMin,
       })
       .select(RULE_COLUMNS)
       .single();
@@ -149,7 +248,7 @@ export const updateCustomTimeSlotRule = authedAction(
     const business = await getBusinessForUser(session.user.id);
     if (!business) return { ok: false, error: d.errNoBusiness };
 
-    const validated = await validateAndNormalize(business.id, payload, d);
+    const validated = await validateAndNormalize(business.id, payload, d, payload.ruleId);
     if (!validated.ok) return validated;
 
     const supabase = await createClient();
@@ -160,6 +259,10 @@ export const updateCustomTimeSlotRule = authedAction(
         days: validated.days,
         team_member_ids: validated.teamMemberIds,
         times: validated.times,
+        slot_type: validated.slotType,
+        range_start: validated.rangeStart,
+        range_end: validated.rangeEnd,
+        frequency_min: validated.frequencyMin,
       })
       .eq("id", payload.ruleId)
       .eq("business_id", business.id)
