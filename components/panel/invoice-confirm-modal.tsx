@@ -425,7 +425,7 @@ export function InvoiceConfirmModal({
               <>
                 {/* Inline PDF viewers are unreliable on phones/tablets: there, a link opens it in a tab instead. */}
                 <iframe
-                  src={previewUrl}
+                  src={`${previewUrl}#navpanes=0&view=FitH`}
                   title={dict.previewTitle}
                   className="hidden min-h-0 w-full flex-1 rounded-lg border border-line bg-surface-2 lg:block"
                 />

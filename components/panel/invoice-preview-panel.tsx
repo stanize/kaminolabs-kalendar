@@ -43,7 +43,10 @@ export function InvoicePreviewPanel({
     setTimeout(onClose, 200);
   }
 
-  const src = `/api/invoices/preview${memberId ? `?member=${encodeURIComponent(memberId)}` : ""}`;
+  // The #fragment asks the browser's PDF viewer to hide its thumbnail
+  // sidebar and fit the page to the width, so the invoice uses the whole
+  // panel instead of a narrow strip.
+  const src = `/api/invoices/preview${memberId ? `?member=${encodeURIComponent(memberId)}` : ""}#navpanes=0&view=FitH`;
 
   return (
     <div className="fixed inset-y-0 left-0 right-0 z-50 md:left-[240px]">
@@ -53,7 +56,7 @@ export function InvoicePreviewPanel({
         aria-hidden
       />
       <div
-        className={`absolute inset-y-0 right-0 flex h-full w-full flex-col bg-surface p-5 shadow-2xl transition-transform duration-200 ease-out sm:w-[min(760px,90%)] sm:p-8 ${
+        className={`absolute inset-y-0 right-0 flex h-full w-full flex-col bg-surface p-5 shadow-2xl transition-transform duration-200 ease-out sm:p-6 ${
           visible ? "translate-x-0" : "translate-x-full"
         }`}
       >
