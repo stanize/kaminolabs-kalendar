@@ -464,7 +464,7 @@ Criteria:
 - CODE IMPLEMENTED (2026-11-19): PENDING LIVE TESTING.
 
 ## Step: invoice-edit-before-generate
-Status: not_started
+Status: in_progress
 Criteria:
 - DESIGN (2026-11-19, Arun): when generating an invoice from an appointment
   (right after Cobrar, from Facturas > Pendientes, or from a client's
@@ -491,6 +491,20 @@ Criteria:
 - Needs a migration (`schema_subset_044.sql`): `note`, `original_amount`,
   `amount_modified` on `kalendar_invoices`. Reads of invoices must tolerate
   the columns not existing yet (select "*").
+- CODE IMPLEMENTED (2026-11-19), typechecked, linted, built: PENDING LIVE
+  TESTING, and `schema_subset_044.sql` must be run for a note or a modified
+  amount to be saved (a plain invoice works without it, and reads tolerate
+  the columns not existing yet). Implementation:
+  `components/panel/invoice-confirm-modal.tsx` (rewritten: form plus live
+  preview, one component for all three entry points),
+  `app/api/invoices/draft-preview/route.ts` (POST, session-authenticated,
+  returns a "BORRADOR" PDF of the real appointment plus the typed edits),
+  `lib/invoices/preview.ts`, `lib/invoices/data.ts` (`createInvoiceForBooking`
+  takes name/amount/note; `getProviderForBooking`),
+  `lib/actions/invoices.ts` (`getInvoiceBookingDefaults`, validation of the
+  new fields), template "OBSERVACIONES" box, and the internal "Importe
+  modificado" label on the Facturas page rows. Invoice reads now use select
+  "*" and default the new fields.
 
 ## Step: invoice-regenerate
 Status: not_started

@@ -43,4 +43,7 @@ export interface InvoiceTemplateProps {
   // the content (e.g. "EJEMPLO") so a preview can't pass for a real invoice.
   // Absent on every real invoice.
   watermark?: string;
+  // invoice-edit-before-generate: optional free text printed in an
+  // "OBSERVACIONES" box. Absent/blank = no box.
+  note?: string | null;
 }

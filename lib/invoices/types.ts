@@ -68,6 +68,18 @@ export interface InvoiceRow {
   // before this feature — lib/invoices/render.ts computes it on the fly
   // in that case rather than requiring a backfill.
   verification_url: string | null;
+  // schema_subset_044.sql (invoice-edit-before-generate / invoice-regenerate).
+  // Defaulted by normalizeInvoiceRow, so every row has them even before the
+  // migration has run.
+  /** Free text printed on the invoice ("Observaciones"). */
+  note: string | null;
+  /** The appointment's service price at generation, set only when the clinic changed the amount. */
+  original_amount: number | null;
+  /** Internal marker (not printed on the PDF): the amount differs from the service price. */
+  amount_modified: boolean;
+  /** 1 for the first issue, +1 on every regeneration. */
+  version: number;
+  regenerated_at: string | null;
 }
 
 /** "2026-0001" — the display/content format, per sequential-numbering-allocation. */

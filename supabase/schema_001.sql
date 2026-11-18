@@ -27,6 +27,7 @@ create extension if not exists "pgcrypto";
 -- Children before parents.
 -- ----------------------------------------------------------------------------
 drop table if exists public.kalendar_invoice_concepts              cascade;
+drop table if exists public.kalendar_invoice_versions            cascade;
 drop table if exists public.kalendar_invoices                     cascade;
 drop table if exists public.kalendar_rate_limit_hits              cascade;
 drop table if exists public.kalendar_stripe_webhook_events       cascade;
@@ -1137,7 +1138,17 @@ create table public.kalendar_invoices (
   -- generation time so a re-download/re-send reproduces the exact same
   -- QR. Nullable — a legacy row computes it on the fly at render time
   -- instead (see lib/invoices/render.ts).
-  verification_url  text
+  verification_url  text,
+  -- schema_subset_044.sql (pdf-invoicing.md: invoice-edit-before-generate /
+  -- invoice-regenerate): free-text note printed on the invoice; the original
+  -- service price when the clinic changed the amount (internal marker, not
+  -- printed); and the current version number (superseded versions live in
+  -- kalendar_invoice_versions).
+  note            text,
+  original_amount numeric(10, 2),
+  amount_modified boolean     not null default false,
+  version         integer     not null default 1,
+  regenerated_at  timestamptz
 );
 
 -- Not globally unique — only unique within a business + year (per-business,
@@ -1149,6 +1160,39 @@ create index kalendar_invoices_booking_id_idx  on public.kalendar_invoices (book
 create index kalendar_invoices_access_token_idx on public.kalendar_invoices (access_token);
 
 alter table public.kalendar_invoices enable row level security;
+
+-- ----------------------------------------------------------------------------
+-- kalendar_invoice_versions (schema_subset_044.sql, pdf-invoicing.md,
+-- invoice-regenerate): every SUPERSEDED version of an invoice. The invoice row
+-- is always the current version; "Regenerar" copies its previous state here
+-- before overwriting it, keeping the same invoice number.
+-- ----------------------------------------------------------------------------
+create table public.kalendar_invoice_versions (
+  id               uuid        primary key default gen_random_uuid(),
+  invoice_id       uuid        not null references public.kalendar_invoices (id) on delete cascade,
+  business_id      uuid        not null references public.kalendar_businesses (id) on delete cascade,
+  version          integer     not null,
+  client_name      text        not null,
+  client_email     text        not null,
+  client_dni       text        not null default '',
+  client_address   text        not null default '',
+  service_name     text        not null,
+  payment_method   text,
+  amount           numeric(10, 2) not null default 0,
+  original_amount  numeric(10, 2),
+  amount_modified  boolean     not null default false,
+  note             text,
+  business_snapshot jsonb      not null default '{}'::jsonb,
+  verification_url text,
+  issued_at        timestamptz not null,
+  created_at       timestamptz not null default now(),
+  unique (invoice_id, version)
+);
+
+create index kalendar_invoice_versions_invoice_id_idx  on public.kalendar_invoice_versions (invoice_id);
+create index kalendar_invoice_versions_business_id_idx on public.kalendar_invoice_versions (business_id);
+
+alter table public.kalendar_invoice_versions enable row level security;
 
 -- ----------------------------------------------------------------------------
 -- kalendar_invoice_concepts (schema_subset_029.sql, pdf-invoicing.md)

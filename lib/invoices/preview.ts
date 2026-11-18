@@ -26,30 +26,85 @@ export interface PreviewProvider {
   signature_url: string | null;
 }
 
-export async function renderInvoicePreviewPdf(business: Business, provider: PreviewProvider | null): Promise<Buffer> {
+interface PreviewContent {
+  client: { name: string; dni: string; address: string };
+  serviceName: string;
+  amount: number;
+  note: string | null;
+  /** Printed as the invoice number and as the watermark, e.g. "EJEMPLO" / "BORRADOR". */
+  word: string;
+}
+
+async function renderPreviewDocument(
+  business: Business,
+  provider: PreviewProvider | null,
+  content: PreviewContent
+): Promise<Buffer> {
   const template = getInvoiceTemplate(business.invoice_template_id);
   const snapshot = buildBusinessSnapshot(business, provider);
 
-  // A placeholder URL — the preview invoice does not exist, so the QR
-  // points at a made-up id (it will not verify anything).
+  // A placeholder URL — a preview invoice does not exist, so the QR points
+  // at a made-up id (it will not verify anything).
   const verificationUrl = buildVerificationUrl("ejemplo");
   const qrDataUri = await generateQrDataUri(verificationUrl);
 
   const props: InvoiceTemplateProps = {
     business: templateBusinessFromSnapshot(snapshot),
-    client: { name: "Paciente Ejemplo", dni: "00000000T", address: "Calle Ejemplo 1, 28001 Madrid" },
-    invoiceNumberFormatted: PREVIEW_WORD,
+    client: content.client,
+    invoiceNumberFormatted: content.word,
     issueDate: new Intl.DateTimeFormat(INTL_LOCALE, { timeZone: TZ, day: "numeric", month: "long", year: "numeric" }).format(
       new Date()
     ),
-    serviceName: "Sesión de ejemplo",
-    amount: 50,
+    serviceName: content.serviceName,
+    amount: content.amount,
     paid: true,
     verificationUrl,
     qrDataUri,
-    watermark: PREVIEW_WORD,
+    watermark: content.word,
+    note: content.note,
   };
 
   const element = createElement(template.component, props) as unknown as ReactElement<DocumentProps>;
   return renderToBuffer(element);
+}
+
+/** Settings > Facturación's "Vista previa": made-up client and service. */
+export async function renderInvoicePreviewPdf(business: Business, provider: PreviewProvider | null): Promise<Buffer> {
+  return renderPreviewDocument(business, provider, {
+    client: { name: "Paciente Ejemplo", dni: "00000000T", address: "Calle Ejemplo 1, 28001 Madrid" },
+    serviceName: "Sesión de ejemplo",
+    amount: 50,
+    note: null,
+    word: PREVIEW_WORD,
+  });
+}
+
+export const DRAFT_WORD = "BORRADOR";
+
+export interface DraftInvoiceContent {
+  clientName: string;
+  clientDni: string;
+  clientAddress: string;
+  /** The final line-item text (service name, plus the optional extra line). */
+  serviceName: string;
+  amount: number;
+  note: string | null;
+}
+
+/**
+ * invoice-edit-before-generate: the REAL appointment's data plus whatever the
+ * clinic has typed so far, marked "BORRADOR" — nothing is created or numbered.
+ */
+export async function renderInvoiceDraftPdf(
+  business: Business,
+  provider: PreviewProvider | null,
+  draft: DraftInvoiceContent
+): Promise<Buffer> {
+  return renderPreviewDocument(business, provider, {
+    client: { name: draft.clientName, dni: draft.clientDni, address: draft.clientAddress },
+    serviceName: draft.serviceName,
+    amount: draft.amount,
+    note: draft.note,
+    word: DRAFT_WORD,
+  });
 }

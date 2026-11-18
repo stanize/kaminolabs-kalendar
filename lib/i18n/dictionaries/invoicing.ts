@@ -67,6 +67,18 @@ export interface InvoicingDictionary {
     dniPlaceholder: string;
     addressLabel: string;
     addressPlaceholder: string;
+    // invoice-edit-before-generate: editable fields + live preview.
+    nameLabel: string;
+    amountLabel: string;
+    amountModifiedHint: string; // "{price}" = the appointment's service price
+    noteLabel: string;
+    notePlaceholder: string;
+    previewTitle: string;
+    previewUpdating: string;
+    previewError: string;
+    previewOpenTab: string;
+    errNameRequired: string;
+    errAmountInvalid: string;
     sending: string;
     errEmailRequired: string;
     errInvalidEmail: string;
@@ -100,6 +112,10 @@ export interface InvoicingDictionary {
     download: string;
     resend: string;
     resending: string;
+    // invoice-edit-before-generate: internal marker on an invoice whose amount
+    // was changed from the service price (never printed on the PDF).
+    amountModified: string;
+    amountModifiedTitle: string; // "{price}" = the service price
     noResults: string;
     paymentMethodCash: string;
     paymentMethodCard: string;
@@ -177,6 +193,17 @@ const es: InvoicingDictionary = {
     dniPlaceholder: "",
     addressLabel: "Domicilio del cliente",
     addressPlaceholder: "",
+    nameLabel: "Nombre del cliente",
+    amountLabel: "Importe (€)",
+    amountModifiedHint: "El importe es distinto del precio del servicio ({price} €). Se guardará una marca interna en la factura; no aparece en el PDF.",
+    noteLabel: "Observaciones (opcional)",
+    notePlaceholder: "Texto que aparecerá en la factura",
+    previewTitle: "Vista previa",
+    previewUpdating: "Actualizando…",
+    previewError: "No se pudo generar la vista previa.",
+    previewOpenTab: "Abrir vista previa en otra pestaña",
+    errNameRequired: "Indica el nombre del cliente.",
+    errAmountInvalid: "Indica un importe válido.",
     sending: "Enviando…",
     errEmailRequired: "Indica un email para enviar la factura.",
     errInvalidEmail: "Indica un email válido.",
@@ -207,6 +234,8 @@ const es: InvoicingDictionary = {
     download: "Descargar",
     resend: "Reenviar",
     resending: "Enviando…",
+    amountModified: "Importe modificado",
+    amountModifiedTitle: "El importe es distinto del precio del servicio ({price} €). Esta marca es interna: no aparece en el PDF.",
     noResults: "Ninguna factura coincide con los filtros.",
     paymentMethodCash: "Efectivo",
     paymentMethodCard: "Tarjeta",
@@ -278,6 +307,17 @@ const en: InvoicingDictionary = {
     dniPlaceholder: "",
     addressLabel: "Client's address",
     addressPlaceholder: "",
+    nameLabel: "Client name",
+    amountLabel: "Amount (€)",
+    amountModifiedHint: "The amount differs from the service price ({price} €). An internal marker is saved on the invoice; it does not appear on the PDF.",
+    noteLabel: "Notes (optional)",
+    notePlaceholder: "Text that will appear on the invoice",
+    previewTitle: "Preview",
+    previewUpdating: "Updating…",
+    previewError: "Couldn't generate the preview.",
+    previewOpenTab: "Open preview in another tab",
+    errNameRequired: "Enter the client's name.",
+    errAmountInvalid: "Enter a valid amount.",
     sending: "Sending…",
     errEmailRequired: "Enter an email to send the invoice.",
     errInvalidEmail: "Enter a valid email.",
@@ -308,6 +348,8 @@ const en: InvoicingDictionary = {
     download: "Download",
     resend: "Resend",
     resending: "Sending…",
+    amountModified: "Amount modified",
+    amountModifiedTitle: "The amount differs from the service price ({price} €). This marker is internal: it does not appear on the PDF.",
     noResults: "No invoices match the filters.",
     paymentMethodCash: "Cash",
     paymentMethodCard: "Card",

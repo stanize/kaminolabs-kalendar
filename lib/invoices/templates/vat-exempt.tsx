@@ -60,6 +60,9 @@ const styles = StyleSheet.create({
   grandTotalLabel: { fontSize: 11, fontWeight: 700, color: "#111827" },
   grandTotalValue: { fontSize: 13, fontWeight: 700, color: "#4338ca" },
 
+  noteBox: { backgroundColor: "#f8fafc", borderRadius: 10, padding: 10, marginTop: 14, fontSize: 9, color: "#475569" },
+  noteBoxLabel: { fontSize: 8, fontWeight: 700, color: "#94a3b8", letterSpacing: 0.5, marginBottom: 4 },
+
   signatureDivider: { marginTop: 48, borderTopWidth: 1, borderTopColor: "#e5e7eb" },
   signatureArea: {
     flexDirection: "row",
@@ -108,19 +111,32 @@ const styles = StyleSheet.create({
   qrCaption: { fontSize: 7, fontWeight: 700, color: "#475569", marginBottom: 4 },
 });
 
+// Sizes the preview watermark so a longer word ("BORRADOR") still fits the
+// page, and keeps it horizontally centered (A4 is ~595pt wide; a bold glyph
+// is roughly 0.68 of the font size wide).
+function watermarkSize(word: string): { fontSize: number; left: number } {
+  const fontSize = Math.min(100, Math.floor(430 / (word.length * 0.68)));
+  const width = word.length * 0.68 * fontSize;
+  return { fontSize, left: Math.max(0, (595 - width) / 2) };
+}
+
 function fullAddressLine(b: InvoiceTemplateProps["business"]): string {
   const street = `${b.addressStreet} ${b.addressNumber}${b.addressAdditional ? `, ${b.addressAdditional}` : ""}`;
   return `${street} · ${b.addressPostalCode} ${b.city}, ${b.addressProvince}`;
 }
 
 export function VatExemptInvoice(props: InvoiceTemplateProps) {
-  const { business, client, invoiceNumberFormatted, issueDate, serviceName, amount, paid, qrDataUri, watermark } = props;
+  const { business, client, invoiceNumberFormatted, issueDate, serviceName, amount, paid, qrDataUri, watermark, note } = props;
   const amountFormatted = amount.toFixed(2).replace(".", ",");
 
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        {watermark && <Text style={styles.watermark} fixed>{watermark}</Text>}
+        {watermark && (
+          <Text style={[styles.watermark, watermarkSize(watermark)]} fixed>
+            {watermark}
+          </Text>
+        )}
         <View style={styles.headerRow}>
           <View style={styles.headerLeft}>
             {business.isSolo ? (
@@ -193,6 +209,13 @@ export function VatExemptInvoice(props: InvoiceTemplateProps) {
             </View>
           </View>
         </View>
+
+        {note && note.trim() && (
+          <View style={styles.noteBox}>
+            <Text style={styles.noteBoxLabel}>OBSERVACIONES</Text>
+            <Text>{note.trim()}</Text>
+          </View>
+        )}
 
         <View style={styles.signatureDivider} />
         <View style={styles.signatureArea}>

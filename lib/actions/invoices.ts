@@ -23,6 +23,9 @@ export interface InvoiceActionDict {
   errEmailRequired: string;
   errInvalidEmail: string;
   errClientIdentityRequired: string;
+  errNameRequired: string;
+  errAmountInvalid: string;
+  errNoteTooLong: string;
 }
 
 const FALLBACK: InvoiceActionDict = {
@@ -34,7 +37,14 @@ const FALLBACK: InvoiceActionDict = {
   errEmailRequired: "Indica un email para enviar la factura.",
   errInvalidEmail: "Indica un email válido.",
   errClientIdentityRequired: "Indica el DNI y el domicilio del cliente.",
+  errNameRequired: "Indica el nombre del cliente.",
+  errAmountInvalid: "Indica un importe válido.",
+  errNoteTooLong: "Las observaciones no pueden superar los 300 caracteres.",
 };
+
+const NOTE_MAX = 300;
+const NAME_MAX = 120;
+const AMOUNT_MAX = 99999.99;
 
 function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -44,6 +54,26 @@ function pdfUrlFor(invoice: InvoiceRow): string {
   const base = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/+$/, "");
   return `${base}/api/invoices/${invoice.id}/pdf?token=${invoice.access_token}`;
 }
+
+/**
+ * invoice-edit-before-generate: the appointment's own client name and service
+ * price, which pre-fill the generate-invoice panel's editable fields. Scoped
+ * to the caller's business.
+ */
+export const getInvoiceBookingDefaults = authedAction(
+  async (session, bookingId: string): Promise<{ clientName: string; servicePrice: number } | null> => {
+    const business = await getBusinessForUser(session.user.id);
+    if (!business) return null;
+    const supabase = await createClient();
+    const { data } = await supabase
+      .from("kalendar_bookings")
+      .select("client_name, service_price")
+      .eq("id", bookingId)
+      .eq("business_id", business.id)
+      .maybeSingle();
+    return data ? { clientName: data.client_name as string, servicePrice: Number(data.service_price) } : null;
+  }
+);
 
 /** Whether an invoice already exists for this booking — invoice-on-payment-trigger's one-invoice-per-booking gate. */
 export const checkExistingInvoiceForBooking = authedAction(
@@ -103,6 +133,12 @@ export const createAndSendInvoice = authedAction(
       // with the booking's service name).
       concept?: string;
       extraConcept?: string;
+      // invoice-edit-before-generate: edited in the panel; apply to this
+      // invoice only. `amount` differing from the appointment's service
+      // price is recorded as an internal marker (never printed).
+      clientName?: string;
+      amount?: number;
+      note?: string;
     },
     dict?: Partial<InvoiceActionDict>
   ): Promise<CreateAndSendInvoiceResult> => {
@@ -116,6 +152,20 @@ export const createAndSendInvoice = authedAction(
       return { ok: false, error: t.errInvalidEmail };
     }
 
+    if (input.clientName !== undefined && (!input.clientName.trim() || input.clientName.trim().length > NAME_MAX)) {
+      return { ok: false, error: t.errNameRequired };
+    }
+    let amount: number | undefined;
+    if (input.amount !== undefined) {
+      if (typeof input.amount !== "number" || !Number.isFinite(input.amount) || input.amount < 0 || input.amount > AMOUNT_MAX) {
+        return { ok: false, error: t.errAmountInvalid };
+      }
+      amount = Math.round(input.amount * 100) / 100;
+    }
+    if (input.note !== undefined && input.note.trim().length > NOTE_MAX) {
+      return { ok: false, error: t.errNoteTooLong };
+    }
+
     const extraConcept = input.extraConcept?.trim();
     if (extraConcept) await findOrCreateInvoiceConcept(business.id, extraConcept);
     const concept = input.concept?.trim();
@@ -126,6 +176,9 @@ export const createAndSendInvoice = authedAction(
       clientDni: input.clientDni,
       clientAddress: input.clientAddress,
       concept,
+      clientName: input.clientName,
+      amount,
+      note: input.note,
     });
     if (!created.ok) {
       const error =

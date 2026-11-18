@@ -69,6 +69,7 @@ export async function renderInvoicePdf(invoice: InvoiceRow, paid: boolean): Prom
     paid,
     verificationUrl,
     qrDataUri,
+    note: invoice.note,
   };
 
   // Our template components render a <Document> internally, but TS only

@@ -9,8 +9,12 @@ import { buildVerificationUrl } from "@/lib/invoices/qr";
 export type { InvoiceRow } from "@/lib/invoices/types";
 export { formatInvoiceNumber } from "@/lib/invoices/types";
 
-const INVOICE_COLUMNS =
-  "id, business_id, booking_id, invoice_number, issue_year, client_name, client_email, client_dni, client_address, service_name, payment_method, amount, access_token, sent_at, created_at, business_snapshot, verification_url";
+// "*" rather than a column list: tolerates the columns added by
+// schema_subset_044.sql (note, original_amount, amount_modified, version,
+// regenerated_at) not existing yet during the window between a deploy and the
+// live migration — normalizeInvoiceRow defaults them, so the Facturas page
+// keeps working either way.
+const INVOICE_COLUMNS = "*";
 
 /**
  * business-fields-snapshot: freezes everything the PDF template reads, at
@@ -59,12 +63,47 @@ export function buildBusinessSnapshot(
   };
 }
 
+/**
+ * The team member whose title/colegiada/signature an invoice for this
+ * booking shows (the booking's assigned provider), or null. Scoped to the
+ * business so a forged id can't read another clinic's member.
+ */
+export async function getProviderForBooking(
+  businessId: string,
+  teamMemberId: string | null
+): Promise<{
+  name: string;
+  professional_dni: string | null;
+  professional_college_number: string | null;
+  professional_title: string | null;
+  signature_url: string | null;
+} | null> {
+  if (!teamMemberId) return null;
+  const supabase = await createClient();
+  const { data: member } = await supabase
+    .from("kalendar_team_members")
+    .select("name, professional_dni, professional_college_number, professional_title, signature_url")
+    .eq("id", teamMemberId)
+    .eq("business_id", businessId)
+    .maybeSingle();
+  return member ?? null;
+}
+
 /** Coalesces legacy rows (client_dni/client_address added later, nullable
  * on the live table — see schema_subset_028.sql) to "" so InvoiceRow's
  * non-null string type holds for every row regardless of when it was
  * created. */
 function normalizeInvoiceRow(row: InvoiceRow): InvoiceRow {
-  return { ...row, client_dni: row.client_dni ?? "", client_address: row.client_address ?? "" };
+  return {
+    ...row,
+    client_dni: row.client_dni ?? "",
+    client_address: row.client_address ?? "",
+    note: row.note ?? null,
+    original_amount: row.original_amount ?? null,
+    amount_modified: row.amount_modified ?? false,
+    version: row.version ?? 1,
+    regenerated_at: row.regenerated_at ?? null,
+  };
 }
 
 /**
@@ -192,6 +231,13 @@ export interface CreateInvoiceInput {
   // invoice's stored line-item description. Falls back to the booking's
   // own service name when not provided.
   concept?: string;
+  // invoice-edit-before-generate: edited in the generate-invoice panel.
+  // These apply to THIS invoice only — never written back to the booking,
+  // the service or (name/amount/note) the client's profile.
+  clientName?: string;
+  /** Overrides the appointment's service price. Differing from it marks the invoice amount_modified. */
+  amount?: number;
+  note?: string;
 }
 
 export type CreateInvoiceResult =
@@ -226,22 +272,7 @@ export async function createInvoiceForBooking(input: CreateInvoiceInput): Promis
 
   if (!booking) return { ok: false, error: "no_booking" };
 
-  let provider: {
-    name: string;
-    professional_dni: string | null;
-    professional_college_number: string | null;
-    professional_title: string | null;
-    signature_url: string | null;
-  } | null = null;
-  if (booking.team_member_id) {
-    const { data: member } = await supabase
-      .from("kalendar_team_members")
-      .select("name, professional_dni, professional_college_number, professional_title, signature_url")
-      .eq("id", booking.team_member_id)
-      .eq("business_id", businessId)
-      .maybeSingle();
-    provider = member ?? null;
-  }
+  const provider = await getProviderForBooking(businessId, booking.team_member_id);
 
   const existing = await getInvoiceForBooking(businessId, input.bookingId);
   if (existing) return { ok: false, error: "already_invoiced" };
@@ -290,6 +321,15 @@ export async function createInvoiceForBooking(input: CreateInvoiceInput): Promis
   });
   if (numberError || !numberData) return { ok: false, error: "create_failed" };
 
+  // invoice-edit-before-generate: the final billed name/amount. The amount
+  // differing from the appointment's service price is recorded as an
+  // internal marker (original_amount + amount_modified), never printed.
+  const finalName = input.clientName?.trim() || booking.client_name;
+  const servicePrice = Number(booking.service_price);
+  const finalAmount = input.amount ?? servicePrice;
+  const amountModified = Math.abs(finalAmount - servicePrice) >= 0.005;
+  const note = input.note?.trim() || null;
+
   const accessToken = randomBytes(24).toString("base64url");
   // invoice-qr-verification: the id is generated here (not left to the
   // column default) so the verification_url — and the QR encoding it —
@@ -305,16 +345,20 @@ export async function createInvoiceForBooking(input: CreateInvoiceInput): Promis
       booking_id: booking.id,
       invoice_number: numberData,
       issue_year: issueYear,
-      client_name: booking.client_name,
+      client_name: finalName,
       client_email: booking.client_email,
       client_dni: finalDni,
       client_address: finalAddress,
       service_name: input.concept?.trim() || booking.service_name,
       payment_method: booking.payment_method,
-      amount: booking.service_price,
+      amount: finalAmount,
       access_token: accessToken,
       business_snapshot: buildBusinessSnapshot(input.business, provider),
       verification_url: buildVerificationUrl(id),
+      // Only written when used, so a plain invoice never touches the new
+      // columns (works before schema_subset_044.sql has run).
+      ...(note ? { note } : {}),
+      ...(amountModified ? { original_amount: servicePrice, amount_modified: true } : {}),
     })
     .select(INVOICE_COLUMNS)
     .single();

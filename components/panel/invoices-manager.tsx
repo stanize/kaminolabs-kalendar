@@ -280,6 +280,14 @@ function InvoiceRowItem({
         <p className="truncate text-[12.5px] text-ink-soft">
           {invoice.service_name} · {methodLabel(invoice.payment_method)} · {invoice.amount.toFixed(2)} €
           {invoice.sent_at && ` · ${new Date(invoice.sent_at).toLocaleDateString()}`}
+          {invoice.amount_modified && (
+            <span
+              title={dict.amountModifiedTitle.replace("{price}", (invoice.original_amount ?? 0).toFixed(2).replace(".", ","))}
+              className="ml-2 inline-block rounded-full border border-amber-300 bg-amber-50 px-2 py-px text-[11px] font-medium text-amber-700"
+            >
+              {dict.amountModified}
+            </span>
+          )}
         </p>
         {error && <p className="text-[12px] text-error">{error}</p>}
       </div>
