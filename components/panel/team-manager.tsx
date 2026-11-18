@@ -524,14 +524,9 @@ function MemberPanel({
           <div className="mb-3 rounded-lg border border-error bg-error-weak px-3 py-2 text-[12.5px] text-error">{error}</div>
         )}
 
-        <div className="mb-4 rounded-lg border border-line bg-surface-2/50 px-3 py-2.5">
-          <p className="text-[12.5px] font-medium text-ink">{m.professionalDataTitle}</p>
-          <p className="text-[11.5px] text-ink-soft">{m.professionalDataSubtitle}</p>
-        </div>
-
         <div className="grid gap-3 sm:grid-cols-2">
           <LabeledField
-            label={m.nameLabel}
+            label={`${m.nameLabel} *`}
             value={name}
             onChange={setName}
             placeholder={m.namePlaceholder}
@@ -547,7 +542,7 @@ function MemberPanel({
             inputClassName={inputBase}
           />
           <LabeledField
-            label={m.titleLabel}
+            label={`${m.titleLabel} *`}
             value={professionalTitle}
             onChange={setProfessionalTitle}
             placeholder={m.titlePlaceholder}
@@ -561,7 +556,7 @@ function MemberPanel({
             inputClassName={inputBase}
           />
           <LabeledField
-            label={m.collegeNumberLabel}
+            label={`${m.collegeNumberLabel} *`}
             value={professionalCollegeNumber}
             onChange={setProfessionalCollegeNumber}
             placeholder={m.collegeNumberPlaceholder}
@@ -571,7 +566,7 @@ function MemberPanel({
 
         {row && (
           <div className="mt-5 rounded-lg border border-line bg-surface-2/50 p-3.5">
-            <p className="text-[12.5px] font-medium text-ink">{m.signatureSectionTitle}</p>
+            <p className="text-[12.5px] font-medium text-ink">{m.signatureSectionTitle} *</p>
             <p className="text-[11.5px] text-ink-soft">{m.signatureSectionSubtitle}</p>
 
             {drawingSignature ? (
@@ -628,6 +623,8 @@ function MemberPanel({
             )}
           </div>
         )}
+
+        <p className="mt-4 text-[11.5px] text-ink-soft">{m.invoiceFieldsNote}</p>
 
         <div className="mt-5 flex justify-end gap-2">
           <button

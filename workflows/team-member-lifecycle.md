@@ -93,3 +93,12 @@ instead (grayed row + badge + Reactivar); a disabled provider doesn't
 appear in the public booking page's provider step or the clinic
 calendar's "+ cita" picker, but their existing bookings/history/invoices
 are unaffected and still display correctly.
+
+## Invoice-fields markers (2026-11-18, Arun)
+In the Equipo edit/new-member panel, the fields printed on the invoice are
+marked with an asterisk: **Nombre ***, **Título profesional ***,
+**Nº de colegiada/o *** and **Firma ***, with a footnote at the bottom
+("* Estos campos aparecerán en la factura."). DNI and Rol are not printed on
+the invoice and carry no asterisk. The old "Datos del profesional" info box
+at the top of the panel was removed. Verified against
+`lib/invoices/templates/vat-exempt.tsx`. Typechecked/linted; PENDING TESTING.
