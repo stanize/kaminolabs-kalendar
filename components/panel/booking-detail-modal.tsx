@@ -788,7 +788,7 @@ export function BookingDetailModal({
               onClick={() => setNewApptOpen(true)}
               className="rounded-lg px-2.5 py-1.5 text-[12.5px] font-semibold text-brand hover:bg-brand-weak"
             >
-              + {d.newApptButton}
+              {d.newApptButton}
             </button>
             <button
               onClick={guardedClose}
