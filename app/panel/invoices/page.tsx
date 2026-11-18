@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { requireSession } from "@/lib/auth-session";
 import { getBusinessForUser } from "@/lib/business/data";
-import { getInvoicesForBusiness, getPendingInvoiceBookings } from "@/lib/invoices/data";
+import { getInvoicesForBusiness, getInvoiceVersionsForBusiness, getPendingInvoiceBookings } from "@/lib/invoices/data";
 import { getLocale } from "@/lib/i18n/server";
 import { getInvoicingDictionary } from "@/lib/i18n/dictionaries/invoicing";
 import { InvoicesManager } from "@/components/panel/invoices-manager";
@@ -11,10 +11,11 @@ export default async function InvoicesPage() {
   const business = await getBusinessForUser(session.user.id);
   if (!business) redirect("/panel/business?from=home");
 
-  const [locale, invoices, pendingBookings] = await Promise.all([
+  const [locale, invoices, pendingBookings, versionsByInvoice] = await Promise.all([
     getLocale(),
     getInvoicesForBusiness(business.id),
     getPendingInvoiceBookings(business.id),
+    getInvoiceVersionsForBusiness(business.id),
   ]);
   const dict = getInvoicingDictionary(locale);
 
@@ -25,7 +26,13 @@ export default async function InvoicesPage() {
         <p className="text-[15px] text-ink-soft">{dict.page.subtitle}</p>
       </div>
 
-      <InvoicesManager invoices={invoices} pendingBookings={pendingBookings} dict={dict.page} confirmModalDict={dict.confirmModal} />
+      <InvoicesManager
+        invoices={invoices}
+        pendingBookings={pendingBookings}
+        versionsByInvoice={versionsByInvoice}
+        dict={dict.page}
+        confirmModalDict={dict.confirmModal}
+      />
     </div>
   );
 }

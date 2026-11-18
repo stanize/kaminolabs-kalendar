@@ -507,7 +507,7 @@ Criteria:
   "*" and default the new fields.
 
 ## Step: invoice-regenerate
-Status: not_started
+Status: in_progress
 Criteria:
 - DESIGN (2026-11-19, Arun): a **"Regenerar"** button per invoice on the
   Facturas page rebuilds the invoice with the clinic's CURRENT information
@@ -530,6 +530,20 @@ Criteria:
   - Stricter control later: once VeriFactu is implemented, officially
     submitted invoices cannot be regenerated (Arun). Not built; the rule
     should be one explicit check in the regenerate action.
+- CODE IMPLEMENTED (2026-11-19), typechecked, linted, built: PENDING LIVE
+  TESTING, and it needs `schema_subset_044.sql` run first (the action fails
+  safely, writing nothing, until the new table/columns exist). Implementation:
+  `regenerateInvoice` in `lib/actions/invoices.ts` (archives the current
+  state into `kalendar_invoice_versions`, then overwrites the invoice row
+  with the refreshed snapshot, version + 1, guarded by the old version number
+  so two clicks can't both win; undoes the archive if the overwrite fails),
+  `app/api/invoices/[id]/pdf/route.ts` (`?version=N` renders an archived
+  version; without it the current one, which is what the patient's emailed
+  link shows), `getInvoiceVersionsForBusiness` / `getInvoiceVersionAsRow` in
+  `lib/invoices/data.ts`, and on the Facturas page a "Regenerar" button with
+  an inline confirmation, a "v2" badge, and a per-invoice "Historial" list
+  with a download for every version. The original issue date stays the same
+  on every version.
 - Data model (in `schema_subset_044.sql` with the edit step): the invoice row
   stays the single "current" record, with `version` (default 1) and
   `regenerated_at`; each superseded state is copied into a new

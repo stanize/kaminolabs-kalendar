@@ -116,6 +116,20 @@ export interface InvoicingDictionary {
     // was changed from the service price (never printed on the PDF).
     amountModified: string;
     amountModifiedTitle: string; // "{price}" = the service price
+    // invoice-regenerate: "Regenerar" rebuilds an invoice with current data,
+    // keeping every earlier version.
+    regenerate: string;
+    regenerating: string;
+    regenerateConfirm: string;
+    regenerateConfirmYes: string;
+    regenerateCancel: string;
+    regenerated: string; // "{n}" = the new version number
+    errRegenerate: string;
+    versionLabel: string; // "{n}"
+    historyShow: string;
+    historyHide: string;
+    historyCurrent: string;
+    historyTitle: string;
     noResults: string;
     paymentMethodCash: string;
     paymentMethodCard: string;
@@ -236,6 +250,18 @@ const es: InvoicingDictionary = {
     resending: "Enviando…",
     amountModified: "Importe modificado",
     amountModifiedTitle: "El importe es distinto del precio del servicio ({price} €). Esta marca es interna: no aparece en el PDF.",
+    regenerate: "Regenerar",
+    regenerating: "Regenerando…",
+    regenerateConfirm: "¿Regenerar esta factura con tus datos actuales? Mantiene el mismo número y conserva la versión anterior en el historial. No se envía nada al cliente.",
+    regenerateConfirmYes: "Sí, regenerar",
+    regenerateCancel: "Cancelar",
+    regenerated: "Versión {n} generada. Usa «Reenviar» si quieres mandársela al cliente.",
+    errRegenerate: "No se pudo regenerar la factura.",
+    versionLabel: "v{n}",
+    historyShow: "Historial",
+    historyHide: "Ocultar historial",
+    historyCurrent: "actual",
+    historyTitle: "Versiones",
     noResults: "Ninguna factura coincide con los filtros.",
     paymentMethodCash: "Efectivo",
     paymentMethodCard: "Tarjeta",
@@ -350,6 +376,18 @@ const en: InvoicingDictionary = {
     resending: "Sending…",
     amountModified: "Amount modified",
     amountModifiedTitle: "The amount differs from the service price ({price} €). This marker is internal: it does not appear on the PDF.",
+    regenerate: "Regenerate",
+    regenerating: "Regenerating…",
+    regenerateConfirm: "Regenerate this invoice with your current details? It keeps the same number and stores the previous version in the history. Nothing is sent to the client.",
+    regenerateConfirmYes: "Yes, regenerate",
+    regenerateCancel: "Cancel",
+    regenerated: "Version {n} generated. Use \"Resend\" if you want to send it to the client.",
+    errRegenerate: "Couldn't regenerate the invoice.",
+    versionLabel: "v{n}",
+    historyShow: "History",
+    historyHide: "Hide history",
+    historyCurrent: "current",
+    historyTitle: "Versions",
     noResults: "No invoices match the filters.",
     paymentMethodCash: "Cash",
     paymentMethodCard: "Card",

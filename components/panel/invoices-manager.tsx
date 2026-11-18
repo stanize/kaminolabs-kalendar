@@ -4,15 +4,15 @@ import { useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { Btn } from "@/components/ui/button";
-import { resendInvoice } from "@/lib/actions/invoices";
+import { resendInvoice, regenerateInvoice } from "@/lib/actions/invoices";
 import { formatInvoiceNumber, type InvoiceRow } from "@/lib/invoices/types";
-import type { PendingInvoiceBooking } from "@/lib/invoices/data";
+import type { PendingInvoiceBooking, InvoiceVersionSummary } from "@/lib/invoices/data";
 import type { InvoicingDictionary } from "@/lib/i18n/dictionaries/invoicing";
 import { reportClientError } from "@/lib/report-client-error";
 import { InvoiceConfirmModal } from "@/components/panel/invoice-confirm-modal";
 
-function pdfHref(invoice: InvoiceRow): string {
-  return `/api/invoices/${invoice.id}/pdf?token=${invoice.access_token}`;
+function pdfHref(invoice: InvoiceRow, version?: number): string {
+  return `/api/invoices/${invoice.id}/pdf?token=${invoice.access_token}${version ? `&version=${version}` : ""}`;
 }
 
 // invoice-concepts-list: service_name is "Servicio\nConcepto adicional"
@@ -31,11 +31,15 @@ function serviceLine(serviceName: string): string {
 export function InvoicesManager({
   invoices,
   pendingBookings,
+  versionsByInvoice,
   dict,
   confirmModalDict,
 }: {
   invoices: InvoiceRow[];
   pendingBookings: PendingInvoiceBooking[];
+  // invoice-regenerate: the superseded versions of each invoice (newest
+  // first); the invoice row itself is always the current version.
+  versionsByInvoice: Record<string, InvoiceVersionSummary[]>;
   dict: InvoicingDictionary["page"];
   confirmModalDict: InvoicingDictionary["confirmModal"];
 }) {
@@ -181,7 +185,7 @@ export function InvoicesManager({
             ) : (
               <div className="flex flex-col gap-2">
                 {filtered.map((inv) => (
-                  <InvoiceRowItem key={inv.id} invoice={inv} dict={dict} methodLabel={methodLabel} />
+                  <InvoiceRowItem key={inv.id} invoice={inv} versions={versionsByInvoice[inv.id] ?? []} dict={dict} methodLabel={methodLabel} />
                 ))}
               </div>
             )}
@@ -247,19 +251,27 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
 
 function InvoiceRowItem({
   invoice,
+  versions,
   dict,
   methodLabel,
 }: {
   invoice: InvoiceRow;
+  versions: InvoiceVersionSummary[];
   dict: InvoicingDictionary["page"];
   methodLabel: (m: InvoiceRow["payment_method"]) => string;
 }) {
+  const router = useRouter();
   const [resending, setResending] = useState(false);
+  const [confirmingRegenerate, setConfirmingRegenerate] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   async function handleResend() {
     setResending(true);
     setError(null);
+    setNotice(null);
     try {
       const result = await resendInvoice({ invoiceId: invoice.id });
       if (!result.ok) setError(result.error);
@@ -271,37 +283,140 @@ function InvoiceRowItem({
     }
   }
 
+  // invoice-regenerate: same number, new version; the old one stays in the
+  // history. Nothing is emailed — "Reenviar" stays a separate, explicit step.
+  async function handleRegenerate() {
+    setRegenerating(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const result = await regenerateInvoice(invoice.id);
+      if (!result.ok) {
+        setError(result.error);
+      } else {
+        setConfirmingRegenerate(false);
+        setNotice(dict.regenerated.replace("{n}", String(result.version)));
+        router.refresh();
+      }
+    } catch (e) {
+      reportClientError("regenerateInvoice", e);
+      setError(dict.errRegenerate);
+    } finally {
+      setRegenerating(false);
+    }
+  }
+
+  const hasHistory = versions.length > 0;
+
   return (
-    <div className="flex flex-col gap-1.5 rounded-xl border border-line bg-surface px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-[14px] font-semibold text-ink">
-          {formatInvoiceNumber(invoice.issue_year, invoice.invoice_number)} · {invoice.client_name}
-        </p>
-        <p className="truncate text-[12.5px] text-ink-soft">
-          {invoice.service_name} · {methodLabel(invoice.payment_method)} · {invoice.amount.toFixed(2)} €
-          {invoice.sent_at && ` · ${new Date(invoice.sent_at).toLocaleDateString()}`}
-          {invoice.amount_modified && (
-            <span
-              title={dict.amountModifiedTitle.replace("{price}", (invoice.original_amount ?? 0).toFixed(2).replace(".", ","))}
-              className="ml-2 inline-block rounded-full border border-amber-300 bg-amber-50 px-2 py-px text-[11px] font-medium text-amber-700"
-            >
-              {dict.amountModified}
-            </span>
-          )}
-        </p>
-        {error && <p className="text-[12px] text-error">{error}</p>}
-      </div>
-      <div className="flex shrink-0 items-center gap-2">
-        <a href={pdfHref(invoice)} target="_blank" rel="noopener noreferrer">
-          <Btn variant="outline" size="sm">
-            <Icon name="externalLink" size={13} />
-            {dict.download}
+    <div className="flex flex-col gap-2 rounded-xl border border-line bg-surface px-4 py-3">
+      <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[14px] font-semibold text-ink">
+            {formatInvoiceNumber(invoice.issue_year, invoice.invoice_number)}
+            {invoice.version > 1 && (
+              <span className="ml-1.5 rounded-full bg-brand-weak px-1.5 py-px text-[11px] font-semibold text-brand-ink">
+                {dict.versionLabel.replace("{n}", String(invoice.version))}
+              </span>
+            )}
+            {" · "}
+            {invoice.client_name}
+          </p>
+          <p className="truncate text-[12.5px] text-ink-soft">
+            {invoice.service_name} · {methodLabel(invoice.payment_method)} · {invoice.amount.toFixed(2)} €
+            {invoice.sent_at && ` · ${new Date(invoice.sent_at).toLocaleDateString()}`}
+            {invoice.amount_modified && (
+              <span
+                title={dict.amountModifiedTitle.replace("{price}", (invoice.original_amount ?? 0).toFixed(2).replace(".", ","))}
+                className="ml-2 inline-block rounded-full border border-amber-300 bg-amber-50 px-2 py-px text-[11px] font-medium text-amber-700"
+              >
+                {dict.amountModified}
+              </span>
+            )}
+          </p>
+        </div>
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <a href={pdfHref(invoice)} target="_blank" rel="noopener noreferrer">
+            <Btn variant="outline" size="sm">
+              <Icon name="externalLink" size={13} />
+              {dict.download}
+            </Btn>
+          </a>
+          <Btn variant="outline" size="sm" onClick={handleResend} disabled={resending}>
+            {resending ? dict.resending : dict.resend}
           </Btn>
-        </a>
-        <Btn variant="outline" size="sm" onClick={handleResend} disabled={resending}>
-          {resending ? dict.resending : dict.resend}
-        </Btn>
+          <Btn
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setConfirmingRegenerate(true);
+              setError(null);
+              setNotice(null);
+            }}
+            disabled={regenerating || confirmingRegenerate}
+          >
+            {dict.regenerate}
+          </Btn>
+        </div>
       </div>
+
+      {confirmingRegenerate && (
+        <div className="rounded-lg border border-line bg-surface-2 px-3 py-2.5">
+          <p className="text-[12.5px] text-ink">{dict.regenerateConfirm}</p>
+          <div className="mt-2 flex gap-2">
+            <Btn size="sm" onClick={handleRegenerate} disabled={regenerating}>
+              {regenerating ? dict.regenerating : dict.regenerateConfirmYes}
+            </Btn>
+            <Btn variant="outline" size="sm" onClick={() => setConfirmingRegenerate(false)} disabled={regenerating}>
+              {dict.regenerateCancel}
+            </Btn>
+          </div>
+        </div>
+      )}
+
+      {error && <p className="text-[12px] text-error">{error}</p>}
+      {notice && <p className="text-[12px] text-brand-ink">{notice}</p>}
+
+      {hasHistory && (
+        <div>
+          <button
+            type="button"
+            onClick={() => setShowHistory((v) => !v)}
+            className="text-[12.5px] font-semibold text-brand hover:underline"
+          >
+            {showHistory ? dict.historyHide : dict.historyShow} ({versions.length + 1})
+          </button>
+          {showHistory && (
+            <ul className="mt-2 flex flex-col gap-1.5">
+              <li className="flex items-center justify-between gap-3 text-[12.5px] text-ink">
+                <span>
+                  {dict.versionLabel.replace("{n}", String(invoice.version))} ({dict.historyCurrent}) ·{" "}
+                  {new Date(invoice.regenerated_at ?? invoice.created_at).toLocaleString()}
+                </span>
+                <a href={pdfHref(invoice)} target="_blank" rel="noopener noreferrer" className="font-semibold text-brand hover:underline">
+                  {dict.download}
+                </a>
+              </li>
+              {versions.map((v) => (
+                <li key={v.version} className="flex items-center justify-between gap-3 text-[12.5px] text-ink-soft">
+                  <span>
+                    {dict.versionLabel.replace("{n}", String(v.version))} · {new Date(v.issued_at).toLocaleString()} ·{" "}
+                    {v.amount.toFixed(2)} €
+                  </span>
+                  <a
+                    href={pdfHref(invoice, v.version)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-semibold text-brand hover:underline"
+                  >
+                    {dict.download}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
     </div>
   );
 }

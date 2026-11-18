@@ -366,3 +366,66 @@ export async function createInvoiceForBooking(input: CreateInvoiceInput): Promis
   if (error || !created) return { ok: false, error: "create_failed" };
   return { ok: true, invoice: normalizeInvoiceRow(created as InvoiceRow) };
 }
+
+// ── Versions (invoice-regenerate) ────────────────────────────────────────
+
+export interface InvoiceVersionSummary {
+  version: number;
+  /** When this version was generated. */
+  issued_at: string;
+  amount: number;
+}
+
+/**
+ * Every SUPERSEDED version of the business's invoices, grouped by invoice id
+ * and ordered newest-first. The invoice row itself is always the current
+ * version, so it isn't in here. Tolerates the table not existing yet (before
+ * schema_subset_044.sql has run): the query then errors and this is empty.
+ */
+export async function getInvoiceVersionsForBusiness(businessId: string): Promise<Record<string, InvoiceVersionSummary[]>> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("kalendar_invoice_versions")
+    .select("invoice_id, version, issued_at, amount")
+    .eq("business_id", businessId)
+    .order("version", { ascending: false });
+
+  const out: Record<string, InvoiceVersionSummary[]> = {};
+  for (const r of (data as { invoice_id: string; version: number; issued_at: string; amount: number | string }[] | null) ?? []) {
+    (out[r.invoice_id] ??= []).push({ version: r.version, issued_at: r.issued_at, amount: Number(r.amount) });
+  }
+  return out;
+}
+
+/**
+ * An archived version of an invoice, shaped as an InvoiceRow so the normal
+ * renderer can draw it. Identity (id, number, year, token, issue date) always
+ * comes from the invoice itself: a regenerated invoice keeps its number and
+ * its original issue date, only the content differs.
+ */
+export async function getInvoiceVersionAsRow(invoice: InvoiceRow, version: number): Promise<InvoiceRow | null> {
+  const supabase = await createClient();
+  const { data: v } = await supabase
+    .from("kalendar_invoice_versions")
+    .select("*")
+    .eq("invoice_id", invoice.id)
+    .eq("version", version)
+    .maybeSingle();
+  if (!v) return null;
+  return normalizeInvoiceRow({
+    ...invoice,
+    client_name: v.client_name,
+    client_email: v.client_email,
+    client_dni: v.client_dni,
+    client_address: v.client_address,
+    service_name: v.service_name,
+    payment_method: v.payment_method,
+    amount: Number(v.amount),
+    business_snapshot: v.business_snapshot,
+    verification_url: v.verification_url ?? invoice.verification_url,
+    note: v.note,
+    original_amount: v.original_amount === null ? null : Number(v.original_amount),
+    amount_modified: v.amount_modified,
+    version: v.version,
+  } as InvoiceRow);
+}

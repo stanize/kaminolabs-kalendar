@@ -4,7 +4,15 @@ import { revalidatePath } from "next/cache";
 import { authedAction } from "@/lib/auth-action";
 import { createClient } from "@/lib/supabase/server";
 import { getBusinessForUser } from "@/lib/business/data";
-import { createInvoiceForBooking, getInvoiceForBooking, formatInvoiceNumber, type InvoiceRow } from "@/lib/invoices/data";
+import {
+  createInvoiceForBooking,
+  getInvoiceById,
+  getInvoiceForBooking,
+  getProviderForBooking,
+  buildBusinessSnapshot,
+  formatInvoiceNumber,
+  type InvoiceRow,
+} from "@/lib/invoices/data";
 import { sendEmail, invoiceEmailHtml } from "@/lib/email";
 import {
   getInvoiceConcepts,
@@ -283,6 +291,136 @@ export const resendInvoice = authedAction(
 
     revalidatePath("/panel/invoices");
     return { ok: true };
+  }
+);
+
+export type RegenerateInvoiceResult = { ok: true; version: number } | { ok: false; error: string };
+
+/**
+ * invoice-regenerate (pdf-invoicing.md): "Regenerar" rebuilds an invoice with
+ * the clinic's CURRENT information while keeping every earlier version.
+ *
+ * - SAME invoice number (and id, token, issue date). The invoice row is
+ *   always the current version; its previous state is copied into
+ *   kalendar_invoice_versions first, so nothing is ever deleted.
+ * - Refreshed from current data: business details, the booking's
+ *   practitioner (name, title, colegiada, signature), the template, and the
+ *   client's DNI/address from their profile.
+ * - Kept as invoiced: client name/email, service/concept, note, amount,
+ *   payment method (the amount and billed name are what was issued).
+ * - Does NOT email anything — the clinic uses "Reenviar" for that.
+ *
+ * FUTURE (Arun): once VeriFactu is implemented, an invoice that has been
+ * officially submitted must NOT be regenerable. That rule belongs right here,
+ * as one explicit check before any write.
+ */
+export const regenerateInvoice = authedAction(
+  async (
+    session,
+    invoiceId: string,
+    dict?: { errNoBusiness: string; errNotFound: string; errFailed: string }
+  ): Promise<RegenerateInvoiceResult> => {
+    const t = {
+      errNoBusiness: dict?.errNoBusiness ?? FALLBACK.errNoBusiness,
+      errNotFound: dict?.errNotFound ?? "Factura no encontrada.",
+      errFailed: dict?.errFailed ?? "No se pudo regenerar la factura.",
+    };
+    const business = await getBusinessForUser(session.user.id);
+    if (!business) return { ok: false, error: t.errNoBusiness };
+
+    const invoice = await getInvoiceById(invoiceId);
+    if (!invoice || invoice.business_id !== business.id) return { ok: false, error: t.errNotFound };
+
+    const supabase = await createClient();
+
+    // Current data. The booking gives the practitioner and the client link;
+    // if the booking is gone, the invoice's own frozen practitioner/client
+    // details are kept (only the business-level part is refreshed).
+    let provider = null;
+    let clientRow: { dni: string | null; address: string | null } | null = null;
+    if (invoice.booking_id) {
+      const { data: booking } = await supabase
+        .from("kalendar_bookings")
+        .select("team_member_id, clinic_client_id")
+        .eq("id", invoice.booking_id)
+        .eq("business_id", business.id)
+        .maybeSingle();
+      if (booking) {
+        provider = await getProviderForBooking(business.id, booking.team_member_id as string | null);
+        if (booking.clinic_client_id) {
+          const { data } = await supabase
+            .from("kalendar_clients")
+            .select("dni, address")
+            .eq("id", booking.clinic_client_id)
+            .maybeSingle();
+          clientRow = data ?? null;
+        }
+      }
+    }
+
+    const fresh = buildBusinessSnapshot(business, provider);
+    if (!provider) {
+      const old = invoice.business_snapshot;
+      fresh.professionalDni = old.professionalDni;
+      fresh.professionalCollegeNumber = old.professionalCollegeNumber;
+      fresh.professionalTitle = old.professionalTitle;
+      fresh.professionalName = old.professionalName;
+      fresh.signatureUrl = old.signatureUrl;
+    }
+    const newDni = clientRow?.dni?.trim() || invoice.client_dni;
+    const newAddress = clientRow?.address?.trim() || invoice.client_address;
+
+    // 1) Archive the version being replaced. The unique (invoice_id, version)
+    //    also stops a double-click from archiving it twice.
+    const { error: archiveError } = await supabase.from("kalendar_invoice_versions").insert({
+      invoice_id: invoice.id,
+      business_id: business.id,
+      version: invoice.version,
+      client_name: invoice.client_name,
+      client_email: invoice.client_email,
+      client_dni: invoice.client_dni,
+      client_address: invoice.client_address,
+      service_name: invoice.service_name,
+      payment_method: invoice.payment_method,
+      amount: invoice.amount,
+      original_amount: invoice.original_amount,
+      amount_modified: invoice.amount_modified,
+      note: invoice.note,
+      business_snapshot: invoice.business_snapshot,
+      verification_url: invoice.verification_url,
+      issued_at: invoice.regenerated_at ?? invoice.created_at,
+    });
+    if (archiveError) return { ok: false, error: t.errFailed };
+
+    // 2) Overwrite the current record, only if nobody regenerated it meanwhile.
+    const nextVersion = invoice.version + 1;
+    const { data: updated, error: updateError } = await supabase
+      .from("kalendar_invoices")
+      .update({
+        business_snapshot: fresh,
+        client_dni: newDni,
+        client_address: newAddress,
+        version: nextVersion,
+        regenerated_at: new Date().toISOString(),
+      })
+      .eq("id", invoice.id)
+      .eq("business_id", business.id)
+      .eq("version", invoice.version)
+      .select("id")
+      .maybeSingle();
+
+    if (updateError || !updated) {
+      // Undo the archive so a retry starts clean.
+      await supabase
+        .from("kalendar_invoice_versions")
+        .delete()
+        .eq("invoice_id", invoice.id)
+        .eq("version", invoice.version);
+      return { ok: false, error: t.errFailed };
+    }
+
+    revalidatePath("/panel/invoices");
+    return { ok: true, version: nextVersion };
   }
 );
 
