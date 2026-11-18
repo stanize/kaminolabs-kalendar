@@ -329,7 +329,9 @@ function RulePanel({
             </label>
           </div>
 
-          <div className="flex flex-col gap-4 rounded-xl border border-line p-4">
+          {/* No box on purpose: sits between the boxed name and type cards. px-4
+              keeps its labels aligned with the text inside those cards. */}
+          <div className="flex flex-col gap-4 px-4">
             <div>
               <p className="mb-1.5 text-[12.5px] font-semibold text-ink-soft">{dict.daysLabel}</p>
               <div className="mb-2 flex gap-2">
