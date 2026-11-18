@@ -64,6 +64,7 @@ export interface CalendarDictionary {
     providerFilterLabel: string; // "Profesionales" — the filter dropdown's trigger button
     providerFilterAll: string; // "Todos" option inside the dropdown — clears the selection back to "all"
     addAppointment: string; // tooltip/aria-label on an empty slot
+    ctxNewHere: string; // right-click menu on an empty slot
     weekRangeTemplate: string; // "{from} – {to}", {from}/{to} pre-formatted date strings
     viewDay: string; // Day/Week/Month dropdown option
     viewWeek: string;
@@ -339,6 +340,7 @@ const es: CalendarDictionary = {
     providerFilterAll: "Todos",
     noProviders: "Añade a tu equipo en Equipo para ver la semana.",
     addAppointment: "Añadir cita",
+    ctxNewHere: "Nueva cita aquí",
     weekRangeTemplate: "{from} – {to}",
     festivoFallbackLabel: "Festivo",
     viewDay: "Día",
@@ -551,6 +553,7 @@ const en: CalendarDictionary = {
     providerFilterAll: "All",
     noProviders: "Add team members under Team to see the week view.",
     addAppointment: "Add appointment",
+    ctxNewHere: "New appointment here",
     weekRangeTemplate: "{from} – {to}",
     viewDay: "Day",
     viewWeek: "Week",

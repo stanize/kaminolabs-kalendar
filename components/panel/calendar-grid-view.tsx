@@ -9,6 +9,7 @@ import { AppointmentModal, type SlotSelection, type ClosureRuleVM } from "@/comp
 import type { CustomTimeSlotRuleVM } from "@/lib/booking/appointment-fields";
 import type { ConflictSummary } from "@/lib/actions/closures";
 import { updateBookingAsOwner } from "@/lib/actions/booking-owner";
+import { isWhatsappSentinelEmail } from "@/lib/whatsapp/sentinel-email";
 
 // Mirrors lib/closures/conflicts.ts's CONFLICT_LIST_CAP — not imported
 // directly since that module pulls in server-only code (Supabase client)
@@ -465,6 +466,14 @@ export function CalendarGridView({
   const w = dict.week;
   const [modalSlot, setModalSlot] = useState<SlotSelection | null>(null);
 
+  // calendar-context-menu (workflows/calendar-management-upcoming.md): right
+  // click on a booking chip or an empty slot, Week and Day views only. A
+  // desktop shortcut for actions already reachable with a normal click.
+  const [ctxMenu, setCtxMenu] = useState<ContextMenuState | null>(null);
+  // "Replicar cita" from the chip menu: a new appointment pre-filled from
+  // this booking, without opening its detail panel first.
+  const [replicaFrom, setReplicaFrom] = useState<WeekBookingVM | null>(null);
+
   // drag-to-reschedule (workflows/calendar-management-upcoming.md): custom
   // pointer-events drag, no library. `drag` drives the single snapped
   // drop-preview (dashed box) in whichever day column the pointer is over
@@ -556,6 +565,8 @@ export function CalendarGridView({
   }
 
   function startChipDrag(booking: WeekBookingVM, e: React.PointerEvent<HTMLDivElement>) {
+    // Primary button only — a right-click (context menu) must never start a drag.
+    if (e.button !== 0) return;
     if (booking.status === "cancelled" || booking.status === "no_show") return;
     if (!booking.teamMemberId || !booking.serviceId) return;
     e.stopPropagation();
@@ -722,6 +733,13 @@ export function CalendarGridView({
     // is this very slot-click handler's owner, so a completed drag must
     // swallow it too, not just the chip's own click (handleChipClick).
     if (suppressNextClickRef.current) { suppressNextClickRef.current = false; return; }
+    openSlotModal(day, member, clickMinute, ranges);
+  };
+
+  // The part of handleSlotClick that opens the new-appointment panel —
+  // shared with the right-click menu's "Nueva cita aquí", which has no
+  // drag-release click to swallow.
+  const openSlotModal = (day: GridDay, member: WeekMemberVM | null, clickMinute: number, ranges: TimeRangeVM[]) => {
     const rounded = snapToSlotGrid(clickMinute, ranges);
     const hh = Math.floor(rounded / 60);
     const mm = rounded % 60;
@@ -733,6 +751,23 @@ export function CalendarGridView({
       teamMemberId: member?.id ?? "",
       providerName: member?.name ?? "",
     });
+  };
+
+  const openBookingMenu = (booking: WeekBookingVM, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setCtxMenu({ kind: "booking", x: e.clientX, y: e.clientY, booking });
+  };
+  const openSlotMenu = (
+    day: GridDay,
+    member: WeekMemberVM | null,
+    clickMinute: number,
+    ranges: TimeRangeVM[],
+    e: React.MouseEvent
+  ) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setCtxMenu({ kind: "slot", x: e.clientX, y: e.clientY, day, member, clickMinute, ranges });
   };
 
   const handleCreated = (optimistic?: WeekBookingVM) => {
@@ -810,6 +845,8 @@ export function CalendarGridView({
                     dict={dict}
                     drag={drag}
                     onSlotClick={(d, clickMinute, r) => handleSlotClick(d, null, clickMinute, r)}
+                    onSlotContextMenu={(d, clickMinute, r, e) => openSlotMenu(d, null, clickMinute, r, e)}
+                    onChipContextMenu={openBookingMenu}
                     onBookingClick={handleChipClick}
                     onAddAtBooking={(d, booking, r) => handleSlotClick(d, null, minutesInTz(new Date(booking.startIso)), r)}
                     onChipPointerDown={startChipDrag}
@@ -838,6 +875,8 @@ export function CalendarGridView({
                     dict={dict}
                     drag={drag}
                     onSlotClick={handleSlotClick}
+                    onSlotContextMenu={openSlotMenu}
+                    onChipContextMenu={openBookingMenu}
                     onBookingClick={handleChipClick}
                     onChipPointerDown={startChipDrag}
                   />
@@ -866,6 +905,67 @@ export function CalendarGridView({
           whatsappEnabled={whatsappEnabled}
           onClose={() => setModalSlot(null)}
           onSaved={handleCreated}
+        />
+      )}
+
+      {replicaFrom && (() => {
+        const today = tzDateParts(new Date());
+        const replica: SlotSelection = {
+          dayYear: today.year,
+          dayMonth: today.month,
+          dayDay: today.day,
+          initialTime: "",
+          teamMemberId: replicaFrom.teamMemberId ?? "",
+          providerName: allMembers.find((m) => m.id === replicaFrom.teamMemberId)?.name ?? "",
+        };
+        return (
+          <AppointmentModal
+            slot={replica}
+            hoursByDay={hoursByDay}
+            allBookings={bookings}
+            services={services.map((s) => ({ id: s.id, name: s.name, durationMin: s.durationMin, price: s.price }))}
+            members={allMembers.filter((m) => m.active).map((m) => ({ id: m.id, name: m.name }))}
+            closures={closures}
+            customSlotRules={customSlotRules}
+            dict={dict}
+            errorsDict={dict.manualErrors}
+            whatsappEnabled={whatsappEnabled}
+            initialServiceId={replicaFrom.serviceId ?? undefined}
+            initialClientId={replicaFrom.clinicClientId}
+            initialClientName={replicaFrom.clientName}
+            initialClientEmail={
+              replicaFrom.clientEmail &&
+              !replicaFrom.clientEmail.startsWith("sin-email+") &&
+              !isWhatsappSentinelEmail(replicaFrom.clientEmail)
+                ? replicaFrom.clientEmail
+                : ""
+            }
+            initialClientPhone={replicaFrom.clientPhone ?? ""}
+            onClose={() => setReplicaFrom(null)}
+            onSaved={(optimistic) => {
+              setReplicaFrom(null);
+              onBookingCreated(optimistic ? { kind: "create", booking: optimistic } : undefined);
+              router.refresh();
+            }}
+          />
+        );
+      })()}
+
+      {ctxMenu && (
+        <CalendarContextMenu
+          x={ctxMenu.x}
+          y={ctxMenu.y}
+          items={
+            ctxMenu.kind === "booking"
+              ? [{ label: dict.detailModal.newApptButton, onSelect: () => setReplicaFrom(ctxMenu.booking) }]
+              : [
+                  {
+                    label: w.ctxNewHere,
+                    onSelect: () => openSlotModal(ctxMenu.day, ctxMenu.member, ctxMenu.clickMinute, ctxMenu.ranges),
+                  },
+                ]
+          }
+          onClose={() => setCtxMenu(null)}
         />
       )}
 
@@ -1070,7 +1170,9 @@ function DayProviderColumn({
   dict,
   drag,
   onSlotClick,
+  onSlotContextMenu,
   onBookingClick,
+  onChipContextMenu,
   onChipPointerDown,
 }: {
   day: GridDay;
@@ -1085,7 +1187,9 @@ function DayProviderColumn({
   dict: CalendarDictionary;
   drag: { booking: WeekBookingVM; target: DragTarget | null } | null;
   onSlotClick: (day: GridDay, member: WeekMemberVM, clickMinute: number, ranges: TimeRangeVM[]) => void;
+  onSlotContextMenu: (day: GridDay, member: WeekMemberVM, clickMinute: number, ranges: TimeRangeVM[], e: React.MouseEvent) => void;
   onBookingClick: (booking: WeekBookingVM) => void;
+  onChipContextMenu: (booking: WeekBookingVM, e: React.MouseEvent) => void;
   onChipPointerDown: (booking: WeekBookingVM, e: React.PointerEvent<HTMLDivElement>) => void;
 }) {
   const dayBookings = bookings.filter((b) => {
@@ -1110,6 +1214,12 @@ function DayProviderColumn({
     const offsetY = e.clientY - rect.top;
     const clickMinute = gridStartMin + offsetY / PX_PER_MIN;
     onSlotClick(day, member, clickMinute, ranges);
+  };
+
+  const handleContextMenu = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clickMinute = gridStartMin + (e.clientY - rect.top) / PX_PER_MIN;
+    onSlotContextMenu(day, member, clickMinute, ranges, e);
   };
 
   return (
@@ -1140,6 +1250,7 @@ function DayProviderColumn({
             : {}),
         }}
         onClick={handleClick}
+        onContextMenu={handleContextMenu}
         title={dict.week.addAppointment}
       >
         {/* Working-hours = bookable free time: lighter surface on top of the
@@ -1254,6 +1365,7 @@ function DayProviderColumn({
             <div
               key={b.id}
               onClick={(e) => { e.stopPropagation(); onBookingClick(b); }}
+              onContextMenu={(e) => onChipContextMenu(b, e)}
               onPointerDown={(e) => onChipPointerDown(b, e)}
               className={`absolute left-0.5 right-0.5 overflow-hidden rounded-md px-1.5 py-[3px] text-[10.5px] leading-[1.2] ${draggable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"} ${isDragSource ? "opacity-30" : ""} ${chipClasses(b.status, isPast, b.clientStatus, b.clinicReviewedAt)}`}
               style={{ top, height }}
@@ -1326,7 +1438,9 @@ function DayMergedColumn({
   dict,
   drag,
   onSlotClick,
+  onSlotContextMenu,
   onBookingClick,
+  onChipContextMenu,
   onAddAtBooking,
   onChipPointerDown,
 }: {
@@ -1341,7 +1455,9 @@ function DayMergedColumn({
   dict: CalendarDictionary;
   drag: { booking: WeekBookingVM; target: DragTarget | null } | null;
   onSlotClick: (day: GridDay, clickMinute: number, ranges: TimeRangeVM[]) => void;
+  onSlotContextMenu: (day: GridDay, clickMinute: number, ranges: TimeRangeVM[], e: React.MouseEvent) => void;
   onBookingClick: (booking: WeekBookingVM) => void;
+  onChipContextMenu: (booking: WeekBookingVM, e: React.MouseEvent) => void;
   // open-slot-plus-badge (2026-10): a small "+" on top of an existing
   // chip, shown only when at least one active provider is still free
   // during that booking's time range — clicking it opens the same
@@ -1372,6 +1488,12 @@ function DayMergedColumn({
     onSlotClick(day, clickMinute, ranges);
   };
 
+  const handleContextMenu = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clickMinute = gridStartMin + (e.clientY - rect.top) / PX_PER_MIN;
+    onSlotContextMenu(day, clickMinute, ranges, e);
+  };
+
   return (
     <div className="flex-1">
       <div className="flex h-12 flex-col items-center justify-center border-b border-line px-1">
@@ -1397,6 +1519,7 @@ function DayMergedColumn({
             : {}),
         }}
         onClick={handleClick}
+        onContextMenu={handleContextMenu}
         title={dict.week.addAppointment}
       >
         {ranges.map((r, i) => {
@@ -1465,6 +1588,7 @@ function DayMergedColumn({
                 )}
                 <div
                   onClick={(e) => { e.stopPropagation(); onBookingClick(b); }}
+                  onContextMenu={(e) => onChipContextMenu(b, e)}
                   onPointerDown={(e) => onChipPointerDown(b, e)}
                   className={`min-h-0 flex-1 overflow-hidden px-1.5 py-[3px] text-[10.5px] leading-[1.2] ${draggable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"} ${chipClasses(b.status, isPast, b.clientStatus, b.clinicReviewedAt)}`}
                 >
@@ -1545,6 +1669,7 @@ function DayMergedColumn({
                   <div
                     key={b.id}
                     onClick={(e) => { e.stopPropagation(); onBookingClick(b); }}
+                    onContextMenu={(e) => onChipContextMenu(b, e)}
                     title={fullDetail}
                     style={{ height: ROW_HEIGHT }}
                     className={`flex shrink-0 cursor-pointer items-center gap-1 overflow-hidden px-1.5 text-[9.5px] leading-none ${chipClasses(b.status, isPast, b.clientStatus, b.clinicReviewedAt)}`}
@@ -1571,6 +1696,85 @@ function DayMergedColumn({
             {String(Math.floor(dropTarget.startMin / 60)).padStart(2, "0")}:{String(dropTarget.startMin % 60).padStart(2, "0")}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ── calendar-context-menu ───────────────────────────────────────────────────
+
+type ContextMenuState =
+  | { kind: "booking"; x: number; y: number; booking: WeekBookingVM }
+  | {
+      kind: "slot";
+      x: number;
+      y: number;
+      day: GridDay;
+      member: WeekMemberVM | null;
+      clickMinute: number;
+      ranges: TimeRangeVM[];
+    };
+
+const CONTEXT_MENU_WIDTH = 190;
+const CONTEXT_MENU_ITEM_HEIGHT = 40;
+
+/**
+ * A small floating menu at the cursor. Closes on Escape, on any click or
+ * right-click outside it, on scroll and on resize. Desktop shortcut only: it
+ * is not a touch gesture, and every action in it is also reachable with a
+ * normal click.
+ */
+function CalendarContextMenu({
+  x,
+  y,
+  items,
+  onClose,
+}: {
+  x: number;
+  y: number;
+  items: { label: string; onSelect: () => void }[];
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("resize", onClose);
+    window.addEventListener("scroll", onClose, true);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("resize", onClose);
+      window.removeEventListener("scroll", onClose, true);
+    };
+  }, [onClose]);
+
+  // Keep the menu inside the viewport near the right/bottom edges.
+  const left = Math.max(8, Math.min(x, window.innerWidth - CONTEXT_MENU_WIDTH - 8));
+  const top = Math.max(8, Math.min(y, window.innerHeight - items.length * CONTEXT_MENU_ITEM_HEIGHT - 16));
+
+  return (
+    <div
+      className="fixed inset-0 z-[80]"
+      onMouseDown={onClose}
+      onContextMenu={(e) => { e.preventDefault(); onClose(); }}
+    >
+      <div
+        role="menu"
+        className="absolute overflow-hidden rounded-lg border border-line bg-surface py-1 shadow-xl"
+        style={{ left, top, width: CONTEXT_MENU_WIDTH }}
+        onMouseDown={(e) => e.stopPropagation()}
+        onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
+      >
+        {items.map((item) => (
+          <button
+            key={item.label}
+            type="button"
+            role="menuitem"
+            onClick={() => { onClose(); item.onSelect(); }}
+            className="block w-full px-3.5 py-2.5 text-left text-[13.5px] font-medium text-ink hover:bg-surface-2"
+          >
+            {item.label}
+          </button>
+        ))}
       </div>
     </div>
   );

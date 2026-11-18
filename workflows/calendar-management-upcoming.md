@@ -217,6 +217,40 @@ Criteria:
 - Failure detail (error text) shown in the booking detail modal
 - No retry action exists from this view (visibility-only, by design — see appointment-reminders workflow)
 
+## Step: calendar-context-menu
+Status: in_progress
+Criteria:
+- DESIGN (2026-11-18, Arun; a clinic asked for it): right-click on the
+  calendar grid opens a small menu of shortcuts. It is a DESKTOP shortcut
+  only: every action in it is also reachable with a normal click plus extra
+  steps, so nothing depends on it.
+  - **Right-click a booking chip:** one item, **Replicar cita**: opens the
+    new-appointment panel pre-filled from that booking (client, service,
+    professional), the same action as the "+ Replicar cita" button in the
+    appointment panel's header, without opening that panel first. Available
+    on any booking, past or upcoming.
+  - **Right-click an empty slot:** one item, **Nueva cita aquí**: the same
+    result as left-clicking that slot (new appointment at that day/time,
+    snapped to the slot grid; blank professional in the merged Week view).
+  - **Week and Day views only.** Not the month view, not the other tabs.
+  - **No touch support:** no long-press handling, no mobile/tablet behavior.
+    (A browser that fires a `contextmenu` event on long-press, such as some
+    Android browsers, will show the same menu; it was not designed for.)
+  - More items can be added later (Cobrar, No-show, Cancelar...); Arun's
+    decision for now is Replicar cita only.
+- Behavior: the menu appears at the cursor, stays inside the viewport,
+  closes on Escape, a click or right-click elsewhere, scroll or resize. A
+  right-click never starts a drag (the drag start now ignores non-primary
+  buttons). The browser's own context menu is suppressed only on chips and
+  grid slots.
+- CODE IMPLEMENTED (2026-11-18), typechecked, linted, built: PENDING LIVE
+  TESTING. Files: `components/panel/calendar-grid-view.tsx`
+  (`CalendarContextMenu`, `ctxMenu`/`replicaFrom` state, `openSlotModal`
+  split out of `handleSlotClick`), `lib/i18n/dictionaries/calendar.ts`
+  (`week.ctxNewHere`; the Replicar label reuses `detailModal.newApptButton`).
+- Also renamed (2026-11-18, Arun): the panel header button "+ Nueva cita"
+  is now "+ Replicar cita" (English: "Duplicate appointment").
+
 ## Step: drag-to-reschedule
 Status: in_progress
 Criteria:
