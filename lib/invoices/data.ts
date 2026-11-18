@@ -22,7 +22,7 @@ const INVOICE_COLUMNS =
  * solo included, see lib/actions/booking.ts — but handled defensively),
  * in which case these three fields fall back to blank/the business name.
  */
-function buildBusinessSnapshot(
+export function buildBusinessSnapshot(
   business: Business,
   provider: {
     name: string;

@@ -94,6 +94,17 @@ const styles = StyleSheet.create({
   // generateQrDataUri's own margin, not by extra space here.
   qrTopRow: { flexDirection: "column", alignItems: "flex-start", marginBottom: 16 },
   qrImage: { width: 99, height: 99 },
+
+  // invoice-preview: big, light, rotated word behind the content.
+  watermark: {
+    position: "absolute",
+    top: 360,
+    left: 55,
+    fontSize: 100,
+    fontWeight: 700,
+    color: "#e5e7eb",
+    transform: "rotate(-28deg)",
+  },
   qrCaption: { fontSize: 7, fontWeight: 700, color: "#475569", marginBottom: 4 },
 });
 
@@ -103,12 +114,13 @@ function fullAddressLine(b: InvoiceTemplateProps["business"]): string {
 }
 
 export function VatExemptInvoice(props: InvoiceTemplateProps) {
-  const { business, client, invoiceNumberFormatted, issueDate, serviceName, amount, paid, qrDataUri } = props;
+  const { business, client, invoiceNumberFormatted, issueDate, serviceName, amount, paid, qrDataUri, watermark } = props;
   const amountFormatted = amount.toFixed(2).replace(".", ",");
 
   return (
     <Document>
       <Page size="A4" style={styles.page}>
+        {watermark && <Text style={styles.watermark} fixed>{watermark}</Text>}
         <View style={styles.headerRow}>
           <View style={styles.headerLeft}>
             {business.isSolo ? (

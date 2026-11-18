@@ -436,3 +436,90 @@ Criteria:
   - The post-Cobrar invoice confirm modal uses ONE shared email input whose label switches between "¿Enviar a otro email?" (has a real email already) and the required missing-email prompt (doesn't) — one UI field serving both of invoice-on-payment-trigger's two distinct cases, rather than two separate inputs.
   - One-invoice-per-booking is enforced at the application layer (a check-then-insert in `createInvoiceForBooking`/the Cobrar handler), not a DB unique constraint on `booking_id` alone — a genuinely concurrent double-click race is theoretically possible but not guarded against at the DB level; judged low-risk enough not to block this pass, flag if it ever actually happens.
   - MIGRATION NOT YET RUN against the live DB — Arun still needs to run `schema_subset_023.sql`, per this repo's convention (Claude creates the file but doesn't execute live DDL).
+
+## Step: invoice-preview
+Status: in_progress
+Criteria:
+- DESIGN (2026-11-19, Arun): the clinic can see what its invoices look like
+  using made-up service and client data.
+  - A **"Vista previa"** button in **Ajustes > Facturación**. It opens a side
+    panel showing the PDF (an inline viewer).
+  - The panel has a **practitioner dropdown**: any active team member, the
+    default being the current user (the owner's own team-member row; only the
+    owner logs in). The title, colegiada number, name and signature printed
+    come from the chosen member, exactly like a real invoice.
+  - Dummy data: client "Paciente Ejemplo", DNI "00000000T", an example
+    address, service "Sesión de ejemplo", 50,00 €, marked PAGADO.
+  - A visible **"EJEMPLO"** mark (a large diagonal watermark) and the invoice
+    number printed as "EJEMPLO", so a preview can never be mistaken for a real
+    invoice.
+  - Uses the clinic's CURRENT saved settings (template, business data,
+    member data). Nothing is created, saved or numbered; no sequence number
+    is consumed.
+- Implementation: `lib/invoices/preview.ts` (dummy props, shares the snapshot
+  builder with real invoices), `app/api/invoices/preview/route.ts` (session
+  authenticated, returns the PDF), watermark support in the template props,
+  `components/panel/invoice-preview-panel.tsx`, button in
+  `components/panel/invoicing-settings.tsx`. No migration.
+- CODE IMPLEMENTED (2026-11-19): PENDING LIVE TESTING.
+
+## Step: invoice-edit-before-generate
+Status: not_started
+Criteria:
+- DESIGN (2026-11-19, Arun): when generating an invoice from an appointment
+  (right after Cobrar, from Facturas > Pendientes, or from a client's
+  history; one shared component, `InvoiceConfirmModal`), the clinic sees a
+  **preview and can edit fields before confirming**. Nothing is created until
+  it confirms.
+  - Editable fields: client name, DNI, address, the extra concept (from the
+    clinic's list or typed), an optional **note** printed on the invoice
+    (an "OBSERVACIONES" box), and the **amount**. The email options stay as
+    today (send checkbox, missing-email field, one-off alternate address).
+  - A live PDF preview next to the form (below it on narrow screens),
+    refreshed shortly after edits.
+  - Edits apply to THIS invoice only (name, concept, note, amount). DNI and
+    address keep today's behavior of also updating the client's profile.
+    The appointment's own price is never changed, and neither is the
+    service's.
+  - **Amount modified:** if the amount differs from the appointment's
+    service price, the invoice stores `original_amount` and
+    `amount_modified = true`. This is **not printed on the PDF**; it is an
+    internal marker, shown on the Facturas page as a small "Importe
+    modificado" label with the original service price. (Arun's "hidden
+    label in the invoice": read as hidden from the patient's PDF, visible to
+    the clinic.)
+- Needs a migration (`schema_subset_044.sql`): `note`, `original_amount`,
+  `amount_modified` on `kalendar_invoices`. Reads of invoices must tolerate
+  the columns not existing yet (select "*").
+
+## Step: invoice-regenerate
+Status: not_started
+Criteria:
+- DESIGN (2026-11-19, Arun): a **"Regenerar"** button per invoice on the
+  Facturas page rebuilds the invoice with the clinic's CURRENT information
+  and keeps every previous version for a historical view.
+  - **Same invoice number** with a **version label** (e.g. "2026-0002 · v2").
+    The latest version is the current one; older versions are never deleted
+    and stay downloadable from a per-invoice history list (v1, v2, ... with
+    their dates).
+  - Refreshed from current data: business details, the booking's
+    practitioner (name, title, colegiada number, signature), the template,
+    and the client's DNI and address from their profile.
+  - Kept exactly as invoiced: client name and email, service/concept, note,
+    amount, payment method, issue number.
+    (Arun suggested "client contact details"; the client NAME is deliberately
+    not refreshed, so a billing name edited at generation never silently
+    reverts.)
+  - Regenerating does **not** email anything; the clinic uses "Reenviar" when
+    it wants to send the new version. The patient's existing link always
+    shows the latest version.
+  - Stricter control later: once VeriFactu is implemented, officially
+    submitted invoices cannot be regenerated (Arun). Not built; the rule
+    should be one explicit check in the regenerate action.
+- Data model (in `schema_subset_044.sql` with the edit step): the invoice row
+  stays the single "current" record, with `version` (default 1) and
+  `regenerated_at`; each superseded state is copied into a new
+  `kalendar_invoice_versions` table (frozen fields + snapshot + the version
+  number). Old versions render from that stored data, via the PDF route with
+  a `version` parameter.
+

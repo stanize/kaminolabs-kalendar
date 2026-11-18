@@ -10,6 +10,7 @@ import type { InvoicingDictionary } from "@/lib/i18n/dictionaries/invoicing";
 import { reportClientError } from "@/lib/report-client-error";
 import { InvoiceConceptsSettings } from "@/components/panel/invoice-concepts-settings";
 import type { InvoiceConcept } from "@/lib/invoices/concepts";
+import { InvoicePreviewPanel, type PreviewMemberOption } from "@/components/panel/invoice-preview-panel";
 
 // invoice-template-selection + auto-invoice-setting + signature-upload
 // (pdf-invoicing.md) — all three live on this one Settings tab.
@@ -19,6 +20,8 @@ export function InvoicingSettings({
   initialNextNumberOverride,
   nextNumberPreview,
   initialConcepts,
+  previewMembers,
+  defaultPreviewMemberId,
   dict,
 }: {
   initialTemplateId: string;
@@ -32,6 +35,10 @@ export function InvoicingSettings({
   // invoice-concepts-list: the clinic's current billing line-item list,
   // managed below.
   initialConcepts: InvoiceConcept[];
+  // invoice-preview: active team members the sample invoice can be shown
+  // "as", and the default one (the current user's own row).
+  previewMembers: PreviewMemberOption[];
+  defaultPreviewMemberId: string | null;
   dict: InvoicingDictionary["settings"];
 }) {
   const router = useRouter();
@@ -42,6 +49,7 @@ export function InvoicingSettings({
   const [nextNumberOverride, setNextNumberOverride] = useState(initialNextNumberOverride);
   const [numberSaving, setNumberSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   async function handleTemplateChange(next: string) {
     setTemplateId(next);
@@ -159,6 +167,27 @@ export function InvoicingSettings({
           ))}
         </div>
       </div>
+
+      <div className="rounded-2xl border border-line bg-surface p-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="text-[15px] font-semibold text-ink">{dict.previewSectionTitle}</h2>
+            <p className="mt-1.5 text-[13.5px] text-ink-soft">{dict.previewSectionSubtitle}</p>
+          </div>
+          <Btn variant="outline" size="sm" type="button" onClick={() => setPreviewOpen(true)}>
+            {dict.previewButton}
+          </Btn>
+        </div>
+      </div>
+
+      {previewOpen && (
+        <InvoicePreviewPanel
+          members={previewMembers}
+          defaultMemberId={defaultPreviewMemberId}
+          dict={dict}
+          onClose={() => setPreviewOpen(false)}
+        />
+      )}
 
       <div className="rounded-2xl border border-line bg-surface p-6">
         <label className="flex items-start gap-2.5">

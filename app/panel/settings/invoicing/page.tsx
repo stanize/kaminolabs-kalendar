@@ -6,6 +6,7 @@ import { getInvoicingDictionary } from "@/lib/i18n/dictionaries/invoicing";
 import { getNextInvoiceNumberPreview } from "@/lib/invoices/data";
 import { getInvoiceConcepts } from "@/lib/invoices/concepts";
 import { InvoicingSettings } from "@/components/panel/invoicing-settings";
+import { getTeamForUser } from "@/lib/team/data";
 
 export default async function InvoicingSettingsPage() {
   const session = await requireSession();
@@ -15,10 +16,15 @@ export default async function InvoicingSettingsPage() {
   const locale = await getLocale();
   const dict = getInvoicingDictionary(locale);
   const issueYear = new Date().getFullYear();
-  const [nextNumberPreview, concepts] = await Promise.all([
+  const [nextNumberPreview, concepts, team] = await Promise.all([
     getNextInvoiceNumberPreview(business.id, issueYear, business.invoice_next_number),
     getInvoiceConcepts(business.id),
+    getTeamForUser(session.user.id),
   ]);
+  // invoice-preview: only active members can be "the practitioner" of a
+  // sample invoice; the default is the current user (the owner's own row).
+  const previewMembers = team.filter((m) => m.active).map((m) => ({ id: m.id, name: m.name }));
+  const defaultPreviewMemberId = team.find((m) => m.is_owner)?.id ?? previewMembers[0]?.id ?? null;
 
   return (
     <InvoicingSettings
@@ -27,6 +33,8 @@ export default async function InvoicingSettingsPage() {
       initialNextNumberOverride={business.invoice_next_number}
       nextNumberPreview={nextNumberPreview}
       initialConcepts={concepts}
+      previewMembers={previewMembers}
+      defaultPreviewMemberId={defaultPreviewMemberId}
       dict={dict.settings}
     />
   );

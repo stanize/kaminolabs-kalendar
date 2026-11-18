@@ -7,6 +7,14 @@ import type { Locale } from "../config";
  */
 export interface InvoicingDictionary {
   settings: {
+    // invoice-preview: "Vista previa" of a sample invoice with made-up data.
+    previewSectionTitle: string;
+    previewSectionSubtitle: string;
+    previewButton: string;
+    previewPanelTitle: string;
+    previewHint: string;
+    previewPractitionerLabel: string;
+    previewClose: string;
     templateSectionTitle: string;
     templateSectionSubtitle: string;
     templateVatExemptLabel: string;
@@ -117,6 +125,13 @@ export interface InvoicingDictionary {
 
 const es: InvoicingDictionary = {
   settings: {
+    previewSectionTitle: "Vista previa de la factura",
+    previewSectionSubtitle: "Mira cómo quedará una factura con tus datos actuales, usando un cliente y un servicio de ejemplo.",
+    previewButton: "Vista previa",
+    previewPanelTitle: "Vista previa de la factura",
+    previewHint: "Es un ejemplo: el cliente, el servicio y el importe son inventados y no se guarda nada. Los datos del profesional, del negocio y la plantilla son los que tienes guardados ahora.",
+    previewPractitionerLabel: "Ver como profesional",
+    previewClose: "Cerrar",
     templateSectionTitle: "Plantilla de factura",
     templateSectionSubtitle: "Elige la plantilla que se usará al generar tus facturas.",
     templateVatExemptLabel: "Exento de IVA",
@@ -212,6 +227,13 @@ const es: InvoicingDictionary = {
 
 const en: InvoicingDictionary = {
   settings: {
+    previewSectionTitle: "Invoice preview",
+    previewSectionSubtitle: "See what an invoice will look like with your current details, using a sample client and service.",
+    previewButton: "Preview",
+    previewPanelTitle: "Invoice preview",
+    previewHint: "This is an example: the client, service and amount are made up and nothing is saved. The practitioner, business and template details are the ones you have saved now.",
+    previewPractitionerLabel: "View as practitioner",
+    previewClose: "Close",
     templateSectionTitle: "Invoice template",
     templateSectionSubtitle: "Choose the template used to generate your invoices.",
     templateVatExemptLabel: "VAT-exempt",

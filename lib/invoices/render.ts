@@ -2,10 +2,36 @@ import "server-only";
 import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer";
 import { createElement, type ReactElement } from "react";
 import type { InvoiceRow } from "@/lib/invoices/data";
+import type { InvoiceBusinessSnapshot } from "@/lib/invoices/types";
 import { getInvoiceTemplate } from "@/lib/invoices/templates";
 import type { InvoiceTemplateProps } from "@/lib/invoices/templates/types";
 import { formatInvoiceNumber } from "@/lib/invoices/data";
 import { buildVerificationUrl, generateQrDataUri } from "@/lib/invoices/qr";
+
+/** The template's `business` props, from an invoice's frozen snapshot — shared by real invoices and the settings preview. */
+export function templateBusinessFromSnapshot(snapshot: InvoiceBusinessSnapshot): InvoiceTemplateProps["business"] {
+  return {
+    name: snapshot.name,
+    legalId: snapshot.legalId,
+    addressStreet: snapshot.addressStreet,
+    addressNumber: snapshot.addressNumber,
+    addressAdditional: snapshot.addressAdditional,
+    city: snapshot.city,
+    addressPostalCode: snapshot.addressPostalCode,
+    addressProvince: snapshot.addressProvince,
+    addressCountry: snapshot.addressCountry,
+    contactEmail: snapshot.contactEmail,
+    phoneCountryCode: snapshot.phoneCountryCode,
+    phoneNumber: snapshot.phoneNumber,
+    professionalDni: snapshot.professionalDni,
+    professionalCollegeNumber: snapshot.professionalCollegeNumber,
+    professionalTitle: snapshot.professionalTitle,
+    professionalName: snapshot.professionalName,
+    signatureUrl: snapshot.signatureUrl,
+    brandColor: snapshot.brandColor,
+    isSolo: snapshot.isSolo,
+  };
+}
 
 const INTL_LOCALE = "es-ES";
 const TZ = "Europe/Madrid";
@@ -32,27 +58,7 @@ export async function renderInvoicePdf(invoice: InvoiceRow, paid: boolean): Prom
   const qrDataUri = await generateQrDataUri(verificationUrl);
 
   const props: InvoiceTemplateProps = {
-    business: {
-      name: snapshot.name,
-      legalId: snapshot.legalId,
-      addressStreet: snapshot.addressStreet,
-      addressNumber: snapshot.addressNumber,
-      addressAdditional: snapshot.addressAdditional,
-      city: snapshot.city,
-      addressPostalCode: snapshot.addressPostalCode,
-      addressProvince: snapshot.addressProvince,
-      addressCountry: snapshot.addressCountry,
-      contactEmail: snapshot.contactEmail,
-      phoneCountryCode: snapshot.phoneCountryCode,
-      phoneNumber: snapshot.phoneNumber,
-      professionalDni: snapshot.professionalDni,
-      professionalCollegeNumber: snapshot.professionalCollegeNumber,
-      professionalTitle: snapshot.professionalTitle,
-      professionalName: snapshot.professionalName,
-      signatureUrl: snapshot.signatureUrl,
-      brandColor: snapshot.brandColor,
-      isSolo: snapshot.isSolo,
-    },
+    business: templateBusinessFromSnapshot(snapshot),
     client: { name: invoice.client_name, dni: invoice.client_dni, address: invoice.client_address },
     invoiceNumberFormatted: formatInvoiceNumber(invoice.issue_year, invoice.invoice_number),
     issueDate: new Intl.DateTimeFormat(INTL_LOCALE, { timeZone: TZ, day: "numeric", month: "long", year: "numeric" }).format(

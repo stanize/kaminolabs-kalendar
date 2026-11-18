@@ -39,4 +39,8 @@ export interface InvoiceTemplateProps {
   // image itself).
   verificationUrl: string;
   qrDataUri: string;
+  // invoice-preview (pdf-invoicing.md): a large diagonal word drawn behind
+  // the content (e.g. "EJEMPLO") so a preview can't pass for a real invoice.
+  // Absent on every real invoice.
+  watermark?: string;
 }
