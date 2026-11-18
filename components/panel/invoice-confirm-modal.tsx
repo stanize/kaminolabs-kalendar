@@ -256,7 +256,7 @@ export function InvoiceConfirmModal({
         aria-hidden
       />
       <div
-        className={`absolute inset-y-0 right-0 flex h-full w-full flex-col overflow-y-auto bg-surface p-5 shadow-2xl transition-transform duration-200 ease-out sm:p-8 lg:w-[min(1100px,92%)] ${
+        className={`absolute inset-y-0 right-0 flex h-full w-full flex-col overflow-y-auto bg-surface p-5 shadow-2xl transition-transform duration-200 ease-out sm:p-6 ${
           visible ? "translate-x-0" : "translate-x-full"
         }`}
       >
@@ -425,7 +425,7 @@ export function InvoiceConfirmModal({
               <>
                 {/* Inline PDF viewers are unreliable on phones/tablets: there, a link opens it in a tab instead. */}
                 <iframe
-                  src={`${previewUrl}#navpanes=0&view=FitH`}
+                  src={`${previewUrl}#navpanes=0&zoom=100`}
                   title={dict.previewTitle}
                   className="hidden min-h-0 w-full flex-1 rounded-lg border border-line bg-surface-2 lg:block"
                 />

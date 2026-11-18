@@ -44,9 +44,9 @@ export function InvoicePreviewPanel({
   }
 
   // The #fragment asks the browser's PDF viewer to hide its thumbnail
-  // sidebar and fit the page to the width, so the invoice uses the whole
-  // panel instead of a narrow strip.
-  const src = `/api/invoices/preview${memberId ? `?member=${encodeURIComponent(memberId)}` : ""}#navpanes=0&view=FitH`;
+  // sidebar and open at 100% zoom (fitting the width made a wide panel
+  // enlarge the page to ~200%, showing only its top).
+  const src = `/api/invoices/preview${memberId ? `?member=${encodeURIComponent(memberId)}` : ""}#navpanes=0&zoom=100`;
 
   return (
     <div className="fixed inset-y-0 left-0 right-0 z-50 md:left-[240px]">
