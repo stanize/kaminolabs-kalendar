@@ -136,7 +136,7 @@ export interface CalendarDictionary {
     // nueva-cita-from-panel: header button opening a new, pre-filled
     // appointment for the same client (see appointment-modal.tsx's
     // `initialServiceId`/`initialClientId`/etc. props).
-    newApptButton: string; // "Nueva cita"
+    newApptButton: string; // "Replicar cita"
     notesLabel: string; // "Comentarios"
     // detail-panel-inline-edit (2026-10): confirm dialog shown when closing
     // with unsaved field changes (the fields themselves reuse dict.modal's
@@ -392,7 +392,7 @@ const es: CalendarDictionary = {
   },
   detailModal: {
     close: "Cerrar",
-    newApptButton: "Nueva cita",
+    newApptButton: "Replicar cita",
     notesLabel: "Comentarios",
     discardTitle: "¿Descartar cambios?",
     discardBody: "Has modificado esta cita pero no has guardado los cambios.",
@@ -604,7 +604,7 @@ const en: CalendarDictionary = {
   },
   detailModal: {
     close: "Close",
-    newApptButton: "New appointment",
+    newApptButton: "Duplicate appointment",
     notesLabel: "Comments",
     discardTitle: "Discard changes?",
     discardBody: "You've made changes to this appointment that haven't been saved.",
