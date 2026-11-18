@@ -61,6 +61,12 @@ confirmed working by Arun):
   Hidden entirely once every active provider is booked for that slot.
   Day view / single-provider Week view unaffected (each provider
   already has their own column there, no overlap ambiguity to solve).
+- IMPLEMENTED (2026-11-18, Arun, after trying the merged view live): in the
+  new-appointment panel, while a team clinic has no provider chosen, the
+  Fecha and Hora fields are disabled (and the time dropdown stays closed),
+  and the "Profesional" label turns orange and bold to pull the eye there
+  first. Previously the time dropdown still offered generic hourly slots
+  with no provider picked. Typechecked/linted; PENDING TESTING.
 - Still needs: Arun to test live with Bea's 2-provider clinic (and
   ideally a 3+ provider account) — Day view, Week view (all/one/a-few
   selected), the persisted-cookie behavior across reloads, creating an
