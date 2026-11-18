@@ -44,3 +44,41 @@ export function generateFrequencyTimes(
   for (let t = s; t < e; t += frequencyMin) out.push(fromMinutes(t));
   return out;
 }
+
+/** One stretch of a Frecuencia rule: start..end (end exclusive) every N minutes. */
+export interface FrequencyRange {
+  start: string; // "HH:MM"
+  end: string; // "HH:MM"
+  frequencyMin: number;
+}
+
+/** Most ranges one rule can hold (more than enough for morning/afternoon). */
+export const MAX_FREQUENCY_RANGES = 8;
+
+export type FrequencyRangesResult =
+  | { ok: true; times: string[] }
+  | { ok: false; reason: "invalid" | "overlap" };
+
+/**
+ * All start times for a rule made of several ranges, sorted and joined —
+ * e.g. 09:00-13:00 and 14:00-18:00 every 30 min leaves a gap over lunch.
+ * `invalid` = a range isn't usable on its own (see generateFrequencyTimes);
+ * `overlap` = two ranges share time (touching, end == next start, is fine).
+ * Same function the editor's preview and the server's save both use.
+ */
+export function generateFrequencyTimesFromRanges(ranges: FrequencyRange[]): FrequencyRangesResult {
+  if (ranges.length === 0 || ranges.length > MAX_FREQUENCY_RANGES) return { ok: false, reason: "invalid" };
+  const parsed: { s: number; e: number; times: string[] }[] = [];
+  for (const r of ranges) {
+    const times = generateFrequencyTimes(r.start, r.end, r.frequencyMin);
+    const s = toMinutes(r.start);
+    const e = toMinutes(r.end);
+    if (!times || times.length === 0 || s === null || e === null) return { ok: false, reason: "invalid" };
+    parsed.push({ s, e, times });
+  }
+  parsed.sort((a, b) => a.s - b.s);
+  for (let i = 1; i < parsed.length; i++) {
+    if (parsed[i].s < parsed[i - 1].e) return { ok: false, reason: "overlap" };
+  }
+  return { ok: true, times: parsed.flatMap((p) => p.times) };
+}

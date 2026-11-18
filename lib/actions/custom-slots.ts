@@ -8,7 +8,8 @@ import type { CustomTimeSlotRule } from "@/lib/custom-slots/data";
 import type { DayId } from "@/lib/onboarding/types";
 import {
   FREQUENCY_OPTIONS,
-  generateFrequencyTimes,
+  generateFrequencyTimesFromRanges,
+  type FrequencyRange,
   type SlotType,
 } from "@/lib/custom-slots/frequency";
 
@@ -29,6 +30,7 @@ export interface CustomTimeSlotActionDict {
   errLabelTooLong: string; // contains "{max}"
   errInvalidRange: string; // frequency: end must be after start, both HH:MM
   errInvalidFrequency: string; // frequency: not one of FREQUENCY_OPTIONS
+  errRangeOverlap: string; // frequency: two ranges share time
   errInvalidType: string;
 }
 
@@ -43,6 +45,7 @@ const FALLBACK: CustomTimeSlotActionDict = {
   errLabelTooLong: "El nombre no puede superar los {max} caracteres.",
   errInvalidRange: "La hora de fin debe ser posterior a la de inicio.",
   errInvalidFrequency: "Frecuencia no válida.",
+  errRangeOverlap: "Los tramos no pueden solaparse.",
   errInvalidType: "Tipo de horario no válido.",
 };
 
@@ -62,9 +65,7 @@ interface RulePayload {
   // slotType "custom": the clinic-entered list.
   times: string[];
   // slotType "frequency": `times` is ignored and generated from these.
-  rangeStart?: string;
-  rangeEnd?: string;
-  frequencyMin?: number;
+  frequencyRanges?: FrequencyRange[];
   dict?: Partial<CustomTimeSlotActionDict>;
 }
 
@@ -75,9 +76,7 @@ type Normalized = {
   times: string[];
   label: string | null;
   slotType: SlotType;
-  rangeStart: string | null;
-  rangeEnd: string | null;
-  frequencyMin: number | null;
+  frequencyRanges: FrequencyRange[] | null;
 };
 
 async function validateAndNormalize(
@@ -96,25 +95,30 @@ async function validateAndNormalize(
   }
 
   let times: string[];
-  let rangeStart: string | null = null;
-  let rangeEnd: string | null = null;
-  let frequencyMin: number | null = null;
+  let frequencyRanges: FrequencyRange[] | null = null;
   if (payload.slotType === "frequency") {
-    const start = (payload.rangeStart ?? "").trim();
-    const end = (payload.rangeEnd ?? "").trim();
-    for (const t of [start, end]) {
-      if (!TIME_RE.test(t)) return { ok: false, error: tmpl(d.errInvalidTime, { time: t }) };
+    const ranges = (payload.frequencyRanges ?? []).map((r) => ({
+      start: (r.start ?? "").trim(),
+      end: (r.end ?? "").trim(),
+      frequencyMin: r.frequencyMin,
+    }));
+    for (const r of ranges) {
+      for (const t of [r.start, r.end]) {
+        if (!TIME_RE.test(t)) return { ok: false, error: tmpl(d.errInvalidTime, { time: t }) };
+      }
+      if (
+        typeof r.frequencyMin !== "number" ||
+        !(FREQUENCY_OPTIONS as readonly number[]).includes(r.frequencyMin)
+      ) {
+        return { ok: false, error: d.errInvalidFrequency };
+      }
     }
-    const freq = payload.frequencyMin;
-    if (typeof freq !== "number" || !(FREQUENCY_OPTIONS as readonly number[]).includes(freq)) {
-      return { ok: false, error: d.errInvalidFrequency };
+    const generated = generateFrequencyTimesFromRanges(ranges);
+    if (!generated.ok) {
+      return { ok: false, error: generated.reason === "overlap" ? d.errRangeOverlap : d.errInvalidRange };
     }
-    const generated = generateFrequencyTimes(start, end, freq);
-    if (!generated || generated.length === 0) return { ok: false, error: d.errInvalidRange };
-    times = generated;
-    rangeStart = start;
-    rangeEnd = end;
-    frequencyMin = freq;
+    times = generated.times;
+    frequencyRanges = ranges;
   } else {
     times = payload.times.map((t) => t.trim()).filter(Boolean);
     if (times.length === 0) return { ok: false, error: d.errTimesRequired };
@@ -143,9 +147,7 @@ async function validateAndNormalize(
     times,
     label: payload.label.trim() || null,
     slotType: payload.slotType,
-    rangeStart,
-    rangeEnd,
-    frequencyMin,
+    frequencyRanges,
   };
 }
 
@@ -157,9 +159,7 @@ function toRule(row: {
   team_member_ids: string[] | null;
   times: string[] | null;
   slot_type?: string | null;
-  range_start?: string | null;
-  range_end?: string | null;
-  frequency_min?: number | null;
+  frequency_ranges?: FrequencyRange[] | null;
   sort_order: number;
   created_at: string;
 }): CustomTimeSlotRule {
@@ -171,9 +171,7 @@ function toRule(row: {
     teamMemberIds: row.team_member_ids ?? [],
     times: row.times ?? [],
     slotType: row.slot_type === "frequency" ? "frequency" : "custom",
-    rangeStart: row.range_start ?? null,
-    rangeEnd: row.range_end ?? null,
-    frequencyMin: row.frequency_min ?? null,
+    frequencyRanges: Array.isArray(row.frequency_ranges) ? row.frequency_ranges : [],
     sortOrder: row.sort_order,
     createdAt: row.created_at,
   };
@@ -200,9 +198,7 @@ export const createCustomTimeSlotRule = authedAction(
         team_member_ids: validated.teamMemberIds,
         times: validated.times,
         slot_type: validated.slotType,
-        range_start: validated.rangeStart,
-        range_end: validated.rangeEnd,
-        frequency_min: validated.frequencyMin,
+        frequency_ranges: validated.frequencyRanges,
       })
       .select(RULE_COLUMNS)
       .single();
@@ -232,9 +228,7 @@ export const updateCustomTimeSlotRule = authedAction(
         team_member_ids: validated.teamMemberIds,
         times: validated.times,
         slot_type: validated.slotType,
-        range_start: validated.rangeStart,
-        range_end: validated.rangeEnd,
-        frequency_min: validated.frequencyMin,
+        frequency_ranges: validated.frequencyRanges,
       })
       .eq("id", payload.ruleId)
       .eq("business_id", business.id)

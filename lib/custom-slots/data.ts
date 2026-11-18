@@ -2,7 +2,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { getBusinessForUser } from "@/lib/business/data";
 import type { DayId } from "@/lib/onboarding/types";
-import type { SlotType } from "@/lib/custom-slots/frequency";
+import type { SlotType, FrequencyRange } from "@/lib/custom-slots/frequency";
 
 export interface CustomTimeSlotRule {
   id: string;
@@ -11,14 +11,12 @@ export interface CustomTimeSlotRule {
   days: DayId[]; // empty = every open day
   teamMemberIds: string[]; // empty = all providers
   // For a "custom" rule: the clinic-entered list. For a "frequency" rule:
-  // generated from rangeStart/rangeEnd/frequencyMin on every save, so every
+  // generated from frequencyRanges on every save, so every
   // consumer (booking form suggestions, future public page) reads `times`
   // the same way regardless of type.
   times: string[]; // "HH:MM"
   slotType: SlotType;
-  rangeStart: string | null; // "HH:MM", frequency rules only
-  rangeEnd: string | null; // "HH:MM", frequency rules only
-  frequencyMin: number | null; // frequency rules only
+  frequencyRanges: FrequencyRange[]; // frequency rules only; empty for custom
   sortOrder: number;
   createdAt: string;
 }
@@ -55,9 +53,7 @@ export async function getCustomTimeSlotsForUser(userId: string): Promise<CustomT
     team_member_ids: string[] | null;
     times: string[] | null;
     slot_type?: string | null;
-    range_start?: string | null;
-    range_end?: string | null;
-    frequency_min?: number | null;
+    frequency_ranges?: FrequencyRange[] | null;
     sort_order: number;
     created_at: string;
   }[] | null) ?? []).map((r) => ({
@@ -68,9 +64,7 @@ export async function getCustomTimeSlotsForUser(userId: string): Promise<CustomT
     teamMemberIds: r.team_member_ids ?? [],
     times: r.times ?? [],
     slotType: r.slot_type === "frequency" ? "frequency" : "custom",
-    rangeStart: r.range_start ?? null,
-    rangeEnd: r.range_end ?? null,
-    frequencyMin: r.frequency_min ?? null,
+    frequencyRanges: Array.isArray(r.frequency_ranges) ? r.frequency_ranges : [],
     sortOrder: r.sort_order,
     createdAt: r.created_at,
   }));

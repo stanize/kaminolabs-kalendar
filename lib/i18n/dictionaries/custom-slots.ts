@@ -23,7 +23,9 @@ export interface CustomSlotsDictionary {
   frequencyLabel: string;
   frequencyOptionTemplate: string; // "{n}" minutes
   frequencyHint: string;
-  previewTemplate: string; // "{n}" count, "{list}" first times
+  addRangeButton: string;
+  removeRangeAria: string;
+  previewTemplate: string; // "{n}" count
   previewInvalid: string;
   frequencySummaryTemplate: string; // "{start}", "{end}", "{n}"
 
@@ -69,6 +71,7 @@ export interface CustomSlotsDictionary {
     errLabelTooLong: string; // "{max}"
     errInvalidRange: string;
     errInvalidFrequency: string;
+    errRangeOverlap: string;
     errInvalidType: string;
   };
 }
@@ -87,10 +90,12 @@ const es: CustomSlotsDictionary = {
   endLabel: "Hora de fin",
   frequencyLabel: "Frecuencia",
   frequencyOptionTemplate: "Cada {n} min",
-  frequencyHint: "La hora de fin no se incluye como hora de cita.",
-  previewTemplate: "Se crearán {n} horarios: {list}",
+  frequencyHint: "La hora de fin no se incluye como hora de cita. Añade varios tramos para dejar huecos, por ejemplo una pausa para comer.",
+  addRangeButton: "Añadir tramo",
+  removeRangeAria: "Eliminar tramo",
+  previewTemplate: "Se crearán {n} horarios",
   previewInvalid: "La hora de fin debe ser posterior a la de inicio.",
-  frequencySummaryTemplate: "{start}–{end} · cada {n} min",
+  frequencySummaryTemplate: "{start}–{end} (cada {n} min)",
 
   panelTitleNew: "Nuevo horario personalizado",
   panelTitleEdit: "Editar horario personalizado",
@@ -132,6 +137,7 @@ const es: CustomSlotsDictionary = {
     errLabelTooLong: "El nombre no puede superar los {max} caracteres.",
     errInvalidRange: "La hora de fin debe ser posterior a la de inicio.",
     errInvalidFrequency: "Frecuencia no válida.",
+    errRangeOverlap: "Los tramos no pueden solaparse.",
     errInvalidType: "Tipo de horario no válido.",
   },
 };
@@ -150,10 +156,12 @@ const en: CustomSlotsDictionary = {
   endLabel: "End time",
   frequencyLabel: "Frequency",
   frequencyOptionTemplate: "Every {n} min",
-  frequencyHint: "The end time itself is not offered as an appointment time.",
-  previewTemplate: "{n} times will be created: {list}",
+  frequencyHint: "The end time itself is not offered as an appointment time. Add several ranges to leave gaps, for example a lunch break.",
+  addRangeButton: "Add range",
+  removeRangeAria: "Remove range",
+  previewTemplate: "{n} times will be created",
   previewInvalid: "The end time must be after the start time.",
-  frequencySummaryTemplate: "{start}–{end} · every {n} min",
+  frequencySummaryTemplate: "{start}–{end} (every {n} min)",
 
   panelTitleNew: "New custom time slot",
   panelTitleEdit: "Edit custom time slot",
@@ -195,6 +203,7 @@ const en: CustomSlotsDictionary = {
     errLabelTooLong: "The name can't be longer than {max} characters.",
     errInvalidRange: "The end time must be after the start time.",
     errInvalidFrequency: "Invalid frequency.",
+    errRangeOverlap: "Ranges can't overlap.",
     errInvalidType: "Invalid slot type.",
   },
 };

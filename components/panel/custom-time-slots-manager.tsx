@@ -14,7 +14,10 @@ import { AvailabilityHeaderAction } from "@/components/panel/availability-header
 import type { CustomTimeSlotRule } from "@/lib/custom-slots/data";
 import {
   FREQUENCY_OPTIONS,
+  MAX_FREQUENCY_RANGES,
   generateFrequencyTimes,
+  generateFrequencyTimesFromRanges,
+  type FrequencyRange,
   type SlotType,
 } from "@/lib/custom-slots/frequency";
 import type { CustomSlotsDictionary } from "@/lib/i18n/dictionaries/custom-slots";
@@ -98,11 +101,15 @@ export function CustomTimeSlotsManager({
                   {" · "}
                   {r.teamMemberIds.length === 0 ? dict.allProvidersSummary : r.teamMemberIds.map(memberName).join(", ")}
                   {" · "}
-                  {r.slotType === "frequency" && r.rangeStart && r.rangeEnd && r.frequencyMin
-                    ? dict.frequencySummaryTemplate
-                        .replace("{start}", r.rangeStart)
-                        .replace("{end}", r.rangeEnd)
-                        .replace("{n}", String(r.frequencyMin))
+                  {r.slotType === "frequency" && r.frequencyRanges.length > 0
+                    ? r.frequencyRanges
+                        .map((fr) =>
+                          dict.frequencySummaryTemplate
+                            .replace("{start}", fr.start)
+                            .replace("{end}", fr.end)
+                            .replace("{n}", String(fr.frequencyMin))
+                        )
+                        .join(", ")
                     : dict.timesCountTemplate.replace("{n}", String(r.times.length))}
                 </p>
               </div>
@@ -177,9 +184,10 @@ function RulePanel({
   const [times, setTimes] = useState<string[]>(
     rule?.slotType !== "frequency" && rule?.times.length ? rule.times : [""]
   );
-  const [rangeStart, setRangeStart] = useState(rule?.rangeStart ?? "");
-  const [rangeEnd, setRangeEnd] = useState(rule?.rangeEnd ?? "");
-  const [frequencyMin, setFrequencyMin] = useState<number>(rule?.frequencyMin ?? 30);
+  // Frecuencia type: one or more ranges (several = gaps, e.g. a lunch break).
+  const [ranges, setRanges] = useState<FrequencyRange[]>(
+    rule?.frequencyRanges.length ? rule.frequencyRanges : [{ start: "", end: "", frequencyMin: 30 }]
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -228,10 +236,31 @@ function RulePanel({
 
   // Frequency type: the exact list that will be saved (same helper the
   // server uses), shown live so the clinic sees what they're creating.
-  const frequencyTimes =
-    slotType === "frequency"
-      ? generateFrequencyTimes(normalizeTime(rangeStart), normalizeTime(rangeEnd), frequencyMin)
+  const normalizedRanges: FrequencyRange[] = ranges.map((r) => ({
+    start: normalizeTime(r.start),
+    end: normalizeTime(r.end),
+    frequencyMin: r.frequencyMin,
+  }));
+  const frequencyResult = slotType === "frequency" ? generateFrequencyTimesFromRanges(normalizedRanges) : null;
+  const frequencyTimes = frequencyResult?.ok ? frequencyResult.times : null;
+  const frequencyProblem =
+    frequencyResult && !frequencyResult.ok && ranges.some((r) => r.start.trim() && r.end.trim())
+      ? frequencyResult.reason
       : null;
+
+  function updateRange(i: number, patch: Partial<FrequencyRange>) {
+    setRanges((rs) => rs.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
+  }
+  function addRange() {
+    setRanges((rs) => {
+      const last = rs[rs.length - 1];
+      return [...rs, { start: last?.end ?? "", end: "", frequencyMin: last?.frequencyMin ?? 30 }];
+    });
+  }
+  // "09:00, 09:30 … 12:30" — a range's times, shortened when long.
+  function compactTimes(ts: string[]): string {
+    return ts.length > 6 ? `${ts.slice(0, 4).join(", ")} … ${ts[ts.length - 1]}` : ts.join(", ");
+  }
 
   function handleTimeBlur(i: number) {
     setTimes((ts) => ts.map((x, idx) => (idx === i ? normalizeTime(x) : x)));
@@ -263,9 +292,7 @@ function RulePanel({
       teamMemberIds: allProviders ? [] : teamMemberIds,
       slotType,
       times,
-      rangeStart: normalizeTime(rangeStart),
-      rangeEnd: normalizeTime(rangeEnd),
-      frequencyMin,
+      frequencyRanges: normalizedRanges,
       dict: dict.errors,
     };
     try {
@@ -386,59 +413,84 @@ function RulePanel({
 
             {slotType === "frequency" ? (
               <div className="flex flex-col gap-3">
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                  <label className="flex flex-col gap-1">
-                    <span className="text-[12.5px] font-semibold text-ink-soft">{dict.startLabel}</span>
-                    <input
-                      type="text"
-                      value={rangeStart}
-                      onChange={(e) => setRangeStart(e.target.value)}
-                      onBlur={() => setRangeStart((v) => normalizeTime(v))}
-                      placeholder={dict.timePlaceholder}
-                      className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[14px] text-ink"
-                    />
-                  </label>
-                  <label className="flex flex-col gap-1">
-                    <span className="text-[12.5px] font-semibold text-ink-soft">{dict.endLabel}</span>
-                    <input
-                      type="text"
-                      value={rangeEnd}
-                      onChange={(e) => setRangeEnd(e.target.value)}
-                      onBlur={() => setRangeEnd((v) => normalizeTime(v))}
-                      placeholder={dict.timePlaceholder}
-                      className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[14px] text-ink"
-                    />
-                  </label>
-                  <label className="flex flex-col gap-1">
-                    <span className="text-[12.5px] font-semibold text-ink-soft">{dict.frequencyLabel}</span>
-                    <select
-                      value={frequencyMin}
-                      onChange={(e) => setFrequencyMin(Number(e.target.value))}
-                      className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[14px] text-ink"
-                    >
-                      {FREQUENCY_OPTIONS.map((n) => (
-                        <option key={n} value={n}>
-                          {dict.frequencyOptionTemplate.replace("{n}", String(n))}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
+                {ranges.map((r, i) => (
+                  <div key={i} className="grid grid-cols-1 items-end gap-3 sm:grid-cols-[1fr_1fr_1fr_auto]">
+                    <label className="flex flex-col gap-1">
+                      <span className={i === 0 ? "text-[12.5px] font-semibold text-ink-soft" : "sr-only"}>
+                        {dict.startLabel}
+                      </span>
+                      <input
+                        type="text"
+                        value={r.start}
+                        onChange={(e) => updateRange(i, { start: e.target.value })}
+                        onBlur={() => updateRange(i, { start: normalizeTime(r.start) })}
+                        placeholder={dict.timePlaceholder}
+                        className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[14px] text-ink"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1">
+                      <span className={i === 0 ? "text-[12.5px] font-semibold text-ink-soft" : "sr-only"}>
+                        {dict.endLabel}
+                      </span>
+                      <input
+                        type="text"
+                        value={r.end}
+                        onChange={(e) => updateRange(i, { end: e.target.value })}
+                        onBlur={() => updateRange(i, { end: normalizeTime(r.end) })}
+                        placeholder={dict.timePlaceholder}
+                        className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[14px] text-ink"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1">
+                      <span className={i === 0 ? "text-[12.5px] font-semibold text-ink-soft" : "sr-only"}>
+                        {dict.frequencyLabel}
+                      </span>
+                      <select
+                        value={r.frequencyMin}
+                        onChange={(e) => updateRange(i, { frequencyMin: Number(e.target.value) })}
+                        className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[14px] text-ink"
+                      >
+                        {FREQUENCY_OPTIONS.map((n) => (
+                          <option key={n} value={n}>
+                            {dict.frequencyOptionTemplate.replace("{n}", String(n))}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    {ranges.length > 1 ? (
+                      <button
+                        type="button"
+                        onClick={() => setRanges((rs) => rs.filter((_, idx) => idx !== i))}
+                        aria-label={dict.removeRangeAria}
+                        className="grid h-9 w-9 place-items-center rounded-lg text-ink-soft hover:bg-surface-2"
+                      >
+                        <Icon name="x" size={14} />
+                      </button>
+                    ) : (
+                      <span className="hidden h-9 w-9 sm:block" aria-hidden />
+                    )}
+                  </div>
+                ))}
+                {ranges.length < MAX_FREQUENCY_RANGES && (
+                  <Btn variant="outline" size="sm" onClick={addRange} className="self-start">
+                    {dict.addRangeButton}
+                  </Btn>
+                )}
                 <p className="text-[12px] text-ink-soft">{dict.frequencyHint}</p>
-                {rangeStart.trim() && rangeEnd.trim() && frequencyTimes === null && (
-                  <p className="text-[12px] text-error">{dict.previewInvalid}</p>
+                {frequencyProblem && (
+                  <p className="text-[12px] text-error">
+                    {frequencyProblem === "overlap" ? dict.errors.errRangeOverlap : dict.previewInvalid}
+                  </p>
                 )}
                 {frequencyTimes && frequencyTimes.length > 0 && (
-                  <p className="text-[12.5px] text-ink">
-                    {dict.previewTemplate
-                      .replace("{n}", String(frequencyTimes.length))
-                      .replace(
-                        "{list}",
-                        frequencyTimes.length > 8
-                          ? `${frequencyTimes.slice(0, 6).join(", ")} … ${frequencyTimes[frequencyTimes.length - 1]}`
-                          : frequencyTimes.join(", ")
-                      )}
-                  </p>
+                  <div className="flex flex-col gap-0.5 text-[12.5px] text-ink">
+                    <p>{dict.previewTemplate.replace("{n}", String(frequencyTimes.length))}</p>
+                    {normalizedRanges.map((r, i) => (
+                      <p key={i} className="text-ink-soft">
+                        {r.start}–{r.end}: {compactTimes(generateFrequencyTimes(r.start, r.end, r.frequencyMin) ?? [])}
+                      </p>
+                    ))}
+                  </div>
                 )}
                 {frequencyOutside && (
                   <p className="text-[11.5px] text-amber-600">⚠ {dict.outsideHoursNote}</p>

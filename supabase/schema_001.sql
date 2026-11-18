@@ -555,14 +555,24 @@ create table public.kalendar_custom_time_slots (
   -- `times` generated from it on every save so readers never care which.
   slot_type       text        not null default 'custom'
                               check (slot_type in ('custom', 'frequency')),
+  -- range_start / range_end / frequency_min: the original single-range form
+  -- (schema_subset_042.sql). Superseded by frequency_ranges below
+  -- (schema_subset_043.sql) and no longer read or written; kept because live-DB
+  -- changes are additive only.
   range_start     text,
   range_end       text,
   frequency_min   integer,
+  -- schema_subset_043.sql: [{"start":"HH:MM","end":"HH:MM","frequencyMin":N}, ...]
+  frequency_ranges jsonb,
   sort_order      integer     not null default 0,
   created_at      timestamptz not null default now(),
   constraint kalendar_custom_time_slots_frequency_check check (
     slot_type = 'custom'
-    or (range_start is not null and range_end is not null and frequency_min between 1 and 720)
+    or (
+      frequency_ranges is not null
+      and jsonb_typeof(frequency_ranges) = 'array'
+      and jsonb_array_length(frequency_ranges) >= 1
+    )
   )
 );
 
