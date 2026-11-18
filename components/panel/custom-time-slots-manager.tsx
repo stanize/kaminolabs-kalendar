@@ -133,11 +133,6 @@ export function CustomTimeSlotsManager({
       {panelRule && (
         <RulePanel
           rule={panelRule === "new" ? null : panelRule}
-          // One type per clinic: any OTHER existing rule fixes the type; the
-          // only rule a clinic has can still be switched to the other type.
-          lockedType={
-            rules.filter((r) => r.id !== (panelRule === "new" ? null : panelRule.id))[0]?.slotType ?? null
-          }
           members={members}
           hoursByDay={hoursByDay}
           dict={dict}
@@ -158,7 +153,6 @@ export function CustomTimeSlotsManager({
 
 function RulePanel({
   rule,
-  lockedType,
   members,
   hoursByDay,
   dict,
@@ -167,7 +161,6 @@ function RulePanel({
   onSaved,
 }: {
   rule: CustomTimeSlotRule | null;
-  lockedType: SlotType | null;
   members: MemberOption[];
   hoursByDay: Partial<Record<DayId, TimeRangeVM[]>>;
   dict: CustomSlotsDictionary;
@@ -180,7 +173,7 @@ function RulePanel({
   const [days, setDays] = useState<DayId[]>(rule?.days ?? []);
   const [allProviders, setAllProviders] = useState((rule?.teamMemberIds.length ?? 0) === 0);
   const [teamMemberIds, setTeamMemberIds] = useState<string[]>(rule?.teamMemberIds ?? []);
-  const [slotType, setSlotType] = useState<SlotType>(rule?.slotType ?? lockedType ?? "custom");
+  const [slotType, setSlotType] = useState<SlotType>(rule?.slotType ?? "custom");
   const [times, setTimes] = useState<string[]>(
     rule?.slotType !== "frequency" && rule?.times.length ? rule.times : [""]
   );
@@ -232,8 +225,6 @@ function RulePanel({
     }
     setTimes((ts) => ts.map((x, idx) => (idx === i ? value : x)));
   }
-
-  const typeLabelFor = (t: SlotType) => (t === "frequency" ? dict.typeFrequency : dict.typeCustom);
 
   // Frequency type: the exact list that will be saved (same helper the
   // server uses), shown live so the clinic sees what they're creating.
@@ -341,17 +332,11 @@ function RulePanel({
             <select
               value={slotType}
               onChange={(e) => setSlotType(e.target.value as SlotType)}
-              disabled={lockedType !== null}
-              className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[15px] text-ink disabled:opacity-60"
+              className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[15px] text-ink"
             >
               <option value="frequency">{dict.typeFrequency}</option>
               <option value="custom">{dict.typeCustom}</option>
             </select>
-            {lockedType !== null && (
-              <span className="text-[12px] text-ink-soft">
-                {dict.typeLockedNote.replace("{type}", typeLabelFor(lockedType))}
-              </span>
-            )}
           </label>
 
           <div>

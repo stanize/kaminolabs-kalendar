@@ -206,14 +206,12 @@ Criteria:
     The editor shows a live preview of the generated times, and flags
     (non-blocking) any time outside Horarios.
   - Days and Profesionales selection are identical for both types.
-- ONE TYPE PER CLINIC (Arun: "the clinic can only input one type of hours,
-  customized or frequency"): if a clinic already has rules, a new rule must
-  be the same type. The Tipo dropdown is disabled with an explanatory note,
-  and the server rejects a mismatch too. The only rule a clinic has can be
-  switched to the other type (nothing to mix with). Switching a clinic's type
-  otherwise means deleting its existing rules first. This is a reading of
-  Arun's sentence ("one type(s)"); confirm if it should instead be per rule
-  or per provider.
+- ONE TYPE PER RECORD (Arun, 2026-11-18, correcting an earlier reading of
+  "the clinic can only input one type"): each rule has exactly one type,
+  Frecuencia or Personalizado. A clinic can have several rules and mix types
+  freely, e.g. a Frecuencia rule for the morning and a Personalizado rule
+  for the afternoon. There is no clinic-wide restriction. (An earlier build
+  locked the whole clinic to one type; that lock was removed the same day.)
 - SCOPE: clinic-panel side only, exactly like Personalizado today. The public
   booking page is NOT touched here: Arun will review and confirm that design
   separately (see KNOWN GAP below, which now applies to both types).
@@ -234,10 +232,9 @@ Criteria:
 - Files: `lib/custom-slots/frequency.ts` (new), `lib/custom-slots/data.ts`,
   `lib/actions/custom-slots.ts`, `components/panel/custom-time-slots-manager.tsx`,
   `lib/i18n/dictionaries/custom-slots.ts`.
-- NOT in v1: per-rule mixing of types, a frequency finer than 5 minutes or
+- NOT in v1: a frequency finer than 5 minutes or
   other than the preset list, a different frequency for different days within
-  one rule (use two rules... which the one-type rule allows, both being
-  Frecuencia).
+  one rule (use two rules).
 
 ## KNOWN GAP (important, pending) — not yet on the public booking page
 

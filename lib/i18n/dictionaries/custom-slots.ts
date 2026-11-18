@@ -18,7 +18,6 @@ export interface CustomSlotsDictionary {
   typeLabel: string;
   typeCustom: string;
   typeFrequency: string;
-  typeLockedNote: string; // "{type}" — why the selector is disabled
   startLabel: string;
   endLabel: string;
   frequencyLabel: string;
@@ -68,7 +67,6 @@ export interface CustomSlotsDictionary {
     errInvalidDay: string;
     errInvalidProvider: string;
     errLabelTooLong: string; // "{max}"
-    errMixedTypes: string; // "{type}"
     errInvalidRange: string;
     errInvalidFrequency: string;
     errInvalidType: string;
@@ -85,7 +83,6 @@ const es: CustomSlotsDictionary = {
   typeLabel: "Tipo",
   typeCustom: "Personalizado",
   typeFrequency: "Frecuencia",
-  typeLockedNote: "Ya usas horarios de tipo «{type}». Para cambiar de tipo, elimina los existentes.",
   startLabel: "Hora de inicio",
   endLabel: "Hora de fin",
   frequencyLabel: "Frecuencia",
@@ -133,7 +130,6 @@ const es: CustomSlotsDictionary = {
     errInvalidDay: "Día no válido.",
     errInvalidProvider: "Uno de los profesionales elegidos no existe.",
     errLabelTooLong: "El nombre no puede superar los {max} caracteres.",
-    errMixedTypes: "Solo puedes usar un tipo de horario a la vez. Ya tienes horarios de tipo «{type}»; elimínalos para usar otro tipo.",
     errInvalidRange: "La hora de fin debe ser posterior a la de inicio.",
     errInvalidFrequency: "Frecuencia no válida.",
     errInvalidType: "Tipo de horario no válido.",
@@ -150,7 +146,6 @@ const en: CustomSlotsDictionary = {
   typeLabel: "Type",
   typeCustom: "Custom",
   typeFrequency: "Frequency",
-  typeLockedNote: "You already use \"{type}\" slots. To switch type, delete the existing ones.",
   startLabel: "Start time",
   endLabel: "End time",
   frequencyLabel: "Frequency",
@@ -198,7 +193,6 @@ const en: CustomSlotsDictionary = {
     errInvalidDay: "Invalid day.",
     errInvalidProvider: "One of the chosen providers doesn't exist.",
     errLabelTooLong: "The name can't be longer than {max} characters.",
-    errMixedTypes: "You can only use one slot type at a time. You already have \"{type}\" slots; delete them to use another type.",
     errInvalidRange: "The end time must be after the start time.",
     errInvalidFrequency: "Invalid frequency.",
     errInvalidType: "Invalid slot type.",

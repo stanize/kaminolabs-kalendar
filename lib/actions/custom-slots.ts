@@ -27,7 +27,6 @@ export interface CustomTimeSlotActionDict {
   errInvalidDay: string;
   errInvalidProvider: string;
   errLabelTooLong: string; // contains "{max}"
-  errMixedTypes: string; // contains "{type}" — the type the clinic already uses
   errInvalidRange: string; // frequency: end must be after start, both HH:MM
   errInvalidFrequency: string; // frequency: not one of FREQUENCY_OPTIONS
   errInvalidType: string;
@@ -42,7 +41,6 @@ const FALLBACK: CustomTimeSlotActionDict = {
   errInvalidDay: "Día no válido.",
   errInvalidProvider: "Uno de los profesionales elegidos no existe.",
   errLabelTooLong: "El nombre no puede superar los {max} caracteres.",
-  errMixedTypes: "Solo puedes usar un tipo de horario a la vez. Ya tienes horarios de tipo \"{type}\"; elimínalos para usar otro tipo.",
   errInvalidRange: "La hora de fin debe ser posterior a la de inicio.",
   errInvalidFrequency: "Frecuencia no válida.",
   errInvalidType: "Tipo de horario no válido.",
@@ -85,10 +83,7 @@ type Normalized = {
 async function validateAndNormalize(
   businessId: string,
   payload: RulePayload,
-  d: CustomTimeSlotActionDict,
-  // The rule being edited (excluded from the one-type-per-clinic check, so
-  // the only rule a clinic has can be switched to the other type).
-  ruleId?: string
+  d: CustomTimeSlotActionDict
 ): Promise<Normalized | { ok: false; error: string }> {
   if (payload.label.length > LABEL_MAX) {
     return { ok: false, error: tmpl(d.errLabelTooLong, { max: String(LABEL_MAX) }) };
@@ -125,29 +120,6 @@ async function validateAndNormalize(
     if (times.length === 0) return { ok: false, error: d.errTimesRequired };
     for (const t of times) {
       if (!TIME_RE.test(t)) return { ok: false, error: tmpl(d.errInvalidTime, { time: t }) };
-    }
-  }
-
-  // One type per clinic: if the business already has rules (other than the
-  // one being edited), the new/edited rule must be the same type.
-  {
-    const supabase = await createClient();
-    const { data: existing } = await supabase
-      .from("kalendar_custom_time_slots")
-      // "*" — tolerates slot_type not existing yet before schema_subset_042.
-      .select("*")
-      .eq("business_id", businessId);
-    const others = ((existing as { id: string; slot_type?: string | null }[] | null) ?? []).filter(
-      (r) => r.id !== ruleId
-    );
-    if (others.length > 0) {
-      const existingType: SlotType = others[0].slot_type === "frequency" ? "frequency" : "custom";
-      if (existingType !== payload.slotType) {
-        return {
-          ok: false,
-          error: tmpl(d.errMixedTypes, { type: existingType === "frequency" ? "Frecuencia" : "Personalizado" }),
-        };
-      }
     }
   }
 
@@ -248,7 +220,7 @@ export const updateCustomTimeSlotRule = authedAction(
     const business = await getBusinessForUser(session.user.id);
     if (!business) return { ok: false, error: d.errNoBusiness };
 
-    const validated = await validateAndNormalize(business.id, payload, d, payload.ruleId);
+    const validated = await validateAndNormalize(business.id, payload, d);
     if (!validated.ok) return validated;
 
     const supabase = await createClient();
