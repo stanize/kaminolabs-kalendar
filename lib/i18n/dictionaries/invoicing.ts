@@ -76,7 +76,9 @@ export interface InvoicingDictionary {
     previewTitle: string;
     previewUpdating: string;
     previewError: string;
-    previewOpenTab: string;
+    zoomInAria: string;
+    zoomOutAria: string;
+    zoomFit: string;
     errNameRequired: string;
     errAmountInvalid: string;
     sending: string;
@@ -215,7 +217,9 @@ const es: InvoicingDictionary = {
     previewTitle: "Vista previa",
     previewUpdating: "Actualizando…",
     previewError: "No se pudo generar la vista previa.",
-    previewOpenTab: "Abrir vista previa en otra pestaña",
+    zoomInAria: "Acercar",
+    zoomOutAria: "Alejar",
+    zoomFit: "Ajustar",
     errNameRequired: "Indica el nombre del cliente.",
     errAmountInvalid: "Indica un importe válido.",
     sending: "Enviando…",
@@ -341,7 +345,9 @@ const en: InvoicingDictionary = {
     previewTitle: "Preview",
     previewUpdating: "Updating…",
     previewError: "Couldn't generate the preview.",
-    previewOpenTab: "Open preview in another tab",
+    zoomInAria: "Zoom in",
+    zoomOutAria: "Zoom out",
+    zoomFit: "Fit",
     errNameRequired: "Enter the client's name.",
     errAmountInvalid: "Enter a valid amount.",
     sending: "Sending…",

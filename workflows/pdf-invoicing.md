@@ -476,10 +476,18 @@ Criteria:
     (an "OBSERVACIONES" box), and the **amount**. The email options stay as
     today (send checkbox, missing-email field, one-off alternate address).
   - A live PDF preview next to the form (below it on narrow screens),
-    refreshed about 0.3 s after the last keystroke, no manual refresh. The
-    new PDF loads in a hidden second viewer and replaces the visible one
-    when ready (no blank flash). The viewer reloads, so its scroll position
-    returns to the top on each update.
+    refreshed about 0.3 s after the last keystroke, no manual refresh.
+    (2026-11-19, Arun) The preview is drawn by our OWN pdf.js viewer
+    (`components/panel/pdf-canvas-viewer.tsx`, `pdfjs-dist` pinned at
+    5.7.284, lazy-loaded) instead of the browser's PDF viewer: the server
+    still renders the real PDF, the browser draws its pages onto canvases
+    off-screen and swaps them in, so an update changes in place with no
+    reload flash and the scroll position and zoom are kept. Our own zoom
+    controls (-, Ajustar, +); it also works on phones/tablets. Used ONLY by
+    this live preview; the Ajustes > Facturación sample preview (static)
+    keeps the browser's viewer. Verified in headless Chromium: renders,
+    keeps scrollTop across an update, zoom works, no console errors, worker
+    emitted by the Next build.
   - Edits apply to THIS invoice only (name, concept, note, amount). DNI and
     address keep today's behavior of also updating the client's profile.
     The appointment's own price is never changed, and neither is the

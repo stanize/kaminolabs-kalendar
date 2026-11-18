@@ -1,12 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import { Btn } from "@/components/ui/button";
 import { createAndSendInvoice, getInvoiceBookingDefaults, listInvoiceConcepts } from "@/lib/actions/invoices";
 import { getClientIdentity } from "@/lib/actions/clients";
 import type { InvoicingDictionary } from "@/lib/i18n/dictionaries/invoicing";
 import { isWhatsappSentinelEmail } from "@/lib/whatsapp/sentinel-email";
+import { PdfCanvasViewer } from "@/components/panel/pdf-canvas-viewer";
 
 let conceptsDatalistSeq = 0;
 
@@ -38,8 +39,6 @@ function formatAmount(n: number): string {
 
 // How long to wait after the last keystroke before refreshing the preview.
 const PREVIEW_DEBOUNCE_MS = 300;
-// If the freshly rendered PDF hasn't reported "loaded" by then, show it anyway.
-const PREVIEW_SWAP_FALLBACK_MS = 2500;
 
 /**
  * invoice-confirm-modal-extraction (2026-10): the invoice-generation panel,
@@ -101,10 +100,9 @@ export function InvoiceConfirmModal({
   const [error, setError] = useState<string | null>(null);
 
   // Live preview (a blob URL of the draft PDF).
-  // The PDF being shown, and the next one loading in a hidden second viewer
-  // (swapped in when ready, so the preview never blanks while it updates).
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [pendingUrl, setPendingUrl] = useState<string | null>(null);
+  // The draft PDF's bytes, drawn by PdfCanvasViewer (our own pdf.js viewer:
+  // new bytes redraw the pages in place, no reload, scroll and zoom kept).
+  const [pdfData, setPdfData] = useState<ArrayBuffer | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewFailed, setPreviewFailed] = useState(false);
 
@@ -154,20 +152,7 @@ export function InvoiceConfirmModal({
   const amountModified = servicePrice !== null && !Number.isNaN(amountValue) && Math.abs(amountValue - servicePrice) >= 0.005;
 
   // Live preview: refreshes ~300ms after the last keystroke, cancelling a
-  // stale request when something changes. The new PDF loads in a hidden
-  // second viewer and replaces the visible one only once it is ready.
-  const shownRef = useRef<string | null>(null);
-  const pendingRef = useRef<string | null>(null);
-
-  const promote = useCallback((url: string) => {
-    if (pendingRef.current !== url) return; // superseded by a newer one
-    if (shownRef.current) URL.revokeObjectURL(shownRef.current);
-    shownRef.current = url;
-    pendingRef.current = null;
-    setPreviewUrl(url);
-    setPendingUrl(null);
-  }, []);
-
+  // stale request when something changes.
   useEffect(() => {
     if (loadingDefaults || Number.isNaN(amountValue)) return;
     const controller = new AbortController();
@@ -190,15 +175,7 @@ export function InvoiceConfirmModal({
           }),
         });
         if (!res.ok) throw new Error(String(res.status));
-        const url = URL.createObjectURL(await res.blob());
-        // A newer PDF replaces one that never finished loading.
-        if (pendingRef.current) URL.revokeObjectURL(pendingRef.current);
-        pendingRef.current = url;
-        if (!shownRef.current) {
-          promote(url); // the first one: nothing to keep visible, show it now
-        } else {
-          setPendingUrl(url);
-        }
+        setPdfData(await res.arrayBuffer());
       } catch (e) {
         if ((e as Error).name !== "AbortError") setPreviewFailed(true);
       } finally {
@@ -209,22 +186,7 @@ export function InvoiceConfirmModal({
       clearTimeout(timer);
       controller.abort();
     };
-  }, [loadingDefaults, bookingId, nameInput, dniInput, addressInput, extraConceptInput, noteInput, amountValue, promote]);
-
-  // Safety net: some browsers never fire the viewer's load event.
-  useEffect(() => {
-    if (!pendingUrl) return;
-    const t = setTimeout(() => promote(pendingUrl), PREVIEW_SWAP_FALLBACK_MS);
-    return () => clearTimeout(t);
-  }, [pendingUrl, promote]);
-
-  useEffect(
-    () => () => {
-      if (shownRef.current) URL.revokeObjectURL(shownRef.current);
-      if (pendingRef.current) URL.revokeObjectURL(pendingRef.current);
-    },
-    []
-  );
+  }, [loadingDefaults, bookingId, nameInput, dniInput, addressInput, extraConceptInput, noteInput, amountValue]);
 
   async function handleConfirm() {
     const email = emailInput.trim();
@@ -453,36 +415,11 @@ export function InvoiceConfirmModal({
               {previewLoading && <p className="text-[11.5px] text-ink-soft">{dict.previewUpdating}</p>}
             </div>
             {previewFailed && <p className="mb-2 text-[12px] text-error">{dict.previewError}</p>}
-            {previewUrl && (
-              <>
-                {/* Inline PDF viewers are unreliable on phones/tablets: there, a link opens it in a tab instead. */}
-                <div className="relative hidden min-h-0 w-full flex-1 lg:block">
-                  {/* Keyed by URL: when the pending PDF is promoted, its viewer is kept
-                      (no reload) and the old one is removed, so nothing flashes. */}
-                  {[previewUrl, pendingUrl].filter((u): u is string => !!u).map((url) => (
-                    <iframe
-                      key={url}
-                      src={`${url}#navpanes=0&zoom=100`}
-                      title={url === previewUrl ? dict.previewTitle : ""}
-                      aria-hidden={url !== previewUrl}
-                      tabIndex={url === previewUrl ? 0 : -1}
-                      onLoad={url === pendingUrl ? () => promote(url) : undefined}
-                      className={`absolute inset-0 h-full w-full rounded-lg border border-line bg-surface-2 ${
-                        url === previewUrl ? "" : "pointer-events-none opacity-0"
-                      }`}
-                    />
-                  ))}
-                </div>
-                <a
-                  href={previewUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-[13px] font-semibold text-brand hover:underline lg:hidden"
-                >
-                  {dict.previewOpenTab}
-                </a>
-              </>
-            )}
+            <PdfCanvasViewer
+              data={pdfData}
+              labels={{ zoomIn: dict.zoomInAria, zoomOut: dict.zoomOutAria, fit: dict.zoomFit }}
+              className="min-h-[360px] flex-1"
+            />
           </div>
         </div>
       </div>
