@@ -317,41 +317,32 @@ function RulePanel({
         )}
 
         <div className="flex flex-col gap-4">
-          <label className="flex flex-col gap-1">
-            <span className="text-[12.5px] font-semibold text-ink-soft">{dict.labelLabel}</span>
-            <input
-              value={label}
-              onChange={(e) => setLabel(e.target.value)}
-              placeholder={dict.labelPlaceholder}
-              className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[15px] text-ink"
-            />
-          </label>
+          <div className="rounded-xl border border-line p-4">
+            <label className="flex flex-col gap-1">
+              <span className="text-[12.5px] font-semibold text-ink-soft">{dict.labelLabel}</span>
+              <input
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                placeholder={dict.labelPlaceholder}
+                className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[15px] text-ink"
+              />
+            </label>
+          </div>
 
-          <label className="flex flex-col gap-1">
-            <span className="text-[12.5px] font-semibold text-ink-soft">{dict.typeLabel}</span>
-            <select
-              value={slotType}
-              onChange={(e) => setSlotType(e.target.value as SlotType)}
-              className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[15px] text-ink"
-            >
-              <option value="frequency">{dict.typeFrequency}</option>
-              <option value="custom">{dict.typeCustom}</option>
-            </select>
-          </label>
-
-          <div>
-            <p className="mb-1.5 text-[12.5px] font-semibold text-ink-soft">{dict.daysLabel}</p>
-            <div className="mb-2 flex gap-2">
-              <ToggleButton active={allDays} onClick={() => setAllDays(true)} label={dict.allDays} />
-              <ToggleButton active={!allDays} onClick={() => setAllDays(false)} label={dict.specificDays} />
-            </div>
-            {!allDays && (
-              <div className="flex flex-wrap gap-1.5">
-                {DAY_ORDER.map((d) => (
-                  <ChipButton key={d} active={days.includes(d)} onClick={() => toggleDay(d)} label={availabilityDict.weekdaysShort[d]} />
-                ))}
+          <div className="flex flex-col gap-4 rounded-xl border border-line p-4">
+            <div>
+              <p className="mb-1.5 text-[12.5px] font-semibold text-ink-soft">{dict.daysLabel}</p>
+              <div className="mb-2 flex gap-2">
+                <ToggleButton active={allDays} onClick={() => setAllDays(true)} label={dict.allDays} />
+                <ToggleButton active={!allDays} onClick={() => setAllDays(false)} label={dict.specificDays} />
               </div>
-            )}
+              {!allDays && (
+                <div className="flex flex-wrap gap-1.5">
+                  {DAY_ORDER.map((d) => (
+                    <ChipButton key={d} active={days.includes(d)} onClick={() => toggleDay(d)} label={availabilityDict.weekdaysShort[d]} />
+                  ))}
+                </div>
+              )}
           </div>
 
           <div>
@@ -376,104 +367,119 @@ function RulePanel({
               </div>
             )}
           </div>
+          </div>
 
-          {slotType === "frequency" ? (
-            <div className="flex flex-col gap-3">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <label className="flex flex-col gap-1">
-                  <span className="text-[12.5px] font-semibold text-ink-soft">{dict.startLabel}</span>
-                  <input
-                    type="text"
-                    value={rangeStart}
-                    onChange={(e) => setRangeStart(e.target.value)}
-                    onBlur={() => setRangeStart((v) => normalizeTime(v))}
-                    placeholder={dict.timePlaceholder}
-                    className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[14px] text-ink"
-                  />
-                </label>
-                <label className="flex flex-col gap-1">
-                  <span className="text-[12.5px] font-semibold text-ink-soft">{dict.endLabel}</span>
-                  <input
-                    type="text"
-                    value={rangeEnd}
-                    onChange={(e) => setRangeEnd(e.target.value)}
-                    onBlur={() => setRangeEnd((v) => normalizeTime(v))}
-                    placeholder={dict.timePlaceholder}
-                    className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[14px] text-ink"
-                  />
-                </label>
-                <label className="flex flex-col gap-1">
-                  <span className="text-[12.5px] font-semibold text-ink-soft">{dict.frequencyLabel}</span>
-                  <select
-                    value={frequencyMin}
-                    onChange={(e) => setFrequencyMin(Number(e.target.value))}
-                    className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[14px] text-ink"
-                  >
-                    {FREQUENCY_OPTIONS.map((n) => (
-                      <option key={n} value={n}>
-                        {dict.frequencyOptionTemplate.replace("{n}", String(n))}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-              <p className="text-[12px] text-ink-soft">{dict.frequencyHint}</p>
-              {rangeStart.trim() && rangeEnd.trim() && frequencyTimes === null && (
-                <p className="text-[12px] text-error">{dict.previewInvalid}</p>
-              )}
-              {frequencyTimes && frequencyTimes.length > 0 && (
-                <p className="text-[12.5px] text-ink">
-                  {dict.previewTemplate
-                    .replace("{n}", String(frequencyTimes.length))
-                    .replace(
-                      "{list}",
-                      frequencyTimes.length > 8
-                        ? `${frequencyTimes.slice(0, 6).join(", ")} … ${frequencyTimes[frequencyTimes.length - 1]}`
-                        : frequencyTimes.join(", ")
-                    )}
-                </p>
-              )}
-              {frequencyOutside && (
-                <p className="text-[11.5px] text-amber-600">⚠ {dict.outsideHoursNote}</p>
-              )}
-            </div>
-          ) : (
-          <div>
-            <p className="mb-1.5 text-[12.5px] font-semibold text-ink-soft">{dict.timesLabel}</p>
-            <p className="mb-2 text-[12px] text-ink-soft">{dict.timesHint}</p>
-            <div className="flex flex-col gap-2">
-              {times.map((t, i) => {
-                const outside = isTimeOutsideHours(t);
-                return (
-                  <div key={i} className="flex items-center gap-2">
+          <div className="flex flex-col gap-4 rounded-xl border border-line p-4">
+            <label className="flex flex-col gap-1">
+              <span className="text-[12.5px] font-semibold text-ink-soft">{dict.typeLabel}</span>
+              <select
+                value={slotType}
+                onChange={(e) => setSlotType(e.target.value as SlotType)}
+                className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[15px] text-ink"
+              >
+                <option value="frequency">{dict.typeFrequency}</option>
+                <option value="custom">{dict.typeCustom}</option>
+              </select>
+            </label>
+
+            {slotType === "frequency" ? (
+              <div className="flex flex-col gap-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <label className="flex flex-col gap-1">
+                    <span className="text-[12.5px] font-semibold text-ink-soft">{dict.startLabel}</span>
                     <input
                       type="text"
-                      value={t}
-                      onChange={(e) => handleTimeChange(i, e.target.value)}
-                      onBlur={() => handleTimeBlur(i)}
+                      value={rangeStart}
+                      onChange={(e) => setRangeStart(e.target.value)}
+                      onBlur={() => setRangeStart((v) => normalizeTime(v))}
                       placeholder={dict.timePlaceholder}
-                      className={`w-28 rounded-lg border bg-surface px-3 py-2 text-[14px] text-ink ${
-                        outside ? "border-amber-400" : "border-line"
-                      }`}
+                      className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[14px] text-ink"
                     />
-                    {outside && <span className="text-[11.5px] text-amber-600">⚠ {dict.outsideHoursNote}</span>}
-                    <button
-                      type="button"
-                      onClick={() => setTimes((ts) => ts.filter((_, idx) => idx !== i))}
-                      aria-label={dict.removeTimeAria}
-                      className="ml-auto grid h-7 w-7 place-items-center rounded-lg text-ink-soft hover:bg-surface-2"
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    <span className="text-[12.5px] font-semibold text-ink-soft">{dict.endLabel}</span>
+                    <input
+                      type="text"
+                      value={rangeEnd}
+                      onChange={(e) => setRangeEnd(e.target.value)}
+                      onBlur={() => setRangeEnd((v) => normalizeTime(v))}
+                      placeholder={dict.timePlaceholder}
+                      className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[14px] text-ink"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    <span className="text-[12.5px] font-semibold text-ink-soft">{dict.frequencyLabel}</span>
+                    <select
+                      value={frequencyMin}
+                      onChange={(e) => setFrequencyMin(Number(e.target.value))}
+                      className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-[14px] text-ink"
                     >
-                      <Icon name="x" size={13} />
-                    </button>
-                  </div>
-                );
-              })}
-              <Btn variant="outline" size="sm" onClick={() => setTimes((ts) => [...ts, ""])} className="self-start">
-                {dict.addTimeButton}
-              </Btn>
-            </div>
+                      {FREQUENCY_OPTIONS.map((n) => (
+                        <option key={n} value={n}>
+                          {dict.frequencyOptionTemplate.replace("{n}", String(n))}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <p className="text-[12px] text-ink-soft">{dict.frequencyHint}</p>
+                {rangeStart.trim() && rangeEnd.trim() && frequencyTimes === null && (
+                  <p className="text-[12px] text-error">{dict.previewInvalid}</p>
+                )}
+                {frequencyTimes && frequencyTimes.length > 0 && (
+                  <p className="text-[12.5px] text-ink">
+                    {dict.previewTemplate
+                      .replace("{n}", String(frequencyTimes.length))
+                      .replace(
+                        "{list}",
+                        frequencyTimes.length > 8
+                          ? `${frequencyTimes.slice(0, 6).join(", ")} … ${frequencyTimes[frequencyTimes.length - 1]}`
+                          : frequencyTimes.join(", ")
+                      )}
+                  </p>
+                )}
+                {frequencyOutside && (
+                  <p className="text-[11.5px] text-amber-600">⚠ {dict.outsideHoursNote}</p>
+                )}
+              </div>
+            ) : (
+            <div>
+              <p className="mb-1.5 text-[12.5px] font-semibold text-ink-soft">{dict.timesLabel}</p>
+              <p className="mb-2 text-[12px] text-ink-soft">{dict.timesHint}</p>
+              <div className="flex flex-col gap-2">
+                {times.map((t, i) => {
+                  const outside = isTimeOutsideHours(t);
+                  return (
+                    <div key={i} className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={t}
+                        onChange={(e) => handleTimeChange(i, e.target.value)}
+                        onBlur={() => handleTimeBlur(i)}
+                        placeholder={dict.timePlaceholder}
+                        className={`w-28 rounded-lg border bg-surface px-3 py-2 text-[14px] text-ink ${
+                          outside ? "border-amber-400" : "border-line"
+                        }`}
+                      />
+                      {outside && <span className="text-[11.5px] text-amber-600">⚠ {dict.outsideHoursNote}</span>}
+                      <button
+                        type="button"
+                        onClick={() => setTimes((ts) => ts.filter((_, idx) => idx !== i))}
+                        aria-label={dict.removeTimeAria}
+                        className="ml-auto grid h-7 w-7 place-items-center rounded-lg text-ink-soft hover:bg-surface-2"
+                      >
+                        <Icon name="x" size={13} />
+                      </button>
+                    </div>
+                  );
+                })}
+                <Btn variant="outline" size="sm" onClick={() => setTimes((ts) => [...ts, ""])} className="self-start">
+                  {dict.addTimeButton}
+                </Btn>
+              </div>
           </div>
           )}
+          </div>
         </div>
 
         <div className="mt-5 flex justify-end gap-2">
